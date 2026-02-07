@@ -21,8 +21,8 @@ Agents invoke Python scripts in `scripts/` which use the Anthropic API. Outputs 
 data/           — Drop source documents here (PDFs, emails, Excel)
 output/         — Agent outputs (timestamped markdown files)
 scripts/        — Python runner scripts called by agents
-lib/prompts/    — LLM system prompts (one file per agent)
-lib/utils/      — Shared utilities (API client, file extraction, output writer)
+src/prompts/    — LLM system prompts (one file per agent)
+src/utils/      — Shared utilities (API client, file extraction, output writer)
 .claude/agents/ — Claude Code subagent definitions
 ```
 

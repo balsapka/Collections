@@ -12,9 +12,9 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib.utils.llm_client import call_llm
-from lib.utils.output_writer import write_output, load_all_outputs
-from lib.prompts.synthesizer_system import SYNTHESIZER_SYSTEM
+from src.utils.llm_client import call_llm
+from src.utils.output_writer import write_output, load_all_outputs
+from src.prompts.synthesizer_system import SYNTHESIZER_SYSTEM
 
 
 def run(model: str | None = None) -> str:

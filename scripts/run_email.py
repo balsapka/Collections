@@ -13,10 +13,10 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib.utils.file_extract import extract_text
-from lib.utils.llm_client import call_llm
-from lib.utils.output_writer import write_output
-from lib.prompts.email_system import EMAIL_SYSTEM
+from src.utils.file_extract import extract_text
+from src.utils.llm_client import call_llm
+from src.utils.output_writer import write_output
+from src.prompts.email_system import EMAIL_SYSTEM
 
 
 def run(email_text: str, model: str | None = None) -> str:

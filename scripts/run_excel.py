@@ -13,10 +13,10 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib.utils.file_extract import get_excel_profile, extract_text
-from lib.utils.llm_client import call_llm
-from lib.utils.output_writer import write_output
-from lib.prompts.excel_system import EXCEL_SYSTEM
+from src.utils.file_extract import get_excel_profile, extract_text
+from src.utils.llm_client import call_llm
+from src.utils.output_writer import write_output
+from src.prompts.excel_system import EXCEL_SYSTEM
 
 
 def run(file_path: str, model: str | None = None) -> str:

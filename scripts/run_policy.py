@@ -12,10 +12,10 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from lib.utils.file_extract import extract_text
-from lib.utils.llm_client import call_llm
-from lib.utils.output_writer import write_output
-from lib.prompts.policy_system import PASS1_EXTRACT, PASS2_ANALYZE, PASS3_QUESTIONS
+from src.utils.file_extract import extract_text
+from src.utils.llm_client import call_llm
+from src.utils.output_writer import write_output
+from src.prompts.policy_system import PASS1_EXTRACT, PASS2_ANALYZE, PASS3_QUESTIONS
 
 
 def run_pass1(document_text: str, model: str | None = None) -> str:
@@ -82,7 +82,7 @@ def main():
 
     if 2 in passes:
         if p1 is None:
-            from lib.utils.output_writer import load_all_outputs
+            from src.utils.output_writer import load_all_outputs
             prev = load_all_outputs("policy_extract")
             if prev:
                 p1 = prev[-1]["content"]
@@ -95,7 +95,7 @@ def main():
 
     if 3 in passes:
         if p1 is None or p2 is None:
-            from lib.utils.output_writer import load_all_outputs
+            from src.utils.output_writer import load_all_outputs
             if p1 is None:
                 prev = load_all_outputs("policy_extract")
                 p1 = prev[-1]["content"] if prev else None
