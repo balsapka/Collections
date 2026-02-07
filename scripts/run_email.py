@@ -36,6 +36,7 @@ def main():
     parser.add_argument("file", nargs="?", help="Path to email file (.eml, .txt)")
     parser.add_argument("--text", help="Paste email content directly")
     parser.add_argument("--model", default=None, help="Override Claude model")
+    parser.add_argument("--pdf", action="store_true", help="Also export output as PDF")
     args = parser.parse_args()
 
     if args.text:
@@ -55,7 +56,7 @@ def main():
         sys.exit(1)
 
     result = run(email_text, model=args.model)
-    path = write_output("email_summary", result, source)
+    path = write_output("email_summary", result, source, pdf=args.pdf)
     print(f"  -> Saved: {path}")
     print("Done.")
 

@@ -48,6 +48,7 @@ def main():
     parser = argparse.ArgumentParser(description="Excel/Data File Profiler")
     parser.add_argument("file", help="Path to Excel (.xlsx/.xls) or CSV file")
     parser.add_argument("--model", default=None, help="Override Claude model")
+    parser.add_argument("--pdf", action="store_true", help="Also export output as PDF")
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
@@ -55,7 +56,7 @@ def main():
         sys.exit(1)
 
     result = run(args.file, model=args.model)
-    path = write_output("data_profile", result, args.file)
+    path = write_output("data_profile", result, args.file, pdf=args.pdf)
     print(f"  -> Saved: {path}")
     print("Done.")
 

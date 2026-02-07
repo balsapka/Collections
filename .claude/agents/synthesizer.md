@@ -18,13 +18,15 @@ ls -la output/
 
 2. **Run the synthesizer**:
 ```bash
-python3 scripts/run_synthesizer.py
+python3 scripts/run_synthesizer.py [--pdf]
 ```
 
 For higher quality synthesis on complex inputs:
 ```bash
-python3 scripts/run_synthesizer.py --model claude-opus-4-5-20250514
+python3 scripts/run_synthesizer.py --model claude-opus-4-5-20250514 [--pdf]
 ```
+
+Add `--pdf` to also export the brief as a PDF file.
 
 3. **Read the output** from `output/project_brief_*.md`
 4. **Present the brief** to the user with highlights

@@ -56,10 +56,11 @@ def run(model: str | None = None) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Synthesizer — Final Brief Generator")
     parser.add_argument("--model", default=None, help="Override Claude model")
+    parser.add_argument("--pdf", action="store_true", help="Also export output as PDF")
     args = parser.parse_args()
 
     result = run(model=args.model)
-    path = write_output("project_brief", result)
+    path = write_output("project_brief", result, pdf=args.pdf)
     print(f"  -> Saved: {path}")
     print("Done.")
 

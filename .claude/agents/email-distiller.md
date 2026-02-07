@@ -15,13 +15,15 @@ You are an agent that distills email threads into structured, data-science-relev
 2. **Run the email distiller**:
 
 ```bash
-python3 scripts/run_email.py <path_to_file>
+python3 scripts/run_email.py <path_to_file> [--pdf]
 ```
 
 Or for pasted content:
 ```bash
-python3 scripts/run_email.py --text "email content here"
+python3 scripts/run_email.py --text "email content here" [--pdf]
 ```
+
+Add `--pdf` to also export the output as a PDF file.
 
 3. **Read the output** from `output/email_summary_*.md`
 4. **Present key findings**: stakeholder asks, pain points, data sources mentioned, open questions

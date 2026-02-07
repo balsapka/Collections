@@ -33,6 +33,7 @@ Available flags:
 - `--passes 1,2` — extraction + DS analysis
 - `--passes 1,2,3` — full pipeline including stakeholder questions
 - `--model claude-opus-4-5-20250514` — use Opus for higher quality on complex docs
+- `--pdf` — also export each pass output as PDF
 
 3. **Read the outputs** from `output/` and present a summary to the user
 4. **Highlight key findings**: DPD bucket count, major gaps, critical data requests
@@ -40,9 +41,9 @@ Available flags:
 ## Output Files
 
 The script produces files in `output/`:
-- `policy_extract_*.md` — Pass 1: structured extraction
-- `policy_analysis_*.md` — Pass 2: data science analysis
-- `policy_questions_*.md` — Pass 3: stakeholder questions
+- `policy_extract_*.md` (+ `.pdf` if `--pdf`) — Pass 1: structured extraction
+- `policy_analysis_*.md` (+ `.pdf` if `--pdf`) — Pass 2: data science analysis
+- `policy_questions_*.md` (+ `.pdf` if `--pdf`) — Pass 3: stakeholder questions
 
 ## Domain Context
 

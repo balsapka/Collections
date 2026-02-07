@@ -3,7 +3,7 @@ Runner script for Policy Document Analyzer.
 Called by the Claude Code policy-analyzer agent.
 
 Usage:
-    python3 scripts/run_policy.py <path_to_file> [--passes 1,2,3] [--model MODEL]
+    python3 scripts/run_policy.py <path_to_file> [--passes 1,2,3] [--model MODEL] [--pdf]
 """
 
 import argparse
@@ -61,6 +61,7 @@ def main():
     parser.add_argument("file", help="Path to the policy document (PDF, DOCX, TXT)")
     parser.add_argument("--passes", default="1,2,3", help="Comma-separated pass numbers (default: 1,2,3)")
     parser.add_argument("--model", default=None, help="Override Claude model")
+    parser.add_argument("--pdf", action="store_true", help="Also export output as PDF")
     args = parser.parse_args()
 
     passes = [int(p.strip()) for p in args.passes.split(",")]
@@ -77,7 +78,7 @@ def main():
 
     if 1 in passes:
         p1 = run_pass1(doc_text, model=args.model)
-        path = write_output("policy_extract", p1, args.file)
+        path = write_output("policy_extract", p1, args.file, pdf=args.pdf)
         print(f"  -> Saved: {path}")
 
     if 2 in passes:
@@ -90,7 +91,7 @@ def main():
                 print("ERROR: Pass 2 requires Pass 1 output. Run pass 1 first.")
                 sys.exit(1)
         p2 = run_pass2(doc_text, p1, model=args.model)
-        path = write_output("policy_analysis", p2, args.file)
+        path = write_output("policy_analysis", p2, args.file, pdf=args.pdf)
         print(f"  -> Saved: {path}")
 
     if 3 in passes:
@@ -106,7 +107,7 @@ def main():
                 print("ERROR: Pass 3 requires Pass 1+2 outputs. Skipping.")
                 sys.exit(1)
         p3 = run_pass3(p1, p2, model=args.model)
-        path = write_output("policy_questions", p3, args.file)
+        path = write_output("policy_questions", p3, args.file, pdf=args.pdf)
         print(f"  -> Saved: {path}")
 
     print("\nDone. Outputs saved to output/ directory.")

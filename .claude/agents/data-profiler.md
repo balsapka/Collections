@@ -15,8 +15,10 @@ You are an agent that profiles data files for a credit risk modeling project, as
 2. **Run the data profiler**:
 
 ```bash
-python3 scripts/run_excel.py <path_to_file>
+python3 scripts/run_excel.py <path_to_file> [--pdf]
 ```
+
+Add `--pdf` to also export the output as a PDF file.
 
 3. **Read the output** from `output/data_profile_*.md`
 4. **Present key findings**: schema overview, feature potential, quality issues, gaps
