@@ -26,6 +26,7 @@ def run(model: str | None = None) -> str:
         ("policy_analysis", "POLICY ANALYSIS REPORTS"),
         ("policy_questions", "STAKEHOLDER QUESTIONS"),
         ("email_summary", "EMAIL THREAD SUMMARIES"),
+        ("notes_summary", "MEETING/DISCUSSION NOTES"),
         ("data_profile", "DATA PROFILES"),
     ]:
         docs = load_all_outputs(agent_prefix)
