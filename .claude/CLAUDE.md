@@ -6,31 +6,35 @@ This project helps a data science team working with a Middle East bank's **Group
 
 ## How This Repo Works
 
-Raw source documents (policy PDFs, email threads, Excel data files) are placed in `data/`. Four Claude Code agents process them:
+Raw source documents (policy PDFs, email threads, Excel data files, meeting notes) are placed in `data/`. Claude Code processes them directly via agents and slash commands. All outputs are saved as timestamped markdown files in `output/`.
+
+### Agents (subagents Claude Code can delegate to)
 
 1. **policy-analyzer** — Multi-pass extraction + analysis of collections policy docs (primary agent)
 2. **email-distiller** — Summarizes stakeholder email threads
 3. **data-profiler** — Profiles Excel/CSV files for ML readiness
-4. **synthesizer** — Combines all outputs into a single project brief
+4. **notes-summarizer** — Distills free-form meeting/discussion notes into insights
+5. **synthesizer** — Combines all outputs into a single project brief
 
-Agents invoke Python scripts in `scripts/` which use the Anthropic API. Outputs go to `output/`.
+### Slash Commands
+
+| Command | What it does |
+|---------|-------------|
+| `/project:process <file>` | Process a single file (auto-detects type, routes to correct agent) |
+| `/project:batch` | Process all unprocessed files in `data/` |
+| `/project:status` | Show pipeline dashboard — what's processed, what's pending, what's stale |
+| `/project:brief` | Generate/refresh the consolidated Data Science Project Brief |
+| `/project:context` | Load all project context (use at start of new sessions) |
+| `/project:gaps` | Find contradictions and gaps across all processed documents |
 
 ## Directory Layout
 
 ```
-data/           — Drop source documents here (PDFs, emails, Excel)
-output/         — Agent outputs (timestamped markdown files)
-scripts/        — Python runner scripts called by agents
-src/prompts/    — LLM system prompts (one file per agent)
-src/utils/      — Shared utilities (API client, file extraction, output writer)
-.claude/agents/ — Claude Code subagent definitions
+data/              — Drop source documents here (PDFs, emails, Excel, notes)
+output/            — Agent outputs (timestamped markdown files)
+.claude/agents/    — Claude Code subagent definitions
+.claude/commands/  — Custom slash commands
 ```
-
-## Environment Requirements
-
-- `ANTHROPIC_API_KEY` must be set in environment
-- `CLAUDE_MODEL` optionally overrides default model (default: claude-sonnet-4-5-20250514)
-- Python dependencies: `pip install -r requirements.txt`
 
 ## Domain Terminology
 
@@ -40,3 +44,10 @@ src/utils/      — Shared utilities (API client, file extraction, output writer
 - **Roll**: When a customer moves from one DPD bucket to a worse one
 - **Dry data**: Buckets where behavioral signals disappear (card blocked, no activity)
 - **Murabaha/Tawarruq/Ijarah**: Islamic finance product types with distinct default handling
+- **SAMA/CBUAE/CBB**: Central bank regulators (Saudi, UAE, Bahrain)
+
+## Output Naming Convention
+
+All outputs follow: `{type}_{source_filename}_{YYYYMMDD_HHMMSS}.md`
+
+Types: `policy_extract`, `policy_analysis`, `policy_questions`, `email_summary`, `notes_summary`, `data_profile`, `project_brief`, `gap_analysis`
