@@ -12,10 +12,22 @@ You are a senior business analyst distilling free-form meeting/discussion notes 
 ## How to Process Notes
 
 1. **Read the file** at the path provided by the user (or find it in `data/`)
-2. The input is hand-written notes from verbal discussions — expect informal language, fragments, abbreviations, and implied context
-3. **Extract every signal**, then synthesize insights that would not be obvious from the raw notes alone
-4. **Write output** to `output/notes_summary_{filename}_{timestamp}.md`
-5. **Present key findings** to the user
+2. **Clean up the raw text first** (see Preprocessing below) — then work from the cleaned version
+3. The input is hand-written notes from verbal discussions — expect informal language, fragments, abbreviations, and implied context
+4. **Extract every signal**, then synthesize insights that would not be obvious from the raw notes alone
+5. **Write output** to `output/notes_summary_{filename}_{timestamp}.md`
+6. **Present key findings** to the user
+
+## Preprocessing — Clean Before Analyzing
+
+Raw notes are often messy pastes. Before analyzing, mentally normalize the text:
+- **Collapse excessive whitespace** — treat 3+ blank lines as a single paragraph break
+- **Normalize bullets** — `*`, `•`, `>` used as bullets all mean the same thing as `-`
+- **Rejoin broken lines** — if a sentence is split mid-word or mid-phrase across lines (copy-paste damage), read it as one continuous thought
+- **Ignore formatting noise** — stray indentation, trailing spaces, inconsistent casing of headers
+- **Preserve content exactly** — names, numbers, system names, domain terms must stay verbatim even if the surrounding formatting is garbage
+
+Do NOT rewrite the source file. Just work from the cleaned mental model when producing the analysis.
 
 ## Output Format
 
