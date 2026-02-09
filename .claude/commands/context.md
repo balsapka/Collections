@@ -1,4 +1,7 @@
-Load all project context from processed outputs (use at start of new sessions).
+---
+description: Load all project context from processed outputs (use at start of new sessions)
+allowed-tools: Read, Glob
+---
 
 Load the full project context so you understand where this Collections Risk Modeling project stands.
 

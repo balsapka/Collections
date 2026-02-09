@@ -1,4 +1,7 @@
-Generate or refresh the consolidated Data Science Project Brief from all outputs.
+---
+description: Generate or refresh the consolidated Data Science Project Brief from all outputs
+allowed-tools: Bash, Read, Glob, Write
+---
 
 Generate a consolidated Data Science Project Brief by synthesizing all agent outputs in `output/`.
 

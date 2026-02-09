@@ -1,4 +1,7 @@
-Process all unprocessed source files in data/.
+---
+description: Process all unprocessed source files in data/
+allowed-tools: Bash, Read, Glob, Grep, Write
+---
 
 Batch-process all source documents in `data/` that haven't been analyzed yet.
 

@@ -1,4 +1,7 @@
-Show pipeline status — what's been processed, what's pending, what's stale.
+---
+description: Show pipeline status — what's been processed, what's pending, what's stale
+allowed-tools: Bash, Read, Glob
+---
 
 Show the current state of the Collections document processing pipeline.
 
