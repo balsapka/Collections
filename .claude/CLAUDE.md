@@ -12,9 +12,10 @@ Raw source documents (policy PDFs, email threads, Excel data files, meeting note
 
 1. **policy-analyzer** — Multi-pass extraction + analysis of collections policy docs (primary agent)
 2. **email-distiller** — Summarizes stakeholder email threads
-3. **data-profiler** — Profiles Excel/CSV files for ML readiness
-4. **notes-summarizer** — Distills free-form meeting/discussion notes into insights
-5. **synthesizer** — Combines all outputs into a single project brief
+3. **data-profiler** — Profiles Excel/CSV data files for ML readiness
+4. **qna-extractor** — Distills stakeholder Q&A sheets (Dimension/Question/Response/Clarification format)
+5. **notes-summarizer** — Distills free-form meeting/discussion notes into insights
+6. **synthesizer** — Combines all outputs into a single project brief
 
 ### Slash Commands
 
@@ -50,4 +51,4 @@ output/            — Agent outputs (timestamped markdown files)
 
 All outputs follow: `{type}_{source_filename}_{YYYYMMDD_HHMMSS}.md`
 
-Types: `policy_extract`, `policy_analysis`, `policy_questions`, `email_summary`, `notes_summary`, `data_profile`, `project_brief`, `gap_analysis`
+Types: `policy_extract`, `policy_analysis`, `policy_questions`, `email_summary`, `notes_summary`, `qna_extract`, `data_profile`, `project_brief`, `gap_analysis`

@@ -10,12 +10,12 @@ Show the current state of the Collections document processing pipeline.
 List all files in `data/` with their type, size, and last-modified date. Classify each by the agent that would process it:
 - `.pdf`/`.docx` → Policy
 - `.eml` → Email
-- `.xlsx`/`.csv` → Data
+- `.xlsx`/`.csv` → Data or QnA (check headers for Dimension/Question/Response/Clarification pattern)
 - `.md`/`.txt` → Notes
 
 ## 2. Processed Outputs
 
-List all files in `output/` grouped by type (policy_extract, policy_analysis, email_summary, data_profile, notes_summary, project_brief, gap_analysis). For each, show filename, timestamp, and size.
+List all files in `output/` grouped by type (policy_extract, policy_analysis, email_summary, data_profile, qna_extract, notes_summary, project_brief, gap_analysis). For each, show filename, timestamp, and size.
 
 ## 3. Coverage Check
 

@@ -13,6 +13,7 @@ Read every markdown file in `output/` (excluding existing `project_brief_*.md` f
 - `email_summary_*` — Email thread summaries
 - `notes_summary_*` — Meeting notes summaries
 - `data_profile_*` — Data file profiles
+- `qna_extract_*` — Stakeholder Q&A extractions
 - `gap_analysis_*` — Previous gap analyses (if any)
 
 If no outputs exist, tell the user to process documents first with `/project:batch` or `/project:process`.
@@ -57,7 +58,7 @@ Concrete actions in priority order.
 - Resolve contradictions between sources — note them if unresolvable
 - Be opinionated — recommend approaches, don't just list options
 - Keep it under 2000 words — this is a brief, not a thesis
-- Cross-reference sources: "(per policy doc)", "(per email thread)", "(per data profile)", "(per meeting notes)"
+- Cross-reference sources: "(per policy doc)", "(per email thread)", "(per data profile)", "(per QnA)", "(per meeting notes)"
 
 ## Step 3: Write output
 

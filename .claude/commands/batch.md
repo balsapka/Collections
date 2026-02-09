@@ -10,7 +10,7 @@ Batch-process all source documents in `data/` that haven't been analyzed yet.
 List all files in `data/` (excluding `.gitkeep`). For each file, note the extension and what agent type it maps to:
 - `.pdf`, `.docx` → policy-analyzer
 - `.eml` → email-distiller
-- `.xlsx`, `.csv` → data-profiler
+- `.xlsx`, `.csv` → data-profiler OR qna-extractor (read headers to detect QnA pattern — columns like "Dimension", "Question", "Response", "Clarification")
 - `.md`, `.txt` → notes-summarizer
 
 ## Step 2: Check what's already processed

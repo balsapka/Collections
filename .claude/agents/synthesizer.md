@@ -14,7 +14,7 @@ Your audience is fellow data scientists who need one consolidated document to un
 ## How to Synthesize
 
 1. **Read all markdown files** in `output/` (excluding existing `project_brief_*.md` and `gap_analysis_*.md`)
-2. **Group by type**: policy extractions, policy analyses, policy questions, email summaries, notes summaries, data profiles
+2. **Group by type**: policy extractions, policy analyses, policy questions, email summaries, notes summaries, QnA extractions, data profiles
 3. **Synthesize** into the brief format below
 4. **Write output** to `output/project_brief_{timestamp}.md`
 5. **Present the brief** to the user
@@ -59,7 +59,7 @@ Concrete actions in priority order.
 - Resolve contradictions between sources — note if unresolvable
 - Be opinionated — recommend approaches, don't just list options
 - Keep under 2000 words
-- Cross-reference: "(per policy doc)", "(per email thread)", "(per data profile)", "(per meeting notes)"
+- Cross-reference: "(per policy doc)", "(per email thread)", "(per data profile)", "(per QnA)", "(per meeting notes)"
 
 ## When to Use
 

@@ -27,8 +27,15 @@ Cross-reference what the policy analysis says is needed for modeling against wha
 
 ### Unanswered Questions
 Questions raised in one output that another output might answer (or explicitly doesn't):
-- Stakeholder questions from policy Pass 3 that email threads or meeting notes address
-- Data gaps flagged in profiles that meeting notes mention being "in progress"
+- Stakeholder questions from policy Pass 3 that email threads, QnA sheets, or meeting notes address
+- Data gaps flagged in profiles that meeting notes or QnA responses mention being "in progress"
+- Questions in QnA sheets that remain unanswered and are blocking
+
+### QnA vs. Other Sources
+If `qna_extract_*` outputs exist, cross-reference them specifically:
+- Do QnA responses confirm or contradict policy rules?
+- Do QnA responses close gaps flagged in data profiles?
+- Are there QnA answers that conflict with what was said in emails or meeting notes?
 
 ### Coverage Gaps
 - Products mentioned in policy (credit cards, personal loans, Murabaha, etc.) that no data file covers
