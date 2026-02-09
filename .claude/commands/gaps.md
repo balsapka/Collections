@@ -1,7 +1,4 @@
----
-description: Find contradictions, gaps, and cross-document issues across all processed outputs
-allowed-tools: Bash, Read, Glob, Grep, Write
----
+Find contradictions, gaps, and cross-document issues across all processed outputs.
 
 Perform a cross-document gap and contradiction analysis across all agent outputs.
 

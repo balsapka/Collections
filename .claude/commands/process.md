@@ -1,8 +1,5 @@
----
-description: Process a single source document (auto-detects type and routes to correct analysis)
-argument-hint: file-path
-allowed-tools: Bash, Read, Glob, Grep, Write
----
+Process a single source document (auto-detects type and routes to correct analysis).
+Argument: file path.
 
 Process the file at `$ARGUMENTS` for the Collections Risk Modeling project.
 
