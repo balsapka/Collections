@@ -12,8 +12,9 @@ Two table archetypes are supported:
 * **SCD2 / effective-dated** ``(account_id, effective_start_date,
   effective_end_date, date_modified, ...)`` -- the active record at an
   observation date is the one whose half-open interval ``[start, end)`` contains
-  it; ``date_modified`` versions (restatements) are de-duplicated by keeping the
-  latest known correction.
+  it. Selection is always point-in-time-correct: ``date_modified`` corrections
+  booked after the observation date are ignored, and the latest remaining version
+  wins (no future-restatement leakage).
 
 All SCD2 tables in this estate share the same date columns and use a sentinel
 ``effective_end_date`` of ``2100-01-01`` for still-open records, so those
@@ -111,22 +112,21 @@ def active_as_of(
     df: DataFrame,
     observation_date: DateLike,
     schema: Scd2Schema = Scd2Schema(),
-    knowledge_date: Optional[DateLike] = None,
 ) -> DataFrame:
     """Return exactly one active row per key, valid at ``observation_date``.
 
+    Point-in-time-correct and leakage-free by construction:
+
     Validity (default half-open):  ``eff_start <= obs < eff_end``.
-    Restatement:                   among valid rows per key, keep the latest
-                                   ``date_modified``.
+    Knowledge cutoff (always on):  ``date_modified <= obs`` -- corrections booked
+                                   after the observation date are never seen.
+    Restatement:                   among the remaining rows per key, keep the
+                                   latest ``date_modified``.
 
     Args:
         df: A single SCD2 source table.
         observation_date: ``'yyyy-MM-dd'`` string, or a Column.
         schema: Column/interval contract; estate defaults usually suffice.
-        knowledge_date: If given, only consider corrections issued on/before this
-            date (``date_modified <= knowledge_date``). Pass the observation date
-            to build point-in-time-correct rows with **no future leakage** -- the
-            right choice for model training sets.
 
     Returns:
         One row per ``schema.key`` (keys with no covering interval are absent).
@@ -134,10 +134,10 @@ def active_as_of(
     obs = _as_date(observation_date)
     start, end = F.col(schema.eff_start), F.col(schema.eff_end)
 
-    candidates = df.where((start <= obs) & _end_after(end, obs, schema))
-
-    if knowledge_date is not None:
-        candidates = candidates.where(F.col(schema.modified) <= _as_date(knowledge_date))
+    # Valid at obs AND only corrections known by then (no future leakage).
+    candidates = df.where(
+        (start <= obs) & _end_after(end, obs, schema) & (F.col(schema.modified) <= obs)
+    )
 
     w = Window.partitionBy(schema.key).orderBy(*_dedup_order(schema))
     return (
@@ -155,11 +155,14 @@ def prefilter_scd2(
     spine: DataFrame,
     schema: Scd2Schema = Scd2Schema(),
     obs_col: str = "observation_date",
-    respect_knowledge_time: bool = True,
     broadcast_dates: bool = True,
     broadcast_accounts: bool = False,
 ) -> DataFrame:
     """Reduce a billion-row SCD2 table to one active row per spine pair.
+
+    Selection is always point-in-time-correct: corrections booked after the
+    observation date (``date_modified > observation_date``) are never used, so
+    staged rows are leakage-free.
 
     Args:
         df: SCD2 source table.
@@ -167,9 +170,6 @@ def prefilter_scd2(
             ``schema.key`` and ``obs_col``).
         schema: Column/interval contract.
         obs_col: Observation-date column name in ``spine``.
-        respect_knowledge_time: Drop corrections booked *after* the observation
-            date (``date_modified <= observation_date``). Keep ``True`` for
-            point-in-time-correct, leakage-free staging.
         broadcast_dates: Broadcast the tiny distinct-observation-date set (the
             key to turning the interval join into a bounded explode). Leave on.
         broadcast_accounts: Broadcast the distinct-account set in the step-0
@@ -196,8 +196,8 @@ def prefilter_scd2(
     od = F.broadcast(obs_dates) if broadcast_dates else obs_dates
     obs = F.col(obs_col)
     paired = df.join(od, (start <= obs) & _end_after(end, obs, schema), "inner")
-    if respect_knowledge_time:
-        paired = paired.where(F.col(schema.modified) <= obs)
+    # Always drop corrections booked after the observation date (no leakage).
+    paired = paired.where(F.col(schema.modified) <= obs)
 
     # 3. restatement dedup -> one row per (key, observation_date).
     w = Window.partitionBy(schema.key, obs_col).orderBy(*_dedup_order(schema))
@@ -303,7 +303,6 @@ def stage_scd2_table(
     spine: DataFrame,
     schema: Optional[Scd2Schema] = None,
     obs_col: str = "observation_date",
-    respect_knowledge_time: bool = True,
     broadcast_accounts: bool = False,
 ) -> DataFrame:
     """Kedro node: stage one SCD2 source table against the spine.
@@ -317,7 +316,6 @@ def stage_scd2_table(
         spine,
         schema=schema,
         obs_col=obs_col,
-        respect_knowledge_time=respect_knowledge_time,
         broadcast_accounts=broadcast_accounts,
     )
     return out.repartition(F.col(obs_col))

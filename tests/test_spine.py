@@ -88,13 +88,13 @@ def test_restatement_latest_modified_wins(spark):
     assert len(out) == 1 and out[0]["limit"] == 150
 
 
-def test_knowledge_date_blocks_future_restatement(spark):
-    # A correction booked after the observation date must not leak in.
+def test_active_as_of_blocks_future_restatement(spark):
+    # A correction booked after the observation date must not leak in (always on).
     df = _scd2(spark, [
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-01-01", 100),
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-09-01", 999),  # future correction
     ])
-    out = active_as_of(df, "2025-04-01", knowledge_date="2025-04-01").collect()
+    out = active_as_of(df, "2025-04-01").collect()
     assert len(out) == 1 and out[0]["limit"] == 100
 
 
@@ -119,13 +119,13 @@ def test_prefilter_scd2_grid_and_population_filter(spark):
     }
 
 
-def test_prefilter_scd2_respects_knowledge_time(spark):
+def test_prefilter_scd2_blocks_future_restatement(spark):
     df = _scd2(spark, [
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-01-01", 100),
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-08-01", 999),  # booked after obs
     ])
     spine = build_spine(spark.createDataFrame([("A",)], ["account_id"]), ["2025-03-31"])
-    rows = prefilter_scd2(df, spine, respect_knowledge_time=True).collect()
+    rows = prefilter_scd2(df, spine).collect()
     assert len(rows) == 1 and rows[0]["limit"] == 100
 
 

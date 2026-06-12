@@ -15,9 +15,10 @@ never transform the full universe.
 - **SCD2 tables** `(account_id, effective_start_date, effective_end_date,
   date_modified, ...)` — the active record is the one whose half-open interval
   `[start, end)` contains the observation date; `date_modified` restatements are
-  de-duplicated by keeping the latest known correction. Open records use the
-  estate-wide sentinel `effective_end_date = 2100-01-01`, baked into
-  `Scd2Schema`'s defaults.
+  de-duplicated by keeping the latest correction known *as of the observation
+  date* (corrections booked later are never used — always point-in-time-correct,
+  no future leakage). Open records use the estate-wide sentinel
+  `effective_end_date = 2100-01-01`, baked into `Scd2Schema`'s defaults.
 
 ## Reduction pipeline
 
@@ -44,14 +45,15 @@ balance = prefilter_daily(raw_balances, spine)              # exact snapshot mat
 score   = prefilter_daily(raw_scores, spine, asof=True, lookback_days=45)
 
 # single-date point-in-time, leakage-free (no future restatements)
-snap = active_as_of(raw_limits, "2026-01-31", knowledge_date="2026-01-31")
+snap = active_as_of(raw_limits, "2026-01-31")
 ```
 
 ### Leakage / point-in-time correctness
 
-`prefilter_scd2(..., respect_knowledge_time=True)` (default) drops corrections
-booked *after* the observation date. Keep it on for training-set staging so a row
-reflects only what was known as of `observation_date`.
+Both `prefilter_scd2` and `active_as_of` **always** drop corrections booked
+*after* the observation date (`date_modified <= observation_date`). This is not
+optional — a staged row reflects only what was known as of its `observation_date`,
+so training sets are leakage-free by construction.
 
 ## Kedro wiring
 
