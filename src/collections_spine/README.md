@@ -119,12 +119,26 @@ node(partial(stage_daily_table, asof=True, lookback_days=45),
 
 ## DLQ contract spine (`nodes/spine_builders.py`)
 
-Selectivity-first build of `(contract_idt, observation_date)` for contracts in DLQ
-buckets `[dlq_min, dlq_max]`, over a billion-row SCD2 `contract` table (latest
-`record_date_from`-wins; `record_date_to` always the `2100-01-01` sentinel) and a
-billion-row daily `billing` table partitioned on `edp_load_date`.
+Selectivity-first rebuild of the old `build_contract_spine`. Final dataset:
+distinct `(contract_idt, observation_date, cif_id, dlq_bucket_from_hist)`, over a
+billion-row SCD2 `contract` table (latest `record_date_from`-wins; `record_date_to`
+always the `2100-01-01` sentinel) and a billion-row daily `billing` table
+partitioned on `edp_load_date`.
 
-Provided as ready-to-run Kedro files:
+Progressive narrowing, each stage a persisted node:
+
+```
+slim_contract -> dlq_candidate_ids -> build_billing_spine -> contract_pit
+  -> contract_dlq ──┬─> dlq_spine ─────────────> stage_contract_attribute ─┐
+                    └─> enrich_product ──────────────────> apply_collateral ┘
+                          (product scope)                   (collateral scope)
+                              -> build_client_spine -> stage_client
+                              -> finalize_contract_spine  (attach cif_id) => contract_spine
+```
+
+`stage_contract_attribute` / `stage_client` call your existing `_stg_ca.build` /
+`_stg_client.build` on the narrowed spine (adjust the imports in
+`nodes/spine_builders.py`). Provided as ready-to-run Kedro files:
 
 - pipeline: [`pipelines/dlq_spine/pipeline.py`](pipelines/dlq_spine/pipeline.py)
 - datasets: [`conf/base/catalog.yml`](../../conf/base/catalog.yml)
@@ -145,7 +159,10 @@ def register_pipelines():
 modelling:
   start_date: "2024-01-01"
   end_date:   "2026-06-30"
-  scope_filtering: {dlq_min: 4, dlq_max: 7}
+  scope_filtering:
+    dlq_min: 4
+    dlq_max: 7
+    collateral_codes: []                  # TODO: codes kept by apply_collateral
   billing_load_date_col: edp_load_date    # the daily PARTITION column on billing
   billing_cycle_buffer_days: 35           # >= one billing cycle (see note below)
 ```

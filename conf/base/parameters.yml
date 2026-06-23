@@ -8,6 +8,9 @@ modelling:
   scope_filtering:
     dlq_min: 4
     dlq_max: 7
+    # TODO(you): collateral codes kept by apply_collateral. Empty list = no
+    # collateral filter (the old function filtered on these — fill them in).
+    collateral_codes: []
 
   # Daily PARTITION column on the billing table (verify with SHOW PARTITIONS /
   # `hdfs dfs -ls` — see README). Used for partition pruning, not row filtering.

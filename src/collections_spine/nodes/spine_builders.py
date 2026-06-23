@@ -36,7 +36,7 @@ Persist every intermediate to HDFS (see the catalog snippet in the package
 README) so reruns read narrow parquet instead of re-scanning billions of rows.
 """
 
-from src.collections_spine import Scd2Schema
+from src.collections_spine import Scd2Schema, prefilter_scd2
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType
@@ -84,6 +84,10 @@ def slim_contract(raw_stg_contract: DataFrame, modelling: dict) -> DataFrame:
         F.col(s.eff_start).cast(DateType()).alias(s.eff_start),
         F.col(s.eff_end).cast(DateType()).alias(s.eff_end),
         F.col(s.modified).cast(DateType()).alias(s.modified),
+        # carried through PIT for the downstream product / client joins
+        F.col("product_id"),
+        F.col("client_idt"),
+        # TODO(you): add any other raw contract columns later steps need
         _parse_dlq_hist(F.col("add_info")),
     )
     # With a sentinel end this only drops future-dated starts; the heavy
@@ -179,7 +183,7 @@ def contract_pit(
     s = _CONTRACT_SCD2
     cidt, cfrom, cto, cmod = s.key, s.eff_start, s.eff_end, s.modified
     start = modelling["start_date"]
-    payload = [cidt, "observation_date", cfrom, cto, cmod, "dlq_hist"]
+    payload = [cidt, "observation_date", cfrom, cto, cmod, "dlq_hist", "product_id", "client_idt"]
 
     keys = billing_spine.select(cidt).distinct()
     cand = contract_slim.join(F.broadcast(keys), cidt, "leftsemi")
@@ -228,14 +232,203 @@ def contract_pit(
 
 
 # --------------------------------------------------------------------------- #
-# 5. precise DLQ filter on the point-in-time version -> final spine
+# 5. precise DLQ filter on the point-in-time version (full rows + bucket label)
 # --------------------------------------------------------------------------- #
-def dlq_spine(contract_pit: DataFrame, modelling: dict) -> DataFrame:
-    """Keep pairs whose point-in-time-active version is in the DLQ band."""
+def contract_dlq(contract_pit: DataFrame, modelling: dict) -> DataFrame:
+    """DLQ-banded point-in-time contract rows -- the base for all enrichment.
+
+    Equivalent to ``result`` in the old function (before the product join): keeps
+    the full contract payload and adds the bucket label carried to the final spine.
+    """
     lo, hi = _dlq_bounds(modelling)
     return (
         contract_pit
         .where(F.col("dlq_hist").between(lo, hi))
-        .select("contract_idt", "observation_date")
+        # TODO(you): map raw DLQ_HIST int -> your bucket label if it differs
+        .withColumn("dlq_bucket_from_hist", F.col("dlq_hist"))
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 6. DLQ spine (contract_idt, observation_date) -- drives the attribute build
+# --------------------------------------------------------------------------- #
+def dlq_spine(contract_dlq: DataFrame) -> DataFrame:
+    """Distinct (contract_idt, observation_date) of the DLQ population."""
+    return contract_dlq.select("contract_idt", "observation_date").distinct()
+
+
+# --------------------------------------------------------------------------- #
+# 7. product enrichment + scope filter
+# --------------------------------------------------------------------------- #
+def enrich_product(
+    contract_dlq: DataFrame,
+    raw_stg_product_config: DataFrame,
+    modelling: dict,
+) -> DataFrame:
+    """Left-join the product dimension and apply the product scope filter."""
+    product_config = raw_stg_product_config  # TODO(you): any product_config prep
+    out = contract_dlq.join(F.broadcast(product_config), on="product_id", how="left")
+    # TODO(you): product scope filter, e.g. .where(F.col("product_active") == 1)
+    return out.where(F.lit(True))
+
+
+# --------------------------------------------------------------------------- #
+# 8. contract-attribute staging build (pivot) on the DLQ spine
+# --------------------------------------------------------------------------- #
+def stage_contract_attribute(
+    raw_stg_contract_attribute: DataFrame,
+    dlq_spine: DataFrame,
+) -> DataFrame:
+    """Spine-prefiltered, pivoted contract attributes (your ``_stg_ca.build``)."""
+    # TODO(you): point this import at your existing contract-attribute builder.
+    from src.collections_spine.nodes import contract_attribute as _stg_ca
+
+    return _stg_ca.build(raw_stg_contract_attribute, dlq_spine)
+
+
+# --------------------------------------------------------------------------- #
+# 9. collateral join + scope filter
+# --------------------------------------------------------------------------- #
+def apply_collateral(
+    product_enriched: DataFrame,
+    contract_attribute_pivoted: DataFrame,
+    modelling: dict,
+) -> DataFrame:
+    """Attach latest collateral attributes and filter to the collateral scope."""
+    scope = modelling.get("scope_filtering", {})
+    collateral_codes = scope.get("collateral_codes", [])  # TODO(you): fill the list
+
+    collateral_latest = contract_attribute_pivoted.select(
+        "contract_idt", "observation_date", "collateral_code",  # TODO(you): add columns
+    )
+    out = product_enriched.join(
+        collateral_latest, on=["contract_idt", "observation_date"], how="left"
+    )
+    if collateral_codes:
+        out = out.where(F.col("collateral_code").isin(collateral_codes))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# 10. client spine from the scoped population
+# --------------------------------------------------------------------------- #
+def build_client_spine(collateral_scoped: DataFrame) -> DataFrame:
+    """Distinct (client_idt, observation_date) of the post-scope population."""
+    return collateral_scoped.select("client_idt", "observation_date").distinct()
+
+
+# --------------------------------------------------------------------------- #
+# 11. client staging build on the client spine
+# --------------------------------------------------------------------------- #
+def stage_client(raw_stg_client: DataFrame, client_spine: DataFrame) -> DataFrame:
+    """Spine-prefiltered client staging (your ``_stg_client.build``)."""
+    # TODO(you): point this import at your existing client builder.
+    from src.collections_spine.nodes import client as _stg_client
+
+    return _stg_client.build(raw_stg_client, client_spine)
+
+
+# --------------------------------------------------------------------------- #
+# 12. attach cif_id -> final spine
+# --------------------------------------------------------------------------- #
+def finalize_contract_spine(
+    collateral_scoped: DataFrame,
+    client_staged: DataFrame,
+) -> DataFrame:
+    """Final dataset: (contract_idt, observation_date, cif_id, dlq_bucket_from_hist)."""
+    client_cif = client_staged.select("client_idt", "observation_date", "cif_id")
+    return (
+        collateral_scoped
+        .join(F.broadcast(client_cif), on=["client_idt", "observation_date"], how="left")
+        .select("contract_idt", "observation_date", "cif_id", "dlq_bucket_from_hist")
         .distinct()
     )
+
+
+# --------------------------------------------------------------------------- #
+# Full-scope pre-refactor implementation = the spec the node chain above
+# reproduces (its final output matches `spine` below). Cleaned only enough to
+# PARSE; the user's placeholders are kept as TODO. DO NOT USE in the pipeline:
+# portfolio-wide billing distinct, DLQ applied last, date_modified-first dedup
+# (wrong for this sentinel table), regexp isNotNull() guard always true.
+# --------------------------------------------------------------------------- #
+def build_contract_spine_old(
+    raw_stg_contract: DataFrame,
+    raw_stg_contract_attribute: DataFrame,
+    raw_stg_billing: DataFrame,
+    raw_stg_product_config: DataFrame,
+    raw_stg_client: DataFrame,
+    modelling: dict
+) -> DataFrame:
+
+    scope = modelling.get("scope_filtering", {})
+    dlq_min = scope.get("dlq_min", 4)
+    dlq_max = scope.get("dlq_max", 7)
+
+    date_filter = F.col("observation_date").between(
+        modelling["start_date"], modelling["end_date"]
+    )
+
+    billing_spine = (
+        raw_stg_billing.select(
+            "contract_idt",
+            F.col("billing_date").cast(DateType()).alias("observation_date")
+        )
+        .filter(date_filter)
+        .distinct()
+    )
+
+    contract_snapshot = prefilter_scd2(
+        raw_stg_contract,
+        billing_spine,
+        schema=_CONTRACT_SCD2
+    )
+
+    contract_snapshot = (
+        contract_snapshot
+        .withColumn("dlq_hist_raw", F.regexp_extract(
+            F.col("add_info"), r"DLQ_HIST=([^;]+)", 1)
+        )
+        .withColumn("dlq_hist", F.when(
+            F.col("dlq_hist_raw").isNotNull(),
+            F.col("dlq_hist_raw")
+        ).otherwise(
+            F.lit(0)
+        ).cast("int")
+        )
+    )
+
+    result = contract_snapshot.filter(
+        F.col("dlq_hist").between(dlq_min, dlq_max)
+    )
+
+    dlq_spine = result.select("contract_idt", "observation_date").distinct()
+
+    product_config = (raw_stg_product_config)
+
+    result = result.join(
+        F.broadcast(product_config), on="product_id", how="left"
+    ).filter(F.lit(True))  # TODO(you): product scope filter
+
+    attr_pivoted = _stg_ca.build(raw_stg_contract_attribute, dlq_spine)  # noqa: F821
+    collateral_latest = attr_pivoted.select(
+        "contract_idt", "observation_date", "collateral_code"  # TODO(you): columns
+    )
+    result = result.join(
+        collateral_latest, on=["contract_idt", "observation_date"], how="left"
+    )
+
+    result = result.filter(F.col("collateral_code").isin([]))  # TODO(you): codes
+
+    client_spine = result.select("client_idt", "observation_date").distinct()
+
+    stg_client_df = _stg_client.build(raw_stg_client, client_spine)  # noqa: F821
+
+    client_cif = stg_client_df.select("client_idt", "observation_date", "cif_id")
+    result = result.join(
+        F.broadcast(client_cif), on=["client_idt", "observation_date"], how="left"
+    )
+
+    spine = result.select("contract_idt", "observation_date", "cif_id", "dlq_bucket_from_hist").distinct()
+
+    return spine
