@@ -112,3 +112,59 @@ node(partial(stage_daily_table, asof=True, lookback_days=45),
   or you will drop/double-count boundary-day records.
 - **Exact vs as-of daily:** if observations don't always land on a snapshot date,
   use `asof=True` (with a `lookback_days` bound).
+- **Open-ended (sentinel) SCD2 tables:** `prefilter_scd2` dedups by `date_modified`
+  first, which assumes proper intervals. For a table where *every* record carries a
+  sentinel `eff_end` and the active row is just the latest `eff_start <= obs`, that
+  is wrong — use a start-first rule (see `nodes/spine_builders.py::contract_pit`).
+
+## DLQ contract spine (`nodes/spine_builders.py`)
+
+Selectivity-first build of `(contract_idt, observation_date)` for contracts in DLQ
+buckets `[dlq_min, dlq_max]`, over a billion-row SCD2 `contract` table (latest
+`record_date_from`-wins; `record_date_to` always the `2100-01-01` sentinel) and a
+billion-row daily `billing` table partitioned on `edp_load_date`.
+
+```python
+# pipeline.py
+from kedro.pipeline import Pipeline, node
+from src.collections_spine.nodes.spine_builders import (
+    slim_contract, dlq_candidate_ids, build_billing_spine, contract_pit, dlq_spine,
+)
+
+def create_pipeline(**_) -> Pipeline:
+    return Pipeline([
+        node(slim_contract,       ["raw_stg_contract", "params:modelling"],                     "contract_slim"),
+        node(dlq_candidate_ids,   ["contract_slim", "params:modelling"],                        "dlq_candidate_ids"),
+        node(build_billing_spine, ["raw_stg_billing", "dlq_candidate_ids", "params:modelling"], "billing_spine"),
+        node(contract_pit,        ["contract_slim", "billing_spine", "params:modelling"],       "contract_pit"),
+        node(dlq_spine,           ["contract_pit", "params:modelling"],                         "dlq_spine"),
+    ])
+```
+
+```yaml
+# parameters.yml
+modelling:
+  start_date: "2024-01-01"
+  end_date:   "2026-06-30"
+  scope_filtering: {dlq_min: 4, dlq_max: 7}
+  billing_load_date_col: edp_load_date    # the daily PARTITION column on billing
+  billing_cycle_buffer_days: 35           # >= one billing cycle (see note below)
+```
+
+```yaml
+# catalog.yml — persist intermediates to HDFS; reruns read narrow parquet
+contract_slim:      {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/02_intermediate/contract_slim.parquet",     file_format: parquet, save_args: {mode: overwrite}}
+dlq_candidate_ids:  {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/02_intermediate/dlq_candidate_ids.parquet", file_format: parquet, save_args: {mode: overwrite}}
+billing_spine:      {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/02_intermediate/billing_spine.parquet",     file_format: parquet, save_args: {mode: overwrite, partitionBy: [observation_date]}}
+contract_pit:       {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/03_primary/contract_pit.parquet",          file_format: parquet, save_args: {mode: overwrite, partitionBy: [observation_date]}}
+dlq_spine:          {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/03_primary/dlq_spine.parquet",             file_format: parquet, save_args: {mode: overwrite}}
+```
+
+**`billing_cycle_buffer_days`** must be ≥ your longest billing cycle. A `billing_date`
+only appears in load partitions from its cycle onward, so to capture dates near
+`end_date` we read `edp_load_date` up to `end_date + buffer`.
+
+**Checking the partition column of an HDFS dataset:** inspect the directory layout —
+`hdfs dfs -ls <filepath>` shows `edp_load_date=YYYY-MM-DD/` subdirectories for a
+partitioned parquet path; for a Hive table use `SHOW PARTITIONS db.table` or
+`DESCRIBE FORMATTED db.table` (look for the `# Partition Information` block).

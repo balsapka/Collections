@@ -164,6 +164,14 @@ def prefilter_scd2(
     observation date (``date_modified > observation_date``) are never used, so
     staged rows are leakage-free.
 
+    Assumes proper interval versioning -- at most one ``[eff_start, eff_end)``
+    interval contains a given date, so restatements (same interval, multiple
+    ``date_modified``) are the only duplicates and dedup orders by
+    ``date_modified`` first. This is the WRONG model for tables where every
+    record is open-ended (a sentinel ``eff_end``) and the active row is simply
+    the latest ``eff_start <= obs`` -- select those with a start-first rule
+    instead (see ``nodes/spine_builders.py::contract_pit`` for that pattern).
+
     Args:
         df: SCD2 source table.
         spine: ``(account_id, observation_date)`` DataFrame (column names per
