@@ -124,25 +124,24 @@ buckets `[dlq_min, dlq_max]`, over a billion-row SCD2 `contract` table (latest
 `record_date_from`-wins; `record_date_to` always the `2100-01-01` sentinel) and a
 billion-row daily `billing` table partitioned on `edp_load_date`.
 
-```python
-# pipeline.py
-from kedro.pipeline import Pipeline, node
-from src.collections_spine.nodes.spine_builders import (
-    slim_contract, dlq_candidate_ids, build_billing_spine, contract_pit, dlq_spine,
-)
+Provided as ready-to-run Kedro files:
 
-def create_pipeline(**_) -> Pipeline:
-    return Pipeline([
-        node(slim_contract,       ["raw_stg_contract", "params:modelling"],                     "contract_slim"),
-        node(dlq_candidate_ids,   ["contract_slim", "params:modelling"],                        "dlq_candidate_ids"),
-        node(build_billing_spine, ["raw_stg_billing", "dlq_candidate_ids", "params:modelling"], "billing_spine"),
-        node(contract_pit,        ["contract_slim", "billing_spine", "params:modelling"],       "contract_pit"),
-        node(dlq_spine,           ["contract_pit", "params:modelling"],                         "dlq_spine"),
-    ])
+- pipeline: [`pipelines/dlq_spine/pipeline.py`](pipelines/dlq_spine/pipeline.py)
+- datasets: [`conf/base/catalog.yml`](../../conf/base/catalog.yml)
+- params: [`conf/base/parameters.yml`](../../conf/base/parameters.yml)
+
+Register it in your `pipeline_registry.py`:
+
+```python
+from src.collections_spine.pipelines.dlq_spine import create_pipeline as dlq_spine
+
+def register_pipelines():
+    dlq = dlq_spine()
+    return {"dlq_spine": dlq, "__default__": dlq}
 ```
 
 ```yaml
-# parameters.yml
+# conf/base/parameters.yml
 modelling:
   start_date: "2024-01-01"
   end_date:   "2026-06-30"
@@ -152,7 +151,7 @@ modelling:
 ```
 
 ```yaml
-# catalog.yml — persist intermediates to HDFS; reruns read narrow parquet
+# conf/base/catalog.yml — persist intermediates to HDFS; reruns read narrow parquet
 contract_slim:      {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/02_intermediate/contract_slim.parquet",     file_format: parquet, save_args: {mode: overwrite}}
 dlq_candidate_ids:  {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/02_intermediate/dlq_candidate_ids.parquet", file_format: parquet, save_args: {mode: overwrite}}
 billing_spine:      {type: spark.SparkDataSet, filepath: "hdfs:///proj/collections/02_intermediate/billing_spine.parquet",     file_format: parquet, save_args: {mode: overwrite, partitionBy: [observation_date]}}

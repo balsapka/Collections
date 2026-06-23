@@ -1,0 +1,19 @@
+# Parameters for the DLQ contract-spine pipeline.
+modelling:
+  # Modelling observation window (inclusive); matched against billing_date.
+  start_date: "2024-01-01"
+  end_date: "2026-06-30"
+
+  # DLQ bucket band kept in the final spine (60+ DPD focus).
+  scope_filtering:
+    dlq_min: 4
+    dlq_max: 7
+
+  # Daily PARTITION column on the billing table (verify with SHOW PARTITIONS /
+  # `hdfs dfs -ls` — see README). Used for partition pruning, not row filtering.
+  billing_load_date_col: edp_load_date
+
+  # Must be >= the longest billing cycle: a billing_date only appears in load
+  # partitions from its cycle onward, so we read edp_load_date up to
+  # end_date + this buffer to capture dates near end_date.
+  billing_cycle_buffer_days: 35
