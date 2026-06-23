@@ -15,8 +15,6 @@ import pytest
 
 pyspark = pytest.importorskip("pyspark")
 
-from pyspark.sql import SparkSession  # noqa: E402
-
 from collections_spine import (  # noqa: E402
     OPEN_END_SENTINEL,
     Scd2Schema,
@@ -26,18 +24,7 @@ from collections_spine import (  # noqa: E402
     prefilter_scd2,
 )
 
-
-@pytest.fixture(scope="module")
-def spark():
-    ss = (
-        SparkSession.builder.master("local[2]")
-        .appName("collections_spine-tests")
-        .config("spark.sql.shuffle.partitions", "2")
-        .config("spark.ui.enabled", "false")
-        .getOrCreate()
-    )
-    yield ss
-    ss.stop()
+# `spark` fixture is provided by the repo-root conftest.py (session-scoped).
 
 
 def _d(s: str) -> dt.date:
