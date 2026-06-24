@@ -14,10 +14,12 @@ never transform the full universe.
   (`snapshot_date == observation_date`) or as-of (latest snapshot on/before).
 - **SCD2 tables** `(account_id, effective_start_date, effective_end_date,
   date_modified, ...)` — the active record is the one whose half-open interval
-  `[start, end)` contains the observation date; `date_modified` restatements are
-  de-duplicated by keeping the latest correction known *as of the observation
-  date* (corrections booked later are never used — always point-in-time-correct,
-  no future leakage). Open records use the estate-wide sentinel
+  `[start, end)` contains the observation date; among those the greatest
+  `effective_start_date` wins, and `date_modified` only breaks a tie between
+  restatements of the same interval (latest wins). `date_modified` is **not** a
+  knowledge cutoff — a correction booked after the observation date is still
+  used; filter `date_modified <= observation_date` upstream yourself if you need
+  leakage-free point-in-time selection. Open records use the estate-wide sentinel
   `effective_end_date = 2100-01-01`, baked into `Scd2Schema`'s defaults.
 
 ## Reduction pipeline
@@ -44,16 +46,21 @@ limits  = prefilter_scd2(raw_limits, spine)                 # SCD2 (estate defau
 balance = prefilter_daily(raw_balances, spine)              # exact snapshot match
 score   = prefilter_daily(raw_scores, spine, asof=True, lookback_days=45)
 
-# single-date point-in-time, leakage-free (no future restatements)
+# single-date active record (greatest eff_start, latest restatement as tie-break)
 snap = active_as_of(raw_limits, "2026-01-31")
 ```
 
-### Leakage / point-in-time correctness
+### Selection rule (and leakage)
 
-Both `prefilter_scd2` and `active_as_of` **always** drop corrections booked
-*after* the observation date (`date_modified <= observation_date`). This is not
-optional — a staged row reflects only what was known as of its `observation_date`,
-so training sets are leakage-free by construction.
+Both `prefilter_scd2` and `active_as_of` select, per `(key, observation_date)`,
+the covering interval with the greatest `effective_start_date`, using
+`date_modified` only to break a tie between restatements of the same interval.
+
+`date_modified` is **not** treated as a knowledge cutoff: a correction booked
+after the observation date is still applied (in this estate `date_modified` is a
+load/restatement timestamp, typically later than the observation date). If you
+need leakage-free training sets, filter `date_modified <= observation_date`
+yourself before staging.
 
 ## Kedro wiring
 
@@ -112,10 +119,13 @@ node(partial(stage_daily_table, asof=True, lookback_days=45),
   or you will drop/double-count boundary-day records.
 - **Exact vs as-of daily:** if observations don't always land on a snapshot date,
   use `asof=True` (with a `lookback_days` bound).
-- **Open-ended (sentinel) SCD2 tables:** `prefilter_scd2` dedups by `date_modified`
-  first, which assumes proper intervals. For a table where *every* record carries a
-  sentinel `eff_end` and the active row is just the latest `eff_start <= obs`, that
-  is wrong — use a start-first rule (see `nodes/spine_builders.py::contract_pit`).
+- **Open-ended (sentinel) SCD2 tables:** `prefilter_scd2` already orders by
+  `eff_start` first, so it picks the latest `eff_start <= obs` correctly even when
+  *every* record carries a sentinel `eff_end`. But its interval grid join still
+  fans each record out to every covered observation date, which is wasteful at
+  billion-row scale — prefer the exact-match/anchor-prune pattern in
+  `nodes/spine_builders.py::contract_pit` for those tables (performance, not
+  correctness).
 
 ## DLQ contract spine (`nodes/spine_builders.py`)
 

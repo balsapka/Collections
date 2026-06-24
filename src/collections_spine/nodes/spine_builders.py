@@ -29,8 +29,11 @@ with the greatest ``record_date_from <= obs`` -- NOT the one with the greatest
 ``edp_modifiedts``. The generic interval-based ``prefilter_scd2`` dedups by
 ``date_modified`` first and would pick a stale version when an old start gets a
 late restatement; ``contract_pit`` below orders by ``record_date_from`` first and
-treats ``edp_modifiedts`` only as the restatement tie-break (and as the
-no-leakage knowledge cutoff: ``edp_modifiedts <= observation_date``).
+treats ``edp_modifiedts`` only as the restatement tie-break for two rows that
+share a ``record_date_from``. ``edp_modifiedts`` is the row's restatement
+timestamp (normally booked *after* the billing date), NOT a knowledge cutoff, so
+it must never gate which version is active -- a later ``record_date_from`` wins
+even when its ``edp_modifiedts`` is after the observation date.
 
 Persist every intermediate to HDFS (see the catalog snippet in the package
 README) so reruns read narrow parquet instead of re-scanning billions of rows.
@@ -76,7 +79,8 @@ def slim_contract(raw_stg_contract: DataFrame, modelling: dict) -> DataFrame:
     """Project contract to needed columns, parse DLQ once, window-prune.
 
     The single unavoidable billion-row scan. ``edp_modifiedts`` is cast to a date
-    so a same-day correction counts as known at the observation date.
+    purely to normalize the restatement tie-break granularity (it ranks rows that
+    share a ``record_date_from``; it is not a point-in-time cutoff).
     """
     s = _CONTRACT_SCD2
     df = raw_stg_contract.select(
@@ -165,7 +169,7 @@ def contract_pit(
     billing_spine: DataFrame,
     modelling: dict,
 ) -> DataFrame:
-    """One active contract version per spine pair, latest-start-wins, no leakage.
+    """One active contract version per spine pair, latest-record_date_from-wins.
 
     * Restrict contract to the spine's contracts (broadcast key set).
     * Anchor-prune: per contract keep only versions with ``record_date_from`` on
@@ -177,8 +181,10 @@ def contract_pit(
     * Fallback (~0.1%): for pairs with no exact start, as-of pick the latest
       ``record_date_from <= observation_date``. Runs on the tiny residual only.
 
-    Both paths enforce ``edp_modifiedts <= observation_date`` (no future
-    restatement leakage) and tie-break restatements by latest ``edp_modifiedts``.
+    ``edp_modifiedts`` is *only* a tie-break for two rows sharing a
+    ``record_date_from`` (latest restatement wins); it never filters which start
+    is active, because the restatement is typically booked after the observation
+    date and is not a knowledge cutoff.
     """
     s = _CONTRACT_SCD2
     cidt, cfrom, cto, cmod = s.key, s.eff_start, s.eff_end, s.modified
@@ -202,8 +208,9 @@ def contract_pit(
     exact = (
         cand.withColumn("observation_date", F.col(cfrom))
         .join(spine, [cidt, "observation_date"], "inner")
-        .where(F.col(cmod) <= F.col("observation_date"))
     )
+    # observation_date == record_date_from here, so the only collision is two
+    # rows that share a record_date_from: break the tie by latest restatement.
     w_rest = Window.partitionBy(cidt, "observation_date").orderBy(
         F.col(cmod).desc(), F.col(cto).desc()
     )
@@ -217,8 +224,10 @@ def contract_pit(
     residual = spine.join(exact.select(cidt, "observation_date"), [cidt, "observation_date"], "leftanti")
     fb = (
         cand.join(residual, cidt, "inner")
-        .where((F.col(cfrom) <= F.col("observation_date")) & (F.col(cmod) <= F.col("observation_date")))
+        .where(F.col(cfrom) <= F.col("observation_date"))
     )
+    # latest record_date_from <= obs wins; restatement (cmod) only breaks a
+    # same-start tie, never gates which start is active.
     w_asof = Window.partitionBy(cidt, "observation_date").orderBy(
         F.col(cfrom).desc(), F.col(cmod).desc(), F.col(cto).desc()
     )

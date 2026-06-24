@@ -4,7 +4,9 @@ Focus on the branches that are easy to get wrong on this latest-record_date_from
 -wins / sentinel-end table:
 
 * exact-match fast path (record_date_from == observation_date)
-* future-restatement fallback (a same-start version booked after obs must not leak)
+* a later record_date_from wins even when its edp_modifiedts is after obs
+  (edp_modifiedts is a restatement tie-break, not a knowledge cutoff)
+* edp_modifiedts breaks a same-start tie (latest restatement wins), both paths
 * anchor-prune boundary (the deep historical tail is dropped, the anchor kept)
 * a pair with no active contract version is dropped
 
@@ -62,17 +64,43 @@ def test_exact_start_equals_observation(spark):
     assert r["product_id"] == "P1" and r["client_idt"] == "C1"
 
 
-def test_future_restatement_falls_back(spark):
-    # The start==obs version was booked AFTER obs (edp_modifiedts > obs); it must
-    # not leak, so selection falls back to the latest version known by obs.
+def test_later_start_wins_despite_future_modifiedts(spark):
+    # The start==obs version was booked AFTER obs (edp_modifiedts > obs). On this
+    # table edp_modifiedts is the restatement timestamp, NOT a knowledge cutoff,
+    # so the later record_date_from still wins -- no fallback to the older start.
     cs = _cs(spark, [
         ("A", "2025-01-01", SENTINEL, "2025-01-01", 4, "P1", "C1"),
-        ("A", "2025-03-31", SENTINEL, "2025-09-01", 7, "P1", "C1"),  # future correction
+        ("A", "2025-03-31", SENTINEL, "2025-09-01", 7, "P1", "C1"),  # modified after obs
     ])
     out = _by_pair(contract_pit(cs, _spine(spark, [("A", "2025-03-31")]),
                                 {"start_date": "2025-01-01"}))
     r = out[("A", "2025-03-31")]
-    assert r["dlq_hist"] == 4 and str(r["record_date_from"]) == "2025-01-01"
+    assert r["dlq_hist"] == 7 and str(r["record_date_from"]) == "2025-03-31"
+
+
+def test_same_start_tiebreak_latest_modifiedts_wins(spark):
+    # Two rows share a record_date_from (== obs, exact path): edp_modifiedts is the
+    # tie-break and the latest restatement wins, regardless of obs.
+    cs = _cs(spark, [
+        ("A", "2025-03-31", SENTINEL, "2025-04-15", 4, "P1", "C1"),
+        ("A", "2025-03-31", SENTINEL, "2025-08-01", 7, "P1", "C1"),  # later restatement
+    ])
+    out = _by_pair(contract_pit(cs, _spine(spark, [("A", "2025-03-31")]),
+                                {"start_date": "2025-01-01"}))
+    assert out[("A", "2025-03-31")]["dlq_hist"] == 7
+
+
+def test_same_start_tiebreak_in_fallback(spark):
+    # Same tie, but the active start is strictly before obs (as-of fallback path):
+    # latest record_date_from then latest edp_modifiedts wins.
+    cs = _cs(spark, [
+        ("A", "2025-01-15", SENTINEL, "2025-02-01", 4, "P1", "C1"),
+        ("A", "2025-01-15", SENTINEL, "2025-09-01", 7, "P1", "C1"),  # later restatement
+    ])
+    out = _by_pair(contract_pit(cs, _spine(spark, [("A", "2025-03-31")]),
+                                {"start_date": "2025-01-01"}))
+    r = out[("A", "2025-03-31")]
+    assert r["dlq_hist"] == 7 and str(r["record_date_from"]) == "2025-01-15"
 
 
 def test_anchor_prune_boundary(spark):

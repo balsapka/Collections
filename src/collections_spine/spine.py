@@ -12,9 +12,11 @@ Two table archetypes are supported:
 * **SCD2 / effective-dated** ``(account_id, effective_start_date,
   effective_end_date, date_modified, ...)`` -- the active record at an
   observation date is the one whose half-open interval ``[start, end)`` contains
-  it. Selection is always point-in-time-correct: ``date_modified`` corrections
-  booked after the observation date are ignored, and the latest remaining version
-  wins (no future-restatement leakage).
+  it; among those, the greatest ``effective_start_date`` wins, with
+  ``date_modified`` only breaking a tie between restatements of the same interval.
+  ``date_modified`` is NOT a knowledge cutoff -- corrections booked after the
+  observation date are still used (filter them upstream if you need leakage-free
+  point-in-time selection).
 
 All SCD2 tables in this estate share the same date columns and use a sentinel
 ``effective_end_date`` of ``2100-01-01`` for still-open records, so those
@@ -58,8 +60,10 @@ class Scd2Schema:
         eff_start: Interval start column (inclusive lower bound).
         eff_end: Interval end column. With ``end_inclusive=False`` (default) the
             interval is half-open ``[start, end)``.
-        modified: Restatement / knowledge timestamp. The latest value wins when
-            several versions are valid at the same observation date.
+        modified: Restatement timestamp. Used only as a tie-break under
+            ``eff_start`` (latest restatement of the same interval wins); it is
+            NOT a knowledge cutoff, so a value after the observation date is still
+            eligible.
         end_inclusive: Treat ``eff_end`` as the last valid day (``<=``) rather
             than the next record's start (``<``). Default ``False``.
         open_end_sentinel: Value of ``eff_end`` for still-open records. Compares
@@ -97,10 +101,17 @@ def _end_after(end: Column, point: Column, s: Scd2Schema) -> Column:
 
 
 def _dedup_order(s: Scd2Schema) -> list[Column]:
-    """Deterministic ordering: latest restatement, then latest start, then ties."""
+    """Deterministic ordering: latest start first, then latest restatement, ties.
+
+    ``eff_start`` leads so the active version is the one with the greatest
+    ``eff_start`` covering the observation date; ``modified`` only breaks a tie
+    between rows that share an ``eff_start`` (e.g. restatements of one interval).
+    It is NOT a knowledge cutoff -- a row whose ``modified`` is after the
+    observation date is still eligible.
+    """
     return [
-        F.col(s.modified).desc_nulls_last(),
         F.col(s.eff_start).desc(),
+        F.col(s.modified).desc_nulls_last(),
         *[F.col(c).desc() for c in s.tiebreak],
     ]
 
@@ -115,13 +126,14 @@ def active_as_of(
 ) -> DataFrame:
     """Return exactly one active row per key, valid at ``observation_date``.
 
-    Point-in-time-correct and leakage-free by construction:
-
     Validity (default half-open):  ``eff_start <= obs < eff_end``.
-    Knowledge cutoff (always on):  ``date_modified <= obs`` -- corrections booked
-                                   after the observation date are never seen.
-    Restatement:                   among the remaining rows per key, keep the
-                                   latest ``date_modified``.
+    Selection among valid rows:    greatest ``eff_start``, then greatest
+                                   ``date_modified`` as a tie-break (latest
+                                   restatement of the same interval wins).
+
+    ``date_modified`` is NOT a knowledge cutoff here: a correction booked after
+    the observation date is still used. If you need leakage-free point-in-time
+    selection, filter ``date_modified <= observation_date`` upstream yourself.
 
     Args:
         df: A single SCD2 source table.
@@ -134,10 +146,8 @@ def active_as_of(
     obs = _as_date(observation_date)
     start, end = F.col(schema.eff_start), F.col(schema.eff_end)
 
-    # Valid at obs AND only corrections known by then (no future leakage).
-    candidates = df.where(
-        (start <= obs) & _end_after(end, obs, schema) & (F.col(schema.modified) <= obs)
-    )
+    # Valid at obs (interval containment only -- no knowledge cutoff).
+    candidates = df.where((start <= obs) & _end_after(end, obs, schema))
 
     w = Window.partitionBy(schema.key).orderBy(*_dedup_order(schema))
     return (
@@ -160,17 +170,19 @@ def prefilter_scd2(
 ) -> DataFrame:
     """Reduce a billion-row SCD2 table to one active row per spine pair.
 
-    Selection is always point-in-time-correct: corrections booked after the
-    observation date (``date_modified > observation_date``) are never used, so
-    staged rows are leakage-free.
+    Selection per ``(key, observation_date)`` is the interval covering the date
+    with the greatest ``eff_start``, then the greatest ``date_modified`` as a
+    tie-break. ``date_modified`` is NOT a knowledge cutoff -- a correction booked
+    after the observation date is still used; filter ``date_modified <= obs``
+    upstream yourself if you need leakage-free point-in-time selection.
 
-    Assumes proper interval versioning -- at most one ``[eff_start, eff_end)``
-    interval contains a given date, so restatements (same interval, multiple
-    ``date_modified``) are the only duplicates and dedup orders by
-    ``date_modified`` first. This is the WRONG model for tables where every
-    record is open-ended (a sentinel ``eff_end``) and the active row is simply
-    the latest ``eff_start <= obs`` -- select those with a start-first rule
-    instead (see ``nodes/spine_builders.py::contract_pit`` for that pattern).
+    The ``eff_start``-first ordering handles both proper intervals (restatements
+    share an ``eff_start``, so ``date_modified`` breaks the tie) and open-ended
+    tables where every record carries a sentinel ``eff_end`` and the active row is
+    the latest ``eff_start <= obs``. For the open-ended case the interval grid
+    join still fans each record out to every covered observation date, which is
+    wasteful at billion-row scale -- prefer the exact-match/anchor-prune pattern
+    in ``nodes/spine_builders.py::contract_pit`` there for performance.
 
     Args:
         df: SCD2 source table.
@@ -204,8 +216,6 @@ def prefilter_scd2(
     od = F.broadcast(obs_dates) if broadcast_dates else obs_dates
     obs = F.col(obs_col)
     paired = df.join(od, (start <= obs) & _end_after(end, obs, schema), "inner")
-    # Always drop corrections booked after the observation date (no leakage).
-    paired = paired.where(F.col(schema.modified) <= obs)
 
     # 3. restatement dedup -> one row per (key, observation_date).
     w = Window.partitionBy(schema.key, obs_col).orderBy(*_dedup_order(schema))

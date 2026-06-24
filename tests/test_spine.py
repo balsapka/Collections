@@ -1,8 +1,9 @@
 """Tests for collections_spine.
 
 Covers the cases where SCD2 / spine logic typically breaks: interval boundaries,
-the 2100-01-01 open-end sentinel, restatement (date_modified) dedup, future-
-restatement leakage, and exact vs as-of daily matching.
+the 2100-01-01 open-end sentinel, restatement (date_modified) dedup as a
+tie-break under eff_start (not a knowledge cutoff), and exact vs as-of daily
+matching.
 
 Run: pytest -q   (requires pyspark; tests skip cleanly if it is not installed)
 """
@@ -75,14 +76,15 @@ def test_restatement_latest_modified_wins(spark):
     assert len(out) == 1 and out[0]["limit"] == 150
 
 
-def test_active_as_of_blocks_future_restatement(spark):
-    # A correction booked after the observation date must not leak in (always on).
+def test_active_as_of_uses_latest_restatement_even_if_future(spark):
+    # date_modified is a tie-break, NOT a knowledge cutoff: among rows sharing an
+    # eff_start, the latest restatement wins even if booked after the obs date.
     df = _scd2(spark, [
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-01-01", 100),
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-09-01", 999),  # future correction
     ])
     out = active_as_of(df, "2025-04-01").collect()
-    assert len(out) == 1 and out[0]["limit"] == 100
+    assert len(out) == 1 and out[0]["limit"] == 999
 
 
 # --------------------------------------------------------------------------- #
@@ -106,14 +108,16 @@ def test_prefilter_scd2_grid_and_population_filter(spark):
     }
 
 
-def test_prefilter_scd2_blocks_future_restatement(spark):
+def test_prefilter_scd2_uses_latest_restatement_even_if_future(spark):
+    # Same eff_start, so date_modified breaks the tie -- latest wins regardless of
+    # when it was booked (no knowledge cutoff).
     df = _scd2(spark, [
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-01-01", 100),
         ("A", "2025-01-01", OPEN_END_SENTINEL, "2025-08-01", 999),  # booked after obs
     ])
     spine = build_spine(spark.createDataFrame([("A",)], ["account_id"]), ["2025-03-31"])
     rows = prefilter_scd2(df, spine).collect()
-    assert len(rows) == 1 and rows[0]["limit"] == 100
+    assert len(rows) == 1 and rows[0]["limit"] == 999
 
 
 # --------------------------------------------------------------------------- #
