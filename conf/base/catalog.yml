@@ -1,0 +1,129 @@
+# DLQ contract-spine pipeline catalog.
+#
+# Note: type is `spark.SparkDataSet` (Kedro <0.19). On newer Kedro with
+# kedro-datasets, use `spark.SparkDataset`. Adjust the `hdfs:///proj/collections`
+# base path to your environment.
+
+# --- raw inputs (defined in your existing project catalog) ------------------
+# These must already be registered. Shown here for reference only — remove or
+# reconcile with your real definitions before running.
+#
+# raw_stg_contract:
+#   type: spark.SparkDataSet
+#   filepath: hdfs:///raw/contract            # SCD2; record_date_to == 2100-01-01 sentinel
+#   file_format: parquet
+#
+# raw_stg_billing:
+#   type: spark.SparkDataSet
+#   filepath: hdfs:///raw/billing             # daily grain; partitioned by edp_load_date
+#   file_format: parquet
+#
+# raw_stg_contract_attribute:                 # consumed by _stg_ca.build via dlq_spine
+#   type: spark.SparkDataSet
+#   filepath: hdfs:///raw/contract_attribute
+#   file_format: parquet
+#
+# raw_stg_product_config:                     # small dimension (broadcast on product_id)
+#   type: spark.SparkDataSet
+#   filepath: hdfs:///raw/product_config
+#   file_format: parquet
+#
+# raw_stg_client:                             # consumed by _stg_client.build via client_spine
+#   type: spark.SparkDataSet
+#   filepath: hdfs:///raw/client
+#   file_format: parquet
+
+# --- intermediate (persisted so reruns read narrow parquet) -----------------
+contract_slim:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/02_intermediate/contract_slim.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+
+dlq_candidate_ids:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/02_intermediate/dlq_candidate_ids.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+
+billing_spine:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/02_intermediate/billing_spine.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+# --- primary ----------------------------------------------------------------
+contract_pit:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/contract_pit.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+contract_dlq:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/contract_dlq.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+dlq_spine:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/dlq_spine.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+
+product_enriched:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/product_enriched.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+contract_attribute_pivoted:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/contract_attribute_pivoted.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+collateral_scoped:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/collateral_scoped.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+client_spine:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/client_spine.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+client_staged:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/client_staged.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
+    partitionBy: [observation_date]
+
+# final dataset: (contract_idt, observation_date, cif_id, dlq_bucket_from_hist)
+contract_spine:
+  type: spark.SparkDataSet
+  filepath: hdfs:///proj/collections/03_primary/contract_spine.parquet
+  file_format: parquet
+  save_args:
+    mode: overwrite
