@@ -1,5 +1,5 @@
-"""Example scope-filtering pipelines (spine layer + staging layer)."""
+"""Example scope-filtering staging pipeline."""
 
-from .pipeline import create_scope_pipeline, create_staging_pipeline
+from .pipeline import create_staging_pipeline
 
-__all__ = ["create_scope_pipeline", "create_staging_pipeline"]
+__all__ = ["create_staging_pipeline"]

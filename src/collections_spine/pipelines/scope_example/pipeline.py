@@ -1,43 +1,31 @@
-"""Example wiring for config-driven scope filtering.
+"""Example STAGING pipeline for config-driven scope filtering.
 
-Two layers:
+Each staging node reduces one raw table with its OWN strategy via ``scoped_stage``,
+then runs a pure transform. Different tables use different scoping -- that per-node
+choice is the ``functools.partial`` config, so nothing is duplicated.
 
-* ``create_scope_pipeline`` -- SPINE layer. Derives the scope sets from the
-  modelling spine ONCE (the only ``distinct()`` / explode), persisted for reuse.
-* ``create_staging_pipeline`` -- STAGING layer. Reduces each raw table with its
-  OWN strategy via ``scoped_stage``, then runs a pure transform. Different tables
-  use different scoping -- that per-node choice is the ``functools.partial`` config.
-
-Downstream primary / intermediate / feature pipelines read staged outputs only,
-so they carry no scope wiring at all.
+The scope sets (``scope_ids`` / ``scope_windows`` / ``scope_grid``) are produced
+UPSTREAM -- by the spine layer or your own builders -- and referenced here purely
+as catalog inputs. Downstream primary / intermediate / feature pipelines read
+staged outputs only, so they carry no scope wiring at all.
 
 Register in ``pipeline_registry.py``::
 
-    from src.collections_spine.pipelines.scope_example import (
-        create_scope_pipeline, create_staging_pipeline,
-    )
+    from src.collections_spine.pipelines.scope_example import create_staging_pipeline
 
     def register_pipelines():
-        scope, staging = create_scope_pipeline(), create_staging_pipeline()
-        return {"scope": scope, "staging": staging,
-                "__default__": scope + staging}
+        staging = create_staging_pipeline()
+        return {"staging": staging, "__default__": staging}
 """
 
 from functools import partial
 
 from kedro.pipeline import Pipeline, node, pipeline
 
-from src.collections_spine.scope import (
-    add_window_bounds,
-    build_grid,
-    build_scope_ids,
-    scoped_stage,
-)
+from src.collections_spine.scope import scoped_stage
 
-# --- example modelling config (move to conf/base/parameters.yml in real use) --
+# --- example config (move to conf/base/parameters.yml in real use) -----------
 ID = "entity_id"
-ANCHOR = "anchor_date"
-LOOKBACK, LOOKAHEAD = 60, 1
 # global window extent for the coarse partition prune, computed once from the
 # modelling window: [start - lookback, end + lookahead].
 PRUNE_BOUNDS = ("2019-01-01", "2026-07-31")
@@ -61,60 +49,16 @@ def stage_dim(df):
     return df
 
 
-# --------------------------------------------------------------------------- #
-# SPINE layer -- build each scope set ONCE from the modelling spine.
-# --------------------------------------------------------------------------- #
-def create_scope_pipeline(**kwargs) -> Pipeline:
-    return pipeline(
-        [
-            node(
-                func=partial(build_scope_ids, id_cols=ID),
-                inputs="modelling_spine",
-                outputs="scope_ids",
-                name="build_scope_ids",
-            ),
-            node(
-                func=partial(
-                    add_window_bounds,
-                    id_cols=ID,
-                    anchor_col=ANCHOR,
-                    lookback_months=LOOKBACK,
-                    lookahead_months=LOOKAHEAD,
-                ),
-                inputs="modelling_spine",
-                outputs="scope_windows",
-                name="build_scope_windows",
-            ),
-            node(
-                func=partial(
-                    build_grid,
-                    id_cols=ID,
-                    anchor_col=ANCHOR,
-                    lookback_months=LOOKBACK,
-                    lookahead_months=LOOKAHEAD,
-                    grain="month",
-                ),
-                inputs="modelling_spine",
-                outputs="scope_grid",
-                name="build_scope_grid",
-            ),
-        ],
-        tags="scope",
-    )
-
-
-# --------------------------------------------------------------------------- #
-# STAGING layer -- each node picks its own scope. Same factory, per-node config.
-# --------------------------------------------------------------------------- #
 def create_staging_pipeline(**kwargs) -> Pipeline:
     return pipeline(
         [
-            # range: date filter via per-anchor windows; coarse-prune the load col
+            # range: date filter via per-anchor windows; coarse-prune the load col.
+            # `windows` (entity_id, win_start, win_end) is built upstream.
             node(
                 func=partial(
                     scoped_stage,
                     transform=stage_txns,
-                    on=ID,
+                    id_col=ID,
                     strategy="range",
                     date_col="txn_date",
                     prune_col="load_date",
@@ -128,14 +72,16 @@ def create_staging_pipeline(**kwargs) -> Pipeline:
                 outputs="txns_staged",
                 name="stage_txns",
             ),
-            # grid: exact (id, month) equi-join -- this table IS month-partitioned
+            # grid: exact (id, month) equi-join -- this table IS month-partitioned.
+            # `scope_grid` (entity_id, obs_month) is YOUR own data_scope_ids output.
             node(
                 func=partial(
                     scoped_stage,
                     transform=stage_events,
-                    on=ID,
+                    id_col=ID,
                     strategy="grid",
                     date_col="event_date",
+                    grid_col="obs_month",
                     grain="month",
                 ),
                 inputs={
@@ -146,12 +92,12 @@ def create_staging_pipeline(**kwargs) -> Pipeline:
                 outputs="events_staged",
                 name="stage_events",
             ),
-            # id_only: small dimension, no date reduction
+            # id_only: small dimension, no date reduction.
             node(
                 func=partial(
                     scoped_stage,
                     transform=stage_dim,
-                    on=ID,
+                    id_col=ID,
                     strategy="id_only",
                 ),
                 inputs={"raw": "raw_dim", "scope_ids": "scope_ids"},
