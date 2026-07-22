@@ -6,6 +6,11 @@ Reduce every billion-row source table to the exact `(account_id, observation_dat
 pairs your data scientists need **before** any feature logic runs, so Kedro nodes
 never transform the full universe.
 
+> **Config-driven scope filtering** (the current refactoring — per-table strategy,
+> multiple id types, no recomputed `distinct()`) lives in [`scope/`](scope/README.md).
+> Start there for the staging-layer reduction pattern; this README covers the older
+> SCD2 / daily prefilter helpers.
+
 ## Concepts
 
 - **Spine** — the `(account_id, observation_date)` backbone. `observation_date` is

@@ -15,6 +15,12 @@ builders -- persisted, and passed to these nodes as catalog inputs. This module
 only *applies* them; it never calls ``.distinct()`` (recomputing it per staging
 node would shuffle the same set N times).
 
+There is no single global scope: there are many scope sets, one per id TYPE
+(customer, account, ...). ``id_col`` and the scope DataFrames are per-node
+arguments, so different staging nodes reduce against different scopes -- e.g. a
+customer-grain table against ``customer_scope_ids`` / ``customer_windows`` and an
+account-grain table against ``account_scope_ids`` / ``account_grid``.
+
 Strategies
 ----------
 * ``id_only`` -- keep raw rows whose id is in scope. ``leftsemi`` on ``scope_ids``.
