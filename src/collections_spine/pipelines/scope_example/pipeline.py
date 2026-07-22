@@ -29,7 +29,11 @@ from functools import partial
 
 from kedro.pipeline import Pipeline, node, pipeline
 
+from src.collections_spine import Scd2Schema, stage_scd2_table
 from src.collections_spine.scope import scoped_stage
+
+# SCD2 column contract for the example interval table (override per table).
+_CONTRACT_SCD2 = Scd2Schema(key="customer_id")
 
 # --- example config (move to conf/base/parameters.yml in real use) -----------
 # global window extent for the coarse partition prune, computed once from the
@@ -109,6 +113,25 @@ def create_staging_pipeline(**kwargs) -> Pipeline:
                 inputs={"raw": "raw_customer_dim", "scope_ids": "customer_scope_ids"},
                 outputs="customer_dim_staged",
                 name="stage_customer_dim",
+            ),
+            # CUSTOMER-grain SCD2 (eff_start/eff_end intervals): NOT a scoped_stage.
+            # stage_scd2_table both reduces AND collapses intervals to one active
+            # row per (customer_id, observation_date) -- the grain we want. It takes
+            # the pre-built scope_ids as `accounts` (no per-node distinct) and the
+            # (id, observation_date) pairs as `spine` (here the customer grid).
+            node(
+                func=partial(
+                    stage_scd2_table,
+                    schema=_CONTRACT_SCD2,
+                    broadcast_accounts=True,
+                ),
+                inputs={
+                    "raw_df": "raw_customer_scd2",
+                    "spine": "customer_grid",
+                    "accounts": "customer_scope_ids",
+                },
+                outputs="customer_scd2_staged",
+                name="stage_customer_scd2",
             ),
         ],
         tags="staging",

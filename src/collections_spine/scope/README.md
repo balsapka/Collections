@@ -62,6 +62,46 @@ relevant nodes at them. No code in this module changes.
   otherwise `range` is cheaper. `grain` truncates the raw date to match the grid;
   `grain=None` for a daily enumerated grid (exact match).
 
+## SCD2 / interval tables — reduction is not enough
+
+The three strategies above are **grain-preserving** reductions (`leftsemi`): they
+keep in-scope raw rows *as they are*. That is correct for daily-grain and event
+tables. It is **wrong** for SCD2 / effective-dated tables (`eff_start`, `eff_end`
+intervals), which need a **grain-changing** step: collapse each id's interval
+history to **one active row per `(id, observation_date)`** — the state as-of each
+date. A plain `apply_scope` would leave such a table at interval grain.
+
+That collapse is `stage_scd2_table` / `prefilter_scd2` in the parent package (the
+point-in-time selection: interval covering the date, greatest `eff_start`, with
+`date_modified` only as a restatement tie-break). Think of it as the **SCD2
+counterpart of `scoped_stage`**: it reduces to the population AND changes grain, in
+one pass.
+
+Intent difference — this is why you can't force SCD2 into `range`/`grid`:
+
+| | `range` / `grid` | SCD2 (`stage_scd2_table`) |
+|---|---|---|
+| question | *gather a window of history* | *state as-of each observation date* |
+| output grain | raw rows in scope | one row per `(id, observation_date)` |
+| operation | grain-preserving `leftsemi` | interval → point-in-time collapse |
+
+Wiring an SCD2 table in the same staging pipeline:
+
+```python
+node(
+    func=partial(stage_scd2_table, schema=Scd2Schema(key="customer_id"),
+                 broadcast_accounts=True),
+    inputs={"raw_df": "raw_customer_scd2",
+            "spine": "customer_grid",          # the (id, observation_date) pairs
+            "accounts": "customer_scope_ids"}, # pre-built scope_ids -> no per-node distinct
+    outputs="customer_scd2_staged", name="stage_customer_scd2",
+)
+```
+
+Note it consumes the **same** `customer_scope_ids` (via `accounts=`) as the
+reduction-only nodes, so the id set is still computed once. The `spine` is this id
+type's `(id, observation_date)` pairs — reuse your `grid` / `data_scope_ids`.
+
 ## Invariants — do not regress these when refactoring further
 
 1. **Never `.distinct()` (or otherwise rebuild a scope set) inside a staging node.**

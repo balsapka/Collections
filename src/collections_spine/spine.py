@@ -167,8 +167,15 @@ def prefilter_scd2(
     obs_col: str = "observation_date",
     broadcast_dates: bool = True,
     broadcast_accounts: bool = False,
+    accounts: Optional[DataFrame] = None,
 ) -> DataFrame:
     """Reduce a billion-row SCD2 table to one active row per spine pair.
+
+    This is the INTERVAL -> point-in-time collapse: unlike the grain-preserving
+    ``scope.apply_scope`` reductions (``id_only`` / ``range`` / ``grid``), it
+    changes grain from ``eff_start``/``eff_end`` intervals to one active row per
+    ``(key, observation_date)``. SCD2 tables need this; a plain scope leftsemi
+    would leave them at interval grain.
 
     Selection per ``(key, observation_date)`` is the interval covering the date
     with the greatest ``eff_start``, then the greatest ``date_modified`` as a
@@ -187,14 +194,19 @@ def prefilter_scd2(
     Args:
         df: SCD2 source table.
         spine: ``(account_id, observation_date)`` DataFrame (column names per
-            ``schema.key`` and ``obs_col``).
+            ``schema.key`` and ``obs_col``). Supplies the observation dates for the
+            PIT collapse -- e.g. your ``data_scope_ids`` / ``grid`` for this id type.
         schema: Column/interval contract.
         obs_col: Observation-date column name in ``spine``.
         broadcast_dates: Broadcast the tiny distinct-observation-date set (the
             key to turning the interval join into a bounded explode). Leave on.
-        broadcast_accounts: Broadcast the distinct-account set in the step-0
-            semi-join. Enable only if that set fits comfortably in memory;
-            otherwise rely on bucketing / dynamic partition pruning.
+        broadcast_accounts: Broadcast the account set in the step-0 semi-join.
+            Enable only if that set fits comfortably in memory; otherwise rely on
+            bucketing / dynamic partition pruning.
+        accounts: Pre-built distinct-id set (your materialized ``scope_ids`` for
+            this id type). Pass it to reuse the once-computed set instead of
+            recomputing ``spine.select(key).distinct()`` per node. ``None`` (default)
+            keeps the old self-contained behaviour. Must expose ``schema.key``.
 
     Returns:
         One row per ``(account_id, observation_date)`` present in the spine and
@@ -203,7 +215,13 @@ def prefilter_scd2(
     start, end = F.col(schema.eff_start), F.col(schema.eff_end)
 
     # 0. account semi-join: drop everything outside the modeling population.
-    accounts = spine.select(schema.key).distinct()
+    #    Prefer the pre-built scope_ids (once-computed) over a per-node distinct.
+    #    A provided set is already distinct; leftsemi ignores right-side dups, so
+    #    project the key but do NOT re-shuffle it with another distinct().
+    if accounts is None:
+        accounts = spine.select(schema.key).distinct()
+    else:
+        accounts = accounts.select(schema.key)
     df = df.join(F.broadcast(accounts) if broadcast_accounts else accounts, schema.key, "leftsemi")
 
     # 1. date-overlap prune (interval must touch [lo, hi]) -> partition pruning.
@@ -322,8 +340,16 @@ def stage_scd2_table(
     schema: Optional[Scd2Schema] = None,
     obs_col: str = "observation_date",
     broadcast_accounts: bool = False,
+    accounts: Optional[DataFrame] = None,
 ) -> DataFrame:
     """Kedro node: stage one SCD2 source table against the spine.
+
+    The SCD2 counterpart of ``scope.scoped_stage``: it reduces to the population
+    AND collapses intervals to one active row per ``(key, observation_date)`` (the
+    grain you want, not raw ``eff_start``/``eff_end``). Pass ``accounts`` as this id
+    type's materialized ``scope_ids`` and ``spine`` as its ``(id, observation_date)``
+    pairs (e.g. your ``data_scope_ids`` / ``grid``); with ``accounts`` provided the
+    only per-node distinct is the tiny observation-date set.
 
     Repartitions by ``observation_date`` so the persisted staging output is laid
     out for cheap, partition-pruned reads by downstream feature nodes.
@@ -335,6 +361,7 @@ def stage_scd2_table(
         schema=schema,
         obs_col=obs_col,
         broadcast_accounts=broadcast_accounts,
+        accounts=accounts,
     )
     return out.repartition(F.col(obs_col))
 

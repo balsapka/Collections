@@ -108,6 +108,24 @@ def test_prefilter_scd2_grid_and_population_filter(spark):
     }
 
 
+def test_prefilter_scd2_accepts_prebuilt_accounts(spark):
+    # Passing a materialized scope_ids via `accounts` must match the self-contained
+    # path (internal spine.select(key).distinct()) exactly.
+    df = _scd2(spark, [
+        ("A", "2025-01-01", "2025-06-01", "2025-01-01", 100),
+        ("A", "2025-06-01", OPEN_END_SENTINEL, "2025-06-01", 200),
+        ("Z", "2025-01-01", OPEN_END_SENTINEL, "2025-01-01", 777),  # not in scope_ids
+    ])
+    spine = build_spine(
+        spark.createDataFrame([("A",)], ["account_id"]),
+        ["2025-03-31", "2025-07-31"],
+    )
+    scope_ids = spark.createDataFrame([("A",)], ["account_id"])
+    out = {(r["account_id"], str(r["observation_date"])): r["limit"]
+           for r in prefilter_scd2(df, spine, accounts=scope_ids).collect()}
+    assert out == {("A", "2025-03-31"): 100, ("A", "2025-07-31"): 200}
+
+
 def test_prefilter_scd2_uses_latest_restatement_even_if_future(spark):
     # Same eff_start, so date_modified breaks the tie -- latest wins regardless of
     # when it was booked (no knowledge cutoff).
