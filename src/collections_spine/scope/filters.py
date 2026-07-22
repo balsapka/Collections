@@ -19,13 +19,13 @@ is shaped to avoid.
 
 Strategies
 ----------
-* ``id_only`` -- keep raw rows whose id is in scope. Broadcast ``leftsemi`` on the
-  distinct id set. For small dimensions / tables with no date reduction.
+* ``id_only`` -- keep raw rows whose id is in scope. ``leftsemi`` on the distinct
+  id set. For small dimensions / tables with no date reduction.
 * ``range``   -- keep raw rows whose date falls in ANY anchor's window
-  ``[anchor - lookback, anchor + lookahead]``. Broadcast ``leftsemi`` against the
-  per-anchor ``(id, win_start, win_end)`` set. Window variation lives in two
-  columns, so nothing is materialised at row grain. Works regardless of how the
-  raw table is physically partitioned.
+  ``[anchor - lookback, anchor + lookahead]``. ``leftsemi`` against the per-anchor
+  ``(id, win_start, win_end)`` set. Window variation lives in two columns, so
+  nothing is materialised at row grain. Works regardless of how the raw table is
+  physically partitioned.
 * ``grid``    -- keep raw rows whose ``(id, month)`` is in the exploded
   ``(id, obs_grain)`` set. A pure equi ``leftsemi``. Prefer this ONLY when the raw
   table is physically partitioned on that grain (it enables dynamic partition
@@ -34,6 +34,16 @@ Strategies
 The precise match is always a ``leftsemi`` so a raw row covered by several anchors
 survives exactly once (no fan-out, no dedup). Scope is reduction only; grain /
 as-of logic belongs in the downstream transform.
+
+Join strategy / broadcasting
+----------------------------
+Only the distinct ``scope_ids`` set (one row per id) is force-broadcast, for the
+cheap id-prune. ``windows`` / ``grid`` are one row per (id, anchor) / (id, month)
+and can be millions of rows, so they are NOT force-broadcast (that would collect
+them to the driver and OOM). The ``range`` join carries an equi key (``id``), so
+Spark runs it as a sort-merge join with the ``BETWEEN`` as a residual filter --
+never a cartesian -- and still auto-broadcasts a genuinely small side on its own.
+See ``apply_scope``'s ``broadcast_ids`` / ``broadcast_scope`` for the knobs.
 """
 
 from __future__ import annotations
