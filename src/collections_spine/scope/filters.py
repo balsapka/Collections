@@ -124,7 +124,8 @@ def apply_scope(
     grain: str = "month",
     prune_col: Optional[str] = None,
     prune_bounds: Optional[tuple[str, str]] = None,
-    broadcast: bool = True,
+    broadcast_ids: bool = True,
+    broadcast_scope: bool = False,
 ) -> DataFrame:
     """Reduce ``df`` to the modelling scope. Pre-built sets in, joined never distinct.
 
@@ -144,13 +145,25 @@ def apply_scope(
             filter when it prunes nothing (single-partition history table).
         prune_bounds: ``(lo, hi)`` literal extent for ``prune_col`` -- the global
             window extent, computed once by the caller (no agg here).
-        broadcast: Broadcast the small scope sets. Leave on unless a set is large.
+        broadcast_ids: Force-broadcast the distinct ``scope_ids`` set (one row per
+            id -- reliably small). Set ``False`` if the id universe itself is too
+            large to broadcast.
+        broadcast_scope: Force-broadcast ``windows`` / ``grid``. Default ``False``:
+            these are one row per (id, anchor) / (id, month) and can be MILLIONS of
+            rows -- forcing a broadcast collects them to the driver and OOMs. Left
+            off, the range join runs as a sort-merge join on the equi ``id`` key
+            with the ``BETWEEN`` as a residual filter (not a cartesian), and the
+            grid join as a normal equi join; Spark still auto-broadcasts either side
+            if it is genuinely under ``autoBroadcastJoinThreshold``. Set ``True``
+            only when you know the set is small (e.g. a single-anchor population).
 
     Returns:
         Raw rows in scope, each at most once (``leftsemi`` precise match).
     """
     keys = _as_list(on)
-    bc = F.broadcast if broadcast else (lambda x: x)
+    _ident = lambda x: x  # noqa: E731
+    bc_ids = F.broadcast if broadcast_ids else _ident
+    bc_scope = F.broadcast if broadcast_scope else _ident
 
     # coarse partition/file prune -- enables pruning where the layout allows it,
     # a harmless row filter otherwise. Bounds are literal: no action triggered.
@@ -160,7 +173,7 @@ def apply_scope(
 
     # cheap broadcast id-prune: shrink the scan before the precise match.
     if scope_ids is not None:
-        df = df.join(bc(scope_ids), keys, "leftsemi")
+        df = df.join(bc_ids(scope_ids), keys, "leftsemi")
 
     if strategy == "id_only":
         return df
@@ -171,8 +184,10 @@ def apply_scope(
         d, w = df.alias("d"), windows.alias("w")
         cond = reduce(operator.and_, (F.col(f"d.{k}") == F.col(f"w.{k}") for k in keys))
         cond = cond & F.col(f"d.{date_col}").between(F.col("w.win_start"), F.col("w.win_end"))
-        # leftsemi -> each raw row survives once even if several windows cover it
-        return d.join(bc(w), cond, "leftsemi")
+        # Equi key `id` present -> sort-merge join with the BETWEEN as a residual
+        # filter (NOT a cartesian). leftsemi -> each raw row survives once even if
+        # several windows cover it. windows unhinted by default (can be millions).
+        return d.join(bc_scope(w), cond, "leftsemi")
 
     if strategy == "grid":
         if date_col is None or grid is None:
@@ -180,7 +195,7 @@ def apply_scope(
         obs = F.trunc(F.col(date_col), grain) if grain else F.col(date_col)
         d = df.withColumn("_obs_grain", obs)
         g = grid.withColumnRenamed("obs_grain", "_obs_grain")
-        return d.join(bc(g), keys + ["_obs_grain"], "leftsemi").drop("_obs_grain")
+        return d.join(bc_scope(g), keys + ["_obs_grain"], "leftsemi").drop("_obs_grain")
 
     raise ValueError(f"unknown strategy: {strategy!r}")
 
@@ -198,6 +213,8 @@ def scoped_stage(
     grain: str = "month",
     prune_col: Optional[str] = None,
     prune_bounds: Optional[tuple[str, str]] = None,
+    broadcast_ids: bool = True,
+    broadcast_scope: bool = False,
 ) -> DataFrame:
     """One staging node: apply the chosen scope, then run the pure ``transform``.
 
@@ -205,7 +222,7 @@ def scoped_stage(
     ``functools.partial`` in the pipeline; the DataFrame inputs (``raw`` +
     whichever scope sets the strategy needs) stay as node inputs. ``transform`` is
     a plain ``DataFrame -> DataFrame`` reused as-is by the spine layer on
-    unscoped slim raw.
+    unscoped slim raw. ``broadcast_scope`` defaults off -- see :func:`apply_scope`.
     """
     scoped = apply_scope(
         raw,
@@ -218,5 +235,7 @@ def scoped_stage(
         grain=grain,
         prune_col=prune_col,
         prune_bounds=prune_bounds,
+        broadcast_ids=broadcast_ids,
+        broadcast_scope=broadcast_scope,
     )
     return transform(scoped)

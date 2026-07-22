@@ -31,6 +31,17 @@ The precise match is always `leftsemi`, so a raw row covered by several anchors
 survives exactly once — no fan-out, no dedup. Grain / as-of logic belongs in the
 downstream transform, not in scope.
 
+## Broadcasting
+
+Only `scope_ids` (one row per id) is force-broadcast by default (`broadcast_ids`).
+`windows` and `grid` are **not** — they're one row per `(id, anchor)` / `(id, month)`
+and can be millions of rows, so forcing a broadcast collects them to the driver and
+OOMs. Left unhinted, the `range` join runs as a sort-merge join on the equi `id`
+key with the `BETWEEN` as a residual filter (the equi key means it's never a
+cartesian), and Spark still auto-broadcasts either side if it's genuinely under
+`spark.sql.autoBroadcastJoinThreshold`. Pass `broadcast_scope=True` only for a
+small set (e.g. a single-anchor population).
+
 ## Catalog (persist the scope sets — narrow, reused everywhere)
 
 ```yaml
