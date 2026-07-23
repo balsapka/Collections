@@ -1,13 +1,15 @@
-"""Config-driven scope filtering for wide raw tables -- staging side.
+"""Scope filtering for wide raw tables -- staging side.
 
-Scope sets (scope_ids / windows / grid) are produced upstream and passed in as
-node inputs; this module only applies them.
+Three composable leftsemi filters; scope sets are produced upstream and passed in
+as node inputs. Column-name differences are handled by aliasing the small side
+internally -- never by copying datasets.
 
 Public API:
-    apply_scope  -- reduce a raw table to scope (joins only, never distinct)
-    scoped_stage -- staging node: apply_scope then a pure transform
+    filter_ids     -- keep rows whose id is in scope
+    filter_windows -- keep rows whose date falls in any of the id's anchor windows
+    filter_pairs   -- keep rows whose exact (id, date) pair is in scope
 """
 
-from .filters import apply_scope, scoped_stage
+from .filters import filter_ids, filter_pairs, filter_windows
 
-__all__ = ["apply_scope", "scoped_stage"]
+__all__ = ["filter_ids", "filter_pairs", "filter_windows"]

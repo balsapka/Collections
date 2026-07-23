@@ -1,185 +1,148 @@
-"""Config-driven scope filtering for wide raw tables (PySpark) -- staging side.
+"""Scope filtering for wide raw tables (PySpark) -- staging side.
 
-A modelling *spine* of ``(id, anchor_date)`` pairs defines the population. Every
-raw table must be reduced to just the rows in scope before feature logic runs.
-Two facts vary *per raw table*, so they are configuration, not code:
+Three small, composable filters instead of one strategy-enum mega-function. Each
+keeps the raw rows that match a pre-built scope set and takes ONLY the arguments
+its join shape needs:
 
-* the id / date column names,
-* the reduction *strategy* -- ``id_only`` / ``range`` / ``grid``.
+* :func:`filter_ids`     -- id in scope                 (leftsemi on the id set)
+* :func:`filter_windows` -- id + date in an anchor window (leftsemi, equi id +
+  ``BETWEEN`` residual)
+* :func:`filter_pairs`   -- exact (id, date) pair in scope (leftsemi, equi on BOTH
+  id and date -- always both, no grain truncation)
+
+Compose them in a per-table staging function; per-table facts (column names,
+which filters apply) live THERE, not in shared machinery::
+
+    def stage_txns(raw, scope_ids, windows):
+        df = filter_ids(raw, scope_ids, id_col="contract_idt",
+                        scope_id_col="customer_id")
+        df = filter_windows(df, windows, id_col="contract_idt",
+                            date_col="txn_date", scope_id_col="customer_id")
+        ...  # real staging logic
+        return df
+
+Column-name mapping, not dataset copies
+---------------------------------------
+Raw tables and scope sets rarely share column names. Every filter takes optional
+``scope_*_col`` names and aliases the SMALL side internally -- an alias is a
+projection in the Spark plan, so nothing is materialised. Never create a renamed
+copy of a scope/spine dataset just to match a raw table.
 
 Scope sets are inputs, not built here
 -------------------------------------
-``scope_ids`` (distinct ids), ``windows`` (``id, win_start, win_end``) and
-``grid`` (``id, <grain>``) are produced UPSTREAM -- by the spine layer or your own
-builders -- persisted, and passed to these nodes as catalog inputs. This module
-only *applies* them; it never calls ``.distinct()`` (recomputing it per staging
-node would shuffle the same set N times).
+Scope sets are produced upstream, persisted, and passed in as catalog inputs.
+There are many of them -- one per id TYPE (customer, account, ...). These
+functions never call ``.distinct()``: recomputing the id set per staging node
+would shuffle the same result N times.
 
-There is no single global scope: there are many scope sets, one per id TYPE
-(customer, account, ...). ``id_col`` and the scope DataFrames are per-node
-arguments, so different staging nodes reduce against different scopes -- e.g. a
-customer-grain table against ``customer_scope_ids`` / ``customer_windows`` and an
-account-grain table against ``account_scope_ids`` / ``account_grid``.
+Broadcasting
+------------
+``filter_ids`` force-broadcasts by default (one row per id -- reliably small).
+``filter_windows`` / ``filter_pairs`` do NOT: their sets are one row per
+(id, anchor) / (id, date) and can be millions of rows; a forced broadcast
+collects them to the driver and OOMs. Unhinted, the window join runs as a
+sort-merge join on the equi id key with ``BETWEEN`` as a residual filter (never a
+cartesian), and Spark still auto-broadcasts a side that is genuinely under
+``autoBroadcastJoinThreshold``.
 
-Strategies
-----------
-* ``id_only`` -- keep raw rows whose id is in scope. ``leftsemi`` on ``scope_ids``.
-  For small dimensions / tables with no date reduction.
-* ``range``   -- keep raw rows whose date falls in ANY anchor's window
-  ``[anchor - lookback, anchor + lookahead]``. ``leftsemi`` against ``windows``.
-  Window variation lives in two columns, nothing materialised at row grain. Works
-  regardless of how the raw table is physically partitioned.
-* ``grid``    -- keep raw rows whose ``(id, grain)`` is in ``grid``. A pure equi
-  ``leftsemi``. Prefer this ONLY when the raw table is physically partitioned on
-  that grain (it enables dynamic partition pruning); otherwise ``range`` is cheaper.
-
-The precise match is always a ``leftsemi`` so a raw row covered by several anchors
-survives exactly once (no fan-out, no dedup). Scope is reduction only; grain /
-as-of logic belongs in the downstream transform.
-
-Join strategy / broadcasting
-----------------------------
-Only ``scope_ids`` (one row per id) is force-broadcast, for the cheap id-prune.
-``windows`` / ``grid`` are one row per (id, anchor) / (id, grain) and can be
-millions of rows, so they are NOT force-broadcast (that would collect them to the
-driver and OOM). The ``range`` join carries an equi key (``id``), so Spark runs it
-as a sort-merge join with the ``BETWEEN`` as a residual filter -- never a
-cartesian -- and still auto-broadcasts a genuinely small side on its own. See
-``broadcast_ids`` / ``broadcast_scope``.
+Every filter is a ``leftsemi``: a raw row covered by several anchors/windows
+survives exactly once -- no fan-out, no dedup. Scope is reduction only; grain /
+as-of / point-in-time logic (e.g. SCD2 collapse via ``stage_scd2_table``) belongs
+downstream.
 """
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Optional
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 
-def apply_scope(
+def filter_ids(
     df: DataFrame,
+    scope_ids: DataFrame,
     *,
     id_col: str,
-    strategy: str,
-    scope_ids: Optional[DataFrame] = None,
-    windows: Optional[DataFrame] = None,
-    grid: Optional[DataFrame] = None,
-    date_col: Optional[str] = None,
-    grid_col: str = "obs_month",
-    grain: Optional[str] = "month",
-    prune_col: Optional[str] = None,
-    prune_bounds: Optional[tuple[str, str]] = None,
-    broadcast_ids: bool = True,
-    broadcast_scope: bool = False,
+    scope_id_col: Optional[str] = None,
+    broadcast: bool = True,
 ) -> DataFrame:
-    """Reduce ``df`` to the modelling scope. Pre-built sets in, joined never distinct.
+    """Keep raw rows whose id is in ``scope_ids``.
 
     Args:
-        id_col: Entity key column (present in ``df`` and every scope set).
-        strategy: ``id_only`` | ``range`` | ``grid``.
-        scope_ids: Distinct id set for the cheap broadcast id-prune (and the whole
-            reduction for ``id_only``).
-        windows: ``(id, win_start, win_end)`` for ``range``.
-        grid: ``(id, <grid_col>)`` for ``grid``.
-        date_col: Raw observation-date column (``range`` / ``grid``).
-        grid_col: Name of the grain column in ``grid`` (``grid`` only).
-        grain: Truncation applied to ``date_col`` to match ``grid_col``
-            (``"month"``, ``"week"``, ...). ``None`` = exact match, e.g. a daily
-            enumerated grid (``grid`` only).
-        prune_col: Partition/clustered column for a coarse file prune. Often NOT
-            ``date_col`` (e.g. an ``edp_load_date`` load partition). Harmless row
-            filter when it prunes nothing (single-partition history table).
-        prune_bounds: ``(lo, hi)`` literal extent for ``prune_col`` -- the global
-            window extent, computed once by the caller (no agg here).
-        broadcast_ids: Force-broadcast ``scope_ids`` (reliably small). Set ``False``
-            only if the id universe itself is too large to broadcast.
-        broadcast_scope: Force-broadcast ``windows`` / ``grid``. Default ``False``:
-            these can be MILLIONS of rows and a forced broadcast OOMs the driver.
-            Left off, ``range`` is a sort-merge join (equi ``id`` + ``BETWEEN``
-            residual) and ``grid`` a normal equi join; Spark still auto-broadcasts a
-            side under ``autoBroadcastJoinThreshold``. Set ``True`` only for a known
-            small set (e.g. a single-anchor population).
-
-    Returns:
-        Raw rows in scope, each at most once (``leftsemi`` precise match).
+        df: Raw table.
+        scope_ids: Pre-built distinct id set for this id type.
+        id_col: Id column in ``df``.
+        scope_id_col: Id column in ``scope_ids`` if named differently (aliased
+            internally -- no copy).
+        broadcast: Force-broadcast the id set. Default on; disable only if the id
+            universe itself is too large to broadcast.
     """
-    ident = lambda x: x  # noqa: E731
-    bc_ids = F.broadcast if broadcast_ids else ident
-    bc_scope = F.broadcast if broadcast_scope else ident
-
-    # coarse partition/file prune -- prunes where the layout allows, a harmless row
-    # filter otherwise. Bounds are literal: no action triggered.
-    if prune_col and prune_bounds:
-        lo, hi = prune_bounds
-        df = df.where(F.col(prune_col).between(F.lit(lo), F.lit(hi)))
-
-    # cheap broadcast id-prune: shrink the scan before the precise match.
-    if scope_ids is not None:
-        df = df.join(bc_ids(scope_ids), id_col, "leftsemi")
-
-    if strategy == "id_only":
-        return df
-
-    if strategy == "range":
-        if date_col is None or windows is None:
-            raise ValueError("range strategy requires date_col and windows")
-        d, w = df.alias("d"), windows.alias("w")
-        cond = (F.col(f"d.{id_col}") == F.col(f"w.{id_col}")) & F.col(
-            f"d.{date_col}"
-        ).between(F.col("w.win_start"), F.col("w.win_end"))
-        # equi key `id` -> sort-merge join, BETWEEN as residual (never cartesian);
-        # leftsemi -> each raw row survives once even if several windows cover it.
-        return d.join(bc_scope(w), cond, "leftsemi")
-
-    if strategy == "grid":
-        if date_col is None or grid is None:
-            raise ValueError("grid strategy requires date_col and grid")
-        d, g = df.alias("d"), grid.alias("g")
-        obs = F.trunc(F.col(f"d.{date_col}"), grain) if grain else F.col(f"d.{date_col}")
-        cond = (F.col(f"d.{id_col}") == F.col(f"g.{id_col}")) & (obs == F.col(f"g.{grid_col}"))
-        return d.join(bc_scope(g), cond, "leftsemi")
-
-    raise ValueError(f"unknown strategy: {strategy!r}")
+    ids = scope_ids.select(F.col(scope_id_col or id_col).alias(id_col))
+    return df.join(F.broadcast(ids) if broadcast else ids, id_col, "leftsemi")
 
 
-def scoped_stage(
-    raw: DataFrame,
-    scope_ids: Optional[DataFrame] = None,
-    windows: Optional[DataFrame] = None,
-    grid: Optional[DataFrame] = None,
+def filter_windows(
+    df: DataFrame,
+    windows: DataFrame,
     *,
-    transform: Callable[[DataFrame], DataFrame],
     id_col: str,
-    strategy: str,
-    date_col: Optional[str] = None,
-    grid_col: str = "obs_month",
-    grain: Optional[str] = "month",
-    prune_col: Optional[str] = None,
-    prune_bounds: Optional[tuple[str, str]] = None,
-    broadcast_ids: bool = True,
-    broadcast_scope: bool = False,
+    date_col: str,
+    scope_id_col: Optional[str] = None,
+    start_col: str = "win_start",
+    end_col: str = "win_end",
 ) -> DataFrame:
-    """One staging node: apply the chosen scope, then run the pure ``transform``.
+    """Keep raw rows whose date falls inside ANY of the id's anchor windows.
 
-    Bind the config (``transform``, ``id_col``, ``strategy``, ...) with
-    ``functools.partial`` in the pipeline; the DataFrame inputs (``raw`` +
-    whichever scope sets the strategy needs) stay as node inputs. ``transform`` is a
-    plain ``DataFrame -> DataFrame`` reused as-is by the spine layer on unscoped
-    slim raw. ``broadcast_scope`` defaults off -- see :func:`apply_scope`.
+    ``windows`` is one row per (id, anchor): ``(id, start, end)``. The join has an
+    equi id key plus a ``BETWEEN`` residual, so Spark runs a sort-merge join --
+    never a cartesian -- and auto-broadcasts a genuinely small side on its own
+    (no forced broadcast here: windows can be millions of rows).
+
+    Args:
+        df: Raw table.
+        windows: Pre-built per-anchor window set for this id type.
+        id_col: Id column in ``df``.
+        date_col: Observation-date column in ``df``.
+        scope_id_col: Id column in ``windows`` if named differently.
+        start_col / end_col: Window bound columns in ``windows``.
     """
-    scoped = apply_scope(
-        raw,
-        id_col=id_col,
-        strategy=strategy,
-        scope_ids=scope_ids,
-        windows=windows,
-        grid=grid,
-        date_col=date_col,
-        grid_col=grid_col,
-        grain=grain,
-        prune_col=prune_col,
-        prune_bounds=prune_bounds,
-        broadcast_ids=broadcast_ids,
-        broadcast_scope=broadcast_scope,
+    w = windows.select(
+        F.col(scope_id_col or id_col).alias("_w_id"),
+        F.col(start_col).alias("_w_start"),
+        F.col(end_col).alias("_w_end"),
     )
-    return transform(scoped)
+    cond = (df[id_col] == w["_w_id"]) & df[date_col].between(w["_w_start"], w["_w_end"])
+    return df.join(w, cond, "leftsemi")
+
+
+def filter_pairs(
+    df: DataFrame,
+    pairs: DataFrame,
+    *,
+    id_col: str,
+    date_col: str,
+    scope_id_col: Optional[str] = None,
+    scope_date_col: Optional[str] = None,
+) -> DataFrame:
+    """Keep raw rows whose exact ``(id, date)`` pair is in ``pairs``.
+
+    Always an equi ``leftsemi`` on BOTH id and date -- no grain truncation. The
+    pair set's date grain must already match the raw table's (build it that way
+    upstream). Use this over :func:`filter_windows` only when the raw table is
+    physically partitioned on the date grain, where the equi key enables dynamic
+    partition pruning.
+
+    Args:
+        df: Raw table.
+        pairs: Pre-built ``(id, date)`` set (e.g. your ``data_scope_ids``).
+        id_col: Id column in ``df``.
+        date_col: Date column in ``df``.
+        scope_id_col / scope_date_col: Column names in ``pairs`` if they differ
+            (aliased internally -- no copy).
+    """
+    p = pairs.select(
+        F.col(scope_id_col or id_col).alias(id_col),
+        F.col(scope_date_col or date_col).alias(date_col),
+    )
+    return df.join(p, [id_col, date_col], "leftsemi")

@@ -1,20 +1,22 @@
-"""Example STAGING pipeline for config-driven scope filtering.
+"""Example STAGING pipeline for scope filtering.
 
-Each staging node reduces one raw table with its OWN strategy AND its OWN scope
-sets via ``scoped_stage``, then runs a pure transform. Different tables use
-different scoping -- that per-node choice is the ``functools.partial`` config, so
-nothing is duplicated.
+Each raw table has its own small staging function that COMPOSES the scope filters
+it needs (``filter_ids`` / ``filter_windows`` / ``filter_pairs``) and then runs the
+real staging logic. Per-table facts -- column names, which filters apply, coarse
+prune -- live in that function, where they are local and readable. There is no
+strategy enum, no factory, no wrapper.
 
-Multiple id types
------------------
-There is no single global scope. Each id TYPE (customer, account, ...) has its own
-``scope_ids`` and (for ``range``) its own ``windows`` / ``grid``, all produced
-UPSTREAM by your own builders. A staging node picks the ``id_col`` and the scope
-datasets that match the grain of its raw table -- see how ``stage_txns`` uses the
-customer scope while ``stage_positions`` uses the account scope below.
+Column-name differences between a raw table and a scope set are handled by the
+filters' ``scope_*_col`` arguments (internal alias on the small side) -- never by
+materialising a renamed copy of a scope dataset.
 
-Downstream primary / intermediate / feature pipelines read staged outputs only, so
-they carry no scope wiring at all.
+Multiple id types: each id TYPE (customer, account, ...) has its own scope sets,
+produced upstream. A staging node simply names the ones matching its table's
+grain in its Kedro inputs.
+
+SCD2 / interval tables do NOT use these filters -- they need the interval ->
+point-in-time collapse to one active row per (id, observation_date), which is
+``stage_scd2_table`` (see the last node).
 
 Register in ``pipeline_registry.py``::
 
@@ -28,33 +30,51 @@ Register in ``pipeline_registry.py``::
 from functools import partial
 
 from kedro.pipeline import Pipeline, node, pipeline
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 
 from src.collections_spine import Scd2Schema, stage_scd2_table
-from src.collections_spine.scope import scoped_stage
+from src.collections_spine.scope import filter_ids, filter_pairs, filter_windows
 
 # SCD2 column contract for the example interval table (override per table).
 _CONTRACT_SCD2 = Scd2Schema(key="customer_id")
 
-# --- example config (move to conf/base/parameters.yml in real use) -----------
-# global window extent for the coarse partition prune, computed once from the
-# modelling window: [start - lookback, end + lookahead].
-PRUNE_BOUNDS = ("2019-01-01", "2026-07-31")
-
 
 # --------------------------------------------------------------------------- #
-# pure transforms (DataFrame -> DataFrame). Reused unscoped by the spine layer.
+# per-table staging functions -- compose the filters this table needs
 # --------------------------------------------------------------------------- #
-def stage_txns(df):
+def stage_txns(raw: DataFrame, scope_ids: DataFrame, windows: DataFrame) -> DataFrame:
+    """Customer-grain transactions: id prune -> window filter -> staging logic.
+
+    The raw table calls the id ``contract_idt`` while the customer scope sets use
+    ``customer_id`` -- mapped via ``scope_id_col``, no renamed dataset copies.
+    """
+    # coarse prune on the load partition: plain where, bounds from the modelling
+    # window extent (move to params in real use).
+    df = raw.where(F.col("load_date").between("2019-01-01", "2026-07-31"))
+    df = filter_ids(df, scope_ids, id_col="contract_idt", scope_id_col="customer_id")
+    df = filter_windows(
+        df, windows,
+        id_col="contract_idt", date_col="txn_date", scope_id_col="customer_id",
+    )
     # TODO(you): real staging logic
     return df
 
 
-def stage_positions(df):
+def stage_positions(raw: DataFrame, scope_ids: DataFrame, pairs: DataFrame) -> DataFrame:
+    """Account-grain positions: month-partitioned, so exact (id, date) pairs."""
+    df = filter_ids(raw, scope_ids, id_col="account_id")
+    df = filter_pairs(
+        df, pairs,
+        id_col="account_id", date_col="position_date", scope_date_col="obs_date",
+    )
     # TODO(you): real staging logic
     return df
 
 
-def stage_customer_dim(df):
+def stage_customer_dim(raw: DataFrame, scope_ids: DataFrame) -> DataFrame:
+    """Customer dimension: small table, id prune only."""
+    df = filter_ids(raw, scope_ids, id_col="customer_id")
     # TODO(you): real staging logic
     return df
 
@@ -62,18 +82,8 @@ def stage_customer_dim(df):
 def create_staging_pipeline(**kwargs) -> Pipeline:
     return pipeline(
         [
-            # CUSTOMER-grain, range: date filter via the customer windows; coarse-
-            # prune the load col. Uses the CUSTOMER scope sets.
             node(
-                func=partial(
-                    scoped_stage,
-                    transform=stage_txns,
-                    id_col="customer_id",
-                    strategy="range",
-                    date_col="txn_date",
-                    prune_col="load_date",
-                    prune_bounds=PRUNE_BOUNDS,
-                ),
+                func=stage_txns,
                 inputs={
                     "raw": "raw_txns",
                     "scope_ids": "customer_scope_ids",
@@ -82,43 +92,26 @@ def create_staging_pipeline(**kwargs) -> Pipeline:
                 outputs="txns_staged",
                 name="stage_txns",
             ),
-            # ACCOUNT-grain, grid: exact (account, month) equi-join -- this table is
-            # month-partitioned. Uses a DIFFERENT id type and the ACCOUNT scope sets.
             node(
-                func=partial(
-                    scoped_stage,
-                    transform=stage_positions,
-                    id_col="account_id",
-                    strategy="grid",
-                    date_col="position_date",
-                    grid_col="obs_month",
-                    grain="month",
-                ),
+                func=stage_positions,
                 inputs={
                     "raw": "raw_positions",
                     "scope_ids": "account_scope_ids",
-                    "grid": "account_grid",
+                    "pairs": "account_pairs",
                 },
                 outputs="positions_staged",
                 name="stage_positions",
             ),
-            # CUSTOMER-grain, id_only: small dimension, no date reduction.
             node(
-                func=partial(
-                    scoped_stage,
-                    transform=stage_customer_dim,
-                    id_col="customer_id",
-                    strategy="id_only",
-                ),
+                func=stage_customer_dim,
                 inputs={"raw": "raw_customer_dim", "scope_ids": "customer_scope_ids"},
                 outputs="customer_dim_staged",
                 name="stage_customer_dim",
             ),
-            # CUSTOMER-grain SCD2 (eff_start/eff_end intervals): NOT a scoped_stage.
-            # stage_scd2_table both reduces AND collapses intervals to one active
-            # row per (customer_id, observation_date) -- the grain we want. It takes
-            # the pre-built scope_ids as `accounts` (no per-node distinct) and the
-            # (id, observation_date) pairs as `spine` (here the customer grid).
+            # SCD2 interval table: reduce AND collapse to one active row per
+            # (customer_id, observation_date). Takes the pre-built scope_ids as
+            # `accounts` (no per-node distinct) and the (id, observation_date)
+            # pairs as `spine`.
             node(
                 func=partial(
                     stage_scd2_table,
@@ -127,7 +120,7 @@ def create_staging_pipeline(**kwargs) -> Pipeline:
                 ),
                 inputs={
                     "raw_df": "raw_customer_scd2",
-                    "spine": "customer_grid",
+                    "spine": "customer_pairs",
                     "accounts": "customer_scope_ids",
                 },
                 outputs="customer_scd2_staged",

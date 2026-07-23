@@ -1,9 +1,9 @@
-"""Tests for collections_spine.scope.filters (staging application).
+"""Tests for collections_spine.scope.filters (composable staging filters).
 
 Focus on the ways scope filtering typically breaks: fan-out when a raw row falls
-in several anchor windows (must survive exactly once), the three strategies, and
-the coarse partition prune. Scope sets are built inline here -- in production they
-come from upstream nodes, not from this module.
+in several anchor windows (must survive exactly once), column-name mapping via
+scope_*_col (no renamed dataset copies), and exact-pair matching. Scope sets are
+built inline here -- in production they come from upstream nodes.
 
 Run: pytest -q   (requires pyspark; tests skip cleanly if it is not installed)
 """
@@ -16,120 +16,100 @@ pyspark = pytest.importorskip("pyspark")
 
 from pyspark.sql import functions as F  # noqa: E402
 
-from collections_spine.scope import apply_scope  # noqa: E402
+from collections_spine.scope import filter_ids, filter_pairs, filter_windows  # noqa: E402
 
 # `spark` fixture is provided by the repo-root conftest.py (session-scoped).
 
 
 def _raw(spark):
+    # raw table uses contract_idt / txn_date -- names differ from the scope sets.
     rows = [
-        ("A", "2025-03-15", "load1"),  # in BOTH of A's windows (overlap) -> once
-        ("A", "2025-06-01", "load1"),  # outside A's windows
-        ("B", "2025-01-10", "load1"),  # in B's window
-        ("C", "2025-01-10", "load1"),  # entity not in scope
+        ("A", "2025-03-15", 10),  # in BOTH of A's windows (overlap) -> once
+        ("A", "2025-06-01", 20),  # outside A's windows
+        ("B", "2025-01-10", 30),  # in B's window
+        ("C", "2025-01-10", 40),  # entity not in scope
     ]
-    df = spark.createDataFrame(rows, ["entity_id", "event_date", "load_col"])
-    return df.withColumn("event_date", df["event_date"].cast("date"))
+    df = spark.createDataFrame(rows, ["contract_idt", "txn_date", "amount"])
+    return df.withColumn("txn_date", df["txn_date"].cast("date"))
 
 
 def _scope_ids(spark):
-    return spark.createDataFrame([("A",), ("B",)], ["entity_id"])
+    # scope set uses customer_id -- mapped via scope_id_col.
+    return spark.createDataFrame([("A",), ("B",)], ["customer_id"])
 
 
 def _windows(spark):
-    # A has TWO anchors whose +/-1-month windows overlap around 2025-03; B one.
+    # A has TWO anchors whose windows overlap around 2025-03; B one.
     rows = [
         ("A", "2025-02-01", "2025-04-01"),
         ("A", "2025-03-01", "2025-05-01"),
         ("B", "2024-12-01", "2025-02-01"),
     ]
-    df = spark.createDataFrame(rows, ["entity_id", "win_start", "win_end"])
+    df = spark.createDataFrame(rows, ["customer_id", "win_start", "win_end"])
     return df.withColumn("win_start", F.col("win_start").cast("date")).withColumn(
         "win_end", F.col("win_end").cast("date")
     )
 
 
-def _grid(spark):
-    # (entity_id, obs_month) enumerated at month grain
-    rows = [("A", "2025-03-01"), ("B", "2025-01-01")]
-    df = spark.createDataFrame(rows, ["entity_id", "obs_month"])
-    return df.withColumn("obs_month", F.col("obs_month").cast("date"))
+def _pairs(spark):
+    # exact (id, date) pairs at the raw table's (daily) grain, own column names.
+    rows = [("A", "2025-03-15"), ("B", "2025-01-10")]
+    df = spark.createDataFrame(rows, ["customer_id", "obs_date"])
+    return df.withColumn("obs_date", F.col("obs_date").cast("date"))
 
 
 # --------------------------------------------------------------------------- #
-# range
+# filter_ids
 # --------------------------------------------------------------------------- #
-def test_range_no_fanout_and_scopes(spark):
-    out = apply_scope(
-        _raw(spark),
-        id_col="entity_id",
-        strategy="range",
-        scope_ids=_scope_ids(spark),
-        windows=_windows(spark),
-        date_col="event_date",
+def test_filter_ids_maps_column_names(spark):
+    out = filter_ids(
+        _raw(spark), _scope_ids(spark),
+        id_col="contract_idt", scope_id_col="customer_id",
     ).collect()
+    got = sorted((r["contract_idt"], r["txn_date"].isoformat()) for r in out)
+    assert got == [
+        ("A", "2025-03-15"), ("A", "2025-06-01"), ("B", "2025-01-10"),
+    ]  # all dates kept; C dropped
+    # payload untouched -- no scope columns leak in
+    assert set(out[0].asDict()) == {"contract_idt", "txn_date", "amount"}
 
-    got = sorted((r["entity_id"], r["event_date"].isoformat()) for r in out)
+
+# --------------------------------------------------------------------------- #
+# filter_windows
+# --------------------------------------------------------------------------- #
+def test_filter_windows_no_fanout(spark):
+    out = filter_windows(
+        _raw(spark), _windows(spark),
+        id_col="contract_idt", date_col="txn_date", scope_id_col="customer_id",
+    ).collect()
+    got = sorted((r["contract_idt"], r["txn_date"].isoformat()) for r in out)
     # A's 2025-03-15 appears ONCE despite matching two overlapping windows;
     # A's June row and entity C are dropped.
     assert got == [("A", "2025-03-15"), ("B", "2025-01-10")]
     assert len(out) == 2  # explicit: no fan-out duplication
+    assert set(out[0].asDict()) == {"contract_idt", "txn_date", "amount"}
 
 
-def test_range_coarse_prune_is_correct(spark):
-    out = apply_scope(
-        _raw(spark),
-        id_col="entity_id",
-        strategy="range",
-        windows=_windows(spark),
-        date_col="event_date",
-        prune_col="event_date",
-        prune_bounds=("2025-01-01", "2025-05-31"),
+def test_filter_windows_custom_bound_cols(spark):
+    w = _windows(spark).withColumnRenamed("win_start", "s").withColumnRenamed("win_end", "e")
+    out = filter_windows(
+        _raw(spark), w,
+        id_col="contract_idt", date_col="txn_date", scope_id_col="customer_id",
+        start_col="s", end_col="e",
     ).collect()
-    assert sorted(r["entity_id"] for r in out) == ["A", "B"]
+    assert sorted(r["contract_idt"] for r in out) == ["A", "B"]
 
 
 # --------------------------------------------------------------------------- #
-# grid
+# filter_pairs
 # --------------------------------------------------------------------------- #
-def test_grid_month_equi(spark):
-    out = apply_scope(
-        _raw(spark),
-        id_col="entity_id",
-        strategy="grid",
-        scope_ids=_scope_ids(spark),
-        grid=_grid(spark),
-        date_col="event_date",
-        grid_col="obs_month",
-        grain="month",
+def test_filter_pairs_exact_match_and_mapping(spark):
+    out = filter_pairs(
+        _raw(spark), _pairs(spark),
+        id_col="contract_idt", date_col="txn_date",
+        scope_id_col="customer_id", scope_date_col="obs_date",
     ).collect()
-
-    got = sorted((r["entity_id"], r["event_date"].isoformat()) for r in out)
+    got = sorted((r["contract_idt"], r["txn_date"].isoformat()) for r in out)
+    # exact pairs only: A's June row has no pair, C not in scope.
     assert got == [("A", "2025-03-15"), ("B", "2025-01-10")]
-    # no helper column leaks into the payload
-    assert set(out[0].asDict()) == {"entity_id", "event_date", "load_col"}
-
-
-# --------------------------------------------------------------------------- #
-# id_only
-# --------------------------------------------------------------------------- #
-def test_id_only_keeps_all_dates_for_scoped_ids(spark):
-    out = apply_scope(
-        _raw(spark),
-        id_col="entity_id",
-        strategy="id_only",
-        scope_ids=_scope_ids(spark),
-    ).collect()
-
-    got = sorted((r["entity_id"], r["event_date"].isoformat()) for r in out)
-    assert got == [("A", "2025-03-15"), ("A", "2025-06-01"), ("B", "2025-01-10")]
-
-
-# --------------------------------------------------------------------------- #
-# guardrails
-# --------------------------------------------------------------------------- #
-def test_missing_inputs_raise(spark):
-    with pytest.raises(ValueError):
-        apply_scope(_raw(spark), id_col="entity_id", strategy="range", date_col="event_date")
-    with pytest.raises(ValueError):
-        apply_scope(_raw(spark), id_col="entity_id", strategy="bogus")
+    assert set(out[0].asDict()) == {"contract_idt", "txn_date", "amount"}
