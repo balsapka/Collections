@@ -1,6 +1,6 @@
 # Label and Feature Specifications
 
-Formula-level definitions for W1–W4. Conventions:
+Formula-level definitions for the label, spell and feature tasks. Conventions:
 - `obs` = observation_date. All features use data `< obs` (R2). A4 additionally `≤ T0`.
 - Field/table names are illustrative — resolve against the workplace repo's own docs
   and code, never guessed (R9).
@@ -8,7 +8,7 @@ Formula-level definitions for W1–W4. Conventions:
   only computable where domain X exists; emit NULL + let `relationship_breadth` carry
   the coverage signal.
 
-## 1. Labels (W1)
+## 1. Labels
 
 Payment definition (shared): `payments(a, t1, t2]` = sum of customer-initiated credits
 to the account in `(t1, t2]`, excluding fee/interest postings, reversals, internal
@@ -17,7 +17,7 @@ adjustments, **and restructure/succession postings** (R13). Exact posting-type c
 
 **⚠ Succession exclusion is not optional.** A restructure closes the account and opens a
 replacement; if the closing credit is not excluded, a restructure reads as full recovery
-and the label is inverted (debt moved, not repaid). Until W0 identifies successions
+and the label is inverted (debt moved, not repaid). Until T03/T04 identifies successions
 reliably, exclude via closure-posting type and flag affected accounts. Emit
 `succession_excluded_flag` on every label row so contamination is measurable.
 
@@ -29,7 +29,7 @@ reliably, exclude via closure-posting type and flag affected accounts. Emit
 | `recovery_amount_180p` | `payments(obs, obs+6m]`, modelled only where `any_recovery_180p = 1` (hurdle part 2) | |
 | Legacy (reports only, R11) | roll label; 5%/1000 AED label | unchanged |
 
-Restructure handling (R13, from D7/W0): add `restructured_in_horizon` flag. Default =
+Restructure handling (R13, from T02/T03): add `restructured_in_horizon` flag. Default =
 exclude restructured rows from futility *training*, keep them in reporting, and never
 score a restructure as recovery. CONFIRM once O14 clarifies where the successor account
 starts.
@@ -37,15 +37,34 @@ starts.
 Leakage tests to implement: labels read only `(obs, obs+N]`; features only `< obs`;
 assert in pipeline tests, not comments.
 
-## 2. Spell / T0 table (W2)
+## 2. Spell / T0 table
 
-Input: daily (or best-available) DPD history per contract. Output grain:
-`(contract_id, spell_id)`.
+Output grain: `(account_id, spell_id)`. **Inputs differ by unit (R15) — two derivation
+paths:**
 
-Derivation:
-1. Order DPD snapshots per contract by date.
-2. A spell starts at the first snapshot with `DPD > 0` following a snapshot with
-   `DPD = 0` (or account origin). `T0` = that snapshot's date.
+**CC — use the existing 24-month DPD bucket history feature.** It stores a per-month
+bucket string (e.g. `33321000000000…`). T0 is the transition from `0` to non-zero;
+spell end is the return to `0`. This makes CC spell derivation nearly free — reuse it
+rather than reconstructing from raw DPD (R14). Confirm before use: string orientation
+(most-recent-first or last?), the as-of reference month, and the bucket encoding.
+
+Two limitations to handle explicitly:
+- **24-month horizon.** A spell starting more than 24 months ago is unlocatable — the
+  string is entirely non-zero and T0 falls outside it. This affects the 180+ >2y cohort
+  exactly, and is an independent reason not to score that book from internal history.
+  Emit `t0_censored_flag = 1` rather than guessing a T0.
+- **Monthly resolution.** T0 resolves to a month, not a day. For CC this can optionally
+  be refined to a day using the payment/balance tables — locate the month cheaply from
+  the string, then refine. Record which resolution was used.
+
+**Loans — no equivalent feature exists.** Buckets must be reconstructed from the full
+data model (month-end snapshots), which is real work and part of the separate loan
+pipeline. Resolution is monthly by construction.
+
+Derivation (both paths, once buckets are available):
+1. Order the monthly bucket series per account.
+2. A spell starts at the first period with `DPD > 0` following `DPD = 0` (or account
+   origin). `T0` = that period's date.
 3. A spell ends at the first later snapshot with `DPD = 0` (cure) or at
    write-off/closure (terminal) or remains open.
 4. **Restructures (R13) — succession, not reset.** The old account closes and a new one
@@ -53,7 +72,7 @@ Derivation:
    'restructure_closure'` where identifiable). The successor account starts its own
    spell history, beginning at DPD 0, lower, or the same bucket — not uniform (O14).
    Do **not** bridge DPD resets within an account; that mechanic does not exist here.
-5. **Inherited history.** Where W0 supplies a link, the successor row carries
+5. **Inherited history.** Where T03/T04 supplies a link, the successor row carries
    `predecessor_account_id` and `inherited_history_flag = 1`, and A4 windows may be
    extended back through the predecessor's timeline (its own T0 becomes the effective
    anchor). Without a link the successor is a known A4 blind spot — set
@@ -73,9 +92,43 @@ Invariant tests: spells per account non-overlapping; `t0 <= obs <= spell_end` fo
 joined observation; DPD = 0 outside spells; no spell bridges an account closure; where
 `inherited_history_flag = 1`, the predecessor link resolves to exactly one account.
 
-## 3. A4 — manner-of-deterioration features (W3)
+## 3. A4 — manner-of-deterioration features
 
-Windows (relative to T0, per D9 availability): `W12 = [T0−365d, T0)`,
+### 3.0 Anchoring — three regimes, not one
+
+Existing CC outflow/transaction features are anchored on the **card block date**
+(~60 DPD). That anchor is downstream of the deterioration and is an *operational*
+event: a 12-month lookback from block mixes pre-delinquency behaviour with the
+delinquency period, and if block policy ever changed the anchor moved with it, breaking
+comparability across time. T0 is a customer event and policy-independent.
+
+The fix is not to discard the block-anchored features — they measure a different and
+useful regime. Separate three windows explicitly:
+
+| Window | Span | What it measures | Feature family |
+|---|---|---|---|
+| `W_pre` | `[T0−12m, T0)` | How they deteriorated *into* delinquency — shock vs spiral | **A4 core** (§3.1–§3.4) |
+| `W_early` | `[T0, block_date)` | How they behaved *once* delinquent but still able to transact | **Early-delinquency response** — a willingness-flavoured signal (see below) |
+| post-block | `[block_date, …)` | Card outflow is structurally near-zero (the instrument is disabled) | Only payments, digital, other products remain — this is the "dry data" problem stated precisely |
+
+**`W_early` is worth keeping as its own family.** Continuing to spend after missing
+payments means the customer is prioritising other outgoings — a willingness signal.
+Going quiet immediately points to shock or departure. That distinction is invisible in
+the pre-T0 window and is exactly what the existing block-anchored features can be
+reused for, relabelled.
+
+**Also derive:** `t0_to_block_days` and `blocked_flag`. If blocking is purely
+DPD-triggered these are mechanical (and belong with the state features, not here); if
+the timing varies, check whether the variation is informative or just policy noise
+(T06).
+
+**Consequence for T11/T14/T15:** existing block-anchored outflow features are the
+principal **ADAPT** case — re-anchor to T0 for A4, and retain the block-anchored
+originals as `W_early` features rather than rebuilding either.
+
+### 3.1 onwards — feature definitions (all on `W_pre` unless stated)
+
+Windows (relative to T0, per T05 availability): `W12 = W_pre = [T0−365d, T0)`,
 `H1 = [T0−365d, T0−90d)`, `H2 = [T0−90d, T0)`. Monthly series over W12: payments
 `P_m`, amount due `D_m`, utilisation `U_m`, spend `S_m`, cash advances `CA_m`,
 fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NULL.
@@ -119,8 +172,8 @@ fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NU
 | Feature | Definition |
 |---|---|
 | `fee_velocity_life`, `fee_velocity_ratio_h2` | lifetime fees / tenure months; H2 monthly fee rate / lifetime rate |
-| `tenure_at_t0_m`, `prior_spell_cnt_24m`, `months_since_prior_spell` | from W2 table |
-| `roll_speed_30_d`, `roll_speed_60_d` | days T0 → first DPD ≥ 30 / ≥ 60 (from W2; past events at obs for this population) |
+| `tenure_at_t0_m`, `prior_spell_cnt_24m`, `months_since_prior_spell` | from the spell table (§2) |
+| `roll_speed_30_d`, `roll_speed_60_d` | days T0 → first DPD ≥ 30 / ≥ 60 (from the spell table §2; past events at obs for this population) |
 | `cross_prod_t0_gap_d` [COND: RL] | \|T0_card − T0_other\| where both products delinquent |
 | `simultaneous_default_flag` [COND: RL] | above gap ≤ 35d |
 | `aecb_leverage_slope` [COND: O7] | OLS slope of bureau total obligations over pulls in [T0−24m, T0]; NULL if < 2 pre-T0 pulls |
@@ -129,7 +182,7 @@ fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NU
 ### 3.5 Deterioration class v1 (rules)
 
 Evaluate in order; first match wins; `det_class_confidence` = matched conditions /
-listed conditions. Thresholds τ are placeholders — tune on D9-available data and log.
+listed conditions. Thresholds τ are placeholders — tune on T05-available data and log.
 
 | Class | Conditions |
 |---|---|
@@ -138,14 +191,14 @@ listed conditions. Thresholds τ are placeholders — tune on D9-available data 
 | `chronic_marginal` | `min_pay_share_w12 ≥ 0.6` AND `fee_velocity_life` in top tercile AND `util_mean_h1 ≥ 0.8` |
 | `mixed` | otherwise |
 
-Validation (W3 DoD): within each segment, realised recovery/cure by class must
+Validation (T17/T18): within each segment, realised recovery/cure by class must
 separate (extreme-class ratio ≥ 1.5×). Report class shares + separation in
 `RESULTS.md`. If `mixed` > ~50%, iterate thresholds before shipping.
 
 Output schema: `(contract_id, spell_id, t0, <features>, det_class_v1,
 det_class_confidence, computed_at)`.
 
-## 4. A2 — locatability states (W4)
+## 4. A2 — locatability states
 
 States: `reachable | avoiding | skip | gone`. All gap features measured at `obs`.
 
@@ -158,7 +211,7 @@ States: `reachable | avoiding | skip | gone`. All gap features measured at `obs`
 | [CORE] | `post_t0_domestic_txn_flag` | any domestic-country activity after T0+60d ⇒ in-country |
 | [CORE] | `travel_mcc_flag_90`, `last_txn_foreign_flag`, `foreign_login_flag` [COND: digital geo] | from A4 §3.3 / digital |
 | [CORE] | `other_product_active_flag` [COND: RL/CASA] | any activity on other products in last 90d |
-| [DCORE, gate D6] | `sms_delivered_rate`, `call_connect_rate`, `delivered_unanswered_ratio`, `wrong_number_flag`, `last_rpc_gap_d` | delivery/disposition-based; delivered-but-unanswered separates `avoiding` from `skip` |
+| [DCORE, gate T10] | `sms_delivered_rate`, `call_connect_rate`, `delivered_unanswered_ratio`, `wrong_number_flag`, `last_rpc_gap_d` | delivery/disposition-based; delivered-but-unanswered separates `avoiding` from `skip` |
 
 ### 4.2 Labels (v2 supervised)
 
@@ -203,7 +256,7 @@ unknown`) — say so in outputs rather than faking 4.
   across the current modelling spectrum) and adds T0-boundary assertions for A4, plus
   the invariant tests in §2. Test data pattern: follow existing repo conventions.
 
-## 6. Account succession linkage (W0)
+## 6. Account succession linkage (T03/T04)
 
 **Problem.** A restructure closes the account and opens a replacement; no link between
 them is currently known (O13). Needed for correct labels (§1), A4 coverage of
@@ -216,7 +269,7 @@ spot with its size in `RESULTS.md`, and move on.
 
 **Step 2 — look for an explicit link first.** Any of: a reference/parent-account field
 on the new account; a closure reason code naming restructure; a DCORE restructure event
-recording both account numbers. If one exists, W0 is a lookup, not a modelling task.
+recording both account numbers. If one exists, T04 is unnecessary — it is a lookup, not a modelling task.
 
 **Step 3 — heuristic record linkage, only if no explicit link exists.** Candidate pairs
 = same CIF, `open_date(new) - close_date(old)` within `<<window, default 0–45d>>`, same

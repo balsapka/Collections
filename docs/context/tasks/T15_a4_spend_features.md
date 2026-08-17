@@ -1,0 +1,28 @@
+# T15 — A4 CC: utilisation, spend & liquidity features
+
+**Goal.** Build the spend/liquidity half of the deterioration axis, anchored to T0.
+
+**Why.** This is the group that separates a gradual over-indebtedness spiral from an
+abrupt shock: a spiral shows rising utilisation, a cash-advance ramp and a slow spend
+taper; a shock shows a cliff. Both look identical once the account is dry — the
+difference is only visible before T0.
+
+**Load.** `reference/feature_specs.md §3.2`. T11 reuse map. T05's window decision.
+
+## Steps
+
+1. **Reuse check (R14)** per feature — utilisation trends in particular are likely to
+   exist already in some form. Record REUSE/ADAPT/BUILD.
+2. Build against the T13 spell table using CC balance, utilisation and transaction
+   sources (R15 — CC has dedicated tables for these, not just transaction history).
+3. Implement the `§3.2` set: utilisation level/slope/acceleration across half-windows,
+   cash-advance ramp and amount share, spend taper ratio, spend cliff flag, active-days
+   share, transaction-count slope.
+4. Respect null rules (≥ 4 non-null months for any slope).
+
+## Done when
+
+- Feature table built, keyed `(account_id, spell_id)`, joinable with T14's output.
+- Null-rate and coverage report per segment.
+- **T0-boundary leakage test passes** (R2).
+- Reuse classification counts logged in `RESULTS.md`.

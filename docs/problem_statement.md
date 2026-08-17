@@ -1,8 +1,8 @@
 # Collections Scoring — Problem Statement and Proposed Direction
 
-*Working document for discussion. v2, 2026-08-16. Status: positions stated to be
+*Working document for discussion. v3, 2026-08-16. Status: positions stated to be
 argued with, not finalised. Each problem carries an evidence status; "to verify" items
-are checks scheduled for the first week.*
+are checks queued to run early.*
 
 **Why this document.** The current scores are felt to "lack differentiation power".
 We agree — but the causes are specific, and most of them are not model-quality issues.
@@ -30,16 +30,20 @@ further tuning of the current model would not change how the score feels to use.
 ## 2. The problems
 
 ### P1 — The model mostly restates the account's delinquency state
-**Evidence (verified):** the model's top features are days-since-last-payment, DPD
-velocity, missed EMIs, last payment amount, block codes, DPD six months ago — all
-measurements of *how delinquent the account already is*. Everything on that list is on
-the officer's screen before the score loads.
-**Consequence:** the score is accurate and unhelpful at the same time. It ranks, but
-adds nothing the officer doesn't already see — which is precisely the complaint.
-**Check (week 1):** a stripped model using only two state features, compared to the
-full model. If it performs nearly as well, the point is proven quantitatively.
-**Open to challenge:** if anyone believes specific non-state features carry real
-weight today, name them and we will test exactly those.
+**Evidence (verified, already tested):** a model built *only* from delinquency
+features — all derived from a single 24-month DPD history — performs close enough to
+the full model that the difference does not change how the score behaves in use. And
+without caps on feature importance, two or three features dominate: days since last
+payment, and DPD velocity over the last three months. We have been constraining feature
+importance to stop the model collapsing onto them.
+
+**Consequence:** the score is accurate and unhelpful at the same time. Everything
+driving it is on the officer's screen before the score loads, so it ranks correctly
+while adding nothing — which is precisely the complaint. This is not a tuning problem;
+more of the same kind of feature cannot fix it.
+
+**Open to challenge:** if anyone believes a specific non-state feature carries real
+weight today, name it and we will test that one directly.
 
 ### P2 — One score is serving three different decisions
 Reachable customers need **negotiation** decisions (settle / restructure / pressure).
@@ -69,14 +73,15 @@ different structures, so they need separate pipelines and separate models — th
 engineering fact before it is a modelling preference. Within loans, auto separates
 cleanly (it is secured; recovery runs through the vehicle rather than the customer);
 personal and personal cash do not. Auto has not yet been measured separately
-*(to verify, week 1)*.
+*(queued to verify)*.
 
 ### P4b — Restructures break the account history, and may be inflating our numbers
 A restructure closes the existing card or loan and opens a **new account**. Three
 consequences, none currently handled:
 - **Recovery may be overstated.** If the closing entry looks like a settlement credit,
   a restructure reads as a *recovery* in our outcome measures — but the debt moved, it
-  was not repaid. *(To verify, week 1.)*
+  was not repaid. *(Queued to verify — this one could affect figures already
+  reported.)*
 - **We lose the customer's history.** The new account starts empty, so any analysis
   built on pre-delinquency behaviour is blind for restructured customers.
 - **We are throwing away a strong signal.** Agreeing a restructure is clear evidence of
@@ -92,6 +97,10 @@ field, closure code, or system record connect them? (§5)
   decisions, and for a delinquent customer there are none.
 - Only ~10–20% of delinquent card customers hold another product with us; salary
   visibility (CASA) is partial.
+- **Cards and loans are not equally observable.** Cards have payment, balance,
+  utilisation and transaction detail. Loans have only month-end snapshots — so payment
+  *behaviour* is partly derivable but payment *timing* is not. If the gap proves
+  material we will ask to source more granular loan payment data *(queued to assess)*.
 - DCORE (contact attempts, promises-to-pay, field visits) has unresolved data-quality
   questions *(reconciliation check scheduled)*.
 
@@ -206,20 +215,25 @@ carried forward, whatever it looks like on a slide.
 
 **We are deliberately building the customer segments before touching the scores.** They
 stand or fall on their own evidence (P8), and if the segment angle does not survive its
-tests we would rather establish that in a few weeks than discover it after a model
-rebuild.
+tests we would rather establish that early than discover it after a model rebuild.
 
-- **Week 1 — verification:** the checks flagged in P1, P3, P4, P4b and P5. Two of these
-  can change the plan materially: whether the current model is mostly restating account
-  state, and whether restructures are inflating recorded recoveries.
-- **Then — segments:** account-history table → manner-of-deterioration → locatability,
-  each put through the four tests in P8, followed by an action-mapping session with
-  collections (the real test).
-- **In parallel — revised targets**, which do not depend on the segments.
-- **Then — scores:** retrained per segment, measured against the dumb baselines, with
-  the P7 holdout and P8 grid checks before anything is used operationally.
+1. **Verification first** — the checks flagged in P3, P4, P4b and P5. The one that
+   could change the most is whether restructures are inflating recorded recoveries,
+   since that would affect figures already reported.
+2. **Then the segments** — account-history table → manner-of-deterioration →
+   locatability, each put through the four tests in P8, followed by an action-mapping
+   session with collections. That session is the real test.
+3. **In parallel, revised targets** — they do not depend on the segments.
+4. **Then the scores** — retrained per segment, measured against deliberately dumb
+   baselines, with the P7 holdout and P8 grid checks before anything is used
+   operationally.
 
-Cards lead; loans follow by porting the same patterns once the approach is proven.
-Progress and evidence updates land in this document as checks close.
+Cards lead; loans follow, though not by simple porting — loans only have month-end
+data, so some card features have no loan equivalent and we may need to source more
+granular loan payment data (P5).
+
+We are deliberately not giving calendar estimates: the work is sequenced by dependency,
+and each check can redirect what follows it. Progress and evidence updates land in this
+document as checks close.
 
 *Technical companion (implementation level): `docs/context/` in the modelling repo.*
