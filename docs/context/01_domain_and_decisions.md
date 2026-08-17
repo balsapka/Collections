@@ -12,14 +12,23 @@ information (why collection is failing), not more magnitude information (how bad
 Division of labour: we ship axes, scores, and evidence. The business owns the action
 mapping (which treatment per cell). Do not design collection strategies.
 
-## 2. Products and security
+## 2. Products, source systems, and the segmentation that follows
 
-| Product | Secured | Notes |
-|---|---|---|
-| Credit card | No | Primary book; all measured base rates below are CC |
-| Personal loan | No | Typically salary-transfer → income observed |
-| Personal cash loan | No | |
-| Auto | **Yes** | Recovery = repossess/sell asset. Never pool with unsecured (S1, W8). Ijarah vs lien structure unknown (O3) |
+**The primary split is the source system, not security.** Credit card and loan
+accounts sit in different systems with different structures, so they need separate
+feature pipelines and separate models (S15, R3) — this is an engineering boundary
+before it is a modelling choice.
+
+| Product | Source group | Secured | Notes |
+|---|---|---|---|
+| Credit card | **CC system** | No | Primary book; all measured base rates in §3 are CC |
+| Auto | Loan system | **Yes** | The one sub-split that is *easy* within loans. Recovery = repossess/sell asset; persona axes mostly n/a (W8). Ijarah vs lien unknown (O3) |
+| Personal loan | Loan system | No | Typically salary-transfer → income observed. Not cleanly separable from personal cash |
+| Personal cash loan | Loan system | No | Not cleanly separable from personal loan |
+
+Modelling units: **CC**, **loan-auto**, **loan-other**. Treat CC as the lead track
+(largest measured book, thinnest data — see §4); build loan tracks by porting patterns
+once the CC persona axes validate.
 
 ## 3. Segments and economics
 
@@ -53,6 +62,20 @@ Contactability is a gate upstream of scoring, not a feature inside it.
 | Demographics | static | 100% | Controls only | Proxy risk for protected attributes (R7) |
 | Digital / login | event | wherever app/web used | Engagement, foreign-login, channel-death signals | Coverage varies |
 
+**Restructures create new accounts (R13).** A restructure closes the CC/loan and opens
+a replacement. Consequences, all currently unmitigated because the old→new link is not
+identifiable (O13):
+- **Label risk:** if closure posts a credit that resembles settlement, a restructure
+  reads as *recovery* in futility and hurdle labels — inverted, since the debt moved
+  rather than being repaid. `payments()` must exclude it (`04 §1`).
+- **Feature blind spot:** the new account has no pre-delinquency history, so A4 has
+  nothing to anchor on for restructured customers.
+- **Missed signal:** restructuring is strong evidence of *willingness* (the customer
+  negotiated and re-committed) and needs no DCORE. Recovering the link partly rescues
+  A3 from its DCORE dependency.
+Whether the new account starts at DPD 0, lower, or the same bucket is not uniform and
+not yet known (O14).
+
 **Population fact that shapes everything:** roughly **80% of the delinquent CC book is
 card-only** (no RL, often no CASA). For them the card's own transaction/payment stream
 plus digital is the entire live instrument. Consequences: (a) squeeze the card stream
@@ -61,7 +84,7 @@ always include an explicit `relationship_breadth` feature so the model separates
 relationship with us" from the signal itself; (c) validate card-only estimates on the
 10–20% where the truth is visible.
 
-## 5. Settled decisions (S1–S14)
+## 5. Settled decisions (S1–S17)
 
 | ID | Decision |
 |---|---|
@@ -79,6 +102,9 @@ relationship with us" from the signal itself; (c) validate card-only estimates o
 | S12 | Live ability signal comes from the **internal cross-product view** (other products current? salary landing?) where it exists (~10–20%); the card-only proxy (A1) covers the rest and must validate on the visible minority first. |
 | S13 | "Synthesized features" is defined to stakeholders as **inferred latent state** (the axes), never generative/synthetic data (X5). |
 | S14 | A permanent **random ~1% holdout** below the 180+ cutoff is required before deployment (R12). Raise with the business early — cannot be retrofitted. |
+| S15 | **CC and loan accounts get separate feature pipelines and models** (different source systems/structures). Within loans, auto splits out; personal vs personal cash does not. Modelling units: CC, loan-auto, loan-other (R3). |
+| S16 | **Persona axes are built and validated FIRST, independently of the risk models.** They must pass the four-gate ladder in `03 Phase P` — buildability, novelty, outcome separation, incremental lift — before any risk-model retrain depends on them. A4 and A2 are deliverables in their own right, not model inputs awaiting a model. |
+| S17 | **Restructures are account successions, not DPD resets** (R13). Linkage discovery (W0) is a prerequisite for correct labels and for A4 coverage of restructured customers. |
 
 ## 6. Rejected approaches (X1–X10) — do not re-propose
 
@@ -113,7 +139,8 @@ relationship with us" from the signal itself; (c) validate card-only estimates o
 | O3 | Auto structure: Ijarah (bank owns) vs lien | W8 target design | Business |
 | O4 | Horizon N for futility (operational review cycle length) | W1 (default 3m, CONFIRM) | Business |
 | O5 | "Negligible" threshold ε for futility | W1 (default min(100 AED, 0.5% outstanding), CONFIRM) | Business |
-| O6 | Re-aging rules: does restructure reset DPD? | D7 → W1 label validity | User/DCORE |
+| O13 | **How is the old→new account link identifiable after a restructure?** Any explicit reference field, closure reason code, or DCORE record naming both accounts? | W0, W1 labels, W2/W3 coverage, A3 signal | User/IT/DCORE |
+| O14 | Does the replacement account start at DPD 0, a lower bucket, or the same bucket? Is it uniform by product/policy? | W1 label semantics, W2 spell continuity | Collections/IT |
 | O7 | Are historical AECB pulls retained point-in-time? | A4 leverage-trajectory feature | User |
 | O8 | AECB ongoing-monitoring feed: permissible purpose + cost vs uplift at 1–2% base rate | B4 (trigger monitor) | Business/Compliance |
 | O9 | Transaction retention depth: is T0−12m available per cohort? | D9 → A4 scope, W7 feasibility | User |

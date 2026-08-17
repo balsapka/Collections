@@ -2,7 +2,8 @@
 
 Formula-level definitions for W1–W4. Conventions:
 - `obs` = observation_date. All features use data `< obs` (R2). A4 additionally `≤ T0`.
-- Field/table names are illustrative — resolve against the Asset Map (R9).
+- Field/table names are illustrative — resolve against the workplace repo's own docs
+  and code, never guessed (R9).
 - `CONFIRM` marks a default the user/business must ratify. `[COND: X]` marks a feature
   only computable where domain X exists; emit NULL + let `relationship_breadth` carry
   the coverage signal.
@@ -10,8 +11,15 @@ Formula-level definitions for W1–W4. Conventions:
 ## 1. Labels (W1)
 
 Payment definition (shared): `payments(a, t1, t2]` = sum of customer-initiated credits
-to the account in `(t1, t2]`, excluding fee/interest postings, reversals, and internal
-adjustments. Exact posting-type codes: `<<FILL-IN>>`.
+to the account in `(t1, t2]`, excluding fee/interest postings, reversals, internal
+adjustments, **and restructure/succession postings** (R13). Exact posting-type codes:
+`<<FILL-IN>>`.
+
+**⚠ Succession exclusion is not optional.** A restructure closes the account and opens a
+replacement; if the closing credit is not excluded, a restructure reads as full recovery
+and the label is inverted (debt moved, not repaid). Until W0 identifies successions
+reliably, exclude via closure-posting type and flag affected accounts. Emit
+`succession_excluded_flag` on every label row so contamination is measurable.
 
 | Label | Definition | Params (defaults) |
 |---|---|---|
@@ -21,8 +29,10 @@ adjustments. Exact posting-type codes: `<<FILL-IN>>`.
 | `recovery_amount_180p` | `payments(obs, obs+6m]`, modelled only where `any_recovery_180p = 1` (hurdle part 2) | |
 | Legacy (reports only, R11) | roll label; 5%/1000 AED label | unchanged |
 
-Re-aging (from D7/O6): if restructures reset DPD, add `reaged_in_horizon` flag; default
-handling = exclude re-aged rows from futility training, keep in reporting. CONFIRM.
+Restructure handling (R13, from D7/W0): add `restructured_in_horizon` flag. Default =
+exclude restructured rows from futility *training*, keep them in reporting, and never
+score a restructure as recovery. CONFIRM once O14 clarifies where the successor account
+starts.
 
 Leakage tests to implement: labels read only `(obs, obs+N]`; features only `< obs`;
 assert in pipeline tests, not comments.
@@ -38,19 +48,30 @@ Derivation:
    `DPD = 0` (or account origin). `T0` = that snapshot's date.
 3. A spell ends at the first later snapshot with `DPD = 0` (cure) or at
    write-off/closure (terminal) or remains open.
-4. **Re-aging:** if D7 shows restructures reset DPD, a reset must NOT end a spell:
-   join restructure events and bridge resets within `<<gap, default 35d>>` of a
-   restructure into the same spell, setting `reaged_flag = 1`. CONFIRM rule with O6.
-5. `current_spell(obs)` = the spell containing `obs`. Every A4 feature row is keyed by
-   `(contract_id, spell_id)` and joined to observations via `current_spell`.
+4. **Restructures (R13) — succession, not reset.** The old account closes and a new one
+   opens, so the old account's spell simply *ends at closure* (`spell_end_reason =
+   'restructure_closure'` where identifiable). The successor account starts its own
+   spell history, beginning at DPD 0, lower, or the same bucket — not uniform (O14).
+   Do **not** bridge DPD resets within an account; that mechanic does not exist here.
+5. **Inherited history.** Where W0 supplies a link, the successor row carries
+   `predecessor_account_id` and `inherited_history_flag = 1`, and A4 windows may be
+   extended back through the predecessor's timeline (its own T0 becomes the effective
+   anchor). Without a link the successor is a known A4 blind spot — set
+   `inherited_history_flag = 0` and let coverage reporting show it.
+6. `current_spell(obs)` = the spell containing `obs`. Every A4 feature row is keyed by
+   `(account_id, spell_id)` and joined to observations via `current_spell`.
 
-Columns: `contract_id, spell_id, t0, spell_end, spell_end_reason, reaged_flag,
-max_dpd_so_far, days_to_dpd30, days_to_dpd60` (the last two: within-spell, NULL until
-reached; safe at obs because obs is inside the spell and those events precede it for
-the 60+/180+ populations).
+Columns: `account_id, account_type, spell_id, t0, spell_end, spell_end_reason,
+predecessor_account_id, inherited_history_flag, max_dpd_so_far, days_to_dpd30,
+days_to_dpd60` (the last two: within-spell, NULL until reached; safe at obs because obs
+is inside the spell and those events precede it for the 60+/180+ populations).
 
-Invariant tests: spells per contract non-overlapping; `t0 <= obs <= spell_end` for
-every joined observation; DPD = 0 outside spells except bridged re-aged gaps.
+Built separately per source system (R3/S15): CC and loan accounts have different
+structures, so this is two pipelines sharing one output schema.
+
+Invariant tests: spells per account non-overlapping; `t0 <= obs <= spell_end` for every
+joined observation; DPD = 0 outside spells; no spell bridges an account closure; where
+`inherited_history_flag = 1`, the predecessor link resolves to exactly one account.
 
 ## 3. A4 — manner-of-deterioration features (W3)
 
@@ -171,9 +192,49 @@ unknown`) — say so in outputs rather than faking 4.
 
 ## 5. Cross-cutting implementation notes
 
-- Join keys: contract-level features on `contract_id`; client-level (cross-product,
-  CASA) via CIF then broadcast to contracts. Follow existing feature-layer patterns.
+- **Separate pipelines per source system** (R3/S15): CC and loan accounts have
+  different structures. Build CC first; port to loans once the CC axes clear Phase P.
+  Shared output schemas so downstream code is source-agnostic.
+- Join keys: account-level features on `account_id`; client-level (cross-product,
+  CASA) via CIF then broadcast to accounts. Follow existing feature-layer patterns.
 - Every new feature table: partition/layout consistent with existing feature layer;
   add a null-rate + coverage report per segment as part of the pipeline, not ad hoc.
-- Every pipeline gets leakage tests (R2) and, where applicable, invariant tests
-  (`04 §2`). Test data pattern: follow existing repo test conventions.
+- Every pipeline inherits the repo's existing leakage discipline (R2 — already in place
+  across the current modelling spectrum) and adds T0-boundary assertions for A4, plus
+  the invariant tests in §2. Test data pattern: follow existing repo conventions.
+
+## 6. Account succession linkage (W0)
+
+**Problem.** A restructure closes the account and opens a replacement; no link between
+them is currently known (O13). Needed for correct labels (§1), A4 coverage of
+restructured customers (§2.5), and as a willingness signal (`01 §4`).
+
+**Step 1 — size it before solving it.** Count closures whose pattern suggests a
+restructure (closure with outstanding balance, followed by a new same-CIF account within
+a short window). If the share of the book is trivial, cap effort here, record the blind
+spot with its size in `RESULTS.md`, and move on.
+
+**Step 2 — look for an explicit link first.** Any of: a reference/parent-account field
+on the new account; a closure reason code naming restructure; a DCORE restructure event
+recording both account numbers. If one exists, W0 is a lookup, not a modelling task.
+
+**Step 3 — heuristic record linkage, only if no explicit link exists.** Candidate pairs
+= same CIF, `open_date(new) - close_date(old)` within `<<window, default 0–45d>>`, same
+account_type family. Score each pair on:
+- balance correspondence: `|initial_principal(new) - closing_balance(old)|` relative to
+  the closing balance (tightest single signal)
+- date proximity
+- product-transition plausibility
+- presence of a restructure-flavoured posting or DCORE event near the closure
+
+Resolve to at most one successor per predecessor (and vice versa) — greedy on score,
+with a minimum threshold; leave ambiguous cases unlinked rather than guessing.
+
+**Step 4 — validate.** If any subset carries an explicit link, use it as ground truth
+and report precision/recall of the heuristic on held-out pairs. With no ground truth
+available, hand-validate a sample and report agreement, clearly labelled as such.
+
+**Output:** `(old_account_id, new_account_id, link_method, link_confidence,
+close_date, open_date, balance_delta)`. Consumers must respect `link_confidence` —
+label exclusion should be conservative (exclude on weak links too); A4 history
+inheritance should be strict (inherit only on strong links).

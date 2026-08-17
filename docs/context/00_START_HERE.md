@@ -18,7 +18,7 @@ pack wins. Most work items modify existing assets rather than build greenfield.
 | File | Load when |
 |---|---|
 | `00_START_HERE.md` | Every session (this file) |
-| `01_domain_and_decisions.md` | Every session — segments, data truths, settled decisions S1–S14, rejected approaches X1–X10, open questions O1–O12 |
+| `01_domain_and_decisions.md` | Every session — segments, data truths, settled decisions S1–S17, rejected approaches X1–X10, open questions O1–O14 |
 | `02_current_state.md` | When touching existing models — the diagnosis and evidence (repo/pipeline inventory lives in the workplace docs, not here) |
 | `03_workplan.md` | When executing — diagnostics D1–D10 and work items W1–W9, each with decision rules and definition of done |
 | `04_feature_specs.md` | When implementing W1/W2/W3/W4 — formula-level label and feature definitions |
@@ -30,12 +30,23 @@ pack wins. Most work items modify existing assets rather than build greenfield.
 - **R1 — Do not re-propose rejected approaches.** `01 §Rejected` lists X1–X10 with
   reasons. If the user appears to ask for one, cite the X-id and its reason, then ask
   whether new information changes it.
-- **R2 — Leakage.** Every feature uses only data timestamped strictly before the
-  `observation_date`. A4 features additionally use only data on or before `T0` (spell
-  start). Implement leakage assertions as tests, not comments.
-- **R3 — Segmentation is load-bearing.** Band (60–180 / 180+) × product security
-  (unsecured / auto) × at 180+ time-in-bucket (<2y / >2y). Never train or evaluate
+- **R2 — Leakage.** The existing modelling spectrum is already leakage-controlled;
+  **maintain that discipline, do not relax it.** Every feature uses only data
+  timestamped strictly before the `observation_date`. A4 features additionally use
+  only data on or before `T0`. New feature families inherit the repo's existing
+  leakage tests and add T0-boundary assertions.
+- **R3 — Segmentation is load-bearing, and it starts with the source system.**
+  Credit card and loan accounts live in **different source systems with different
+  structures** and get **separate feature pipelines and separate models** — never one
+  pipeline with a product flag. Within loans, auto separates cleanly; personal and
+  personal cash do not. Full segmentation: account type (CC / loan{auto, other}) ×
+  band (60–180 / 180+) × at 180+ time-in-bucket (<2y / >2y). Never train or evaluate
   pooled across these boundaries unless a work item explicitly says so.
+- **R13 — Restructures create a NEW account.** A restructure closes the existing
+  CC/loan and opens a new one; it is not a DPD reset. The old→new link is not yet
+  identifiable (O13, W0). Until it is: never count a restructure closure as recovery
+  in a label, and treat restructured accounts as a known blind spot in A4. Any code
+  assuming same-account DPD reset is wrong.
 - **R4 — Evaluation is within-segment only.** Report capture@1/5/10% (accounts AND
   AED), decile lift, and precision@bottom-decile for futility. AUC alone is never a
   sufficient result. Always compare against the two dumb baselines: balance-only
@@ -97,6 +108,7 @@ pack wins. Most work items modify existing assets rather than build greenfield.
 | EOSB | End-of-service benefit (gratuity) — lump sum on leaving a job |
 | MCC | Merchant category code on card transactions |
 | CIF | Customer id across products (client level) |
-| Re-aging | DPD reset after restructure — contaminates roll targets (D7) |
+| Restructure | Old account closed, new account opened (R13). Not a DPD reset. Whether the new account starts at DPD 0, lower, or the same bucket is not uniform/known (O14) |
+| Account succession | The old→new account link created by a restructure; not currently identifiable (O13, W0) |
 | Write-off / early chargeoff | 180+ book; "early" = in 180+ for < 2 years |
 | Ibra' | Shariah rebate for early settlement; cannot be promised upfront |

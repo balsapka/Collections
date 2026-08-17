@@ -1,6 +1,6 @@
 # Collections Scoring — Problem Statement and Proposed Direction
 
-*Working document for discussion. v1, 2026-08-16. Status: positions stated to be
+*Working document for discussion. v2, 2026-08-16. Status: positions stated to be
 argued with, not finalised. Each problem carries an evidence status; "to verify" items
 are checks scheduled for the first week.*
 
@@ -53,20 +53,39 @@ can serve all of these; each needs a different quantity.
 "rolls forward" and gets the same label as one that vanished — yet for deciding where
 to *stop spending effort*, those are opposite cases. The label also rewards treading
 water (one installment = "stays in bucket") and looks one month ahead while the
-decision commits months of effort. **To verify:** whether restructure-driven DPD
-resets count as "moved back" — if so, part of today's target measures our own actions,
-not customer behaviour.
+decision commits months of effort.
 **180+ (5% of outstanding or 1000 AED in 6m).** 1000 AED is 10% of a 10k balance and
 0.2% of a 500k one — the target's meaning depends on balance. And a binary at a low
 bar erases the differentiation being asked for: an account that recovers 5.1% and one
 that recovers 55% get identical labels.
 
-### P4 — "180+" is not one population
+### P4 — "180+" is not one population, and neither is "the portfolio"
 **Evidence (verified, cards):** under 2 years in the bucket → ~5% positive rate; over
 2 years → 1–2%. The older cohort's internal history is stale by construction — their
-pre-delinquency behaviour describes a person from 3–8 years ago. **Auto is different
-again:** it is secured, recovery runs through the vehicle rather than the customer,
-and it has not yet been measured separately *(to verify, week 1)*.
+pre-delinquency behaviour describes a person from 3–8 years ago.
+
+**Cards and loans are also not one thing.** They sit in different source systems with
+different structures, so they need separate pipelines and separate models — this is an
+engineering fact before it is a modelling preference. Within loans, auto separates
+cleanly (it is secured; recovery runs through the vehicle rather than the customer);
+personal and personal cash do not. Auto has not yet been measured separately
+*(to verify, week 1)*.
+
+### P4b — Restructures break the account history, and may be inflating our numbers
+A restructure closes the existing card or loan and opens a **new account**. Three
+consequences, none currently handled:
+- **Recovery may be overstated.** If the closing entry looks like a settlement credit,
+  a restructure reads as a *recovery* in our outcome measures — but the debt moved, it
+  was not repaid. *(To verify, week 1.)*
+- **We lose the customer's history.** The new account starts empty, so any analysis
+  built on pre-delinquency behaviour is blind for restructured customers.
+- **We are throwing away a strong signal.** Agreeing a restructure is clear evidence of
+  willingness to pay — arguably the cleanest we have, and it needs no collections-system
+  data.
+
+We cannot currently link the old account to the new one, and it is not uniform whether
+the replacement starts at zero, at a lower bucket, or at the same one. **Ask:** does any
+field, closure code, or system record connect them? (§5)
 
 ### P5 — The differentiating data is thinnest exactly where it is needed
 - Bureau (AECB) goes quiet once a customer is delinquent — pulls fire at credit
@@ -98,10 +117,25 @@ in-house below the cutoff, before the first sale wave.
 
 ### P8 — Personas must not be the score wearing a costume
 If customer segments are built from the same information as the score, high-score
-accounts pile into one segment and the segment × score grid adds nothing. Before any
-strategy is designed on the grid, we will publish the segment mix *within* each score
-band. If a band turns out to be 90% one segment, we will say the grid failed the test
-there.
+accounts pile into one segment and the segment × score grid adds nothing.
+
+We are treating this as the **first** thing to prove, not the last. The segments are
+being built and tested ahead of and independently of the scores, against four
+questions, in order:
+
+1. **Can we build it?** — coverage and class sizes across the book.
+2. **Is it actually new?** — can the segment be predicted from the features we already
+   have? If yes, it is a repackaging of what we know and we will say so and revise. This
+   is the gate we expect to be hardest, and the one that most directly answers "does the
+   persona angle work".
+3. **Does it relate to outcomes?** — do cure and recovery rates genuinely differ across
+   segments.
+4. **Does it add anything?** — measured against a deliberately dumb two-feature model,
+   not against our current model.
+
+Then, with the business: **does each segment imply a different action?** If two segments
+lead to the same action, we collapse them. A segment that fails question 2 will not be
+carried forward, whatever it looks like on a slide.
 
 ---
 
@@ -160,7 +194,8 @@ there.
 | Is 180+ disposal outright sale or commission placement? | Placement keeps outcomes visible → future models remain trainable | Collections |
 | Feasible action menu per product (incl. Shariah position on settlements/ibra') | We model toward actions that are actually offerable | Collections / Shariah |
 | Futility horizon N and the "negligible payment" threshold | Gives the exclusion label its operational meaning | Collections |
-| Re-aging rules: does a restructure reset DPD? | Decides whether today's 60–180 target partly measures our own actions (P3) | Collections / IT |
+| **How do we link a restructured account to its replacement?** Any reference field, closure code, or system record naming both | Without it: recovery may be overstated, restructured customers have no usable history, and we lose the best willingness signal we have (P4b) | Collections / IT |
+| Where does the replacement account start — zero, lower bucket, or same bucket? Is it uniform? | Decides how restructures are treated in every outcome measure (P4b) | Collections / IT |
 | DCORE remediation timeline | Decides whether willingness/contact analytics are in or out this cycle | Data / IT |
 | Permanent ~1% random holdout below the 180+ cutoff | The only way to validate the cutoff and keep future models honest (P7) | Collections / Finance |
 | Bureau monitoring feed for the written-off book: permissible? cost? | The only live signal available for the >2y cohort | Compliance / Finance |
@@ -169,9 +204,22 @@ there.
 
 ## 6. Sequencing
 
-Week 1 is verification: the checks flagged in P1, P3, P4 and P5. Then, in order:
-revised labels → deterioration features → locatability states → retrained per-segment
-models → the P7/P8 gates before anything is operationalised. Progress and evidence
-updates land in this document as checks close.
+**We are deliberately building the customer segments before touching the scores.** They
+stand or fall on their own evidence (P8), and if the segment angle does not survive its
+tests we would rather establish that in a few weeks than discover it after a model
+rebuild.
+
+- **Week 1 — verification:** the checks flagged in P1, P3, P4, P4b and P5. Two of these
+  can change the plan materially: whether the current model is mostly restating account
+  state, and whether restructures are inflating recorded recoveries.
+- **Then — segments:** account-history table → manner-of-deterioration → locatability,
+  each put through the four tests in P8, followed by an action-mapping session with
+  collections (the real test).
+- **In parallel — revised targets**, which do not depend on the segments.
+- **Then — scores:** retrained per segment, measured against the dumb baselines, with
+  the P7 holdout and P8 grid checks before anything is used operationally.
+
+Cards lead; loans follow by porting the same patterns once the approach is proven.
+Progress and evidence updates land in this document as checks close.
 
 *Technical companion (implementation level): `docs/context/` in the modelling repo.*

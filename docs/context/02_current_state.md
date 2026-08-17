@@ -34,6 +34,11 @@ mechanically in every bucket) and is the substance behind the stakeholder compla
 
 Quantify it with **D4** (state-only baseline) before presenting anything.
 
+Note: this is *not* a leakage finding. The existing modelling spectrum is already
+leakage-controlled (R2) — the features are legitimate, they are simply restatements of
+what the officer already sees. Keep that discipline; the problem is orthogonality, not
+correctness.
+
 **The two genuine signals in the list:**
 - `CASA inflow/outflow` + `bureau total salary` — real ability signal. But importance
   may be inflated relative to ~20% coverage (split-based GBM importance artefact).
@@ -50,7 +55,7 @@ not a broken model. Do not frame this to stakeholders as "the model is weak".
 
 | Risk | Check | Consequence if real |
 |---|---|---|
-| Re-aging: restructure resets DPD → "moved back" positives caused by our own action | D7 | Current 60–180 labels partly encode collections' restructure choices; futility label must flag/censor re-aged accounts |
+| **Restructure = account succession** (R13): the old CC/loan is closed and a new one opened. If closure posts a settlement-like credit, a restructure reads as **recovery** — inverted, since the debt moved rather than being repaid. The old→new link is not yet identifiable (O13) | D7 / W0 | Recovery and futility labels inflated on every restructured account; `payments()` must exclude succession postings (`04 §1`); restructured customers are an A4 blind spot until W0 lands |
 | Card block codes fire after observation date, or are DPD-triggered operational actions | D10 / O11 | Leakage or self-fulfilling feature — drop or lag it |
 | Bureau salary freshness inconsistent across rows (AECB dry at delinquency) | D10 / O12 | Feature means different things per row; model exploits the inconsistency |
 
