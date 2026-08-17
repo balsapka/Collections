@@ -15,10 +15,12 @@ this is a check on two known-awkward cases rather than a general audit.
 2. Is blocking a DPD-triggered operational action (i.e. does it record our own
    decision rather than customer behaviour)?
 
-**Decision rule.** Any block timestamps after the observation date → leakage: drop or
-lag the feature and re-run the affected models. Purely DPD-triggered with no
-independent information → it is a state restatement (relevant to T01's finding), keep
-but do not count it as signal.
+**Decision rule.** Any block timestamps after the observation date → **leakage in the
+existing system. Report it, do not fix it** (R19): log it under "Defects found in
+existing system" in `RESULTS.md` with its impact, and let the user decide on the repair
+separately. For this programme's own work, exclude the feature. Purely DPD-triggered
+with no independent information → it is a state restatement (consistent with T01),
+usable but not signal.
 
 ## Bureau salary field
 
@@ -33,5 +35,7 @@ thing on every row.
 
 ## Done when
 
-Findings and any feature changes are logged in `RESULTS.md`; if either feature is
-changed, note which models need re-running and whether T01's baseline is affected.
+Findings logged in `RESULTS.md` — under "Diagnostics" for the measurement, and under
+"Defects found in existing system" for anything wrong with the running models. Note
+which existing models would be affected *if* the user chooses to fix, but do not make
+that change here (R19).

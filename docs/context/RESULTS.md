@@ -4,13 +4,42 @@ Append-only. Every session records what it measured, built, or decided here, so 
 sessions do not re-run or re-litigate. Newest entries at the top of each section.
 (Repo/pipeline inventory lives in the workplace repo's own docs — not here.)
 
+## New assets manifest (R18 — the abandon path)
+
+Every new file, pipeline, catalog entry and output table created by this programme.
+Append as you create. Deleting everything listed here must return the repo and the
+warehouse to their current behaviour.
+
+Agreed prefix: `crx_` — **CONFIRM with user before first use.**
+
+| Date | Type (file / pipeline / catalog entry / table) | Name or path | Created by | Notes |
+|---|---|---|---|---|
+| | | | | |
+
+## Defects found in existing system (R19 — reported, NOT fixed)
+
+Problems found in the running system during diagnostics. These are **not** repaired by
+this programme — they are separate decisions for the user, with their own testing and
+timing.
+
+| Date | Found by | Defect | Impact if unfixed | Suggested owner |
+|---|---|---|---|---|
+| | | | | |
+
 ## Returned outputs (raw PROD results)
 
-Paste the raw output block from each PROD run here, so no later session needs a re-run
-and results can be re-interpreted if a decision rule changes. Keep the scope line.
+So no later session needs a re-run, and results can be re-interpreted if a decision
+rule changes. Two forms depending on the return channel used:
+
+- **Small results:** paste the raw output block below, keeping the scope line.
+- **File hand-off:** record the path in `results/` — do not duplicate its contents.
+
+| Date | Task | Channel | Location / block |
+|---|---|---|---|
+| | | | |
 
 <details>
-<summary>T## — &lt;task&gt; — run YYYY-MM-DD</summary>
+<summary>T## — &lt;task&gt; — run YYYY-MM-DD (pasted)</summary>
 
 ```
 (paste the === T## OUTPUT START/END === block here)

@@ -19,8 +19,34 @@ a **snippet the user runs in PROD** and pastes back.
   template and rules.
 - Snippets use `catalog.load()` only, are read-only by default, aggregate in Spark and
   collect only small results, and print between `=== T## OUTPUT START/END ===` markers.
+- **Two return channels.** Small results (≲30 lines) are pasted back. Anything larger
+  or structured is **written to `results/` as JSON**, which the user commits and pushes
+  from PROD and pulls in UAT — the next session reads the file directly. Always print a
+  headline summary too, so the user can skip the commit when it is not worth it.
+- **Aggregates only in results files** — they are committed to a repo. No account ids,
+  CIFs, names, contact details or individual transactions.
 - **Never fabricate results.** If output has not come back, the task is not done. Do
   not write plausible numbers into `RESULTS.md` or reason as if a query had run.
+
+## Reversibility — this is an experiment, not a rewrite
+
+The current solution is not ideal, but **it works end to end**: data pipelines run,
+modelling pipelines run, reports are produced. That working system must keep working
+whatever happens to this programme, and if the strategy does not pan out, everything
+built here must be removable without a trace.
+
+**Isolation:** work on a dedicated branch. Additive-only discipline (R18) is what makes
+that branch *safe to merge*, so it does not have to be long-lived — merge early rather
+than accumulating a divergent branch. If the user chooses to stay on their active
+development branch instead, R18 alone still protects the running system.
+
+**The acid test for every change:** *if I deleted every file I added and every catalog
+entry I added, would the repo behave exactly as it does today?* If not, something was
+modified rather than added — undo it and find the additive path.
+
+**Side effect worth exploiting:** because old and new coexist, they can be run in
+parallel on the same population and compared directly. That comparison is the evidence
+that the new approach is better — or the early warning that it is not.
 
 ## Session protocol
 
@@ -76,6 +102,24 @@ If a task turns out to be bigger than one session, split it, record the split in
   reset. The old→new link is not yet identifiable. Until it is: never count a
   restructure closure as recovery, and treat restructured accounts as a known A4 blind
   spot. Any code assuming same-account DPD reset is wrong.
+- **R18 — Additive only. Never modify existing pipelines, logic or assets.**
+  - **Never:** change an existing node function, repoint or alter an existing catalog
+    entry, add columns to an existing table, change an existing model config, or
+    change an existing report.
+  - **Always:** new modules, new nodes, new pipelines registered under new names, new
+    catalog entries with new paths, new output tables, new reports beside the old.
+  - Every new asset carries a single agreed prefix so it can be found and removed in
+    one sweep — default `crx_` (collections-risk experimental), **CONFIRM** with the
+    user before first use.
+  - Record every new asset in the manifest in `RESULTS.md` as you create it. The
+    abandon path must stay mechanical, not archaeological.
+  - Adding a *new* label table is additive; adding columns to the existing one is not.
+    Prefer a new table joined on keys.
+- **R19 — Report defects, do not fix them.** If a diagnostic finds a problem in the
+  existing system (leakage, a contaminated label, a broken feature), **report it and
+  stop**. Do not repair it as part of this work — that is a modification to a running
+  system and a separate decision for the user, with its own testing and timing. Log it
+  in `RESULTS.md` under "Defects found in existing system" and continue the task.
 - **R16 — No data access in UAT.** Never write code that assumes you can execute it,
   and never state a data fact you have not been shown. Data questions are answered by
   a PROD snippet per `reference/snippet_contract.md`. A task whose snippet has not been
@@ -106,7 +150,8 @@ If a task turns out to be bigger than one session, split it, record the split in
 | `tasks/T##_*.md` | The one task being worked |
 | `reference/domain_and_decisions.md` | When a card names a section (segments, data truths, S/X/O lists) |
 | `reference/current_state.md` | When a card names it (model diagnosis, contamination risks) |
-| `reference/snippet_contract.md` | **Whenever a task touches data** — PROD snippet template and rules |
+| `reference/snippet_contract.md` | **Whenever a task touches data** — PROD snippet template, return channels, governance |
+| `results/` | PROD run outputs (JSON), pushed from PROD and pulled into UAT |
 | `reference/feature_specs.md` | When implementing — formula-level label/spell/A4/A2 specs |
 | `reference/roadmap.md` | Only for orientation on why a task exists / what comes later |
 | `RESULTS.md` | Every session — append results, read before re-running anything |

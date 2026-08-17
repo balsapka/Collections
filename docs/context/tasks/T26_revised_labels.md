@@ -16,9 +16,14 @@ reads as recovery and every new label inherits the error.
 
 ## Steps
 
-1. Implement `payments(a, t1, t2]` per `§1`, **excluding succession/restructure
-   postings** (R13). Emit `succession_excluded_flag` on every row so contamination
-   stays measurable.
+**Additive only (R18).** Build a **new label table** with the agreed prefix, joined to
+existing data on keys. Do **not** add columns to the existing label table and do not
+touch the existing label builder — it feeds the running models. Register a new catalog
+entry with a new path, and record both in the `RESULTS.md` manifest.
+
+1. Implement `payments(a, t1, t2]` per `§1` in a **new module**, **excluding
+   succession/restructure postings** (R13). Emit `succession_excluded_flag` on every
+   row so contamination stays measurable.
 2. Build: `futility_60_180`, `recovery_aed_60_180`, `any_recovery_180p`,
    `recovery_amount_180p`.
 3. Parameters from config with the `§1` defaults, each marked CONFIRM: horizon `N`,
