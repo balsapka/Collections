@@ -13,6 +13,12 @@ highest-leverage thing to do before any feature build.
 read the workplace repo's own `CLAUDE.md` and docs — they describe the existing
 pipelines and are the primary source here (R9).
 
+**This task is mostly runnable in UAT** — it is code and documentation reading, not
+data querying, so no PROD round trip is needed for the bulk of it. Where fit can only
+be settled by looking at actual values (e.g. does an existing feature's distribution
+match what A4 needs?), note the question and batch those into a single optional
+snippet at the end rather than blocking the inventory on them.
+
 ## Steps
 
 1. Enumerate the required features from `feature_specs.md §3` (A4) and `§4` (A2).

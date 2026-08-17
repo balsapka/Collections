@@ -36,9 +36,19 @@ spell/window helpers may already exist.
 
 ## Done when
 
-- Invariants tested: spells per account non-overlapping; `t0 <= obs <= spell_end` for
+Code is written blind in UAT, so it ships with a **validation snippet** (R17,
+`reference/snippet_contract.md`) that the user runs in PROD. Not done until that
+output comes back clean.
+
+The validation snippet must report:
+- **Invariants:** spells per account non-overlapping; `t0 <= obs <= spell_end` for
   every joined observation; `DPD = 0` outside spells; no spell bridges a closure;
-  `inherited_history_flag = 1` resolves to exactly one predecessor.
-- A sample is spot-checked against raw DPD history by hand.
-- Spell count, mean spells per account, and inherited-history coverage logged in
-  `RESULTS.md`.
+  `inherited_history_flag = 1` resolves to exactly one predecessor. Print a
+  pass/fail plus a violation count per invariant — counts make the fix obvious.
+- **Distributions:** spell count, mean spells per account, `t0_censored_flag` rate by
+  cohort (expect it concentrated in 180+ >2y), inherited-history coverage.
+- **A ~20-row sample** of accounts with their derived spells, for eyeballing against
+  the raw DPD string.
+
+Log the returned output in `RESULTS.md`. Expect at least one fix round — write the
+snippet to surface *what* broke, not just that something did.

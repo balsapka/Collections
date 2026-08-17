@@ -9,7 +9,15 @@ since the debt moved rather than being repaid. That would mean numbers already r
 to stakeholders overstate recovery. Size the problem before solving it: if restructures
 are a trivial share of the book, record the blind spot and move on.
 
-**Load.** `reference/current_state.md §3`; `reference/feature_specs.md §1`.
+**Load.** `reference/snippet_contract.md`; `reference/current_state.md §3`;
+`reference/feature_specs.md §1`.
+
+**Snippet notes.** Step 2 is a self-join on the account table keyed by CIF — restrict
+it to accounts closed with a balance first, which should cut it to a small fraction of
+the book before the join. Step 3 needs the *distribution of posting types* at closure,
+not the postings themselves: print the type codes with counts and let the user
+identify which are settlement-like. Sequence this as one snippet with clearly separated
+parts so a single PROD run answers the whole card.
 
 ## Steps
 

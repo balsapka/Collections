@@ -4,6 +4,19 @@ Append-only. Every session records what it measured, built, or decided here, so 
 sessions do not re-run or re-litigate. Newest entries at the top of each section.
 (Repo/pipeline inventory lives in the workplace repo's own docs — not here.)
 
+## Returned outputs (raw PROD results)
+
+Paste the raw output block from each PROD run here, so no later session needs a re-run
+and results can be re-interpreted if a decision rule changes. Keep the scope line.
+
+<details>
+<summary>T## — &lt;task&gt; — run YYYY-MM-DD</summary>
+
+```
+(paste the === T## OUTPUT START/END === block here)
+```
+</details>
+
 ## Diagnostics
 
 | Date | ID | Headline result | Decision taken | Artifact |

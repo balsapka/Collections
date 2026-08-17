@@ -8,8 +8,14 @@ that entered the bucket over two years ago, that window is 3+ years back and may
 purged or archived — which would make A4 unavailable for exactly the cohort where
 deterioration history matters most. This sets the achievable scope of T14–T17.
 
-**Load.** Nothing required. `reference/feature_specs.md §3` for the window definition
-if useful.
+**Load.** `reference/snippet_contract.md`. `feature_specs.md §3` for the window
+definition if useful.
+
+**Snippet cost warning.** A naive version scans full transaction history across
+billions of rows. Instead: draw a bounded random sample of accounts per segment
+(a few thousand each is ample for a coverage estimate), compute min/max transaction
+date per sampled account, and derive months-available from that. State the sample size
+and method in the output so the estimate is interpretable.
 
 ## Steps
 

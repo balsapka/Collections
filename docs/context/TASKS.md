@@ -3,7 +3,11 @@
 One task per session. Take the task the user names, or the first `todo` whose
 dependencies are `done`. Update `Status` here and append results to `RESULTS.md`.
 
-Status: `todo | in-progress | done | blocked | dropped | n/a`
+**UAT has no data access (R16).** Most tasks run in two legs: emit a PROD snippet, then
+interpret the output the user pastes back. `in-progress` means the snippet is out and
+awaiting results. See `reference/snippet_contract.md`.
+
+Status: `todo | in-progress (snippet out) | done | blocked | dropped | n/a`
 
 ## Phase 0 — Diagnostics and inventory (read-only)
 

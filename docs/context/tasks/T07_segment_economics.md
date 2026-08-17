@@ -8,7 +8,12 @@ differently enough to justify its own track, whether the >2y cohort holds enough
 absolute value to deserve attention despite a 1–2% rate, and whether the current
 180+ target's dual threshold is balance-dependent.
 
-**Load.** `reference/domain_and_decisions.md §3`.
+**Load.** `reference/snippet_contract.md`; `reference/domain_and_decisions.md §3`.
+
+**Snippet notes.** This is pure group-by aggregation — cheap if written as such, so
+aggregate in Spark and collect only the summary grid. The output is a small table
+(segments × metrics), which fits well inside the paste-back limit. Include counts
+alongside rates so thin cells are visible rather than being read as real signal.
 
 ## Steps
 

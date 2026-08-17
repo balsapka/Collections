@@ -9,15 +9,34 @@ The workplace repo has its own `CLAUDE.md` and docs for the codebase, pipelines
 **Precedence:** repo facts (what exists, names, patterns) come from the workplace docs;
 modelling strategy, decisions and the task queue come from this pack.
 
+## Environment — read this before anything else
+
+**This session runs in UAT and has NO data access.** You cannot query, profile, or
+verify anything against real data. Any question about the data is answered by writing
+a **snippet the user runs in PROD** and pastes back.
+
+- Load `reference/snippet_contract.md` whenever a task touches data. It has the
+  template and rules.
+- Snippets use `catalog.load()` only, are read-only by default, aggregate in Spark and
+  collect only small results, and print between `=== T## OUTPUT START/END ===` markers.
+- **Never fabricate results.** If output has not come back, the task is not done. Do
+  not write plausible numbers into `RESULTS.md` or reason as if a query had run.
+
 ## Session protocol
 
 1. Read this file and `TASKS.md`.
 2. Take the task the user names, or the first `todo` whose dependencies are `done`.
 3. Open its card in `tasks/`. Load only the reference sections the card lists.
-4. Do that one task. Do not start the next one.
-5. Append the result to `RESULTS.md` and set the task's status in `TASKS.md`.
-6. If the card's decision rule changes the plan, note it in `RESULTS.md` under
-   "Proposed amendments" — do not silently re-plan.
+4. Do that one task, in whichever leg it is at:
+   - **Leg A** — write the snippet (diagnostics) or the pipeline code plus its
+     validation snippet (build tasks). Hand it over. Set status `in-progress`.
+   - **Leg B** — the user pastes PROD output back. Interpret it, apply the card's
+     decision rule explicitly, log it, and set status `done`.
+   Do not start the next task in either leg.
+5. Append to `RESULTS.md`: headline number, decision taken, and the raw returned
+   output under "Returned outputs" so no later session needs a re-run.
+6. If a result changes a plan assumption, note it in `RESULTS.md` under "Proposed
+   amendments" — do not silently re-plan.
 
 If a task turns out to be bigger than one session, split it, record the split in
 `TASKS.md`, and finish the first half cleanly rather than running long.
@@ -57,6 +76,14 @@ If a task turns out to be bigger than one session, split it, record the split in
   reset. The old→new link is not yet identifiable. Until it is: never count a
   restructure closure as recovery, and treat restructured accounts as a known A4 blind
   spot. Any code assuming same-account DPD reset is wrong.
+- **R16 — No data access in UAT.** Never write code that assumes you can execute it,
+  and never state a data fact you have not been shown. Data questions are answered by
+  a PROD snippet per `reference/snippet_contract.md`. A task whose snippet has not been
+  run is `in-progress`, not `done`.
+- **R17 — Build tasks ship a validation snippet.** Pipeline code is written blind, so
+  every build task also produces a snippet that checks it in PROD (row counts, null
+  rates, the card's invariant tests, a small output sample). Not done until that comes
+  back clean.
 - **R14 — Reuse before build.** The repo has full end-to-end pipelines for most
   domains and hundreds of existing features. **Before implementing any feature, search
   the repo for an existing equivalent or near-equivalent** (see the reuse map from
@@ -79,6 +106,7 @@ If a task turns out to be bigger than one session, split it, record the split in
 | `tasks/T##_*.md` | The one task being worked |
 | `reference/domain_and_decisions.md` | When a card names a section (segments, data truths, S/X/O lists) |
 | `reference/current_state.md` | When a card names it (model diagnosis, contamination risks) |
+| `reference/snippet_contract.md` | **Whenever a task touches data** — PROD snippet template and rules |
 | `reference/feature_specs.md` | When implementing — formula-level label/spell/A4/A2 specs |
 | `reference/roadmap.md` | Only for orientation on why a task exists / what comes later |
 | `RESULTS.md` | Every session — append results, read before re-running anything |

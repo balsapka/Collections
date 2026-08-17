@@ -9,7 +9,13 @@ action/outcome crosstab. Its data quality is unresolved and may not be fixed in 
 so the build order deliberately puts DCORE-dependent work last — but that ordering
 needs a measurement behind it.
 
-**Load.** `reference/domain_and_decisions.md §4`.
+**Load.** `reference/snippet_contract.md`; `reference/domain_and_decisions.md §4`.
+
+**Snippet notes.** The PTP reconciliation is a join between DCORE promises and the
+payments table — bound it to a recent window (say 12 months) rather than all history;
+agreement rate is a ratio and does not need the full record. Print rates and code
+distributions only, never individual records: DCORE rows contain customer contact
+detail that should not be pasted into a chat session.
 
 ## Steps
 
