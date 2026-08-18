@@ -178,6 +178,7 @@ If a task turns out to be bigger than one session, split it, record the split in
 |---|---|
 | `00_START_HERE.md` | Every session |
 | `TASKS.md` | Every session — the queue |
+| `PROMPTS.md` | Human-facing: the prompts the user types to open a session. Not an instruction source. |
 | `tasks/T##_*.md` | The one task being worked |
 | `reference/domain_and_decisions.md` | When a card names a section (segments, data truths, S/X/O lists) |
 | `reference/current_state.md` | When a card names it (model diagnosis, contamination risks) |
