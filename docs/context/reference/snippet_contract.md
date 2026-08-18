@@ -41,14 +41,13 @@ can skip the commit when it is not worth it.
 
 ### ⚠ Data governance — aggregates only
 
-These files get committed to a repository. **Never write customer-identifiable or
-row-level data into them** — no account ids, CIFs, names, contact details, or
-individual transactions. Aggregates, distributions, rates and counts only. Where a
-sample of rows is genuinely needed for eyeballing (e.g. validating the spell table),
-use surrogate ids or redact keys, and keep it to a handful of rows.
+**Portfolio-level aggregates in the repo are approved** (confirmed 2026-08-16) —
+distributions, rates, counts, segment grids, metric tables.
 
-Confirm with the user that the repo is an approved location for portfolio-level metrics
-before the first file hand-off.
+**Never write customer-identifiable or row-level data into them** — no account ids,
+CIFs, names, contact details, or individual transactions. Where a sample of rows is
+genuinely needed for eyeballing (e.g. validating the spell table), use surrogate ids or
+redact keys, and keep it to a handful of rows.
 
 ## Hard requirements
 

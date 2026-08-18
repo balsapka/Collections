@@ -10,7 +10,10 @@ Every new file, pipeline, catalog entry and output table created by this program
 Append as you create. Deleting everything listed here must return the repo and the
 warehouse to their current behaviour.
 
-Agreed prefix: `crx_` — **CONFIRM with user before first use.**
+**Isolation mechanism.** Code: dedicated module directory + dedicated catalog file, so
+deletion is `rm -r` plus one file. Physical paths and warehouse tables: prefix
+`crx_` — **CONFIRM the marker with the user before first use** (or adopt the repo's own
+experimental-asset convention if one exists).
 
 | Date | Type (file / pipeline / catalog entry / table) | Name or path | Created by | Notes |
 |---|---|---|---|---|
@@ -68,6 +71,7 @@ rule changes. Two forms depending on the return channel used:
 
 | Date | Decision | Ref |
 |---|---|---|
+| 2026-08-16 | **Portfolio-level aggregates may be stored in the repo** — results files under `results/` are approved. Row-level/customer-identifiable data remains prohibited | `results/README.md` |
 | 2026-08-16 | Existing CC outflow features are anchored on **card block date** (~60 DPD). Re-anchor to T0 for A4; retain block-anchored originals as a distinct `W_early` (early-delinquency response) family — reuse, do not rebuild | `reference/feature_specs.md §3.0` |
 | 2026-08-16 | CC has a ready-made **24-month DPD bucket history** feature → near-free spell/T0 derivation (with a 24-month censoring limit and monthly resolution). Loans have no equivalent; buckets must be reconstructed | `reference/feature_specs.md §2` |
 | 2026-08-16 | **Loans are month-end snapshot only** — payment behaviour partly derivable, payment timing not. T25 decides whether to trigger granular data sourcing | `00 R15`, T25 |

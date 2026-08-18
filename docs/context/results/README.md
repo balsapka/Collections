@@ -15,10 +15,10 @@ using the numbers** — it records the filters, sampling and date range actually
 
 ## ⚠ Aggregates only
 
-These files are committed to a repository. They must contain **no customer-identifiable
-or row-level data** — no account ids, CIFs, names, contact details or individual
-transactions. Aggregates, distributions, rates and counts only. Where a few sample rows
-are genuinely needed (e.g. eyeballing derived spells), use surrogate ids or redact keys.
+**Portfolio-level aggregates in this repo are approved** (confirmed 2026-08-16).
 
-Confirm this repo is an approved location for portfolio-level metrics before the first
-file lands here.
+What that permits: distributions, rates, counts, segment grids, metric tables.
+
+What it does **not** permit: customer-identifiable or row-level data — no account ids,
+CIFs, names, contact details or individual transactions. Where a few sample rows are
+genuinely needed (e.g. eyeballing derived spells), use surrogate ids or redact keys.

@@ -23,8 +23,9 @@ a **snippet the user runs in PROD** and pastes back.
   or structured is **written to `results/` as JSON**, which the user commits and pushes
   from PROD and pulls in UAT — the next session reads the file directly. Always print a
   headline summary too, so the user can skip the commit when it is not worth it.
-- **Aggregates only in results files** — they are committed to a repo. No account ids,
-  CIFs, names, contact details or individual transactions.
+- **Aggregates only in results files.** Portfolio-level aggregates in the repo are
+  approved; customer-identifiable or row-level data is not — no account ids, CIFs,
+  names, contact details or individual transactions.
 - **Never fabricate results.** If output has not come back, the task is not done. Do
   not write plausible numbers into `RESULTS.md` or reason as if a query had run.
 
@@ -108,9 +109,12 @@ If a task turns out to be bigger than one session, split it, record the split in
     change an existing report.
   - **Always:** new modules, new nodes, new pipelines registered under new names, new
     catalog entries with new paths, new output tables, new reports beside the old.
-  - Every new asset carries a single agreed prefix so it can be found and removed in
-    one sweep — default `crx_` (collections-risk experimental), **CONFIRM** with the
-    user before first use.
+  - **Isolate new assets so they can be deleted in one sweep.** For code: a dedicated
+    module directory and a dedicated catalog file (`conf/base/catalog_<name>.yml`) —
+    deletion is `rm -r` plus one file. For physical paths and warehouse tables, where
+    that structure is not available: a single agreed prefix, default `crx_`
+    (collections-risk experimental). Use the repo's own convention for experimental
+    assets if one exists. **CONFIRM the marker with the user before first use.**
   - Record every new asset in the manifest in `RESULTS.md` as you create it. The
     abandon path must stay mechanical, not archaeological.
   - Adding a *new* label table is additive; adding columns to the existing one is not.
