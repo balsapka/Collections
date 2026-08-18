@@ -8,10 +8,15 @@ Results files written by PROD snippets (channel B in
 3. **Pull in UAT** — the next session reads the file directly instead of you pasting
    it by hand.
 
-Naming: `T##_<short_name>_<YYYYMMDD>.json`
+Naming: `T##_<short_name>_<model_id>_<YYYYMMDD>.json`
 
-Every file carries `task`, `run_date`, `scope` and `results`. **Check `scope` before
-using the numbers** — it records the filters, sampling and date range actually used.
+The **model_id is in the filename** so the same script can be run across every model_id
+variant without one run overwriting another — several files per task is normal and is
+how the full cross-variant picture gets assembled.
+
+Every file carries `task`, `run_date`, `model_id`, `scope` and `results`. **Check
+`model_id` and `scope` before using the numbers** — they record which variant was run
+and the filters, sampling and date range actually used.
 
 ## ⚠ Aggregates only
 

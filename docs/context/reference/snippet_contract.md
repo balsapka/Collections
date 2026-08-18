@@ -31,11 +31,13 @@ can skip the commit when it is not worth it.
 ### File hand-off conventions
 
 - **Location:** `docs/context/results/` (create if absent).
-- **Name:** `T##_<short_name>_<YYYYMMDD>.json` — stable and sortable.
+- **Name:** `T##_<short_name>_<model_id>_<YYYYMMDD>.json` — stable, sortable, and one
+  file per model_id variant so re-runs never overwrite each other (see below).
 - **Format:** JSON for anything a later session must parse; add a `.md` sibling only
   if a human needs to read it directly.
-- **Envelope:** always include `task`, `run_date`, `scope` (filters, sampling, date
-  range) and `results`. Scope travels with the numbers so they cannot be misread later.
+- **Envelope:** always include `task`, `run_date`, `model_id`, `scope` (filters,
+  sampling, date range) and `results`. Scope and model_id travel with the numbers so
+  they cannot be misread later.
 - **Size:** aggregates only. Cap at a few hundred rows — this goes into git, not a
   data lake. If a result is genuinely larger, aggregate harder or sample.
 
@@ -119,8 +121,47 @@ Preference order — take the earliest that answers the question:
 4. **Raw unscoped** — never.
 
 Discover the real dataset names in the repo catalog (R9); do not guess them. Put the
-`model_id` and scope dataset names in `<<FILL-IN>>` constants at the top so the user
-corrects them in one place.
+scope dataset names in `{model_id}`-templated `<<FILL-IN>>` constants at the top so the
+user corrects them in one place. The `model_id` itself is **never** one of those
+constants — it comes from globals (next section).
+
+## `model_id` — from globals, never hardcoded
+
+**A hardcoded model_id is a defect.** The same snippet must run unchanged against every
+model_id variant, so the user can build the full picture across them in one sitting.
+
+Resolution order, implemented in every snippet and every validation script:
+
+1. **The `model_id=` argument** the user passes to `main()` — always wins, so a variant
+   can be run without editing the file.
+2. **The project globals** (`globals_dev`) when the argument is omitted.
+
+```python
+def _resolve_model_id(model_id=None):
+    """caller arg → project globals. Never a hardcoded literal."""
+    if model_id:
+        return model_id
+    # <<FILL-IN: the real accessor — discover it in the workplace repo, never guess (R9).
+    #  The user's globals are `globals_dev`; shape is one of:
+    #    from <pkg>.<module> import globals_dev   →  globals_dev["model_id"]
+    #    conf_loader["globals"]["model_id"]  (Kedro OmegaConfigLoader) >>
+    from <<FILL-IN: module exposing globals_dev>> import globals_dev
+    return globals_dev["model_id"]                  # <<FILL-IN: key, if it differs>>
+```
+
+Consequences that are easy to get wrong:
+
+- **Build namespaced dataset names inside `main()`**, from the resolved value — not at
+  module level, where the model_id is not known yet. Keep them as templates at the top:
+  `DS_SCOPE_TMPL = "{model_id}.<<FILL-IN: scope dataset>>"`.
+- **The resolved model_id goes into the results filename**, the payload envelope, and
+  the printed headline. Filename so variant runs sit side by side instead of clobbering
+  one another; envelope and headline so a pasted-back block is attributable to a variant
+  months later.
+- **Sanitise it for the filename** (`re.sub(r"[^A-Za-z0-9]+", "_", model_id)`) — a
+  namespace with dots or slashes in it must not shape the path.
+- **Print it first**, before any number, so the user can see at a glance which variant
+  a run covers.
 
 ### Two exceptions to be deliberate about
 
@@ -173,6 +214,10 @@ is); otherwise let Spark plan the semi-join normally.
    runnable via `main(catalog)`, with no dependency on prior session state.
 10. **Scope before anything else.** Spine first, then `model_id` scope datasets, then
     scoped raw. Never an unscoped raw scan.
+11. **`model_id` from globals, never hardcoded.** `main()` takes `model_id=None`,
+    resolves it from `globals_dev` when omitted, builds every namespaced dataset name
+    from the resolved value, and writes it into the results **filename**, the payload
+    and the printed headline — so one script covers all model_id variants.
 
 ## Absolute rule: never fabricate results
 
@@ -196,20 +241,22 @@ Works from any notebook location (CWD is never used):
     sys.path.insert(0, str(ROOT / "docs" / "context" / "snippets"))
 
     from t##_<short_name> import main
-    result = main(catalog)
+    result = main(catalog)                      # model_id from globals_dev
+    result = main(catalog, model_id="<variant>")  # or one variant explicitly
 
 READ-ONLY: writes nothing to the warehouse.
-FILL IN before running: MODEL_ID, DS_SCOPE, DS_RAW
+FILL IN before running: the globals accessor in _resolve_model_id, DS_SCOPE_TMPL, DS_RAW
 """
 import datetime
 import json
 import pathlib
+import re
 
 from pyspark.sql import functions as F
 
 # --- catalog names — FILL IN (discover in the repo catalog, never guess) -------
-MODEL_ID = "<<FILL-IN: model_id namespace used by the spine pipelines>>"
-DS_SCOPE = f"{MODEL_ID}.<<FILL-IN: spine or scope_accounts dataset>>"
+# model_id is NOT a constant here — it comes from globals or the caller.
+DS_SCOPE_TMPL = "{model_id}.<<FILL-IN: spine or scope_accounts dataset>>"
 DS_RAW = "<<FILL-IN: raw table — only if the spine cannot answer this>>"
 
 KEY = "account_id"
@@ -224,11 +271,21 @@ def _repo_root() -> pathlib.Path:
     raise RuntimeError(f"repo root not found above {here}")
 
 
-def main(catalog, out_dir=None, sample_frac=None):
+def _resolve_model_id(model_id=None) -> str:
+    """caller arg → project globals. Never a hardcoded literal."""
+    if model_id:
+        return model_id
+    from <<FILL-IN: module exposing globals_dev>> import globals_dev
+    return globals_dev["model_id"]                # <<FILL-IN: key, if it differs>>
+
+
+def main(catalog, model_id=None, out_dir=None, sample_frac=None):
+    model_id = _resolve_model_id(model_id)        # every variant runs the same file
     out_dir = pathlib.Path(out_dir) if out_dir else _repo_root() / "docs" / "context" / "results"
+    ds_scope = DS_SCOPE_TMPL.format(model_id=model_id)
 
     # 1. SCOPE FIRST — never touch a raw table before this ---------------------
-    scope = catalog.load(DS_SCOPE).select(KEY).distinct()
+    scope = catalog.load(ds_scope).select(KEY).distinct()
     if sample_frac:
         scope = scope.sample(fraction=sample_frac, seed=42)
 
@@ -246,20 +303,25 @@ def main(catalog, out_dir=None, sample_frac=None):
     res = df.groupBy("<<col_a>>").agg(F.count("*").alias("n"))
     rows = [r.asDict() for r in res.limit(500).collect()]
 
-    scope_note = f"scoped to {DS_SCOPE}" + (f", sampled {sample_frac}" if sample_frac else "")
+    scope_note = f"scoped to {ds_scope}" + (f", sampled {sample_frac}" if sample_frac else "")
     payload = {
         "task": "T##",
         "run_date": datetime.date.today().isoformat(),
+        "model_id": model_id,
         "scope": scope_note,
         "results": rows,
     }
 
     # 4. file hand-off + printed summary --------------------------------------
+    # model_id in the filename: variant runs sit side by side, never overwrite.
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"T##_<short_name>_{payload['run_date'].replace('-', '')}.json"
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", model_id).strip("_")
+    stamp = payload["run_date"].replace("-", "")
+    out = out_dir / f"T##_<short_name>_{slug}_{stamp}.json"
     out.write_text(json.dumps(payload, indent=2, default=str))
 
     print("=== T## OUTPUT START ===")
+    print(f"model_id: {model_id}")                # first line — which variant is this
     print(f"scope: {scope_note}")
     print(f"wrote: {out} ({len(rows)} rows) -> commit & push from PROD, pull in UAT")
     for r in rows[:20]:                           # headline only; detail in the file
@@ -300,3 +362,10 @@ build task ships **two** things:
 The build task is not done until the validation snippet's output has come back clean.
 Expect at least one fix round — write the validation snippet to surface *what* broke,
 not just that something did.
+
+**Validation snippets are the sharpest case of the model_id rule.** The same pipeline is
+built per segment, so the user validates it across several model_id variants in one
+sitting. Take `model_id=None` (globals by default, caller override to pick a variant),
+put the resolved value in the results filename, the payload and the first printed line,
+and never hardcode one — a validation script that can only check one variant, or that
+overwrites the previous variant's results file, is a defect.

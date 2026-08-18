@@ -27,6 +27,10 @@ a **snippet the user runs in PROD** and pastes back.
   spine id, dates and delinquency info, and are scoped by construction), then the
   `model_id` scope datasets, then scoped raw. **Never an unscoped raw scan** — these
   are billion-row tables and we want a small population.
+- **`model_id` from globals, never hardcoded (R22).** `main()` takes `model_id=None`
+  and resolves it from `globals_dev` unless the user passes one, builds every namespaced
+  dataset name from the resolved value, and writes it into the results **filename**, the
+  payload and the first printed line — so one script runs across all model_id variants.
 - Snippets use `catalog.load()` only, are read-only by default, aggregate in Spark and
   collect only small results, and print between `=== T## OUTPUT START/END ===` markers.
 - **Two return channels.** Small results (≲30 lines) are pasted back. Anything larger
@@ -151,6 +155,17 @@ If a task turns out to be bigger than one session, split it, record the split in
   **retail loans 180+ has no spine/scope pipeline** (build an ad-hoc scope and label it),
   and **sizing questions may need the business population rather than the modelling
   spine**, which can carry exclusions. Always state which scope was used.
+- **R22 — `model_id` comes from globals and travels into the filename.** Never hardcode
+  a model_id in a snippet, a validation script or a pipeline config. Resolve it in this
+  order: the **`model_id=` argument** the user passes to `main()` (so a variant runs
+  without editing the file), then the **project globals — `globals_dev`** (discover the
+  exact accessor in the workplace repo, never guess, R9). Build every model_id-namespaced
+  dataset name from the resolved value *inside* `main()`, not at module level. Write the
+  resolved model_id into **the results filename** (`T##_<name>_<model_id>_<YYYYMMDD>.json`,
+  slug-sanitised), the payload envelope, and the **first printed line** of the output
+  block. Reason: the user runs the same script across every model_id variant to get the
+  full picture — a hardcoded id blocks that, and a filename without the id silently
+  overwrites the previous variant's results.
 - **R16 — No data access in UAT.** Never write code that assumes you can execute it,
   and never state a data fact you have not been shown. Data questions are answered by
   a PROD snippet per `reference/snippet_contract.md`. A task whose snippet has not been
@@ -158,7 +173,8 @@ If a task turns out to be bigger than one session, split it, record the split in
 - **R17 — Build tasks ship a validation snippet.** Pipeline code is written blind, so
   every build task also produces a snippet that checks it in PROD (row counts, null
   rates, the card's invariant tests, a small output sample). Not done until that comes
-  back clean.
+  back clean. Validation snippets obey R22 — parametrised by `model_id`, which lands in
+  the output filename — because the same pipeline is validated across several variants.
 - **R14 — Reuse before build.** The repo has full end-to-end pipelines for most
   domains and hundreds of existing features. **Before implementing any feature, search
   the repo for an existing equivalent or near-equivalent** (see the reuse map from

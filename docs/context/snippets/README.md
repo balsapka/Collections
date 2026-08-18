@@ -17,12 +17,14 @@ ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
 sys.path.insert(0, str(ROOT / "docs" / "context" / "snippets"))
 
 from t02_transaction_retention import main
-result = main(catalog)
+result = main(catalog)                        # model_id from globals_dev
+result = main(catalog, model_id="<variant>")  # or pick a variant explicitly
 ```
 
-Every module exposes `main(catalog, out_dir=None, ...)`. It prints a summary, writes a
-results file into `docs/context/results/` when the output is too big to paste, and
-**returns the payload** so you can inspect it in the notebook without re-running.
+Every module exposes `main(catalog, model_id=None, out_dir=None, ...)`. It prints a
+summary, writes a results file into `docs/context/results/` when the output is too big
+to paste, and **returns the payload** so you can inspect it in the notebook without
+re-running.
 
 No `KedroSession` bootstrap and no `__main__` block — `catalog` comes in as an
 argument, because the notebook already has it.
@@ -35,6 +37,10 @@ sits. Pass `out_dir=` to override.
 
 - **Scope first.** Spine datasets, or the `model_id` scope datasets, before touching
   any raw table. An unscoped scan of a billion-row table is a defect, not a slow query.
+- **Never hardcode `model_id`.** It comes from `globals_dev`, or from the `model_id=`
+  argument you pass, and it lands in the results **filename**, the payload and the first
+  printed line — so you can run the same file across every variant and keep every
+  result.
 - **Read-only**, unless the task explicitly says otherwise and says so loudly.
 - **Aggregate in Spark**, collect only the small result.
 - **Schema-guard** before computing, so a wrong column name gives you a useful message
