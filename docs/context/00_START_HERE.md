@@ -137,7 +137,10 @@ If a task turns out to be bigger than one session, split it, record the split in
   often answer a question with no raw table touched at all. Otherwise semi-join raw
   down to the `model_id` scope datasets (`scope_accounts`, `scope_cifs` or whatever
   they are actually called — discover, do not guess, R9) before anything else. An
-  unscoped scan of a raw table is a **defect**.
+  unscoped scan of a raw table is a **defect**. Two exceptions to handle explicitly:
+  **retail loans 180+ has no spine/scope pipeline** (build an ad-hoc scope and label it),
+  and **sizing questions may need the business population rather than the modelling
+  spine**, which can carry exclusions. Always state which scope was used.
 - **R16 — No data access in UAT.** Never write code that assumes you can execute it,
   and never state a data fact you have not been shown. Data questions are answered by
   a PROD snippet per `reference/snippet_contract.md`. A task whose snippet has not been

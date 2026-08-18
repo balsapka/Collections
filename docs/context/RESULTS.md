@@ -71,6 +71,7 @@ rule changes. Two forms depending on the return channel used:
 
 | Date | Decision | Ref |
 |---|---|---|
+| 2026-08-16 | **Spine/scope pipelines exist for every model segment except retail loans 180+.** That segment needs an ad-hoc scope, labelled as such in the results `scope` field. Running its spine is deferred — CC leads, loans follow | `domain_and_decisions.md §4` |
 | 2026-08-16 | **Portfolio-level aggregates may be stored in the repo** — results files under `results/` are approved. Row-level/customer-identifiable data remains prohibited | `results/README.md` |
 | 2026-08-16 | Existing CC outflow features are anchored on **card block date** (~60 DPD). Re-anchor to T0 for A4; retain block-anchored originals as a distinct `W_early` (early-delinquency response) family — reuse, do not rebuild | `reference/feature_specs.md §3.0` |
 | 2026-08-16 | CC has a ready-made **24-month DPD bucket history** feature → near-free spell/T0 derivation (with a 24-month censoring limit and monthly resolution). Loans have no equivalent; buckets must be reconstructed | `reference/feature_specs.md §2` |

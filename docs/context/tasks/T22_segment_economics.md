@@ -12,10 +12,19 @@ absolute value to deserve attention despite a 1–2% rate, and whether the curre
 
 **Load.** `reference/snippet_contract.md`; `reference/domain_and_decisions.md §3`.
 
-**Snippet notes.** This is pure group-by aggregation — cheap if written as such, so
-aggregate in Spark and collect only the summary grid. The output is a small table
-(segments × metrics), which fits well inside the paste-back limit. Include counts
-alongside rates so thin cells are visible rather than being read as real signal.
+**Snippet notes.** Pure group-by aggregation — cheap if written as such. Aggregate in
+Spark, collect only the summary grid; the output is a small table (segments × metrics)
+that fits inside the paste-back limit. Include counts beside rates so thin cells are
+visible rather than read as real signal.
+
+**⚠ Two scope subtleties specific to this task:**
+- **Retail loans 180+ has no spine/scope pipeline.** Every other segment does. Build an
+  ad-hoc scope from explicit filters for that cell, and label it in the `scope` field
+  so its numbers are not read as comparable to the spine-scoped ones.
+- **This is a sizing question, so the modelling spine may be the wrong denominator** —
+  it can already carry modelling exclusions, which would understate the segment.
+  Prefer the business population; if both are cheap, report both and note the gap.
+  Record which was used per segment.
 
 ## Steps
 

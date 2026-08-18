@@ -93,6 +93,22 @@ Discover the real dataset names in the repo catalog (R9); do not guess them. Put
 `model_id` and scope dataset names in `<<FILL-IN>>` constants at the top so the user
 corrects them in one place.
 
+### Two exceptions to be deliberate about
+
+**1. Retail loans 180+ has no spine/scope pipeline yet.** Every other segment does.
+For that segment, build an **ad-hoc scope** in the snippet from explicit filters
+(product, DPD band, date), keep it as a named DataFrame at the top exactly where a
+`catalog.load` would have been, and state `"ad-hoc scope: <filters>"` in the payload's
+`scope` field. Never silently fall back to an unscoped scan, and never present its
+numbers as comparable to spine-scoped ones without saying so.
+
+**2. Pick the scope that matches the question.** A modelling spine may already carry
+modelling exclusions, which makes it the wrong denominator for a *sizing* question —
+"how much is recoverable in this segment" needs the business population, not the
+modelled one. Use the spine for model-related diagnostics; use a business-population
+filter for sizing, and **always record which in the `scope` field.** If both are cheap,
+report both and note the difference — the gap between them is itself informative.
+
 ```python
 scope = catalog.load(DS_SCOPE).select("account_id").distinct()
 raw   = catalog.load(DS_RAW)

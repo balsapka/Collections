@@ -51,6 +51,14 @@ Contactability is a gate upstream of scoring, not a feature inside it.
 
 ## 4. Data domain truths
 
+**Spine / scope pipeline coverage.** Spine and scoping pipelines have been run for
+every model segment **except retail loans 180+**. So scope-first (R20) works
+everywhere else; for loans 180+ a snippet must build an **ad-hoc scope** with explicit
+filters and label it as such in the results `scope` field, so its numbers are not read
+as comparable to spine-scoped ones. Running the spine for that segment would remove the
+inconsistency, but CC leads and loans follow — defer unless loans 180+ becomes a live
+track.
+
 **Grain differs sharply by unit (R15):**
 - **CC is rich** — dedicated payment, balance and utilisation tables *plus* transaction
   history, all sub-monthly. Also has a ready-made **24-month DPD bucket history**
