@@ -17,6 +17,13 @@ a **snippet the user runs in PROD** and pastes back.
 
 - Load `reference/snippet_contract.md` whenever a task touches data. It has the
   template and rules.
+- **Snippets are modules under `docs/context/snippets/`** named `t##_<short_name>.py`,
+  each exposing **`main(catalog, ...)`** — the user runs them in a Kedro notebook where
+  `catalog` already exists. No session bootstrap, no `__main__` block.
+- **Scope before anything else (R20).** Spine datasets first (they already carry the
+  spine id, dates and delinquency info, and are scoped by construction), then the
+  `model_id` scope datasets, then scoped raw. **Never an unscoped raw scan** — these
+  are billion-row tables and we want a small population.
 - Snippets use `catalog.load()` only, are read-only by default, aggregate in Spark and
   collect only small results, and print between `=== T## OUTPUT START/END ===` markers.
 - **Two return channels.** Small results (≲30 lines) are pasted back. Anything larger
@@ -124,6 +131,13 @@ If a task turns out to be bigger than one session, split it, record the split in
   stop**. Do not repair it as part of this work — that is a modification to a running
   system and a separate decision for the user, with its own testing and timing. Log it
   in `RESULTS.md` under "Defects found in existing system" and continue the task.
+- **R20 — Scope first, always.** Filtering to the target population is the *first*
+  operation in any data code, before any other logic. Prefer the spine datasets (they
+  carry spine id, dates and delinquency info and are scoped by construction) — they
+  often answer a question with no raw table touched at all. Otherwise semi-join raw
+  down to the `model_id` scope datasets (`scope_accounts`, `scope_cifs` or whatever
+  they are actually called — discover, do not guess, R9) before anything else. An
+  unscoped scan of a raw table is a **defect**.
 - **R16 — No data access in UAT.** Never write code that assumes you can execute it,
   and never state a data fact you have not been shown. Data questions are answered by
   a PROD snippet per `reference/snippet_contract.md`. A task whose snippet has not been
@@ -155,6 +169,7 @@ If a task turns out to be bigger than one session, split it, record the split in
 | `reference/domain_and_decisions.md` | When a card names a section (segments, data truths, S/X/O lists) |
 | `reference/current_state.md` | When a card names it (model diagnosis, contamination risks) |
 | `reference/snippet_contract.md` | **Whenever a task touches data** — PROD snippet template, return channels, governance |
+| `snippets/` | Generated PROD snippets — modules with `main(catalog)`, run in a Kedro notebook |
 | `results/` | PROD run outputs (JSON), pushed from PROD and pulled into UAT |
 | `reference/feature_specs.md` | When implementing — formula-level label/spell/A4/A2 specs |
 | `reference/roadmap.md` | Only for orientation on why a task exists / what comes later |

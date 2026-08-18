@@ -49,11 +49,64 @@ CIFs, names, contact details, or individual transactions. Where a sample of rows
 genuinely needed for eyeballing (e.g. validating the spell table), use surrogate ids or
 redact keys, and keep it to a handful of rows.
 
+## Where snippets live and how they run
+
+**Every snippet is a module under `docs/context/snippets/`**, named
+`t##_<short_name>.py`. Never loose scripts, never inline-only code in chat.
+
+**Each module exposes `main(catalog, ...)`.** The user runs it in a **Kedro notebook**,
+where `catalog` is already defined:
+
+```python
+import sys; sys.path.insert(0, "docs/context/snippets")
+from t02_transaction_retention import main
+result = main(catalog)
+```
+
+So: no `KedroSession` bootstrap, no path juggling, no `if __name__ == "__main__"`
+entry point. `catalog` arrives as an argument. `main()` prints the summary, writes the
+results file when the result warrants it, **and returns the payload** so the user can
+inspect it in the notebook without a re-run.
+
+Put the run instructions in the module docstring — the user should not have to
+reconstruct the import line.
+
+## Scope first — never scan raw tables unscoped
+
+These are billion-row tables and we care only about a small target population.
+**Filtering to scope is the first operation, before any other logic.** An unscoped scan
+is a defect, not an inefficiency.
+
+Preference order — take the earliest that answers the question:
+
+1. **The spine datasets.** They already carry the spine id, date columns and
+   delinquency info, and are scoped by construction. Many diagnostics can be answered
+   from the spine alone with no raw table touched at all. **Check this first.**
+2. **Scoped outputs from the spine pipelines** — the `model_id`-namespaced datasets
+   (`scope_accounts`, `scope_cifs`, or whatever they are actually called). Semi-join
+   raw down to these before anything else.
+3. **Raw tables, scoped.** Only for columns the above do not carry, and only after the
+   semi-join.
+4. **Raw unscoped** — never.
+
+Discover the real dataset names in the repo catalog (R9); do not guess them. Put the
+`model_id` and scope dataset names in `<<FILL-IN>>` constants at the top so the user
+corrects them in one place.
+
+```python
+scope = catalog.load(DS_SCOPE).select("account_id").distinct()
+raw   = catalog.load(DS_RAW)
+df    = raw.join(F.broadcast(scope), "account_id", "leftsemi")   # scope FIRST
+```
+
+Broadcast the scope side when it is small enough (a few hundred thousand keys usually
+is); otherwise let Spark plan the semi-join normally.
+
 ## Hard requirements
 
 1. **`catalog.load()` only.** Never hardcode paths, never construct readers directly.
    Put every dataset name in a named constant at the top so the user can correct them
-   in one place.
+   in one place. `catalog` is a parameter of `main()`, never a global lookup.
 2. **Never invent catalog names** (R9). Use `<<FILL-IN: description>>` and say in the
    preamble which names need filling.
 3. **Schema-guard before computing.** Check required columns exist; if not, print the
@@ -71,8 +124,10 @@ redact keys, and keep it to a handful of rows.
 8. **Sample when a full scan is not needed.** State the sampling in the output so the
    result is interpretable. Prefer a bounded date range or a fraction sample over a
    full historical scan for exploratory questions.
-9. **Self-contained.** One file, runnable top to bottom, no dependency on prior
-   session state.
+9. **Self-contained.** One module under `docs/context/snippets/`, importable and
+   runnable via `main(catalog)`, with no dependency on prior session state.
+10. **Scope before anything else.** Spine first, then `model_id` scope datasets, then
+    scoped raw. Never an unscoped raw scan.
 
 ## Absolute rule: never fabricate results
 
@@ -82,66 +137,80 @@ expected result as an actual one. An un-run snippet is an open task.
 
 ## Template
 
+`docs/context/snippets/t##_<short_name>.py`
+
 ```python
-# ==============================================================================
-# T## — <task name>
-# Generated in UAT (no data access). RUN IN PROD.
-# Paste everything between the OUTPUT markers back into the UAT session.
-# READ-ONLY: this snippet writes nothing.
-# FILL IN: <list the <<FILL-IN>> constants the user must set>
-# ==============================================================================
+"""T## — <task name>.
+
+Generated in UAT (no data access). Run in a Kedro notebook where `catalog` exists:
+
+    import sys; sys.path.insert(0, "docs/context/snippets")
+    from t##_<short_name> import main
+    result = main(catalog)
+
+READ-ONLY: writes nothing to the warehouse.
+FILL IN before running: MODEL_ID, DS_SCOPE, DS_RAW
+"""
+import datetime
+import json
+import pathlib
+
 from pyspark.sql import functions as F
 
-# --- inputs -------------------------------------------------------------------
-DS_ACCOUNT = "<<FILL-IN: catalog name for the account master>>"
-DS_PAYMENT = "<<FILL-IN: catalog name for payments/postings>>"
+# --- catalog names — FILL IN (discover in the repo catalog, never guess) -------
+MODEL_ID = "<<FILL-IN: model_id namespace used by the spine pipelines>>"
+DS_SCOPE = f"{MODEL_ID}.<<FILL-IN: spine or scope_accounts dataset>>"
+DS_RAW = "<<FILL-IN: raw table — only if the spine cannot answer this>>"
 
-acct = catalog.load(DS_ACCOUNT)
-pay  = catalog.load(DS_PAYMENT)
+OUT_DIR = pathlib.Path("docs/context/results")
+KEY = "account_id"
 
-# --- schema guard -------------------------------------------------------------
-REQUIRED = {"acct": ["account_id", "account_type", "close_date"],
-            "pay":  ["account_id", "posting_date", "amount", "posting_type"]}
-for name, df in (("acct", acct), ("pay", pay)):
-    missing = [c for c in REQUIRED[name] if c not in df.columns]
-    if missing:
-        print(f"SCHEMA MISMATCH in {name}. missing={missing}")
-        print(f"available={sorted(df.columns)}")
-        raise SystemExit
 
-# --- computation (aggregate in Spark, collect small) --------------------------
-res = (acct
-       .where(F.col("close_date").isNotNull())
-       .groupBy("account_type")
-       .agg(F.count("*").alias("n_closed"))
-       .orderBy("account_type"))
+def main(catalog, sample_frac=None):
+    # 1. SCOPE FIRST — never touch a raw table before this ---------------------
+    scope = catalog.load(DS_SCOPE).select(KEY).distinct()
+    if sample_frac:
+        scope = scope.sample(fraction=sample_frac, seed=42)
 
-# --- output: file hand-off + printed summary ----------------------------------
-import json, datetime, pathlib
+    # 2. filter raw down to scope before any other logic -----------------------
+    raw = catalog.load(DS_RAW)
+    required = [KEY, "<<col_a>>", "<<col_b>>"]
+    missing = [c for c in required if c not in raw.columns]
+    if missing:                                   # schema guard: fail usefully
+        print(f"SCHEMA MISMATCH. missing={missing}")
+        print(f"available={sorted(raw.columns)}")
+        return None
+    df = raw.join(F.broadcast(scope), KEY, "leftsemi")
 
-rows = [r.asDict() for r in res.limit(500).collect()]   # aggregates only, capped
+    # 3. aggregate in Spark; collect only the small result ---------------------
+    res = df.groupBy("<<col_a>>").agg(F.count("*").alias("n"))
+    rows = [r.asDict() for r in res.limit(500).collect()]
 
-OUT_DIR = pathlib.Path("<<FILL-IN: repo path, e.g. docs/context/results>>")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-run_date = datetime.date.today().isoformat()
-out_path = OUT_DIR / f"T##_<short_name>_{run_date.replace('-','')}.json"
-out_path.write_text(json.dumps({
-    "task": "T##",
-    "run_date": run_date,
-    "scope": "<filters, sampling, date range actually used>",
-    "results": rows,
-}, indent=2, default=str))
+    scope_note = f"scoped to {DS_SCOPE}" + (f", sampled {sample_frac}" if sample_frac else "")
+    payload = {
+        "task": "T##",
+        "run_date": datetime.date.today().isoformat(),
+        "scope": scope_note,
+        "results": rows,
+    }
 
-print("=== T## OUTPUT START ===")
-print(f"scope: <state filters/sampling used>")
-print(f"wrote: {out_path}  ({len(rows)} rows)  -> commit & push from PROD, pull in UAT")
-for r in rows[:20]:            # headline only; full detail is in the file
-    print(r)
-print("=== T## OUTPUT END ===")
+    # 4. file hand-off + printed summary --------------------------------------
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUT_DIR / f"T##_<short_name>_{payload['run_date'].replace('-', '')}.json"
+    out.write_text(json.dumps(payload, indent=2, default=str))
+
+    print("=== T## OUTPUT START ===")
+    print(f"scope: {scope_note}")
+    print(f"wrote: {out} ({len(rows)} rows) -> commit & push from PROD, pull in UAT")
+    for r in rows[:20]:                           # headline only; detail in the file
+        print(r)
+    print("=== T## OUTPUT END ===")
+
+    return payload
 ```
 
-If the whole result comfortably fits in the printed block, the file write is optional —
-say so in the preamble so the user does not commit for nothing.
+If the whole result comfortably fits in the printed block, skip the file write and say
+so in the docstring, so the user does not commit for nothing.
 
 ## Interpreting returned output
 
