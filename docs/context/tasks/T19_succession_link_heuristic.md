@@ -1,12 +1,14 @@
 # T19 — Succession link: heuristic matching
 
+**Track B** · **Depends:** T18 · **PROD round trip:** Yes
+
 **Goal.** Infer the old→new account link where it is not explicitly recorded, with a
 measured confidence.
 
 **Precondition.** T18 found no usable explicit link (or only partial coverage). If T18
 found a good one, this task is `n/a`.
 
-**Load.** `reference/feature_specs.md §6` (steps 3–4).
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §6` (steps 3–4).
 
 ## Steps
 

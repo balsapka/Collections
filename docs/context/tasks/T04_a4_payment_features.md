@@ -1,5 +1,7 @@
 # T04 — A4 CC: payment & balance trajectory features
 
+**Track A** · **Depends:** T03, T02, T01 · **PROD round trip:** Yes — validation snippet
+
 **Goal.** Build the payment-behaviour half of the deterioration axis, anchored to T0.
 
 **Why.** Payment *rhythm* is the closest thing to an income proxy available for the
@@ -8,7 +10,7 @@ tight day-of-month band; the loss or drift of that rhythm is a distress signatur
 window aggregates flatten away. This is the feature group most likely to carry the
 "new information" the axis exists to provide.
 
-**Load.** `reference/feature_specs.md §3.1` (definitions). T01 reuse map. T02's window
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §3.1` (definitions). T01 reuse map. T02's window
 decision (the 12-month window may have been shortened).
 
 ## Steps

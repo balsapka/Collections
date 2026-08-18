@@ -1,5 +1,7 @@
 # T09 — A4 gate PV2: novelty  ·  **the critical gate**
 
+**Track A** · **Depends:** T07 · **PROD round trip:** Yes
+
 **Goal.** Determine whether the deterioration axis carries information the existing
 feature set does not already contain.
 

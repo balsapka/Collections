@@ -1,5 +1,7 @@
 # T11 — DCORE trust assessment
 
+**Track A** · **Depends:** — · **PROD round trip:** Yes — fire before T12
+
 **Goal.** Establish objectively whether DCORE fields can be trusted, without waiting
 for the data owners' investigation to conclude.
 

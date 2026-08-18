@@ -1,5 +1,7 @@
 # T14 — A2 gates PV1–PV4
 
+**Track A** · **Depends:** T12 (or T13) · **PROD round trip:** Yes
+
 **Goal.** Put the locatability axis through the same four gates as A4.
 
 **Why.** Locatability feels obviously useful, which is exactly why it should be tested
@@ -7,7 +9,7 @@ rather than assumed. In particular it may be substantially predictable from exis
 recency features (days since last payment already encodes some of "we cannot reach
 them"), which would make it a partial repackaging.
 
-**Load.** Outputs of T12 (or T13). Gate definitions below; T08/T09/T10 for the
+**Load.** `reference/snippet_contract.md`; Outputs of T12 (or T13). Gate definitions below; T08/T09/T10 for the
 equivalent A4 procedure.
 
 ## PV1 — Buildability

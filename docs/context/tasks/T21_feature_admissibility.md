@@ -1,5 +1,7 @@
 # T21 — Feature admissibility: block codes & bureau salary
 
+**Track B** · **Depends:** — · **PROD round trip:** Yes
+
 **Goal.** Determine whether two high-importance features in the current models are
 admissible as-is.
 
@@ -7,7 +9,7 @@ admissible as-is.
 risk. Leakage discipline is already in place across the modelling spectrum (R2), so
 this is a check on two known-awkward cases rather than a general audit.
 
-**Load.** `reference/current_state.md §3`.
+**Load.** `reference/snippet_contract.md`; `reference/current_state.md §3`.
 
 ## Card block codes
 

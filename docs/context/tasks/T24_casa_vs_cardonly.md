@@ -1,5 +1,7 @@
 # T24 — CASA-holder vs card-only performance split
 
+**Track C** · **Depends:** — · **PROD round trip:** Yes
+
 **Goal.** Measure how much better the current model performs where ability signal is
 directly observable, to decide whether estimating ability for everyone else is worth
 building.
@@ -11,7 +13,7 @@ GBM importance can overweight a high-variance feature in a subpopulation, so the
 ranking may be an artefact. The performance gap between the two groups is the honest
 measure, and it is the business case for the A1 ability proxy.
 
-**Load.** `reference/domain_and_decisions.md §4`.
+**Load.** `reference/snippet_contract.md`; `reference/domain_and_decisions.md §4`.
 
 ## Steps
 

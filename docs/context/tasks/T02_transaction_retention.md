@@ -1,5 +1,7 @@
 # T02 — Transaction retention depth
 
+**Track A** · **Depends:** — · **PROD round trip:** Yes — fire early
+
 **Goal.** Establish whether the pre-delinquency window `[T0−12m, T0]` actually exists
 in retained data, per segment and cohort.
 

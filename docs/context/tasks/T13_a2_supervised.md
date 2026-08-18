@@ -1,5 +1,7 @@
 # T13 — A2 supervised v2
 
+**Track A** · **Depends:** T12, T11 · **PROD round trip:** Yes
+
 **Goal.** Replace the v1 rules with a supervised classifier trained on field-visit
 dispositions.
 
@@ -7,7 +9,7 @@ dispositions.
 and distinguish the needed outcomes. If not, this task is `blocked` — T12's rules ship
 instead, and that is an acceptable outcome, not a failure.
 
-**Load.** `reference/feature_specs.md §4.2` (label mapping). T12's feature set.
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §4.2` (label mapping). T12's feature set.
 
 ## Steps
 

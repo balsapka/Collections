@@ -39,7 +39,7 @@ proceed in parallel — it does not block this.
 | T13 | [A2 supervised v2](tasks/T13_a2_supervised.md) — gated on T11 | T12, T11 | Yes | todo |
 | T14 | [A2 gates PV1–PV4](tasks/T14_a2_gates.md) | T12 (or T13) | Yes | todo |
 | T15 | [Proxy check on shipped axes](tasks/T15_proxy_check.md) — R7/compliance, before anything ships | T08, T14 | Yes | todo |
-| T16 | PV5 action-distinctness workshop — business session, not a coding task | T08, T14 | n/a | todo |
+| T16 | [PV5 action-distinctness workshop pack](tasks/T16_pv5_workshop_pack.md) — assemble the materials; the session itself is a business meeting | T08, T14 | No | todo |
 
 **If T09 fails**, stop and re-plan before continuing to T10–T16. An axis that
 reproduces the 24-month DPD string will fail in exactly the way the current score

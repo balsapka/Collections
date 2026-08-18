@@ -1,5 +1,7 @@
 # T23 — Within-cohort discrimination at 180+
 
+**Track C** · **Depends:** — · **PROD round trip:** Yes
+
 **Goal.** Test whether the 180+ model's discrimination survives *inside* the
 time-in-bucket cohorts, or whether it comes from separating <2y from >2y accounts.
 
@@ -9,7 +11,7 @@ apparent skill by learning "how long has this been sitting" — which tells coll
 nothing they don't already know. The equivalent test across DPD buckets was run and
 came back negative; this finer version has not been tested.
 
-**Load.** `reference/domain_and_decisions.md §3`.
+**Load.** `reference/snippet_contract.md`; `reference/domain_and_decisions.md §3`.
 
 ## Steps
 

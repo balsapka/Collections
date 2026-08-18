@@ -1,5 +1,7 @@
 # T05 — A4 CC: utilisation, spend & liquidity features
 
+**Track A** · **Depends:** T03, T02, T01 · **PROD round trip:** Yes — validation snippet
+
 **Goal.** Build the spend/liquidity half of the deterioration axis, anchored to T0.
 
 **Why.** This is the group that separates a gradual over-indebtedness spiral from an
@@ -7,7 +9,7 @@ abrupt shock: a spiral shows rising utilisation, a cash-advance ramp and a slow 
 taper; a shock shows a cliff. Both look identical once the account is dry — the
 difference is only visible before T0.
 
-**Load.** `reference/feature_specs.md §3.2`. T01 reuse map. T02's window decision.
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §3.2`. T01 reuse map. T02's window decision.
 
 ## Steps
 

@@ -1,5 +1,7 @@
 # T03 — Spell / T0 table (CC)
 
+**Track A** · **Depends:** T01 · **PROD round trip:** Yes — validation snippet
+
 **Goal.** Build the delinquency-spell table that anchors every A4 feature: one row per
 account × spell, with `T0` (spell start).
 

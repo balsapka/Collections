@@ -1,5 +1,7 @@
 # T06 — A4: departure signature & history shape
 
+**Track A** · **Depends:** T03, T01 · **PROD round trip:** Yes — validation snippet
+
 **Goal.** Assemble the departure/travel signals and the long-horizon history features —
 **reusing the existing retail features rather than rebuilding them.**
 
@@ -9,7 +11,7 @@ changes that. Ready-made departure-flavoured features already exist from interna
 retail use cases built on CASA and product-holdings data — those should carry this
 group, with card-transaction signals filling gaps rather than duplicating them.
 
-**Load.** `reference/feature_specs.md §3.3` and `§3.4`. T01 reuse map — this is the
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §3.3` and `§3.4`. T01 reuse map — this is the
 task where reuse matters most.
 
 ## Steps

@@ -1,5 +1,7 @@
 # T08 — A4 gates PV1 + PV3: buildability & outcome separation
 
+**Track A** · **Depends:** T07 · **PROD round trip:** Yes
+
 **Goal.** Confirm the axis is computable across the book and that its classes actually
 differ in what happens next.
 
@@ -7,7 +9,7 @@ differ in what happens next.
 half the population it cannot drive strategy; if its classes have the same outcomes it
 describes nothing that matters. Both are checkable without touching the risk models.
 
-**Load.** Outputs of T07. `reference/domain_and_decisions.md §3` for segment
+**Load.** `reference/snippet_contract.md`; Outputs of T07. `reference/domain_and_decisions.md §3` for segment
 definitions.
 
 ## PV1 — Buildability

@@ -1,5 +1,7 @@
 # T12 — A2 locatability v1 (rules)
 
+**Track A** · **Depends:** T03, T01, T06 · **PROD round trip:** Yes — validation snippet
+
 **Goal.** Assign each delinquent account a contact state — `gone`, `skip`, `avoiding`,
 `reachable` — using core-banking signals plus the sourced retail departure features.
 
@@ -8,7 +10,7 @@ are wasted, `skip` means tracing works, `avoiding` means the customer is reachab
 choosing not to pay (an escalation case, not a locating one). It also survives if DCORE
 proves untrustworthy, because the core signals come from banking data.
 
-**Load.** `reference/feature_specs.md §4` (signals and v1 rules). T01 reuse map; T06's
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §4` (signals and v1 rules). T01 reuse map; T06's
 departure features.
 
 ## Steps

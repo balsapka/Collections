@@ -1,5 +1,7 @@
 # T18 — Succession link: is it recorded anywhere?
 
+**Track B** · **Depends:** T17 · **PROD round trip:** Yes
+
 **Goal.** Determine whether the old→new account relationship created by a restructure
 is explicitly recorded in any system, before attempting to infer it.
 
@@ -8,7 +10,7 @@ is explicitly recorded in any system, before attempting to infer it.
 (T01–T05), and capturing restructure participation as a willingness signal. An explicit
 link makes this a lookup; its absence makes it a record-linkage problem (T19).
 
-**Load.** `reference/feature_specs.md §6` (steps 1–2).
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §6` (steps 1–2).
 
 ## Steps
 

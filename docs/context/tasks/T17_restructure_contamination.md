@@ -1,5 +1,7 @@
 # T17 — Restructure volume & label contamination
 
+**Track B** · **Depends:** — · **PROD round trip:** Yes
+
 **Goal.** Measure how often restructures happen, and whether their closing entries are
 being counted as recovery in current outcome measures.
 

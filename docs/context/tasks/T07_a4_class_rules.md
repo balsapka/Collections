@@ -1,5 +1,7 @@
 # T07 — A4 deterioration class v1
 
+**Track A** · **Depends:** T04, T05, T06 · **PROD round trip:** Yes
+
 **Goal.** Collapse the A4 feature set into a small set of interpretable classes:
 `abrupt_shock`, `gradual_spiral`, `chronic_marginal`, `mixed`.
 
@@ -8,7 +10,7 @@ and what the persona grid uses. A customer whose income stopped abruptly may be 
 and recoverable if located; one who spiralled into over-indebtedness is structurally
 insolvent. Both look identical at 180+ DPD — the class is what tells them apart.
 
-**Load.** `reference/feature_specs.md §3.5` (rules and thresholds). Outputs of
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §3.5` (rules and thresholds). Outputs of
 T04–T06.
 
 ## Steps

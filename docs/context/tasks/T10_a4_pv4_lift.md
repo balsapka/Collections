@@ -1,5 +1,7 @@
 # T10 — A4 gate PV4: incremental lift
 
+**Track A** · **Depends:** T09 · **PROD round trip:** Yes
+
 **Goal.** Measure what the axis adds to predictive performance over the model that
 exists today.
 

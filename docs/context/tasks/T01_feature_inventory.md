@@ -1,5 +1,7 @@
 # T01 — Feature inventory & reuse map
 
+**Track A** · **Depends:** — · **PROD round trip:** No — UAT only (optional follow-up snippet)
+
 **Goal.** Produce a mapping from every feature the persona axes need to what already
 exists in the repo, so later build tasks reuse instead of rebuild (R14).
 
@@ -9,7 +11,7 @@ the feature layer, in other retail use cases, or as helper logic. Building it ag
 wastes sessions and creates two versions of the same number. This task is the single
 highest-leverage thing to do before any feature build.
 
-**Load.** `reference/feature_specs.md §3` and `§4` (the target feature lists). Also
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §3` and `§4` (the target feature lists). Also
 read the workplace repo's own `CLAUDE.md` and docs — they describe the existing
 pipelines and are the primary source here (R9).
 

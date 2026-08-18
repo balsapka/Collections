@@ -1,5 +1,7 @@
 # T22 — Segment economics
 
+**Track C** · **Depends:** — · **PROD round trip:** Yes
+
 **Goal.** Size every segment: positive rate, recovery magnitude, and total recoverable
 AED — so effort goes where the value is, decided by a number rather than an argument.
 

@@ -1,5 +1,7 @@
 # T25 — Loan monthly-grain feasibility
 
+**Track C** · **Depends:** T01 · **PROD round trip:** Yes
+
 **Goal.** Establish what payment behaviour can be derived for loan accounts from
 month-end snapshots (plus CASA where available), and decide whether granular loan
 payment data needs to be sourced.
@@ -9,7 +11,7 @@ history. Loans have **only month-end snapshots**, so the CC payment-timing featu
 not port. Sourcing granular loan payment data is possible but costs effort and has
 lead time — so this decision should be made early even though CC leads the build.
 
-**Load.** `reference/feature_specs.md §3.1` (the CC payment features, as the target to
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §3.1` (the CC payment features, as the target to
 approximate). Repo docs for the loan snapshot schema.
 
 ## What is likely derivable at monthly grain

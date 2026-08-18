@@ -1,5 +1,7 @@
 # T20 — Revised labels
 
+**Track B** · **Depends:** T17 · **PROD round trip:** Yes — validation snippet
+
 **Goal.** Add the new target labels beside the existing ones: futility and expected
 recovery at 60–180, hurdle components at 180+.
 
@@ -12,7 +14,7 @@ differentiation being asked for.
 **Precondition.** T17 — succession postings must be identifiable, or a restructure
 reads as recovery and every new label inherits the error.
 
-**Load.** `reference/feature_specs.md §1` (definitions and parameters).
+**Load.** `reference/snippet_contract.md`; `reference/feature_specs.md §1` (definitions and parameters).
 
 ## Steps
 
