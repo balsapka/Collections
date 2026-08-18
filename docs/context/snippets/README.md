@@ -7,18 +7,29 @@ Naming: `t##_<short_name>.py` — one module per task.
 
 ## Running one
 
+Works from any notebook in the repo — `notebooks/local/` or anywhere else. CWD is
+never used:
+
 ```python
-import sys; sys.path.insert(0, "docs/context/snippets")
+import sys, pathlib
+_c = pathlib.Path.cwd()
+ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
+sys.path.insert(0, str(ROOT / "docs" / "context" / "snippets"))
+
 from t02_transaction_retention import main
 result = main(catalog)
 ```
 
-Every module exposes `main(catalog, ...)`. It prints a summary, writes a results file
-to `../results/` when the output is too big to paste, and **returns the payload** so
-you can inspect it in the notebook without re-running.
+Every module exposes `main(catalog, out_dir=None, ...)`. It prints a summary, writes a
+results file into `docs/context/results/` when the output is too big to paste, and
+**returns the payload** so you can inspect it in the notebook without re-running.
 
 No `KedroSession` bootstrap and no `__main__` block — `catalog` comes in as an
 argument, because the notebook already has it.
+
+**No relative paths anywhere.** Modules resolve the repo root from their own
+`__file__`, so output lands in `docs/context/results/` regardless of where the notebook
+sits. Pass `out_dir=` to override.
 
 ## What every snippet must do
 

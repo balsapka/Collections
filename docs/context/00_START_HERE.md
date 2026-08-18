@@ -18,8 +18,11 @@ a **snippet the user runs in PROD** and pastes back.
 - Load `reference/snippet_contract.md` whenever a task touches data. It has the
   template and rules.
 - **Snippets are modules under `docs/context/snippets/`** named `t##_<short_name>.py`,
-  each exposing **`main(catalog, ...)`** — the user runs them in a Kedro notebook where
-  `catalog` already exists. No session bootstrap, no `__main__` block.
+  each exposing **`main(catalog, out_dir=None, ...)`** — the user runs them in a Kedro
+  notebook where `catalog` already exists. No session bootstrap, no `__main__` block.
+- **Never use relative paths (R21).** Notebooks run from anywhere in the repo, usually
+  `notebooks/local/`. Modules resolve the repo root from their own `__file__`; the
+  notebook import line walks up from CWD. Applies to validation snippets too.
 - **Scope before anything else (R20).** Spine datasets first (they already carry the
   spine id, dates and delinquency info, and are scoped by construction), then the
   `model_id` scope datasets, then scoped raw. **Never an unscoped raw scan** — these
@@ -131,6 +134,13 @@ If a task turns out to be bigger than one session, split it, record the split in
   stop**. Do not repair it as part of this work — that is a modification to a running
   system and a separate decision for the user, with its own testing and timing. Log it
   in `RESULTS.md` under "Defects found in existing system" and continue the task.
+- **R21 — No relative paths, ever.** Notebooks are run from all over the repo
+  (typically `notebooks/local/`), so a relative path resolves somewhere unintended.
+  Inside a module, resolve the repo root by walking up from `__file__` — never from
+  CWD — and do it *inside* `main()` so a bad import cannot break the kernel. Outputs go
+  to `<repo_root>/docs/context/results/`, with an `out_dir=None` override. The notebook
+  import line walks up from CWD to find the root. Applies equally to validation
+  snippets and any file a snippet writes.
 - **R20 — Scope first, always.** Filtering to the target population is the *first*
   operation in any data code, before any other logic. Prefer the spine datasets (they
   carry spine id, dates and delinquency info and are scoped by construction) — they

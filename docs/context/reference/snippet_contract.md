@@ -55,21 +55,50 @@ redact keys, and keep it to a handful of rows.
 `t##_<short_name>.py`. Never loose scripts, never inline-only code in chat.
 
 **Each module exposes `main(catalog, ...)`.** The user runs it in a **Kedro notebook**,
-where `catalog` is already defined:
+where `catalog` is already defined. No `KedroSession` bootstrap, no
+`if __name__ == "__main__"` entry point — `catalog` arrives as an argument. `main()`
+prints the summary, writes the results file when the result warrants it, **and returns
+the payload** so the user can inspect it in the notebook without a re-run.
+
+### ⚠ Never use relative paths — notebooks run from anywhere
+
+Notebooks are run from all over the repo (typically `notebooks/local/`), so **any
+relative path is wrong.** This applies to output paths, the import line, and anything
+in validation snippets too. Two anchors, one for each side:
+
+**Inside the module — anchor to `__file__`.** The module knows where it lives, so this
+is independent of CWD entirely:
 
 ```python
-import sys; sys.path.insert(0, "docs/context/snippets")
+def _repo_root() -> pathlib.Path:
+    """Repo root resolved from this file — independent of the notebook's CWD."""
+    here = pathlib.Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / ".git").exists() or (parent / "conf").is_dir():
+            return parent
+    raise RuntimeError(f"repo root not found above {here}")
+```
+
+Resolve it **inside `main()`**, not at module level, so a bad import never breaks the
+notebook kernel. Take an `out_dir=None` argument so the caller can override.
+
+**In the notebook — walk up from CWD** to put the snippets directory on the path:
+
+```python
+import sys, pathlib
+_c = pathlib.Path.cwd()
+ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
+sys.path.insert(0, str(ROOT / "docs" / "context" / "snippets"))
+
 from t02_transaction_retention import main
 result = main(catalog)
 ```
 
-So: no `KedroSession` bootstrap, no path juggling, no `if __name__ == "__main__"`
-entry point. `catalog` arrives as an argument. `main()` prints the summary, writes the
-results file when the result warrants it, **and returns the payload** so the user can
-inspect it in the notebook without a re-run.
+Note `[_c, *_c.parents]` — including CWD itself, so it also works when the notebook
+happens to be at the repo root.
 
-Put the run instructions in the module docstring — the user should not have to
-reconstruct the import line.
+Put this exact block in the module docstring. The user should never have to
+reconstruct it.
 
 ## Scope first — never scan raw tables unscoped
 
@@ -158,9 +187,14 @@ expected result as an actual one. An un-run snippet is an open task.
 ```python
 """T## — <task name>.
 
-Generated in UAT (no data access). Run in a Kedro notebook where `catalog` exists:
+Generated in UAT (no data access). Run in a Kedro notebook where `catalog` exists.
+Works from any notebook location (CWD is never used):
 
-    import sys; sys.path.insert(0, "docs/context/snippets")
+    import sys, pathlib
+    _c = pathlib.Path.cwd()
+    ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
+    sys.path.insert(0, str(ROOT / "docs" / "context" / "snippets"))
+
     from t##_<short_name> import main
     result = main(catalog)
 
@@ -178,11 +212,21 @@ MODEL_ID = "<<FILL-IN: model_id namespace used by the spine pipelines>>"
 DS_SCOPE = f"{MODEL_ID}.<<FILL-IN: spine or scope_accounts dataset>>"
 DS_RAW = "<<FILL-IN: raw table — only if the spine cannot answer this>>"
 
-OUT_DIR = pathlib.Path("docs/context/results")
 KEY = "account_id"
 
 
-def main(catalog, sample_frac=None):
+def _repo_root() -> pathlib.Path:
+    """Repo root resolved from this file — independent of the notebook's CWD."""
+    here = pathlib.Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / ".git").exists() or (parent / "conf").is_dir():
+            return parent
+    raise RuntimeError(f"repo root not found above {here}")
+
+
+def main(catalog, out_dir=None, sample_frac=None):
+    out_dir = pathlib.Path(out_dir) if out_dir else _repo_root() / "docs" / "context" / "results"
+
     # 1. SCOPE FIRST — never touch a raw table before this ---------------------
     scope = catalog.load(DS_SCOPE).select(KEY).distinct()
     if sample_frac:
@@ -211,8 +255,8 @@ def main(catalog, sample_frac=None):
     }
 
     # 4. file hand-off + printed summary --------------------------------------
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUT_DIR / f"T##_<short_name>_{payload['run_date'].replace('-', '')}.json"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"T##_<short_name>_{payload['run_date'].replace('-', '')}.json"
     out.write_text(json.dumps(payload, indent=2, default=str))
 
     print("=== T## OUTPUT START ===")
