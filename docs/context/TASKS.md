@@ -1,70 +1,98 @@
 # Task Queue
 
-One task per session. Take the task the user names, or the first `todo` whose
+One task per session. **Take T01 first, then work down** — the numbering is the
+execution order. Otherwise take the task the user names, or the first `todo` whose
 dependencies are `done`. Update `Status` here and append results to `RESULTS.md`.
 
 **UAT has no data access (R16).** Most tasks run in two legs: emit a PROD snippet, then
-interpret the output the user pastes back. `in-progress` means the snippet is out and
-awaiting results. See `reference/snippet_contract.md`.
+interpret the output the user returns (pasted, or via a results file pulled from PROD).
+`in-progress` means the snippet is out and awaiting results. See
+`reference/snippet_contract.md`.
+
+**Additive only (R18).** New assets beside the existing ones, never modifications.
+Record everything created in the `RESULTS.md` manifest.
 
 Status: `todo | in-progress (snippet out) | done | blocked | dropped | n/a`
 
-## Phase 0 — Diagnostics and inventory (read-only)
+---
 
-| ID | Task | Depends | Status |
-|---|---|---|---|
-| T01 | [State-only baseline](tasks/T01_state_only_baseline.md) — **CLOSED, do not re-run.** Tautology confirmed by prior testing | — | done |
-| T02 | [Restructure volume & label contamination](tasks/T02_restructure_contamination.md) | — | todo |
-| T03 | [Succession link — explicit](tasks/T03_succession_link_explicit.md) — is old→new account recorded anywhere? | T02 | todo |
-| T04 | [Succession link — heuristic](tasks/T04_succession_link_heuristic.md) — only if T03 finds nothing | T03 | todo |
-| T05 | [Transaction retention depth](tasks/T05_transaction_retention.md) — is [T0−12m, T0] available? | — | todo |
-| T06 | [Feature admissibility](tasks/T06_feature_admissibility.md) — block-code timing, bureau salary provenance | — | todo |
-| T07 | [Segment economics](tasks/T07_segment_economics.md) — rates, recoverable AED, balance-band gradient | — | todo |
-| T08 | [Within-cohort discrimination](tasks/T08_within_cohort_auc.md) — does skill survive inside <2y / >2y? | — | todo |
-| T09 | [CASA vs card-only split](tasks/T09_casa_vs_cardonly.md) — what is the ability signal worth? | — | todo |
-| T10 | [DCORE trust assessment](tasks/T10_dcore_trust.md) — PTP reconciliation, coverage, code discipline | — | todo |
-| T11 | [**Feature inventory & reuse map**](tasks/T11_feature_inventory.md) — what already exists vs what A4/A2 need (R14). **Do before any build task.** | — | todo |
-| T12 | [Loan monthly-grain feasibility](tasks/T12_loan_grain_feasibility.md) — what payment behaviour is derivable from month-end snapshots + CASA; does data sourcing need triggering? | T11 | todo |
+## Track A — Persona axes  ·  THE PRIORITY
 
-## Phase P — Persona axes (lead phase; independent of the risk models)
+This is the part that decides whether the whole approach works. The axes must carry
+information the current model does not (T09 is where that is settled). Track B can
+proceed in parallel — it does not block this.
 
-CC leads. Loan A4 is a **different feature set**, not a port (R15) — carded after CC
-axes clear their gates.
+| ID | Task | Depends | Round trip? | Status |
+|---|---|---|---|---|
+| T01 | [**Feature inventory & reuse map**](tasks/T01_feature_inventory.md) — what already exists vs what A4/A2 need (R14) | — | **No — UAT only** | todo |
+| T02 | [Transaction retention depth](tasks/T02_transaction_retention.md) — is `[T0−12m, T0]` available? Sets the A4 window | — | Yes — **fire early**, runs while T03 is built | todo |
+| T03 | [Spell / T0 table (CC)](tasks/T03_spell_table.md) — the anchor for every A4 feature | T01 | Yes (validation) | todo |
+| T04 | [A4 — payment & balance trajectory](tasks/T04_a4_payment_features.md) | T03, T02, T01 | Yes (validation) | todo |
+| T05 | [A4 — utilisation, spend, liquidity](tasks/T05_a4_spend_features.md) | T03, T02, T01 | Yes (validation) | todo |
+| T06 | [A4 — departure & history shape](tasks/T06_a4_departure_history.md) — **reuse the sourced retail features** | T03, T01 | Yes (validation) | todo |
+| T07 | [A4 deterioration class v1](tasks/T07_a4_class_rules.md) | T04, T05, T06 | Yes | todo |
+| T08 | [A4 gate PV1+PV3 — buildability & outcome separation](tasks/T08_a4_pv1_pv3.md) | T07 | Yes | todo |
+| T09 | [**A4 gate PV2 — novelty**](tasks/T09_a4_pv2_novelty.md) — *the decisive gate* | T07 | Yes | todo |
+| T10 | [A4 gate PV4 — incremental lift](tasks/T10_a4_pv4_lift.md) | T09 | Yes | todo |
+| T11 | [DCORE trust assessment](tasks/T11_dcore_trust.md) — gates T13 and the willingness axis | — | Yes — fire before T12 | todo |
+| T12 | [A2 locatability v1](tasks/T12_a2_locatability_v1.md) | T03, T01, T06 | Yes (validation) | todo |
+| T13 | [A2 supervised v2](tasks/T13_a2_supervised.md) — gated on T11 | T12, T11 | Yes | todo |
+| T14 | [A2 gates PV1–PV4](tasks/T14_a2_gates.md) | T12 (or T13) | Yes | todo |
+| T15 | [Proxy check on shipped axes](tasks/T15_proxy_check.md) — R7/compliance, before anything ships | T08, T14 | Yes | todo |
+| T16 | PV5 action-distinctness workshop — business session, not a coding task | T08, T14 | n/a | todo |
 
-| ID | Task | Depends | Status |
-|---|---|---|---|
-| T13 | [Spell / T0 table (CC)](tasks/T13_spell_table.md) | T02, T03/T04, T11 | todo |
-| T14 | [A4 CC — payment & balance trajectory](tasks/T14_a4_payment_features.md) | T13, T05, T11 | todo |
-| T15 | [A4 CC — utilisation, spend, liquidity](tasks/T15_a4_spend_features.md) | T13, T05, T11 | todo |
-| T16 | [A4 — departure & history shape](tasks/T16_a4_departure_history.md) — **reuse ready-made retail features** | T13, T11 | todo |
-| T17 | [A4 deterioration class v1](tasks/T17_a4_class_rules.md) | T14, T15, T16 | todo |
-| T18 | [A4 gate PV1+PV3 — buildability & outcome separation](tasks/T18_a4_pv1_pv3.md) | T17 | todo |
-| T19 | [A4 gate PV2 — novelty (critical gate)](tasks/T19_a4_pv2_novelty.md) | T17, T01 | todo |
-| T20 | [A4 gate PV4 — incremental lift](tasks/T20_a4_pv4_lift.md) | T19, T01 | todo |
-| T21 | [A2 locatability v1](tasks/T21_a2_locatability_v1.md) — reuse sourced departure features | T13, T11, T16 | todo |
-| T22 | [A2 supervised v2](tasks/T22_a2_supervised.md) — gated on T10 | T21, T10 | todo |
-| T23 | [A2 gates PV1–PV4](tasks/T23_a2_gates.md) | T21 (or T22) | todo |
-| T24 | [Proxy check on shipped axes](tasks/T24_proxy_check.md) — R7/compliance | T18, T23 | todo |
-| T25 | PV5 action-distinctness workshop — business session, not a coding task | T18, T23 | todo |
+**If T09 fails**, stop and re-plan before continuing to T10–T16. An axis that
+reproduces the 24-month DPD string will fail in exactly the way the current score
+fails, and no amount of downstream work fixes that.
 
-## Phase 1 — Targets (independent of Phase P; can interleave)
+---
 
-| ID | Task | Depends | Status |
-|---|---|---|---|
-| T26 | [Revised labels](tasks/T26_revised_labels.md) — futility + hurdle, succession-safe | T02 | todo |
+## Track B — Targets & risk models  ·  parallel, independent of Track A
+
+| ID | Task | Depends | Round trip? | Status |
+|---|---|---|---|---|
+| T17 | [Restructure volume & label contamination](tasks/T17_restructure_contamination.md) — may affect figures already reported | — | Yes | todo |
+| T18 | [Succession link — explicit](tasks/T18_succession_link_explicit.md) | T17 | Yes | todo |
+| T19 | [Succession link — heuristic](tasks/T19_succession_link_heuristic.md) — only if T18 finds nothing | T18 | Yes | todo |
+| T20 | [Revised labels](tasks/T20_revised_labels.md) — futility + hurdle, succession-safe, **new table** | T17 | Yes (validation) | todo |
+| T21 | [Feature admissibility](tasks/T21_feature_admissibility.md) — block-code timing, bureau salary provenance | — | Yes | todo |
+
+Track B enhances Track A but does not block it: T03 can derive spells without the
+succession link (set `inherited_history_flag = 0` and accept the blind spot), and
+refine later once T18/T19 lands.
+
+---
+
+## Track C — Supporting diagnostics  ·  when convenient
+
+| ID | Task | Depends | Round trip? | Status |
+|---|---|---|---|---|
+| T22 | [Segment economics](tasks/T22_segment_economics.md) — rates, recoverable AED, balance-band gradient | — | Yes | todo |
+| T23 | [Within-cohort discrimination](tasks/T23_within_cohort_auc.md) — does 180+ skill survive inside <2y / >2y? | — | Yes | todo |
+| T24 | [CASA vs card-only split](tasks/T24_casa_vs_cardonly.md) — is the ability signal (A1) worth building? | — | Yes | todo |
+| T25 | [Loan monthly-grain feasibility](tasks/T25_loan_grain_feasibility.md) — **fire early if T22 shows loans matter**; data sourcing has lead time | T01 | Yes | todo |
+
+---
+
+## Closed before this plan
+
+The **state-only baseline** was already run by the user: a model built only from the
+24-month DPD history performs close enough to the full model, and 2–3 features dominate
+SHAP unless importance is capped. The tautology is confirmed — no task needed. See
+`reference/current_state.md §2`.
 
 ## Later — not yet carded
 
-Expand into cards when reached; early results may redirect these.
+Expand into cards when reached; earlier results may redirect them.
 
-- **A4 for loans** — a distinct monthly-grain feature set (T12 decides its shape), not
+- **A4 for loans** — a distinct monthly-grain feature set (T25 decides its shape), not
   a port of the CC one
-- Retrain decision models per segment + reporting upgrade (needs T26 + axes past PV4)
+- Retrain decision models per segment + reporting upgrade (needs T20 + axes past T10)
 - Orthogonality gate: persona mix within score deciles
 - Priced cutoff curve; holdout proposal; descriptive crosstab
-- Sequence encoder for A4 (gated on T14–T17 plateauing with headroom + T05)
-- Auto / secured track (gated on T07)
-- A1 ability proxy (gated on T09) and A3 willingness (gated on T10 + T03/T04)
+- Sequence encoder for A4 (gated on T04–T07 plateauing with headroom + T02)
+- Auto / secured track (gated on T22)
+- A1 ability proxy (gated on T24) and A3 willingness (gated on T11 + T18/T19)
 
 See `reference/roadmap.md` for why these exist and what gates them.
 

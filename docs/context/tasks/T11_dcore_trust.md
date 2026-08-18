@@ -1,4 +1,4 @@
-# T10 — DCORE trust assessment
+# T11 — DCORE trust assessment
 
 **Goal.** Establish objectively whether DCORE fields can be trusted, without waiting
 for the data owners' investigation to conclude.
@@ -37,7 +37,7 @@ detail that should not be pasted into a chat session.
 
 Provisional thresholds — **CONFIRM with the user before acting on them**:
 - PTP agreement < ~90% **or** coverage < ~80% → DCORE fields untrusted: **A3 blocked**,
-  A2 ships core-banking-only (T21 without T22), crosstab deferred.
+  A2 ships core-banking-only (T12 without T13), crosstab deferred.
 - Passes both but field-visit dispositions are unusable → A2 stays at v1 rules; record
   that its supervised version has no label source.
 - Passes all → A3 and A2-v2 unblock; note it in `TASKS.md`.
@@ -45,4 +45,4 @@ Provisional thresholds — **CONFIRM with the user before acting on them**:
 ## Done when
 
 Agreement rates, coverage, code distribution and the field-visit finding are logged in
-`RESULTS.md`, and the gates on T22 / A3 are set in `TASKS.md`.
+`RESULTS.md`, and the gates on T13 / A3 are set in `TASKS.md`.

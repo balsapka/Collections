@@ -1,4 +1,4 @@
-# T21 — A2 locatability v1 (rules)
+# T12 — A2 locatability v1 (rules)
 
 **Goal.** Assign each delinquent account a contact state — `gone`, `skip`, `avoiding`,
 `reachable` — using core-banking signals plus the sourced retail departure features.
@@ -8,18 +8,18 @@ are wasted, `skip` means tracing works, `avoiding` means the customer is reachab
 choosing not to pay (an escalation case, not a locating one). It also survives if DCORE
 proves untrustworthy, because the core signals come from banking data.
 
-**Load.** `reference/feature_specs.md §4` (signals and v1 rules). T11 reuse map; T16's
+**Load.** `reference/feature_specs.md §4` (signals and v1 rules). T01 reuse map; T06's
 departure features.
 
 ## Steps
 
-1. **Reuse first (R14):** the departure signals overlap heavily with T16's output and
+1. **Reuse first (R14):** the departure signals overlap heavily with T06's output and
    the sourced retail features. Reuse rather than recompute.
 2. Build the [CORE] signals in `§4.1`: per-channel activity gaps, channel-death
    simultaneity, post-T0 domestic activity, travel/foreign flags, other-product
    activity.
 3. Apply the `§4.3` v1 rules. Include DCORE delivery/disposition signals **only** if
-   T10 cleared them.
+   T11 cleared them.
 4. Emit state + confidence + `observed|inferred` (R6).
 
 ## Important limitation to respect

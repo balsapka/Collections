@@ -17,7 +17,7 @@ adjustments, **and restructure/succession postings** (R13). Exact posting-type c
 
 **⚠ Succession exclusion is not optional.** A restructure closes the account and opens a
 replacement; if the closing credit is not excluded, a restructure reads as full recovery
-and the label is inverted (debt moved, not repaid). Until T03/T04 identifies successions
+and the label is inverted (debt moved, not repaid). Until T18/T19 identifies successions
 reliably, exclude via closure-posting type and flag affected accounts. Emit
 `succession_excluded_flag` on every label row so contamination is measurable.
 
@@ -29,7 +29,7 @@ reliably, exclude via closure-posting type and flag affected accounts. Emit
 | `recovery_amount_180p` | `payments(obs, obs+6m]`, modelled only where `any_recovery_180p = 1` (hurdle part 2) | |
 | Legacy (reports only, R11) | roll label; 5%/1000 AED label | unchanged |
 
-Restructure handling (R13, from T02/T03): add `restructured_in_horizon` flag. Default =
+Restructure handling (R13, from T17/T18): add `restructured_in_horizon` flag. Default =
 exclude restructured rows from futility *training*, keep them in reporting, and never
 score a restructure as recovery. CONFIRM once O14 clarifies where the successor account
 starts.
@@ -72,7 +72,7 @@ Derivation (both paths, once buckets are available):
    'restructure_closure'` where identifiable). The successor account starts its own
    spell history, beginning at DPD 0, lower, or the same bucket — not uniform (O14).
    Do **not** bridge DPD resets within an account; that mechanic does not exist here.
-5. **Inherited history.** Where T03/T04 supplies a link, the successor row carries
+5. **Inherited history.** Where T18/T19 supplies a link, the successor row carries
    `predecessor_account_id` and `inherited_history_flag = 1`, and A4 windows may be
    extended back through the predecessor's timeline (its own T0 becomes the effective
    anchor). Without a link the successor is a known A4 blind spot — set
@@ -120,15 +120,15 @@ reused for, relabelled.
 **Also derive:** `t0_to_block_days` and `blocked_flag`. If blocking is purely
 DPD-triggered these are mechanical (and belong with the state features, not here); if
 the timing varies, check whether the variation is informative or just policy noise
-(T06).
+(T21).
 
-**Consequence for T11/T14/T15:** existing block-anchored outflow features are the
+**Consequence for T01/T04/T05:** existing block-anchored outflow features are the
 principal **ADAPT** case — re-anchor to T0 for A4, and retain the block-anchored
 originals as `W_early` features rather than rebuilding either.
 
 ### 3.1 onwards — feature definitions (all on `W_pre` unless stated)
 
-Windows (relative to T0, per T05 availability): `W12 = W_pre = [T0−365d, T0)`,
+Windows (relative to T0, per T02 availability): `W12 = W_pre = [T0−365d, T0)`,
 `H1 = [T0−365d, T0−90d)`, `H2 = [T0−90d, T0)`. Monthly series over W12: payments
 `P_m`, amount due `D_m`, utilisation `U_m`, spend `S_m`, cash advances `CA_m`,
 fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NULL.
@@ -182,7 +182,7 @@ fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NU
 ### 3.5 Deterioration class v1 (rules)
 
 Evaluate in order; first match wins; `det_class_confidence` = matched conditions /
-listed conditions. Thresholds τ are placeholders — tune on T05-available data and log.
+listed conditions. Thresholds τ are placeholders — tune on T02-available data and log.
 
 | Class | Conditions |
 |---|---|
@@ -191,7 +191,7 @@ listed conditions. Thresholds τ are placeholders — tune on T05-available data
 | `chronic_marginal` | `min_pay_share_w12 ≥ 0.6` AND `fee_velocity_life` in top tercile AND `util_mean_h1 ≥ 0.8` |
 | `mixed` | otherwise |
 
-Validation (T17/T18): within each segment, realised recovery/cure by class must
+Validation (T07/T08): within each segment, realised recovery/cure by class must
 separate (extreme-class ratio ≥ 1.5×). Report class shares + separation in
 `RESULTS.md`. If `mixed` > ~50%, iterate thresholds before shipping.
 
@@ -211,7 +211,7 @@ States: `reachable | avoiding | skip | gone`. All gap features measured at `obs`
 | [CORE] | `post_t0_domestic_txn_flag` | any domestic-country activity after T0+60d ⇒ in-country |
 | [CORE] | `travel_mcc_flag_90`, `last_txn_foreign_flag`, `foreign_login_flag` [COND: digital geo] | from A4 §3.3 / digital |
 | [CORE] | `other_product_active_flag` [COND: RL/CASA] | any activity on other products in last 90d |
-| [DCORE, gate T10] | `sms_delivered_rate`, `call_connect_rate`, `delivered_unanswered_ratio`, `wrong_number_flag`, `last_rpc_gap_d` | delivery/disposition-based; delivered-but-unanswered separates `avoiding` from `skip` |
+| [DCORE, gate T11] | `sms_delivered_rate`, `call_connect_rate`, `delivered_unanswered_ratio`, `wrong_number_flag`, `last_rpc_gap_d` | delivery/disposition-based; delivered-but-unanswered separates `avoiding` from `skip` |
 
 ### 4.2 Labels (v2 supervised)
 
@@ -256,7 +256,7 @@ unknown`) — say so in outputs rather than faking 4.
   across the current modelling spectrum) and adds T0-boundary assertions for A4, plus
   the invariant tests in §2. Test data pattern: follow existing repo conventions.
 
-## 6. Account succession linkage (T03/T04)
+## 6. Account succession linkage (T18/T19)
 
 **Problem.** A restructure closes the account and opens a replacement; no link between
 them is currently known (O13). Needed for correct labels (§1), A4 coverage of
@@ -269,7 +269,7 @@ spot with its size in `RESULTS.md`, and move on.
 
 **Step 2 — look for an explicit link first.** Any of: a reference/parent-account field
 on the new account; a closure reason code naming restructure; a DCORE restructure event
-recording both account numbers. If one exists, T04 is unnecessary — it is a lookup, not a modelling task.
+recording both account numbers. If one exists, T19 is unnecessary — it is a lookup, not a modelling task.
 
 **Step 3 — heuristic record linkage, only if no explicit link exists.** Candidate pairs
 = same CIF, `open_date(new) - close_date(old)` within `<<window, default 0–45d>>`, same

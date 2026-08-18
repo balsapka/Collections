@@ -1,4 +1,4 @@
-# T08 — Within-cohort discrimination at 180+
+# T23 — Within-cohort discrimination at 180+
 
 **Goal.** Test whether the 180+ model's discrimination survives *inside* the
 time-in-bucket cohorts, or whether it comes from separating <2y from >2y accounts.

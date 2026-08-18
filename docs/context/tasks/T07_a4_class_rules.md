@@ -1,4 +1,4 @@
-# T17 — A4 deterioration class v1
+# T07 — A4 deterioration class v1
 
 **Goal.** Collapse the A4 feature set into a small set of interpretable classes:
 `abrupt_shock`, `gradual_spiral`, `chronic_marginal`, `mixed`.
@@ -9,14 +9,14 @@ and recoverable if located; one who spiralled into over-indebtedness is structur
 insolvent. Both look identical at 180+ DPD — the class is what tells them apart.
 
 **Load.** `reference/feature_specs.md §3.5` (rules and thresholds). Outputs of
-T14–T16.
+T04–T06.
 
 ## Steps
 
 1. Implement the ordered rules in `§3.5`; first match wins; emit
    `det_class_confidence` = matched conditions / listed conditions.
 2. Thresholds (`τ_u`, `τ_p`, tercile cuts) are **placeholders** — tune them on the data
-   actually available after T05's window decision, and log the values chosen.
+   actually available after T02's window decision, and log the values chosen.
 3. Report class shares per segment.
 4. Iterate the thresholds if `mixed` dominates.
 

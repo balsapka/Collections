@@ -1,4 +1,4 @@
-# T06 — Feature admissibility: block codes & bureau salary
+# T21 — Feature admissibility: block codes & bureau salary
 
 **Goal.** Determine whether two high-importance features in the current models are
 admissible as-is.

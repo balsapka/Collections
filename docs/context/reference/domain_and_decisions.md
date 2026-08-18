@@ -37,7 +37,7 @@ once the CC persona axes validate.
 | 60–180 DPD, unsecured | 1x | cure ~25% at 60–90, falls with depth | **Exclusion**: business works every account; model flags the futile few | B1 (futility), B2 (recovery) |
 | 180+ CC, < 2y in bucket | part of a book ~10x the 60–180 | **5%** (per current 5%/1000 AED def.) | **Selection**: keep top X in-house, sell/agency the rest | B3 (hurdle) |
 | 180+ CC, > 2y in bucket | large share of 180+ | **1–2%** | Bulk treatment; trigger monitoring blocked on data feed (O8) | B4 (blocked) |
-| Auto, both bands | unmeasured (T07) | unknown | Repossession economics | B5 (gated on T07) |
+| Auto, both bands | unmeasured (T22) | unknown | Repossession economics | B5 (gated on T22) |
 
 Decision graph the outputs must serve:
 
@@ -59,20 +59,20 @@ Contactability is a gate upstream of scoring, not a feature inside it.
 - **Loans have only month-end snapshots.** Payment *behaviour* (installment paid,
   partial amounts, paydown trajectory) is partly derivable; payment *timing*
   (day-of-month rhythm) is not. No 24-month DPD feature either — buckets must be
-  reconstructed from the full data model. T12 decides whether granular loan payment
+  reconstructed from the full data model. T25 decides whether granular loan payment
   data needs sourcing.
 - **Ready-made departure/travel features exist** from internal retail use cases built
-  on CASA and product-holdings data. Reuse these rather than rebuilding (R14, T16).
+  on CASA and product-holdings data. Reuse these rather than rebuilding (R14, T06).
 
 | Domain | Grain | Coverage of delinquent CC book | Allowed use | Known issues |
 |---|---|---|---|---|
-| Credit card (payment/balance/utilisation tables + txn) | account / event, sub-monthly | 100% | Primary instrument for everything | Retention depth unverified (T05) |
-| Loan snapshots | account / **month-end only** | 100% of loans | Monthly behaviour features; no timing features | No 24-month DPD feature; sourcing decision at T12 |
-| Financial transactions | event | 100% of card activity | A4 trajectory features | Same retention question (T05) |
+| Credit card (payment/balance/utilisation tables + txn) | account / event, sub-monthly | 100% | Primary instrument for everything | Retention depth unverified (T02) |
+| Loan snapshots | account / **month-end only** | 100% of loans | Monthly behaviour features; no timing features | No 24-month DPD feature; sourcing decision at T25 |
+| Financial transactions | event | 100% of card activity | A4 trajectory features | Same retention question (T02) |
 | Retail loan | account | **~10–20%** also hold RL | Internal cross-product ability signal | Small overlap — never design as if universal |
 | CASA | account / txn | partial (`<<FILL-IN share>>`) | Salary continuity (A1), EOSB signature | Missingness is informative AND a confound (S12 note) |
 | AECB (bureau) | snapshot at credit decisions | pulls stop at delinquency | **Pre-T0 leverage trajectory only** (A4 input) | No live signal during delinquency (X9). PIT snapshot retention unknown (O7) |
-| DCORE | event | delinquent book | PTP, contact attempts, dispositions, field visits | **Trust unresolved** — gate everything on T10 |
+| DCORE | event | delinquent book | PTP, contact attempts, dispositions, field visits | **Trust unresolved** — gate everything on T11 |
 | Demographics | static | 100% | Controls only | Proxy risk for protected attributes (R7) |
 | Digital / login | event | wherever app/web used | Engagement, foreign-login, channel-death signals | Coverage varies |
 
@@ -107,8 +107,8 @@ relationship with us" from the signal itself; (c) validate card-only estimates o
 | S3 | Score names: `futility_60_180`, `exp_recovery_aed_60_180`, `exp_recovery_aed_180p_lt2y`. Direction per R5. |
 | S4 | The 180+ keep/sell cutoff is **priced** (expected AED vs agency economics curve), never a chosen round number. Blocked on O1 for the final line, but the curve is built now. |
 | S5 | The >2y cohort is **not scored from internal history** (stale by construction). Plan = bulk treatment now; trigger monitoring is a costed data-acquisition proposal (O8), not a build item. |
-| S6 | Personas = **supervised mechanism axes**, never unsupervised clusters (X1). Axes: A2 locatability, A4 manner-of-deterioration (full coverage, build first); A1 ability and A3 willingness gated (T09, T10). Expected recovery is NOT an axis (X7). |
-| S7 | Grid stays small: ~3 persona states × ~3 score bands, collapsing to ≤6 strategies. The **orthogonality gate** (T24) runs before any strategy is designed on the cells. |
+| S6 | Personas = **supervised mechanism axes**, never unsupervised clusters (X1). Axes: A2 locatability, A4 manner-of-deterioration (full coverage, build first); A1 ability and A3 willingness gated (T24, T11). Expected recovery is NOT an axis (X7). |
+| S7 | Grid stays small: ~3 persona states × ~3 score bands, collapsing to ≤6 strategies. The **orthogonality gate** (T15) runs before any strategy is designed on the cells. |
 | S8 | Every estimated axis ships `observed|inferred` + a validation number (R6). |
 | S9 | Build order follows **DCORE dependency**: A4 (none) → A1/direct ability (low) → A2 (moderate, core-banking v1 first) → A3 (total, contingent). |
 | S10 | Deterioration features are **event-anchored to T0** (spell start), never to calendar or observation date. Spell spec in `04`. |
@@ -118,7 +118,7 @@ relationship with us" from the signal itself; (c) validate card-only estimates o
 | S14 | A permanent **random ~1% holdout** below the 180+ cutoff is required before deployment (R12). Raise with the business early — cannot be retrofitted. |
 | S15 | **CC and loan accounts get separate feature pipelines and models** (different source systems/structures). Within loans, auto splits out; personal vs personal cash does not. Modelling units: CC, loan-auto, loan-other (R3). |
 | S16 | **Persona axes are built and validated FIRST, independently of the risk models.** They must pass the four-gate ladder in `03 Phase P` — buildability, novelty, outcome separation, incremental lift — before any risk-model retrain depends on them. A4 and A2 are deliverables in their own right, not model inputs awaiting a model. |
-| S17 | **Restructures are account successions, not DPD resets** (R13). Linkage discovery (T03/T04) is a prerequisite for correct labels and for A4 coverage of restructured customers. |
+| S17 | **Restructures are account successions, not DPD resets** (R13). Linkage discovery (T18/T19) is a prerequisite for correct labels and for A4 coverage of restructured customers. |
 
 ## 6. Rejected approaches (X1–X10) — do not re-propose
 
@@ -129,11 +129,11 @@ relationship with us" from the signal itself; (c) validate card-only estimates o
 | X3 | Continuous recovery-rate regression at 180+ | 2–5% positive rate → spike-at-zero; regression predicts ~0 for all and scores well | Hurdle model (S2) |
 | X4 | Capacity-constrained allocation optimisation | We don't own or see collections capacity; ranking + cutoff suffices | Priced cutoff curve (S4) |
 | X5 | Synthetic data generation as differentiator | Cannot create information absent from the source | Synthesized = inferred state (S13) |
-| X6 | Full causal / uplift modelling this cycle | Needs treatment-variation analysis there is no time for; officers assign actions non-randomly (confounding by indication) | Descriptive crosstab, labelled correlational (T24); revisit next cycle |
+| X6 | Full causal / uplift modelling this cycle | Needs treatment-variation analysis there is no time for; officers assign actions non-randomly (confounding by indication) | Descriptive crosstab, labelled correlational (T15); revisit next cycle |
 | X7 | Expected recovery amount as a persona axis | It IS the score; guarantees grid collinearity | Mechanism axes only |
 | X8 | Single risk score across bands | Targets genuinely differ; produced the current complaint | S1/S3 |
 | X9 | AECB as live delinquency signal | Pulls stop firing at 60+ DPD: no contemporaneous cross-lender status; absence ≠ gone; enquiry triggers need a feed we don't have | Pre-T0 leverage only (S11); internal cross-product for live ability (S12) |
-| X10 | Pooled-AUC-inflation hypothesis (DPD buckets) | Tested and closed: within-bucket AUC ≈ pooled | The finer within-time-in-bucket version is still open → T08 |
+| X10 | Pooled-AUC-inflation hypothesis (DPD buckets) | Tested and closed: within-bucket AUC ≈ pooled | The finer within-time-in-bucket version is still open → T23 |
 
 ## 7. Constraints
 
@@ -141,7 +141,7 @@ relationship with us" from the signal itself; (c) validate card-only estimates o
 |---|---|
 | C1 | **Shariah**: on Murabaha/Tawarruq the receivable is fixed sale debt; ibra' cannot be promised upfront. Concession menu differs by product and is owned by the Shariah board (O2). Never assume a discount is offerable. |
 | C2 | **IFRS 9**: forbearance/restructure triggers stage migration; settlement books a loss. Affects how outputs are framed (prefer "cease effort" over "write off early" at 60–180). |
-| C3 | **Protected attributes** (CBUAE/SAMA): R7. Inferred "left country" is the highest proxy risk — T24 check mandatory. |
+| C3 | **Protected attributes** (CBUAE/SAMA): R7. Inferred "left country" is the highest proxy risk — T15 check mandatory. |
 | C4 | **Model risk**: outputs feeding provisioning/credit decisions carry full MRM burden; operational collections prioritisation is lighter. Sequence-encoder embeddings are features, not decisions, to stay in the lighter regime (sequence-encoder gate). |
 
 ## 8. Open questions (O1–O12)
@@ -151,13 +151,13 @@ relationship with us" from the signal itself; (c) validate card-only estimates o
 | O1 | Agency commission / sale price by cohort; field visit unit cost | Final priced cutoff (S4); persona ROI framing | Business |
 | O2 | Feasible action menu per product (post-Shariah) | Strategy mapping (business side) | Business |
 | O3 | Auto structure: Ijarah (bank owns) vs lien | auto-track target design | Business |
-| O4 | Horizon N for futility (operational review cycle length) | T26 (default 3m, CONFIRM) | Business |
-| O5 | "Negligible" threshold ε for futility | T26 (default min(100 AED, 0.5% outstanding), CONFIRM) | Business |
-| O13 | **How is the old→new account link identifiable after a restructure?** Any explicit reference field, closure reason code, or DCORE record naming both accounts? | T03/T04, T26 labels, T13/T14 coverage, A3 signal | User/IT/DCORE |
-| O14 | Does the replacement account start at DPD 0, a lower bucket, or the same bucket? Is it uniform by product/policy? | T26 label semantics, T13 spell continuity | Collections/IT |
+| O4 | Horizon N for futility (operational review cycle length) | T20 (default 3m, CONFIRM) | Business |
+| O5 | "Negligible" threshold ε for futility | T20 (default min(100 AED, 0.5% outstanding), CONFIRM) | Business |
+| O13 | **How is the old→new account link identifiable after a restructure?** Any explicit reference field, closure reason code, or DCORE record naming both accounts? | T18/T19, T20 labels, T03/T04 coverage, A3 signal | User/IT/DCORE |
+| O14 | Does the replacement account start at DPD 0, a lower bucket, or the same bucket? Is it uniform by product/policy? | T20 label semantics, T03 spell continuity | Collections/IT |
 | O7 | Are historical AECB pulls retained point-in-time? | A4 leverage-trajectory feature | User |
 | O8 | AECB ongoing-monitoring feed: permissible purpose + cost vs uplift at 1–2% base rate | B4 (trigger monitor) | Business/Compliance |
-| O9 | Transaction retention depth: is T0−12m available per cohort? | T05 → A4 scope, sequence-encoder feasibility | User |
+| O9 | Transaction retention depth: is T0−12m available per cohort? | T02 → A4 scope, sequence-encoder feasibility | User |
 | O10 | Field-visit disposition codes: list + where stored | A2 labels (`04` mapping table) | User/DCORE |
-| O11 | Card block code timing vs observation date | T06 → feature admissibility | User |
-| O12 | Bureau salary field provenance (stale pull? consistent freshness?) | T06 → feature admissibility | User |
+| O11 | Card block code timing vs observation date | T21 → feature admissibility | User |
+| O12 | Bureau salary field provenance (stale pull? consistent freshness?) | T21 → feature admissibility | User |

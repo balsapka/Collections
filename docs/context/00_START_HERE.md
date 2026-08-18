@@ -131,14 +131,14 @@ If a task turns out to be bigger than one session, split it, record the split in
 - **R14 — Reuse before build.** The repo has full end-to-end pipelines for most
   domains and hundreds of existing features. **Before implementing any feature, search
   the repo for an existing equivalent or near-equivalent** (see the reuse map from
-  T11). Use it if it matches, adapt it if it nearly matches, and build new only when
+  T01). Use it if it matches, adapt it if it nearly matches, and build new only when
   nothing does — recording which of the three applied. Rebuilding a feature that
   already existed is a defect. This applies to feature logic, spell/window helpers,
   evaluation code and reporting alike.
 - **R15 — Data granularity differs by source.** CC has payment, balance and
   utilisation tables plus transaction history — rich, sub-monthly. **Loans have only
   month-end snapshots**, so intra-month timing features are not portable to them
-  (T12). Never assume a CC feature has a loan equivalent; state the grain a feature
+  (T25). Never assume a CC feature has a loan equivalent; state the grain a feature
   needs and check it exists for that unit.
 
 ## Files

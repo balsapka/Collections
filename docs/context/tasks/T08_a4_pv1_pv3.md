@@ -1,4 +1,4 @@
-# T18 — A4 gates PV1 + PV3: buildability & outcome separation
+# T08 — A4 gates PV1 + PV3: buildability & outcome separation
 
 **Goal.** Confirm the axis is computable across the book and that its classes actually
 differ in what happens next.
@@ -7,7 +7,7 @@ differ in what happens next.
 half the population it cannot drive strategy; if its classes have the same outcomes it
 describes nothing that matters. Both are checkable without touching the risk models.
 
-**Load.** Outputs of T17. `reference/domain_and_decisions.md §3` for segment
+**Load.** Outputs of T07. `reference/domain_and_decisions.md §3` for segment
 definitions.
 
 ## PV1 — Buildability
@@ -28,8 +28,8 @@ distinct time periods (guards against a one-off).
 
 ## Decision rule
 
-- Both pass → proceed to T19 (novelty), the harder gate.
-- PV1 fails → return to T17 (thresholds) or T14–T16 (coverage) before proceeding.
+- Both pass → proceed to T09 (novelty), the harder gate.
+- PV1 fails → return to T07 (thresholds) or T04–T06 (coverage) before proceeding.
 - PV3 fails → the axis describes something real but outcome-irrelevant. It may still
   have operational value (e.g. for routing), but it does not enter the risk models —
   record that distinction explicitly rather than quietly dropping it.

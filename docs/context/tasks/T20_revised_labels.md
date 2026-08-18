@@ -1,4 +1,4 @@
-# T26 — Revised labels
+# T20 — Revised labels
 
 **Goal.** Add the new target labels beside the existing ones: futility and expected
 recovery at 60–180, hurdle components at 180+.
@@ -9,7 +9,7 @@ opposite cases for an exclusion decision. The 180+ dual threshold (5% or 1000 AE
 means different things at different balances, and a binary at a low bar erases the
 differentiation being asked for.
 
-**Precondition.** T02 — succession postings must be identifiable, or a restructure
+**Precondition.** T17 — succession postings must be identifiable, or a restructure
 reads as recovery and every new label inherits the error.
 
 **Load.** `reference/feature_specs.md §1` (definitions and parameters).

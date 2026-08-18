@@ -1,4 +1,4 @@
-# T16 — A4: departure signature & history shape
+# T06 — A4: departure signature & history shape
 
 **Goal.** Assemble the departure/travel signals and the long-horizon history features —
 **reusing the existing retail features rather than rebuilding them.**
@@ -9,7 +9,7 @@ changes that. Ready-made departure-flavoured features already exist from interna
 retail use cases built on CASA and product-holdings data — those should carry this
 group, with card-transaction signals filling gaps rather than duplicating them.
 
-**Load.** `reference/feature_specs.md §3.3` and `§3.4`. T11 reuse map — this is the
+**Load.** `reference/feature_specs.md §3.3` and `§3.4`. T01 reuse map — this is the
 task where reuse matters most.
 
 ## Steps
@@ -29,7 +29,7 @@ task where reuse matters most.
 
 ## Done when
 
-- Feature table built and joinable with T14/T15.
+- Feature table built and joinable with T04/T05.
 - **Explicitly recorded:** which features came from the sourced retail set, which were
   adapted, which were newly built — and for any reused feature, confirmation that its
   time-anchoring is leakage-safe.

@@ -1,15 +1,16 @@
-# T19 — A4 gate PV2: novelty  ·  **the critical gate**
+# T09 — A4 gate PV2: novelty  ·  **the critical gate**
 
 **Goal.** Determine whether the deterioration axis carries information the existing
 feature set does not already contain.
 
 **Why.** This is the whole premise. The current model is already known to be
-substantially a function of one 24-month DPD vector (T01) — if the new axis can be
+substantially a function of one 24-month DPD vector (`current_state.md §2`) — if the new axis can be
 predicted from those same features, it is a repackaging of what we know, and it will
 fail in exactly the way the current score fails. Every other gate can pass while this
 one fails, which is why it is worth running deliberately rather than assuming.
 
-**Load.** Outputs of T17. T01 (the state feature set and its dominance finding).
+**Load.** Outputs of T07; `reference/current_state.md §2` (the state feature set and
+its confirmed dominance); `reference/snippet_contract.md`.
 
 ## Steps
 
@@ -35,7 +36,7 @@ one fails, which is why it is worth running deliberately rather than assuming.
 - **Poorly predicted** → PASS. The axis is genuinely orthogonal; this is the headline
   result for the persona programme and should be reported as such.
 - **Mixed** (some classes predictable, others not) → keep the novel classes, merge or
-  drop the predictable ones, and re-run T18.
+  drop the predictable ones, and re-run T08.
 
 ## Done when
 

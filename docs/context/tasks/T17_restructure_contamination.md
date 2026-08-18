@@ -1,4 +1,4 @@
-# T02 — Restructure volume & label contamination
+# T17 — Restructure volume & label contamination
 
 **Goal.** Measure how often restructures happen, and whether their closing entries are
 being counted as recovery in current outcome measures.
@@ -33,8 +33,8 @@ parts so a single PROD run answers the whole card.
 
 - Restructures are a material share AND closing postings are counted → succession
   postings must be excluded from `payments()` (`reference/feature_specs.md §1`); all
-  current recovery/cure figures need a caveat; T24 depends on this.
-- Trivial share → record the size, note the blind spot in `RESULTS.md`, and T03/T04
+  current recovery/cure figures need a caveat; T15 depends on this.
+- Trivial share → record the size, note the blind spot in `RESULTS.md`, and T18/T19
   can be capped or dropped.
 
 ## Done when

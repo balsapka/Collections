@@ -1,4 +1,4 @@
-# T05 — Transaction retention depth
+# T02 — Transaction retention depth
 
 **Goal.** Establish whether the pre-delinquency window `[T0−12m, T0]` actually exists
 in retained data, per segment and cohort.
@@ -6,7 +6,7 @@ in retained data, per segment and cohort.
 **Why.** A4 is anchored to T0 and reads the 12 months before it. For a 180+ account
 that entered the bucket over two years ago, that window is 3+ years back and may be
 purged or archived — which would make A4 unavailable for exactly the cohort where
-deterioration history matters most. This sets the achievable scope of T14–T17.
+deterioration history matters most. This sets the achievable scope of T04–T07.
 
 **Load.** `reference/snippet_contract.md`. `feature_specs.md §3` for the window
 definition if useful.
@@ -34,9 +34,9 @@ and method in the output so the estimate is interpretable.
 - Thin everywhere → **shrink the A4 window** to what actually exists (e.g. 6 months),
   record the change, and note the expected weakening of trajectory features.
 - Data exists but only in archive → flag to the user as a sourcing question before
-  T14 is scheduled.
+  T04 is scheduled.
 
 ## Done when
 
 Availability table (share by months-available, per segment and cohort) logged in
-`RESULTS.md`, and the A4 window decision recorded for T14–T17 to consume.
+`RESULTS.md`, and the A4 window decision recorded for T04–T07 to consume.

@@ -1,13 +1,13 @@
-# T22 — A2 supervised v2
+# T13 — A2 supervised v2
 
 **Goal.** Replace the v1 rules with a supervised classifier trained on field-visit
 dispositions.
 
-**Precondition.** T10 cleared DCORE **and** confirmed field-visit dispositions exist
-and distinguish the needed outcomes. If not, this task is `blocked` — T21's rules ship
+**Precondition.** T11 cleared DCORE **and** confirmed field-visit dispositions exist
+and distinguish the needed outcomes. If not, this task is `blocked` — T12's rules ship
 instead, and that is an acceptable outcome, not a failure.
 
-**Load.** `reference/feature_specs.md §4.2` (label mapping). T21's feature set.
+**Load.** `reference/feature_specs.md §4.2` (label mapping). T12's feature set.
 
 ## Steps
 
@@ -16,7 +16,7 @@ instead, and that is an acceptable outcome, not a failure.
 2. Assemble the labelled set: accounts with a field visit or recorded right-party
    contact. Note it is a **selected** population — visits are not randomly assigned —
    so report how it differs from the book and treat transfer with caution.
-3. Train a multiclass LightGBM (R8) on T21's features; hold out for evaluation.
+3. Train a multiclass LightGBM (R8) on T12's features; hold out for evaluation.
 4. Report the held-out confusion matrix per state, not just overall accuracy — the
    `gone` state's precision is what protects the field-visit budget.
 5. Apply to the full book; set `observed` only where a recent visit or right-party
@@ -25,5 +25,5 @@ instead, and that is an acceptable outcome, not a failure.
 ## Done when
 
 Confusion matrix and per-state precision/recall logged in `RESULTS.md`; the selection
-caveat documented; comparison against T21's rules (do they agree? where do they
+caveat documented; comparison against T12's rules (do they agree? where do they
 diverge?) recorded so the rules can be improved even if v2 ships.

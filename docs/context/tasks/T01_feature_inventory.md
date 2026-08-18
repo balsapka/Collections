@@ -1,4 +1,4 @@
-# T11 — Feature inventory & reuse map
+# T01 — Feature inventory & reuse map
 
 **Goal.** Produce a mapping from every feature the persona axes need to what already
 exists in the repo, so later build tasks reuse instead of rebuild (R14).
@@ -39,7 +39,7 @@ snippet at the end rather than blocking the inventory on them.
 
 - **Departure / travel signature features:** ready-made features exist from internal
   retail use cases built on CASA and product-holdings data. The user is sourcing these.
-  Find them, assess fit, and mark T16 accordingly — do not rebuild departure logic
+  Find them, assess fit, and mark T06 accordingly — do not rebuild departure logic
   from card transactions if these cover it.
 - **Payment regularity / recency:** the current models already use days-since-last-
   payment and DPD velocity; check whether richer payment-pattern features exist beside
@@ -48,6 +48,6 @@ snippet at the end rather than blocking the inventory on them.
 ## Done when
 
 A reuse map table (feature → REUSE/ADAPT/BUILD → source → caveat) is committed to the
-repo's docs and summarised in `RESULTS.md`, with a count per class. T14–T16 and T21
+repo's docs and summarised in `RESULTS.md`, with a count per class. T04–T06 and T12
 consume it. Any feature classified BUILD that looks expensive should be flagged for
 the user before it is scheduled.

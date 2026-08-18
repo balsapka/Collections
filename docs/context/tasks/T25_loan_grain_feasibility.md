@@ -1,4 +1,4 @@
-# T12 — Loan monthly-grain feasibility
+# T25 — Loan monthly-grain feasibility
 
 **Goal.** Establish what payment behaviour can be derived for loan accounts from
 month-end snapshots (plus CASA where available), and decide whether granular loan
@@ -39,7 +39,7 @@ Assess each; the first group is behaviour, the second is timing (probably lost):
 
 - Monthly grain + CASA covers the behaviour signal adequately → build the loan A4 as a
   **distinct monthly-grain feature set**; no data sourcing needed.
-- Substantial signal loss AND loans are a material share of recoverable value (T07) →
+- Substantial signal loss AND loans are a material share of recoverable value (T22) →
   **recommend triggering the granular data sourcing**, with the CC-degradation test as
   the evidence. Flag to the user; this has lead time.
 

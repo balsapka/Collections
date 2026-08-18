@@ -1,4 +1,4 @@
-# T07 — Segment economics
+# T22 — Segment economics
 
 **Goal.** Size every segment: positive rate, recovery magnitude, and total recoverable
 AED — so effort goes where the value is, decided by a number rather than an argument.
@@ -33,7 +33,7 @@ Group existing outcome data by modelling unit (CC / loan-auto / loan-other) × b
 - **>2y cohort holds large absolute value** despite its low rate → revisit how much
   attention the aged book gets; otherwise confirm bulk treatment.
 - **Strong balance gradient in positive rate** → evidence that the dual threshold is
-  partly measuring account size; feeds the T26 label revision and the stakeholder
+  partly measuring account size; feeds the T20 label revision and the stakeholder
   material.
 
 ## Done when

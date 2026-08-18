@@ -1,4 +1,4 @@
-# T23 — A2 gates PV1–PV4
+# T14 — A2 gates PV1–PV4
 
 **Goal.** Put the locatability axis through the same four gates as A4.
 
@@ -7,7 +7,7 @@ rather than assumed. In particular it may be substantially predictable from exis
 recency features (days since last payment already encodes some of "we cannot reach
 them"), which would make it a partial repackaging.
 
-**Load.** Outputs of T21 (or T22). Gate definitions below; T18/T19/T20 for the
+**Load.** Outputs of T12 (or T13). Gate definitions below; T08/T09/T10 for the
 equivalent A4 procedure.
 
 ## PV1 — Buildability

@@ -1,4 +1,4 @@
-# T09 — CASA-holder vs card-only performance split
+# T24 — CASA-holder vs card-only performance split
 
 **Goal.** Measure how much better the current model performs where ability signal is
 directly observable, to decide whether estimating ability for everyone else is worth

@@ -1,4 +1,4 @@
-# T24 — Proxy check on shipped axes
+# T15 — Proxy check on shipped axes
 
 **Goal.** Verify that no axis output acts as a proxy for a protected attribute, before
 anything ships.
@@ -9,7 +9,7 @@ inferred axis can reproduce a protected attribute without ever using it as an in
 `gone` (left the country) is the highest-risk case, since departure correlates strongly
 with residency status. This must be documented **before** compliance asks, not after.
 
-**Load.** `reference/domain_and_decisions.md §7` (constraint C3). Outputs of T18, T23.
+**Load.** `reference/domain_and_decisions.md §7` (constraint C3). Outputs of T08, T14.
 
 ## Steps
 

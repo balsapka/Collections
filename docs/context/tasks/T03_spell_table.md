@@ -1,4 +1,4 @@
-# T13 — Spell / T0 table (CC)
+# T03 — Spell / T0 table (CC)
 
 **Goal.** Build the delinquency-spell table that anchors every A4 feature: one row per
 account × spell, with `T0` (spell start).
@@ -8,12 +8,12 @@ relative to when the trouble started — not relative to the calendar or the obs
 date. Anchoring wrong silently destroys the signal, so this is built once, tested, and
 reused.
 
-**Load.** `reference/feature_specs.md §2` (full spec). Reuse map from T11 (R14) —
+**Load.** `reference/feature_specs.md §2` (full spec). Reuse map from T01 (R14) —
 spell/window helpers may already exist.
 
 ## Steps
 
-1. **Check T11's reuse map first.** If an equivalent spell or delinquency-episode table
+1. **Check T01's reuse map first.** If an equivalent spell or delinquency-episode table
    exists, adapt it rather than building new.
 2. **Use the existing 24-month DPD bucket history feature** (the `33321000…` string) —
    T0 is the 0 → non-zero transition, spell end the return to 0. This makes CC
@@ -29,7 +29,7 @@ spell/window helpers may already exist.
 3. **Restructures (R13):** the old account's spell ends at closure with
    `spell_end_reason = 'restructure_closure'`. Do **not** bridge DPD resets within an
    account — that mechanic does not exist here.
-4. Where T03/T04 supplied a succession link, set `predecessor_account_id` and
+4. Where T18/T19 supplied a succession link, set `predecessor_account_id` and
    `inherited_history_flag = 1` on the successor (strict confidence only — wrong
    history is worse than none).
 5. Emit the schema in `§2`, built for CC only (loans are a separate pipeline, R3).
