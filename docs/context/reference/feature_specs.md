@@ -7,6 +7,41 @@ Formula-level definitions for the label, spell and feature tasks. Conventions:
 - `CONFIRM` marks a default the user/business must ratify. `[COND: X]` marks a feature
   only computable where domain X exists; emit NULL + let `relationship_breadth` carry
   the coverage signal.
+- **Window arithmetic is in months, not days** — see below. Day arithmetic appears only
+  *inside* a window, for features that genuinely measure days.
+
+## 0. Window arithmetic — months, matching the existing pipelines
+
+**Window boundaries are month-based.** `M0 = month(T0)`; `W_pre = [M0−12, M0)` means the
+**12 complete calendar months strictly before the onset month.** Three reasons, in order
+of weight:
+
+1. **T0 is month-resolved** (§2 derives it from the bucket string). `T0 − 365d` is false
+   precision on a value that is only accurate to a month.
+2. **The features are monthly series.** A boundary landing mid-month leaves the first and
+   last buckets partial, which biases every mean and every OLS slope — the quantities A4
+   is built on.
+3. **It matches the existing pipelines**, which use `F.add_months` / `F.months_between`.
+
+```python
+w_pre_start = F.add_months(F.trunc(F.col("t0"), "month"), -12)   # boundaries
+month_idx   = F.floor(F.months_between(F.trunc(c, "month"), w_pre_start))
+```
+
+⚠ **`F.months_between` returns a fractional double** (and special-cases end-of-month
+pairs). For a month *index*, truncate both sides to month start and floor — or diff a
+`yyyyMM` key. Comparing raw `months_between` output against an integer is a silent bug.
+
+**The onset month `M0` is excluded from `W_pre`.** The miss happens inside it, so it is
+not a pre-delinquency month; keeping it would also make the last bucket partial in a
+different way for every account. Where onset-month behaviour is wanted, take it as its
+own named feature, not as the tail of `W_pre`.
+
+**Days still belong inside a window.** Anything measuring an actual elapsed interval or
+a calendar position stays in days, computed from event timestamps: `pay_dom_*`,
+`pay_gap_max_d`, `pay_gap_last_d`, `casa_inflow_stop_gap_d`, `t0_to_block_days`,
+`days_to_dpd30/60`. The rule is: **month arithmetic decides which rows are in the
+window; day arithmetic measures what happened within it.**
 
 ## 1. Labels
 
@@ -43,14 +78,47 @@ Output grain: `(account_id, spell_id)`. **Inputs differ by unit (R15) — two de
 paths:**
 
 **CC — use the existing 24-month DPD bucket history feature.** It stores a per-month
-bucket string (e.g. `33321000000000…`). T0 is the transition from `0` to non-zero;
-spell end is the return to `0`. This makes CC spell derivation nearly free — reuse it
-rather than reconstructing from raw DPD (R14). Confirm before use: string orientation
-(most-recent-first or last?), the as-of reference month, and the bucket encoding.
+bucket string (e.g. `33321000000000…`). This makes CC spell derivation nearly free —
+reuse it rather than reconstructing from raw DPD (R14). Confirm before use: string
+orientation (most-recent-first or last?) and the as-of reference month.
+
+### ⚠ The bucket code is offset on CC — "non-zero" is NOT delinquent
+
+Confirmed with the user 2026-08-19. **The same code means different things per unit:**
+
+| Code | CC | Retail loan |
+|---|---|---|
+| `0` | nothing due | nothing due (**not differentiated from `1`, or `1` unused**) |
+| `1` | **due but not overdue** — ordinary revolver behaviour, recurs every cycle | **already 0–30 DPD** |
+| `2` | **0–30 DPD — delinquency starts here** | 31–60 DPD |
+| `n` | `(n−2)×30` to `(n−1)×30` DPD | `(n−1)×30` to `n×30` DPD |
+
+So define the threshold per unit and reference it everywhere — never `> 0`:
+
+- **CC: `DELINQ_MIN = 2`.** Spell starts at the first month with code **≥ 2**; cure is a
+  return to code **≤ 1** — *not* to `0`, because an account sitting at `1` is current
+  with a statement due.
+- **Retail loan: `DELINQ_MIN = 1`.** Spell starts at code ≥ 1; cure is a return to `0`.
+
+**Using `> 0` on CC is a defect with a specific fingerprint:** a revolver who always
+carries a statement balance never returns to `0`, so the string reads as permanently
+non-zero — producing one enormous spell with T0 at the customer's first-ever statement,
+and a spuriously high `t0_censored_flag` spread across *all* cohorts instead of
+concentrating in 180+ >2y. If a run shows that pattern, this is why (see T03b).
+
+**Segment filters inherit the offset too.** "60+ DPD" is code ≥ 4 on CC but code ≥ 3 on
+loans. Any snippet that scopes by bucket code must use the per-unit mapping, never a
+shared constant (R20 — the wrong constant silently selects the wrong population).
+
+**Free signal from the `0`/`1` distinction (CC only).** Because `1` means "statement
+due", the pre-T0 mix of `0` and `1` months separates transactor/inactive from revolver
+at no cost: `months_at_code0_w12` (nothing due — dormant or paid before statement) and
+`revolver_share_w12` (share of clean months at code `1`). CONFIRM the exact semantics of
+"nothing due" before shipping these.
 
 Two limitations to handle explicitly:
 - **24-month horizon.** A spell starting more than 24 months ago is unlocatable — the
-  string is entirely non-zero and T0 falls outside it. This affects the 180+ >2y cohort
+  string never drops below `DELINQ_MIN` and T0 falls outside it. This affects the 180+ >2y cohort
   exactly, and is an independent reason not to score that book from internal history.
   Emit `t0_censored_flag = 1` rather than guessing a T0.
 - **Monthly resolution.** T0 resolves to a month, not a day. For CC this can optionally
@@ -63,9 +131,10 @@ pipeline. Resolution is monthly by construction.
 
 Derivation (both paths, once buckets are available):
 1. Order the monthly bucket series per account.
-2. A spell starts at the first period with `DPD > 0` following `DPD = 0` (or account
-   origin). `T0` = that period's date.
-3. A spell ends at the first later snapshot with `DPD = 0` (cure) or at
+2. A spell starts at the first period with `code >= DELINQ_MIN` following a period
+   below it (or account origin). `T0` = that period's date. **`DELINQ_MIN` is 2 for CC,
+   1 for loans** — never `> 0`.
+3. A spell ends at the first later snapshot with `code < DELINQ_MIN` (cure) or at
    write-off/closure (terminal) or remains open.
 4. **Restructures (R13) — succession, not reset.** The old account closes and a new one
    opens, so the old account's spell simply *ends at closure* (`spell_end_reason =
@@ -81,15 +150,18 @@ Derivation (both paths, once buckets are available):
    `(account_id, spell_id)` and joined to observations via `current_spell`.
 
 Columns: `account_id, account_type, spell_id, t0, spell_end, spell_end_reason,
-predecessor_account_id, inherited_history_flag, max_dpd_so_far, days_to_dpd30,
-days_to_dpd60` (the last two: within-spell, NULL until reached; safe at obs because obs
-is inside the spell and those events precede it for the 60+/180+ populations).
+prior_spell_end, predecessor_account_id, inherited_history_flag, max_dpd_so_far,
+days_to_dpd30, days_to_dpd60` (the last two: within-spell, NULL until reached; safe at
+obs because obs is inside the spell and those events precede it for the 60+/180+
+populations). `prior_spell_end` carries the previous spell's cure date — NULL for a
+first spell — because the A4 window is truncated at it (§3.0).
 
 Built separately per source system (R3/S15): CC and loan accounts have different
 structures, so this is two pipelines sharing one output schema.
 
 Invariant tests: spells per account non-overlapping; `t0 <= obs <= spell_end` for every
-joined observation; DPD = 0 outside spells; no spell bridges an account closure; where
+joined observation; `code < DELINQ_MIN` outside spells (**≤ 1 on CC, 0 on loans** — not
+`= 0`); no spell bridges an account closure; where
 `inherited_history_flag = 1`, the predecessor link resolves to exactly one account.
 
 ## 3. A4 — manner-of-deterioration features
@@ -126,12 +198,59 @@ the timing varies, check whether the variation is informative or just policy noi
 principal **ADAPT** case — re-anchor to T0 for A4, and retain the block-anchored
 originals as `W_early` features rather than rebuilding either.
 
+### 3.0b `W_pre` is truncated, not assumed — three cut points
+
+A nominal 12 months before T0 is often not 12 months of *pre-delinquency*. Truncate at
+the latest of three boundaries (user-ratified 2026-08-19):
+
+```
+M0          = month(T0)                       # onset month, excluded from W_pre
+w_pre_start = max(M0 − 12,
+                  month_after(prior_spell_end),   # cure month is partly delinquent
+                  month(account_open_date),
+                  retention_floor_month)       # all month-aligned (§0)
+w_pre_clean_m = months_between(M0, w_pre_start)   # integer by construction
+```
+
+| Cut | Why it matters |
+|---|---|
+| `prior_spell_end` | **The one that bites.** For a repeat delinquent, `[T0−12m, T0)` overlaps their *previous* spell — so "pre-delinquency behaviour" is really post-cure behaviour from an earlier episode, possibly while blocked. Two identical feature vectors would then mean different things. |
+| `account_open_date` | Short-tenure accounts have no 12-month run-up. Early-default is a distinct population, not a missing-data case — read with `tenure_at_t0_m`. |
+| `retention_floor` | Transaction history does not reach back far enough (T02). Note `W_pre` starts at `T0−12m` and T0 is *itself* months before `obs`, so a 180+ account needs data from roughly `obs−18m` to `obs−30m` — much deeper than 12 months from today. |
+
+**Emit on every A4 row, always:** `w_pre_start`, `w_pre_clean_m` (months actually
+available), `w_pre_contaminated_flag` (1 where any cut bit), and
+`w_pre_truncation_reason` ∈ `none | prior_spell | tenure | retention`. Truncation that
+is not visible downstream gets read as data-quality noise.
+
+**Slopes count clean months only.** The ≥ 4-non-null-month rule below applies to months
+inside `w_pre_start`, not to the nominal 12 — a slope fitted across a prior spell
+boundary measures the boundary, not the deterioration.
+
 ### 3.1 onwards — feature definitions (all on `W_pre` unless stated)
 
-Windows (relative to T0, per T02 availability): `W12 = W_pre = [T0−365d, T0)`,
-`H1 = [T0−365d, T0−90d)`, `H2 = [T0−90d, T0)`. Monthly series over W12: payments
-`P_m`, amount due `D_m`, utilisation `U_m`, spend `S_m`, cash advances `CA_m`,
-fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NULL.
+Windows — **month-aligned (§0)**, per T02 availability and §3.0b truncation.
+`M0 = month(T0)`, excluded:
+
+| Window | Months | Was (do not use) |
+|---|---|---|
+| `W12 = W_pre` | `[w_pre_start, M0)` — nominally 12 | `[T0−365d, T0)` |
+| `H1` | `[w_pre_start, M0−3)` — nominally 9 | `[T0−365d, T0−90d)` |
+| `H2` | `[M0−3, M0)` — 3 | `[T0−90d, T0)` |
+
+Monthly series over W12: payments `P_m`, amount due `D_m`, utilisation `U_m`, spend
+`S_m`, cash advances `CA_m`, fees `F_m`. Slopes = OLS over month index (from
+`months_between` on month-truncated dates — see the §0 warning); require ≥ 4 non-null
+**clean** months else NULL. Where truncation leaves fewer than 3 months, `H1` is empty
+and every `_h1`/ratio feature is NULL — emit rather than defaulting to zero.
+
+**On the residual anchor lag.** With `DELINQ_MIN = 2` (§2), CC T0 is the month the
+payment went *overdue* — so the first missed due date sits inside that same month and
+the old "T0 is a cycle or two late" concern largely dissolves. What remains is that the
+unpaid statement covers the *prior* cycle's spend, so the final ~30 days of `W_pre`
+carry the run-up to the miss. That is wanted here (A4 is descriptive, and the label
+looks forward from `obs`, so there is no R2 exposure) — but do not describe these as
+strictly pre-hardship features. Day-level refinement via the due date is optional (§2).
 
 ### 3.1 Payment periodicity and trajectory (income proxy)
 
@@ -169,11 +288,11 @@ fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NU
 
 | Feature | Definition |
 |---|---|
-| `travel_mcc_flag_90` | any airline/travel-agency MCC (4511, 4722, 3000–3299) in [T0−90d, T0] |
+| `travel_mcc_flag_h2` | any airline/travel-agency MCC (4511, 4722, 3000–3299) in `H2` = `[M0−3, M0)` (renamed from `travel_mcc_flag_90` — the window is 3 months, not 90 days) |
 | `foreign_txn_share_h2` | share of H2 transactions with non-domestic country code |
 | `last_txn_foreign_flag` | last pre-T0 transaction carries a foreign country code |
 | `casa_inflow_stop_gap_d` [COND: CASA] | days between last salary-like inflow and T0 |
-| `eosb_like_flag` [COND: CASA] | single inflow > 3× median monthly salary inflow within [T0−180d, T0], followed by inflow stop |
+| `eosb_like_flag` [COND: CASA] | single inflow > 3× median monthly salary inflow within `[M0−6, M0)`, followed by inflow stop |
 
 ### 3.4 History shape and cross-product
 
@@ -184,7 +303,7 @@ fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NU
 | `roll_speed_30_d`, `roll_speed_60_d` | days T0 → first DPD ≥ 30 / ≥ 60 (from the spell table §2; past events at obs for this population) |
 | `cross_prod_t0_gap_d` [COND: RL] | \|T0_card − T0_other\| where both products delinquent |
 | `simultaneous_default_flag` [COND: RL] | above gap ≤ 35d |
-| `aecb_leverage_slope` [COND: O7] | OLS slope of bureau total obligations over pulls in [T0−24m, T0]; NULL if < 2 pre-T0 pulls |
+| `aecb_leverage_slope` [COND: O7] | OLS slope of bureau total obligations over pulls in `[M0−24, M0)`; NULL if < 2 pre-T0 pulls |
 | `relationship_breadth` | count of product types held with us (ALWAYS computed — confound control, `01 §4`) |
 
 ### 3.5 Deterioration class v1 (rules)

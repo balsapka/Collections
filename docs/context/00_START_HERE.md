@@ -223,8 +223,11 @@ If a task turns out to be bigger than one session, split it, record the split in
 
 ## Glossary
 
-DPD days past due · **bucket** 30-day DPD interval · **roll/cure** move to worse
-bucket / return to current · **spell** maximal continuous DPD>0 period ·
+DPD days past due · **bucket** 30-day DPD interval — **but the CC code is offset: `1` =
+due but not overdue, delinquency starts at `2`; on loans `1` is already 0–30 DPD**
+(`feature_specs §2`, never use "non-zero") · **roll/cure** move to worse
+bucket / return to current · **spell** maximal continuous period at or above the unit's
+`DELINQ_MIN` ·
 **T0** spell start · **EMI** equated monthly installment · **PTP** promise to pay ·
 **DCORE** collections front-end (trust unresolved) · **AECB** UAE bureau (pulls stop
 at delinquency) · **CASA** current/savings account · **EOSB** end-of-service gratuity ·

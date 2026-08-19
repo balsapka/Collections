@@ -14,6 +14,16 @@ Record everything created in the `RESULTS.md` manifest.
 
 Status: `todo | in-progress (snippet out) | done | blocked | dropped | n/a`
 
+**`done (workplace)`** means the task was run in the workplace environment and its
+outputs live in the **workplace copy** of this pack, not in this authoring repo. The
+numbers are not reproduced here — read them there (never re-derive or assume them).
+**T01–T04 were run in the workplace on 2026-08-19.**
+
+⚠ **Sync hazard.** This authoring repo holds the rules and specs; the workplace copy
+holds the live `Status` column and `RESULTS.md` log. Copying this pack over the
+workplace copy wholesale would clobber both. Bring across `00_START_HERE.md`,
+`reference/` and `tasks/` — merge `TASKS.md` and `RESULTS.md` by hand.
+
 ---
 
 ## Track A — Persona axes  ·  THE PRIORITY
@@ -24,18 +34,20 @@ proceed in parallel — it does not block this.
 
 | ID | Task | Depends | Round trip? | Status |
 |---|---|---|---|---|
-| T01 | [**Feature inventory & reuse map**](tasks/T01_feature_inventory.md) — what already exists vs what A4/A2 need (R14) | — | **No — UAT only** | todo |
-| T02 | [Transaction retention depth](tasks/T02_transaction_retention.md) — is `[T0−12m, T0]` available? Sets the A4 window | — | Yes — **fire early**, runs while T03 is built | todo |
-| T03 | [Spell / T0 table (CC)](tasks/T03_spell_table.md) — the anchor for every A4 feature | T01 | Yes (validation) | todo |
-| T04 | [A4 — payment & balance trajectory](tasks/T04_a4_payment_features.md) | T03, T02, T01 | Yes (validation) | todo |
-| T05 | [A4 — utilisation, spend, liquidity](tasks/T05_a4_spend_features.md) | T03, T02, T01 | Yes (validation) | todo |
-| T06 | [A4 — departure & history shape](tasks/T06_a4_departure_history.md) — **search `wealth_management` / `retail.feature_space` first, derive only the gaps** | T03, T01 | Yes (validation) | todo |
-| T07 | [A4 deterioration class v1](tasks/T07_a4_class_rules.md) | T04, T05, T06 | Yes | todo |
+| T01 | [**Feature inventory & reuse map**](tasks/T01_feature_inventory.md) — what already exists vs what A4/A2 need (R14) | — | **No — UAT only** | done (workplace) |
+| T02 | [Transaction retention depth](tasks/T02_transaction_retention.md) — is `[T0−12m, T0]` available? Sets the A4 window | — | Yes — **fire early**, runs while T03 is built | done (workplace) |
+| T03 | [Spell / T0 table (CC)](tasks/T03_spell_table.md) — the anchor for every A4 feature | T01 | Yes (validation) | done (workplace) |
+| T04 | [A4 — payment & balance trajectory](tasks/T04_a4_payment_features.md) | T03, T02, T01 | Yes (validation) | done (workplace) — superseded by T04b |
+| **T03b** | [**T0 threshold fix**](tasks/T03b_t0_threshold_fix.md) — CC delinquency starts at code **2**, not 1. Rework, not rebuild | T03 | Yes (delta) | **todo — do first** |
+| **T04b** | [**Re-anchor A4 + window truncation**](tasks/T04b_a4_reanchor.md) — formulas unchanged; anchor and window moved | T03b | Yes (delta) | **todo** |
+| T05 | [A4 — utilisation, spend, liquidity](tasks/T05_a4_spend_features.md) | T03b, T02, T01 | Yes (validation) | todo |
+| T06 | [A4 — departure & history shape](tasks/T06_a4_departure_history.md) — **search `wealth_management` / `retail.feature_space` first, derive only the gaps** | T03b, T01 | Yes (validation) | todo |
+| T07 | [A4 deterioration class v1](tasks/T07_a4_class_rules.md) | T04b, T05, T06 | Yes | todo |
 | T08 | [A4 gate PV1+PV3 — buildability & outcome separation](tasks/T08_a4_pv1_pv3.md) | T07 | Yes | todo |
 | T09 | [**A4 gate PV2 — novelty**](tasks/T09_a4_pv2_novelty.md) — *the decisive gate* | T07 | Yes | todo |
 | T10 | [A4 gate PV4 — incremental lift](tasks/T10_a4_pv4_lift.md) | T09 | Yes | todo |
 | T11 | [DCORE trust assessment](tasks/T11_dcore_trust.md) — gates T13 and the willingness axis | — | Yes — fire before T12 | todo |
-| T12 | [A2 locatability v1](tasks/T12_a2_locatability_v1.md) | T03, T01, T06 | Yes (validation) | todo |
+| T12 | [A2 locatability v1](tasks/T12_a2_locatability_v1.md) | T03b, T01, T06 | Yes (validation) | todo |
 | T13 | [A2 supervised v2](tasks/T13_a2_supervised.md) — gated on T11 | T12, T11 | Yes | todo |
 | T14 | [A2 gates PV1–PV4](tasks/T14_a2_gates.md) | T12 (or T13) | Yes | todo |
 | T15 | [Proxy check on shipped axes](tasks/T15_proxy_check.md) — R7/compliance, before anything ships | T08, T14 | Yes | todo |

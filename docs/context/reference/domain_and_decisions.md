@@ -63,6 +63,8 @@ track.
 - **CC is rich** — dedicated payment, balance and utilisation tables *plus* transaction
   history, all sub-monthly. Also has a ready-made **24-month DPD bucket history**
   feature (`33321000…`) that makes spell/T0 derivation nearly free (`feature_specs §2`)
+  — **but the code is offset on CC: `1` = due but not overdue, delinquency starts at
+  `2`. Loans differ (`1` is already 0–30 DPD). Never treat "non-zero" as delinquent**
   — and which is also the source of most current model features (see `current_state §2.1`).
 - **Loans have only month-end snapshots.** Payment *behaviour* (installment paid,
   partial amounts, paydown trajectory) is partly derivable; payment *timing*
