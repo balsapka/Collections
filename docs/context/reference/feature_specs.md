@@ -159,6 +159,14 @@ fees `F_m`. Slopes = OLS over month index; require ≥ 4 non-null months else NU
 
 ### 3.3 Departure / travel signature
 
+> **Reuse before you derive any of these (R14, T06).** Departure/travel features already
+> exist in the working repo's feature layer and in the sibling repos
+> `wealth_management` and `retail.feature_space`. The definitions below are the
+> **gap fill** — what to build when the search turns up nothing usable, or when a
+> borrowed feature fails the coverage / T0-anchoring / protected-input screen. Deriving
+> them from transaction history while a maintained version exists creates a second
+> version of the same number.
+
 | Feature | Definition |
 |---|---|
 | `travel_mcc_flag_90` | any airline/travel-agency MCC (4511, 4722, 3000–3299) in [T0−90d, T0] |

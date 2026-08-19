@@ -21,6 +21,11 @@ with residency status. This must be documented **before** compliance asks, not a
 2. Report separability (AUC / accuracy) against the base-rate baseline.
 3. Repeat with the axis's underlying features, not just the class — a class may look
    clean while a component feature does not.
+   **Features borrowed from another repo get no exemption.** A departure feature reused
+   from `wealth_management` or `retail.feature_space` (T06, R14) was cleared — if at all
+   — for a different use case and a different population. Include every borrowed feature
+   here by name, and check its *inputs* too: one built directly on nationality, visa or
+   residency status fails R7 at the source, whatever its output separability looks like.
 4. Where separability is high, identify which features drive it and whether the axis
    survives without them.
 

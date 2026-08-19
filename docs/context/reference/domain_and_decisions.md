@@ -70,7 +70,12 @@ track.
   reconstructed from the full data model. T25 decides whether granular loan payment
   data needs sourcing.
 - **Ready-made departure/travel features exist** from internal retail use cases built
-  on CASA and product-holdings data. Reuse these rather than rebuilding (R14, T06).
+  on CASA and product-holdings data — in the working repo and in the sibling repos
+  **`wealth_management`** and **`retail.feature_space`**, cloned beside the working
+  branch in the same workspace. Reuse these rather than rebuilding (R14, T06), and
+  screen each one for coverage on the delinquent book, T0 anchoring and
+  protected-attribute inputs before adopting — `wealth_management` in particular serves
+  an affluent population that may barely intersect ours.
 
 | Domain | Grain | Coverage of delinquent CC book | Allowed use | Known issues |
 |---|---|---|---|---|

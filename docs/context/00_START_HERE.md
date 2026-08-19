@@ -175,13 +175,28 @@ If a task turns out to be bigger than one session, split it, record the split in
   rates, the card's invariant tests, a small output sample). Not done until that comes
   back clean. Validation snippets obey R22 — parametrised by `model_id`, which lands in
   the output filename — because the same pipeline is validated across several variants.
-- **R14 — Reuse before build.** The repo has full end-to-end pipelines for most
-  domains and hundreds of existing features. **Before implementing any feature, search
-  the repo for an existing equivalent or near-equivalent** (see the reuse map from
+- **R14 — Reuse before build, across the whole workspace.** The workplace repo has full
+  end-to-end pipelines for most domains and hundreds of existing features — **and it is
+  not the only repo in the workspace.** `wealth_management` and `retail.feature_space`
+  are cloned beside the working branch and carry existing feature solutions, notably for
+  **departure / travel signals** (T06, T12). **Before implementing any feature, search
+  all three** for an existing equivalent or near-equivalent (see the reuse map from
   T01). Use it if it matches, adapt it if it nearly matches, and build new only when
   nothing does — recording which of the three applied. Rebuilding a feature that
   already existed is a defect. This applies to feature logic, spell/window helpers,
   evaluation code and reporting alike.
+  - **Sibling repos are read-only.** Read and port from them; never edit them, never
+    commit into them. Resolve the workspace root as the parent of the working repo root
+    — directory names on disk may differ from the repo names, so confirm the actual
+    paths rather than guessing (R9).
+  - **Port, do not cross-import**, unless the workplace has a real shared-library
+    mechanism — a cross-repo import will not resolve at pipeline runtime. Copy the logic
+    into our own additive module (R18) and record provenance: source repo, file path,
+    commit sha, original feature name.
+  - **A borrowed feature carries no clearance with it.** Screen every candidate on three
+    things before adopting: **coverage** on our delinquent population, **point-in-time
+    correctness** against T0 (R2), and its **inputs** for protected attributes (R7/T15).
+    A feature that was fine for its original use case can fail all three here.
 - **R15 — Data granularity differs by source.** CC has payment, balance and
   utilisation tables plus transaction history — rich, sub-monthly. **Loans have only
   month-end snapshots**, so intra-month timing features are not portable to them

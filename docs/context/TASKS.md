@@ -29,7 +29,7 @@ proceed in parallel — it does not block this.
 | T03 | [Spell / T0 table (CC)](tasks/T03_spell_table.md) — the anchor for every A4 feature | T01 | Yes (validation) | todo |
 | T04 | [A4 — payment & balance trajectory](tasks/T04_a4_payment_features.md) | T03, T02, T01 | Yes (validation) | todo |
 | T05 | [A4 — utilisation, spend, liquidity](tasks/T05_a4_spend_features.md) | T03, T02, T01 | Yes (validation) | todo |
-| T06 | [A4 — departure & history shape](tasks/T06_a4_departure_history.md) — **reuse the sourced retail features** | T03, T01 | Yes (validation) | todo |
+| T06 | [A4 — departure & history shape](tasks/T06_a4_departure_history.md) — **search `wealth_management` / `retail.feature_space` first, derive only the gaps** | T03, T01 | Yes (validation) | todo |
 | T07 | [A4 deterioration class v1](tasks/T07_a4_class_rules.md) | T04, T05, T06 | Yes | todo |
 | T08 | [A4 gate PV1+PV3 — buildability & outcome separation](tasks/T08_a4_pv1_pv3.md) | T07 | Yes | todo |
 | T09 | [**A4 gate PV2 — novelty**](tasks/T09_a4_pv2_novelty.md) — *the decisive gate* | T07 | Yes | todo |

@@ -3,7 +3,8 @@
 **Track A** · **Depends:** T03, T01, T06 · **PROD round trip:** Yes — validation snippet
 
 **Goal.** Assign each delinquent account a contact state — `gone`, `skip`, `avoiding`,
-`reachable` — using core-banking signals plus the sourced retail departure features.
+`reachable` — using core-banking signals plus the existing departure features T06
+sourced from the workspace.
 
 **Why.** This is the axis with the cleanest action mapping: `gone` means field visits
 are wasted, `skip` means tracing works, `avoiding` means the customer is reachable and
@@ -16,7 +17,13 @@ departure features.
 ## Steps
 
 1. **Reuse first (R14):** the departure signals overlap heavily with T06's output and
-   the sourced retail features. Reuse rather than recompute.
+   the features it sourced from the workspace (`retail.feature_space`,
+   `wealth_management`, and the working repo's own feature layer). Take T06's screened
+   set rather than recomputing — and if T06 rejected a candidate on coverage, anchoring
+   or protected inputs, it stays rejected here; do not re-adopt it by another route.
+   Check the same repos for **contactability** logic specifically (address quality,
+   returned-mail, phone-reachability, KYC-refresh failures) — A2 is a contact-state
+   problem, and that flavour of feature may exist there even where departure does not.
 2. Build the [CORE] signals in `§4.1`: per-channel activity gaps, channel-death
    simultaneity, post-T0 domestic activity, travel/foreign flags, other-product
    activity.
