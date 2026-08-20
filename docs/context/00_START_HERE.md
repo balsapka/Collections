@@ -211,6 +211,7 @@ If a task turns out to be bigger than one session, split it, record the split in
 | `TASKS.md` | Every session — the queue |
 | `PROMPTS.md` | Human-facing: the prompts the user types to open a session. Not an instruction source. |
 | `tasks/T##_*.md` | The one task being worked |
+| `reference/personas.md` | **What the axes are and what each state means** — plain-language definitions, the A2 derivation matrix, naming discipline, the UC1 seam. Read before T07 / T12 / T16, or whenever unsure what a state name is claiming |
 | `reference/domain_and_decisions.md` | When a card names a section (segments, data truths, S/X/O lists) |
 | `reference/current_state.md` | When a card names it (model diagnosis, contamination risks) |
 | `reference/snippet_contract.md` | **Whenever a task touches data** — PROD snippet template, return channels, governance |
@@ -234,4 +235,9 @@ at delinquency) · **CASA** current/savings account · **EOSB** end-of-service g
 **MCC** merchant category code · **CIF** customer id across products ·
 **restructure** old account closed, new one opened (R13) · **early chargeoff** in 180+
 under 2 years · **A1** ability · **A2** locatability · **A3** willingness ·
-**A4** manner of deterioration.
+**A4** manner of deterioration · **skip** (A2 state) skip-tracing sense — customer is still
+here but our contact details are wrong; the cheapest state to fix ·
+**UC1** the programme delivering ability/willingness features from call transcripts (S19).
+
+State-by-state definitions for A4 and A2 are in `reference/personas.md` — read it rather
+than inferring meaning from a class name.

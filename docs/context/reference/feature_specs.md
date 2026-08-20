@@ -125,9 +125,38 @@ Two limitations to handle explicitly:
   be refined to a day using the payment/balance tables — locate the month cheaply from
   the string, then refine. Record which resolution was used.
 
-**Loans — no equivalent feature exists.** Buckets must be reconstructed from the full
-data model (month-end snapshots), which is real work and part of the separate loan
-pipeline. Resolution is monthly by construction.
+**Loans — no equivalent *24-month history feature* exists**, so the bucket series comes
+from the snapshot table. Resolution is monthly by construction.
+
+> ⚠ **UNVERIFIED — check before building any reconstruction (raised 2026-08-20).** The
+> loan snapshot rows may carry a **days-overdue column**. If they do, the bucket series is
+> *assembled* (order snapshots per account, read the column, map days → bucket), not
+> *derived* — and the `arrears / emi` arithmetic below is unnecessary. This is a schema
+> question: check the workplace repo's loan snapshot docs **in UAT first** (R9/R14), no
+> PROD round trip needed to answer existence. Do not build the reconstruction until this
+> is settled. Four things to establish, not just existence:
+> 1. **Which DPD convention.** Days since the *oldest unpaid instalment's* due date
+>    (climbs 30/60/90, maps to buckets — what we want) or days since the most recent
+>    missed payment (resets each cycle — useless for bucketing, and would show a flat
+>    series for a chronic non-payer).
+> 2. **How partial payments are applied** — oldest-instalment-first (a partial payment
+>    can cure the oldest instalment and drop DPD), pro-rata, or held in suspense. This
+>    decides whether a chronic partial payer's DPD climbs, sawtooths or plateaus, and
+>    that population is exactly `chronic_marginal`.
+> 3. **DPD at snapshot date, or max DPD during the month?**
+> 4. **Days → bucket boundary convention** — is 30 DPD bucket 1 or 2, `>` or `>=`? A raw
+>    days column avoids the CC code-offset trap (§2 above) but needs its own mapping
+>    stated explicitly.
+>
+> Also worth measuring: **snapshot history depth**. CC's 24-month string is a hard
+> censoring limit (`t0_censored_flag`, and an independent reason not to score the 180+
+> >2y cohort). A snapshot *table* may retain further back — in which case loans have no
+> such limit and are *better* than CC on this one dimension.
+
+If no such column exists, buckets must be reconstructed from the full data model, which
+is real work and part of the separate loan pipeline. Approximate months-in-arrears as
+`arrears / emi` — and validate it specifically on partial payers, where it drifts from
+calendar DPD (see the amendment log).
 
 Derivation (both paths, once buckets are available):
 1. Order the monthly bucket series per account.
@@ -208,15 +237,22 @@ M0          = month(T0)                       # onset month, excluded from W_pre
 w_pre_start = max(M0 − 12,
                   month_after(prior_spell_end),   # cure month is partly delinquent
                   month(account_open_date),
-                  retention_floor_month)       # all month-aligned (§0)
+                  retention_floor_month[source])  # PER SOURCE TABLE — see below
 w_pre_clean_m = months_between(M0, w_pre_start)   # integer by construction
 ```
+
+⚠ **`retention_floor` is per source table, not one window-wide cut** (user-ratified
+2026-08-20). CC balance, utilisation and payment data live in **dedicated tables**, not only
+in transaction history — so a single transaction-derived floor would truncate feature
+families that never depended on the transaction stream. Only §3.3 (departure — MCC, country
+codes) genuinely needs transactions. Resolve the floor per family, and record which floor
+applied in `w_pre_truncation_reason`.
 
 | Cut | Why it matters |
 |---|---|
 | `prior_spell_end` | **The one that bites.** For a repeat delinquent, `[T0−12m, T0)` overlaps their *previous* spell — so "pre-delinquency behaviour" is really post-cure behaviour from an earlier episode, possibly while blocked. Two identical feature vectors would then mean different things. |
 | `account_open_date` | Short-tenure accounts have no 12-month run-up. Early-default is a distinct population, not a missing-data case — read with `tenure_at_t0_m`. |
-| `retention_floor` | Transaction history does not reach back far enough (T02). Note `W_pre` starts at `T0−12m` and T0 is *itself* months before `obs`, so a 180+ account needs data from roughly `obs−18m` to `obs−30m` — much deeper than 12 months from today. |
+| `retention_floor` | The **source table for that feature family** does not reach back far enough (T02). Payment/balance/utilisation tables and transaction history retain independently — ask T02 the question of each, and apply the answer per family, not once globally. Note `W_pre` starts at `T0−12m` and T0 is *itself* months before `obs`, so a 180+ account needs data from roughly `obs−18m` to `obs−30m` — much deeper than 12 months from today. |
 
 **Emit on every A4 row, always:** `w_pre_start`, `w_pre_clean_m` (months actually
 available), `w_pre_contaminated_flag` (1 where any cut bit), and
@@ -227,7 +263,7 @@ is not visible downstream gets read as data-quality noise.
 inside `w_pre_start`, not to the nominal 12 — a slope fitted across a prior spell
 boundary measures the boundary, not the deterioration.
 
-### 3.1 onwards — feature definitions (all on `W_pre` unless stated)
+### 3.0c Windows and monthly series — applies to §3.1–§3.4
 
 Windows — **month-aligned (§0)**, per T02 availability and §3.0b truncation.
 `M0 = month(T0)`, excluded:
@@ -313,23 +349,97 @@ listed conditions. Thresholds τ are placeholders — tune on T02-available data
 
 | Class | Conditions |
 |---|---|
-| `abrupt_shock` | `spend_cliff_flag` AND `pay_ratio_mean_h1 ≥ 0.8` AND payments ≈ 0 in last 2 pre-T0 months AND \|util_slope over H1\| < τ_u |
+| `abrupt_shock` | `spend_cliff_flag` AND `pay_ratio_mean_h1 ≥ 0.8` AND payments ≈ 0 in last 2 pre-T0 months AND \|util_slope over H1\| < τ_u **AND NOT dormant** (see ⚠ below) |
 | `gradual_spiral` | `util_slope > τ_u` AND `pay_ratio_slope < −τ_p` AND `cash_adv_ramp > 1.5` |
-| `chronic_marginal` | `min_pay_share_w12 ≥ 0.6` AND `fee_velocity_life` in top tercile AND `util_mean_h1 ≥ 0.8` |
+| `chronic_marginal` | `min_pay_share_w12 ≥ 0.6` AND `fee_velocity_life` in top tercile AND `util_mean_h1 ≥ 0.8` **AND a duration condition** (see ⚠ below) AND `w_pre_clean_m ≥ τ_m` |
 | `mixed` | otherwise |
 
-Validation (T07/T08): within each segment, realised recovery/cure by class must
-separate (extreme-class ratio ≥ 1.5×). Report class shares + separation in
-`RESULTS.md`. If `mixed` > ~50%, iterate thresholds before shipping.
+### ⚠ Two conditions that do not yet establish what their class names claim
 
-Output schema: `(contract_id, spell_id, t0, <features>, det_class_v1,
-det_class_confidence, computed_at)`.
+**`chronic_marginal` asserts duration it cannot see.** `min_pay_share_w12` spans the
+~12-month window and `util_mean_h1` is narrower still; only `fee_velocity_life` is
+lifetime. Under §3.0b truncation the window can be a handful of months, so "chronic" can
+rest on very thin evidence.
+
+The consequence is a **systematic confusion with `gradual_spiral`**: a spiral that plateaued
+at the limit *before* `W_pre` opened shows flat high utilisation with minimum payments,
+fails `gradual_spiral`'s rising-`util_slope` condition, falls through the ordered rules and
+lands in `chronic_marginal`. Which class an account receives then depends on **when the
+spiral started relative to our window** — an artefact of the anchor, not a property of the
+customer. That is precisely the boundary carrying the action difference (long-run revolver =
+structured arrangement; plateaued spiral = insolvent, settlement).
+
+Fix: recruit the duration features **already computed in §3.4 and currently unused here** —
+`prior_spell_cnt_24m`, `months_since_prior_spell`, `tenure_at_t0_m` — as an explicit
+condition, and require a minimum clean window `w_pre_clean_m ≥ τ_m` (τ_m placeholder,
+CONFIRM). **Honest ceiling:** CC prior-spell history is capped at 24 months by the DPD
+string, so the class can only ever mean *sustained across up to two years, plus lifetime
+tenure and fee rate* — never "years of minimum payments". If the rule cannot carry that
+meaning, rename the class rather than keep the claim.
+
+**`abrupt_shock`'s zero-payment condition may be firing on dormancy.** With
+`DELINQ_MIN = 2` (§2), T0 is the *first* overdue month — so if payments genuinely stopped
+two months earlier, T0 should have been earlier too. The condition is therefore either
+redundant, or it fires on accounts where **nothing was due** (paid-ahead or dormant), which
+is a different customer from one whose income stopped. §2 already exposes the signal to
+separate them (`months_at_code0_w12`, from the code-`0`/code-`1` distinction) and this rule
+does not use it. **Cross-tab `abrupt_shock` against `months_at_code0_w12` at T07**; if the
+class is enriched for code-`0` months, the not-dormant guard is required, not optional.
+
+### Validation
+
+- **Outcome separation (T07/T08):** within each segment, realised recovery/cure by class must
+  separate (extreme-class ratio ≥ 1.5×). Report class shares + separation in `RESULTS.md`.
+  If `mixed` > ~50%, iterate thresholds before shipping.
+- **Face validity (T07) — distinct from the above.** Do the classes mean what their *names*
+  claim? `abrupt_shock` should show low prior spells and longer clean `tenure_at_t0_m`;
+  `gradual_spiral` rising `fee_velocity_ratio_h2`; `chronic_marginal` high
+  `prior_spell_cnt_24m`. A class can separate outcomes perfectly while being misnamed —
+  and the gates will not catch it (`personas.md §5`).
+
+### Output schema and provenance
+
+`(contract_id, spell_id, t0, <features>, det_class_v1, det_class_confidence,
+w_pre_clean_m, w_pre_contaminated_flag, computed_at)`.
+
+**The label does not travel alone.** If `det_class_v1` reaches the DCORE screen or any
+agent-facing surface, `det_class_confidence` and the `observed|inferred` flag (R6/S8) travel
+with it. The class names are *legible* — `abrupt_shock` describes a trajectory shape, not a
+diagnosed cause — and an agent reading one as "this customer lost their job" carries an
+unearned assumption into a live negotiation (`personas.md §5`).
 
 ## 4. A2 — locatability states
 
-States: `reachable | avoiding | skip | gone`. All gap features measured at `obs`.
+States: `reachable | avoiding | skip | gone | unknown`. All gap features measured at `obs`.
+Plain-language definitions and the action mapping are in `personas.md §4` — read that first
+if you are not sure what `skip` means.
+
+### 4.0 Derivation principle — two streams, crossed
+
+**A2 is derived, not learned** (revised 2026-08-20; supersedes the field-visit-supervised
+design). Two independent evidence streams resolve the states between them:
+
+- **Channel status** — what contact attempts came back with (§4.1b)
+- **Presence evidence** — whether the customer is still visibly active anywhere (§4.1a)
+
+| Attempt came back as | Presence evidence | No presence evidence |
+|---|---|---|
+| Right party answered | `reachable` | `reachable` — wherever they are, we have them |
+| Rang, no answer | `avoiding` | **ambiguous** — departure signature decides, else `unknown` |
+| Someone else answered | `skip` | `gone` on a departure trail, else `skip` |
+| Number dead / no delivery | `skip` | `gone` on a departure trail, else `unknown` |
+
+**Why not train on field-visit dispositions.** A visit is dispatched *because* calling
+already failed, so a model trained on visited accounts learns
+P(state | features, **already failed contact**) and cannot be pointed at the rest of the
+book. `reachable` is near-absent from that sample — the state most needing a label source,
+worst supplied by it. Field visits keep two jobs: **adjudicating the ambiguous cell**, and
+**validating `gone` precision**, which is what protects the visit budget. Their coverage is
+unverified and may be low; this design does not depend on it.
 
 ### 4.1 Signals
+
+#### 4.1a Presence evidence [CORE — banking data, no DCORE dependency]
 
 | Tag | Feature | Definition |
 |---|---|---|
@@ -338,37 +448,125 @@ States: `reachable | avoiding | skip | gone`. All gap features measured at `obs`
 | [CORE] | `post_t0_domestic_txn_flag` | any domestic-country activity after T0+60d ⇒ in-country |
 | [CORE] | `travel_mcc_flag_90`, `last_txn_foreign_flag`, `foreign_login_flag` [COND: digital geo] | from A4 §3.3 / digital |
 | [CORE] | `other_product_active_flag` [COND: RL/CASA] | any activity on other products in last 90d |
-| [DCORE, gate T11] | `sms_delivered_rate`, `call_connect_rate`, `delivered_unanswered_ratio`, `wrong_number_flag`, `last_rpc_gap_d` | delivery/disposition-based; delivered-but-unanswered separates `avoiding` from `skip` |
+| [CORE] | `observable_channel_cnt` | how many channels we can see at all. **Always computed** — the guard for §4.4a |
 
-### 4.2 Labels (v2 supervised)
+#### 4.1b Channel status [DCORE, gate T11]
 
-Ground truth = field-visit dispositions (DCORE; O10). Mapping table to fill:
+The recorded contact-attempt vocabulary (user-confirmed 2026-08-20). Resolve the actual code
+list before building — never guess (R9), and see the open question below.
 
-| Disposition code (`<<FILL-IN>>`) | Label |
+| Outcome | Reads as | Contributes to |
+|---|---|---|
+| Right-party contact | Channel live **and** correct — a *positive observation* | `reachable` |
+| Rang, no answer | Channel live, no pickup | `avoiding` / ambiguous |
+| Answered, no meaningful conversation | **Ambiguous — see below** | `avoiding` or `skip` |
+| Call did not go through | Channel dead (invalid / disconnected / unobtainable) | `skip` / `gone` |
+| No reply to email; SMS undelivered | Channel-specific, weak alone | supporting |
+
+⚠ **Open question (O15), and it decides how cleanly two states separate.** Does "answered
+but no meaningful conversation" distinguish *the customer deflecting* from *a stranger on a
+reassigned number*? If it is one undifferentiated code, that row collapses and `avoiding` /
+`skip` both inherit the ambiguity. Establish this before T12, not after.
+
+**All contact signals are attempt-normalised (§4.4b)** — rates over attempts made, never raw
+flags:
+
+| Feature | Definition |
 |---|---|
-| premises vacant / relocated abroad / person unknown | `gone` |
-| relocated locally / address stale, in-country evidence | `skip` |
-| confirmed residing + persistent no-answer | `avoiding` |
-| met customer / right-party contact | `reachable` |
+| `contact_attempts_n` | attempts in the window. **Always emitted** — the exposure denominator |
+| `connect_rate` | went-through / attempted |
+| `pickup_rate` | answered / went-through |
+| `rpc_rate` | right-party / answered |
+| `last_rpc_gap_d` | `obs` − last right-party contact |
+| `attempt_time_diversity` | spread of attempts across hour-of-day and day-of-week |
+| `wrong_party_flag` | answered by someone who is not the customer (subject to O15) |
 
-Train multiclass LightGBM on visited accounts; apply to all; report held-out
-confusion matrix per state. `observed|inferred`: `observed` only for accounts with a
-recent field-visit or right-party-contact fact; else `inferred`.
+### 4.2 Derivation rules
 
-### 4.3 v1 rules (ships even if DCORE fails)
+Evaluate in order; first match wins; emit `a2_confidence` = matched conditions / listed.
 
-- `gone`: all [CORE] gaps > 90d AND `channel_death_std_d` small AND
-  (`travel_mcc_flag_90` OR `last_txn_foreign_flag` OR `foreign_login_flag`) AND NOT
-  `post_t0_domestic_txn_flag`
-- `avoiding`: (digital activity OR domestic txn activity recent) AND no payment —
-  with DCORE: delivered/ringing evidence AND no right-party contact
-- `skip`: in-country evidence (`post_t0_domestic_txn_flag` OR `other_product_active_flag`)
-  AND dead contact channels — with DCORE: disconnected/wrong-number codes
-- `reachable`: recent right-party contact or inbound contact [DCORE]; without DCORE,
-  assign only via v2 labels or leave `unknown`
+- **`reachable`** — right-party contact within the labelling window (§4.4c), or recent
+  inbound contact from the customer. **Directly observed, not inferred.** Needs no presence
+  evidence: if the right party picks up, they are reachable wherever they are.
+- **`gone`** — dead or wrong-party channels AND no presence evidence AND a **positive
+  departure trail**: `travel_mcc_flag_90` OR `last_txn_foreign_flag` OR `foreign_login_flag`
+  OR `casa_inflow_stop_gap_d` large. **Never assigned on absence alone** (§4.4a).
+- **`skip`** — in-country evidence (`post_t0_domestic_txn_flag` OR
+  `other_product_active_flag`) AND dead-or-wrong contact channels (`connect_rate` ≈ 0, or
+  `wrong_party_flag`).
+- **`avoiding`** — live channel with no pickup (`connect_rate` high, `pickup_rate` ≈ 0 or
+  `rpc_rate` ≈ 0 across sufficient attempts) AND presence evidence.
+- **`unknown`** — everything else, and mandatory where the §4.4 guards bite.
 
-Without DCORE this degrades to 3 reliable states (`gone / active-but-not-paying /
-unknown`) — say so in outputs rather than faking 4.
+**Without trustworthy DCORE (T11 fails):** channel status is unavailable, so the axis
+degrades to `gone` (departure trail + no presence) / `active-but-not-paying` / `unknown` —
+three states. Say so in the output schema and documentation. Do not fabricate a fourth state
+to make the grid look complete.
+
+### 4.3 Supervised refinement (optional — scoped by coverage, not a prerequisite)
+
+Where field-visit history is deep enough, a classifier can sharpen the **ambiguous cell
+only** — the rang-no-answer / no-presence case where §4.2 falls to `unknown`.
+
+- Ground truth = field-visit dispositions (O10). Mapping to fill from the actual code list:
+  premises vacant / relocated abroad / person unknown → `gone`; relocated locally / address
+  stale with in-country evidence → `skip`; confirmed residing + persistent no-answer →
+  `avoiding`; met customer → `reachable`.
+- **Train and apply on the same population.** Field visits are dispatched to the unreached,
+  so a model trained on them may be applied *only* to the unreached — never to the book.
+  State the population in the output.
+- Report the held-out confusion matrix per state. `gone` precision is the number that
+  matters: it protects the visit budget.
+- Compare against §4.2's rules — where do they agree, where do they diverge? — so the rules
+  improve even if the refinement does not ship.
+
+Also worth reporting: how visited accounts differ from unvisited ones on observables. Even
+within the unreached, dispatch is unlikely to be random (O16).
+
+### 4.4 Guards — three ways this axis goes wrong
+
+#### 4.4a Silence is not proof of departure
+
+`gone` requires a **positive** departure trail, never mere absence. Roughly 80% of the
+delinquent CC book is card-only (`domain_and_decisions §4`), and once the card is blocked
+there may be no channel left to observe presence on at all. Silence then measures how little
+we can see, not where the customer is — and it correlates with exactly the population the
+axis exists to sort.
+
+**Rule:** where `observable_channel_cnt` is below τ_c (CONFIRM) and there is no departure
+trail, the state is `unknown`, not `gone`. Emit `observable_channel_cnt` on every row.
+
+#### 4.4b Uncontacted is not unreachable
+
+An account nobody called has no contact record, and a naive rule or model reads absence as
+`gone` — the same conditional error as training on visited accounts only.
+
+**Rule:** every contact signal is a rate over `contact_attempts_n`, never a raw flag; the
+state is `unknown` below τ_a attempts (CONFIRM); and `attempt_time_diversity` is carried,
+because someone only ever called at 10am on weekdays who never answers may simply be at work.
+
+#### 4.4c The labelling window
+
+Both a visit and a contact evidence the state **at the time they happened**, not at `obs`.
+Set an explicit maximum gap between `obs` and the labelling event; rows outside it are
+unusable, not stale-but-accepted. Default `<<FILL-IN — CONFIRM>>`. Undefined "recent"
+silently mixes a state observed last week with one observed six months ago.
+
+### 4.5 Where A2 stops
+
+**Locatability ends the moment the right party picks up.** A customer who answers and then
+says nothing useful is *reached* — the failure is willingness, not location, and it belongs
+to A3. Assign `reachable` and route the deflection onward.
+
+This boundary is load-bearing: it is exactly where UC1's transcript-derived features will
+operate (`personas.md §6`), and blurring it now guarantees grid collinearity later (S7/T15).
+
+### 4.6 Output schema
+
+`(account_id, obs, a2_state_v1, a2_confidence, observed|inferred, contact_attempts_n,
+observable_channel_cnt, label_event_gap_d, computed_at)`.
+
+Provenance travels with the state, same discipline as A4 §3.5.
 
 ## 5. Cross-cutting implementation notes
 

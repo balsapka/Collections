@@ -26,6 +26,24 @@ workplace copy wholesale would clobber both. Bring across `00_START_HERE.md`,
 
 ---
 
+## ⚠ Revision round — 2026-08-20
+
+A design review changed several ratified specs. **Re-read the cards before working them**;
+the changes are not cosmetic. Full rationale in `RESULTS.md` → Decisions taken.
+
+| What changed | Where | Affects |
+|---|---|---|
+| **A2 is derived, not learned** (S18). Field visits demoted from label source to adjudicator of one cell | `feature_specs §4` rewritten | T11, T12, T13 |
+| **T02 asks retention per source table**, producing a floor per feature family | T02, `§3.0b` | T02 needs a **delta run** — the completed version answered the narrower question. Also carries O17 |
+| **`chronic_marginal` must evidence duration**, not assert it; **`abrupt_shock` needs a dormancy check** | `§3.5` | T07 |
+| **UC1 will supply A1/A3 from call transcripts** (S19) | `personas.md §6`, `domain_and_decisions §5` | A1/A3 sequencing, T11 verdict |
+| **Labels never ship without provenance** (S20) | `§3.5`, `§4.6` | T07, T12, T16 |
+| **T25's sourcing ask is CASA depth**, not loan-account transactions | T25 | T25 |
+| **New reference: `personas.md`** — what the axes are, what each state means, naming discipline | `reference/personas.md` | Read before T07, T12, T16 |
+| New open questions **O15–O18** | `domain_and_decisions §8` | T11, T12, T02, T25 |
+
+---
+
 ## Track A — Persona axes  ·  THE PRIORITY
 
 This is the part that decides whether the whole approach works. The axes must carry
@@ -35,7 +53,7 @@ proceed in parallel — it does not block this.
 | ID | Task | Depends | Round trip? | Status |
 |---|---|---|---|---|
 | T01 | [**Feature inventory & reuse map**](tasks/T01_feature_inventory.md) — what already exists vs what A4/A2 need (R14) | — | **No — UAT only** | done (workplace) |
-| T02 | [Transaction retention depth](tasks/T02_transaction_retention.md) — is `[T0−12m, T0]` available? Sets the A4 window | — | Yes — **fire early**, runs while T03 is built | done (workplace) |
+| T02 | [Retention depth, **per source table**](tasks/T02_transaction_retention.md) — sets a window floor per feature family, not one window | — | Yes — **fire early**, runs while T03 is built | **done (workplace) — needs a delta**, see below |
 | T03 | [Spell / T0 table (CC)](tasks/T03_spell_table.md) — the anchor for every A4 feature | T01 | Yes (validation) | done (workplace) |
 | T04 | [A4 — payment & balance trajectory](tasks/T04_a4_payment_features.md) | T03, T02, T01 | Yes (validation) | done (workplace) — superseded by T04b |
 | **T03b** | [**T0 threshold fix**](tasks/T03b_t0_threshold_fix.md) — CC delinquency starts at code **2**, not 1. Rework, not rebuild | T03 | Yes (delta) | **todo — do first** |
@@ -46,9 +64,9 @@ proceed in parallel — it does not block this.
 | T08 | [A4 gate PV1+PV3 — buildability & outcome separation](tasks/T08_a4_pv1_pv3.md) | T07 | Yes | todo |
 | T09 | [**A4 gate PV2 — novelty**](tasks/T09_a4_pv2_novelty.md) — *the decisive gate* | T07 | Yes | todo |
 | T10 | [A4 gate PV4 — incremental lift](tasks/T10_a4_pv4_lift.md) | T09 | Yes | todo |
-| T11 | [DCORE trust assessment](tasks/T11_dcore_trust.md) — gates T13 and the willingness axis | — | Yes — fire before T12 | todo |
-| T12 | [A2 locatability v1](tasks/T12_a2_locatability_v1.md) | T03b, T01, T06 | Yes (validation) | todo |
-| T13 | [A2 supervised v2](tasks/T13_a2_supervised.md) — gated on T11 | T12, T11 | Yes | todo |
+| T11 | [DCORE trust assessment](tasks/T11_dcore_trust.md) — now tests **contact-attempt codes as a label source** too, and reports a verdict per consumer | — | Yes — fire before T12 | todo |
+| T12 | [A2 locatability (derivation)](tasks/T12_a2_locatability_v1.md) — contact-outcome × presence; **this ships the axis** | T03b, T01, T06 | Yes (validation) | todo |
+| T13 | [A2 supervised refinement](tasks/T13_a2_supervised.md) — sharpens one ambiguous cell; **scoped by visit coverage, droppable** | T12, T11 | Yes | todo |
 | T14 | [A2 gates PV1–PV4](tasks/T14_a2_gates.md) | T12 (or T13) | Yes | todo |
 | T15 | [Proxy check on shipped axes](tasks/T15_proxy_check.md) — R7/compliance, before anything ships | T08, T14 | Yes | todo |
 | T16 | [PV5 action-distinctness workshop pack](tasks/T16_pv5_workshop_pack.md) — assemble the materials; the session itself is a business meeting | T08, T14 | No | todo |
@@ -82,7 +100,7 @@ refine later once T18/T19 lands.
 | T22 | [Segment economics](tasks/T22_segment_economics.md) — rates, recoverable AED, balance-band gradient | — | Yes | todo |
 | T23 | [Within-cohort discrimination](tasks/T23_within_cohort_auc.md) — does 180+ skill survive inside <2y / >2y? | — | Yes | todo |
 | T24 | [CASA vs card-only split](tasks/T24_casa_vs_cardonly.md) — is the ability signal (A1) worth building? | — | Yes | todo |
-| T25 | [Loan monthly-grain feasibility](tasks/T25_loan_grain_feasibility.md) — **fire early if T22 shows loans matter**; data sourcing has lead time | T01 | Yes | todo |
+| T25 | [Loan monthly-grain feasibility](tasks/T25_loan_grain_feasibility.md) — **fire early if T22 shows loans matter**; sourcing ask is **CASA depth, not loan transactions**; carries O17 (loan DPD column) | T01 | Yes | todo |
 
 ---
 

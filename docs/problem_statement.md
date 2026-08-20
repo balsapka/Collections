@@ -168,10 +168,22 @@ carried forward, whatever it looks like on a slide.
     marginal, read from pre-delinquency card history anchored to when the trouble
     started. Full-book coverage; works even for dry late-stage accounts, because their
     histories differ even when their present looks identical.
-  - *Locatability* — gone / stale details / avoiding / reachable, from channel-death
-    patterns and travel/foreign signatures, validated against field-visit findings.
+  - *Locatability* — gone / stale details / avoiding / reachable, derived by crossing
+    **what our contact attempts came back with** against **whether the customer is still
+    visibly active anywhere with us**. Speaking to the right party is a direct observation,
+    not an inference. Field visits validate the states rather than defining them — a visit
+    is dispatched *because* calling already failed, so visit records describe only accounts
+    where calling already failed, and cannot stand in for the rest of the book. Two rules
+    we hold to: *gone* is never assigned on silence alone, only on a positive departure
+    trail; and an account nobody has called is not an unreachable account.
   - *Ability* and *willingness* — gated on two week-1 checks (value test on the
-    salary-visible minority; DCORE trust test).
+    salary-visible minority; DCORE trust test). We are nonetheless defining both now,
+    because **UC1 will deliver exactly these two from call transcripts** — cutting them
+    in advance means that work lands into a structure that already exists. Note the two
+    efforts cover different customers and do not overtake each other: transcripts exist
+    only where someone answered the phone, so they can say nothing about the customers we
+    never reach. Deterioration, which needs no contact at all, stays the only read we have
+    on those.
 - **Deep learning in exactly one place:** learning representations of pre-delinquency
   behaviour sequences (an embedding feeding the LightGBM models), and only if simpler
   trajectory features leave measurable headroom. Everything else stays LightGBM.

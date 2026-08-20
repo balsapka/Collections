@@ -33,18 +33,38 @@ detail that should not be pasted into a chat session.
 4. **Integrity.** Referential integrity to accounts; duplicates; orphans.
 5. **Field visits specifically.** Are dispositions recorded, and do they distinguish
    the outcomes locatability needs (vacant / relocated / person unknown / confirmed
-   residing / contacted)?
+   residing / contacted)? **Also: how many accounts have any visit at all** — T13's scope
+   depends on it, and it is currently unverified.
+6. **Contact-attempt outcome codes — as a label source, not only as features.** A2 now
+   derives its states from these (S18, `feature_specs §4.1b`), so they need their own check;
+   clearing field-visit dispositions does not clear them. Telephony metadata and
+   hand-written visit dispositions fail differently — auto-dialler behaviour and carrier
+   reporting versus human recording discipline.
+   - Is the vocabulary as described: right-party contact / rang-no-answer / answered-no-
+     meaningful-conversation / did-not-go-through / email no-reply?
+   - **O15, the decisive one:** does "answered but no meaningful conversation" distinguish
+     *the customer deflecting* from *a stranger on a reassigned number*? One undifferentiated
+     code collapses a row of the `§4.0` matrix and blurs `avoiding` against `skip`.
+   - Is `contact_attempts_n` reliably countable? Attempt-normalisation (§4.4b) depends on a
+     trustworthy denominator — if attempts are logged inconsistently, every rate is wrong.
+7. **O16 — dispatch rule.** How are field visits triggered: by failed contact, by balance, or
+   by a routing rule? The `§4.0` selection argument and T13's population both rest on this.
 
 ## Decision rule
 
-Provisional thresholds — **CONFIRM with the user before acting on them**:
-- PTP agreement < ~90% **or** coverage < ~80% → DCORE fields untrusted: **A3 blocked**,
-  A2 ships core-banking-only (T12 without T13), crosstab deferred.
-- Passes both but field-visit dispositions are unusable → A2 stays at v1 rules; record
-  that its supervised version has no label source.
-- Passes all → A3 and A2-v2 unblock; note it in `TASKS.md`.
+Provisional thresholds — **CONFIRM with the user before acting on them**. Note the three
+consumers now fail independently, so report a verdict per consumer, not one overall:
+
+| Test | If it fails |
+|---|---|
+| PTP agreement < ~90% or coverage < ~80% | **A3 deferred** — but not permanently: UC1 transcripts are its eventual source (S19). Descriptive crosstab deferred |
+| Contact-attempt codes unusable, or `contact_attempts_n` untrustworthy | **A2 degrades to three states** (`gone` / `active-but-not-paying` / `unknown`, §4.2) — it does not block, but say so in the output |
+| O15 collapses (one undifferentiated "answered" code) | `avoiding` and `skip` blur; record the ambiguity in the state definitions rather than presenting four clean states |
+| Field-visit dispositions unusable **or** coverage thin | **T13 dropped or scoped down.** A2 still ships from T12 — the derivation does not depend on visits (S18) |
+| Passes all | A3 unblocks now rather than waiting for UC1; T13 proceeds at whatever scale coverage supports |
 
 ## Done when
 
-Agreement rates, coverage, code distribution and the field-visit finding are logged in
-`RESULTS.md`, and the gates on T13 / A3 are set in `TASKS.md`.
+Agreement rates, coverage, code distribution, the contact-code findings (including O15), the
+field-visit coverage number and the dispatch rule (O16) are logged in `RESULTS.md`, and the
+per-consumer gates on T12 / T13 / A3 are set in `TASKS.md`.
