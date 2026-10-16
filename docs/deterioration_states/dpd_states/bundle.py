@@ -32,6 +32,7 @@ FILES = [
     "dpd_states/analysis.py",
     "dpd_states/expectations.py",
     "dpd_states/file_mode.py",
+    "dpd_states/segment_180.py",
     "dpd_states/discover.py",
     "dpd_states/synth.py",
     "dpd_states/run_synthetic.py",

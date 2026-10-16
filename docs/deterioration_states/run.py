@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))   # makes dpd_states importable
 
-TOOLS = ("validate", "selftest", "synthetic", "bundle")
+TOOLS = ("validate", "selftest", "synthetic", "s180", "bundle")
 
 
 def main() -> int:
@@ -31,6 +31,10 @@ def main() -> int:
         return run(n)
     if cmd == "synthetic":
         from dpd_states.run_synthetic import main as run
+        run(n)
+        return 0
+    if cmd == "s180":
+        from dpd_states.segment_180 import main as run
         run(n)
         return 0
     if cmd == "bundle":

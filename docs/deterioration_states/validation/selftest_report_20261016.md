@@ -46,22 +46,22 @@ OK   0000 3 0000000000000 2 3 4            -> straight_roller_seasoned    single
 | E09 | PASS | Stabilized share (today) | 0.078 | 4–10% | bank | Bank's 5-of-6 rule gives ~6%; the long-run clause adds about one point. | Compare with the bank's implementation (E11, PROMPTS P4) and escalate. |
 | E10 | PASS | Recall of the bank's existing bust-out flag by our EPD | 0.919 | >= 80% | bank | Same concept; ours additionally requires no payment since crossing bucket 2. | Read the bank's rule (PROMPTS P4), list the differences and escalate. |
 | E11 | PASS | Recall of the bank's existing stabilized flag by our stabilized | 0.941 | >= 90% | bank | Ours is the bank's 5-of-6 rule plus the long-run clause; differences: EPD/ordering, glitch and +2-jump cleaning. | Check the band definition (±1 of today's bucket, 5 of the last 6 months incl. today). |
-| E12 | PASS | Stabilized separates risk: fixed states' next-month roll minus stabilized (bucket-standardised) | 0.335 | >= 20pp | synthetic | Synthetic: ~0.37. Standardised to the same bucket mix, because stabilized sits mostly at bucket 4. | Stabilized is not behaving as stable: check payment holidays / restructuring flags (E21) and escalate whether to use 6 of 6. |
-| E13 | PASS | Fixed states keep their state (or move into stabilized) next month — min over states with n >= 100 | 0.999 | >= 95% | design | Run-up, history and the repairs are causal: how they fell in never changes once past 4. EPD is not fixed (it ends when the account pays) and moving into stabilized is not a leak. | A feature is drifting with time or with the next month's data — find the leaking state. |
+| E12 | PASS | Stabilized separates risk: fixed states' next-month roll minus stabilized (bucket-standardised) | 0.336 | >= 20pp | synthetic | Synthetic: ~0.37. Standardised to the same bucket mix, because stabilized sits mostly at bucket 4. | Stabilized is not behaving as stable: check payment holidays / restructuring flags (E21) and escalate whether to use 6 of 6. |
+| E13 | PASS | Fixed states keep their state (or move into stabilized) next month — min over states with n >= 100 | 0.997 | >= 95% | design | Run-up, history and the repairs are causal: how they fell in never changes once past 4. EPD is not fixed (it ends when the account pays) and moving into stabilized is not a leak. | A feature is drifting with time or with the next month's data — find the leaking state. |
 | E14 | PASS | Stabilized persistence next month | 0.600 | 45–85% | synthetic | Stabilized is current behaviour; it should persist but not forever (synthetic ~60%). | Too low: the band is too loose. Too high: frozen buckets (holidays) are read as payments. |
 | E15 | PASS | Option A: straight-roller share | 0.714 | 55–80% | bank | Most accounts roll straight 2-3-4 (synthetic ~70%). | If much lower, many run-ups contain a hold — look at E28 (artefacts) before trusting slow roller. |
-| E16 | PASS | Smallest optional state in option B (EPD and stabilized are required; empty = 0) | 0.058 | >= 5% | design | Actionable size for the optional splits; the bank's two known states are kept at any size. Synthetic: early-life straight roller ~4.7% under the 12-month cut. | If it is early-life straight roller: merge it into straight roller (agreed with the owner: set seasoned_min_months=None and keep early life as a flag). Any other state: escalate. |
+| E16 | WARN | Smallest optional state in option B (EPD and stabilized are required; empty = 0) | 0.046 | >= 5% | design | Actionable size for the optional splits; the bank's two known states are kept at any size. Synthetic: early-life straight roller ~4.7% under the 12-month cut. | If it is early-life straight roller: merge it into straight roller (agreed with the owner: set seasoned_min_months=None and keep early life as a flag). Any other state: escalate. |
 | E17 | PASS | Option C: smaller of intermittent / erratic payer | 0.057 | >= 4% | design | Synthetic 10% / 6%. | Too small to act on — use option B. |
 | E18 | PASS | Stabilized sits low in the spine: share at bucket 4 / share at bucket 7 | 15.141 | >= 2x | bank | 90–95% roll rates at 6–7 leave little room to hold there. | Stabilized accounts at 6–7 are unusual — check for frozen buckets (payment holidays). |
-| E19 | PASS | Orthogonality: credibility score explained by the states (eta²) | 0.180 | <= 0.25 | design | Known overlap via stabilized (money in), slow roller (money in near bucket 4) and repeat delinquent (clean point); the states should not reproduce the score. | Use option A (drops repeat delinquent) or report stabilized under credibility instead. |
-| E19b | WARN | Orthogonality: credibility 'pre-delinquency clean' point explained by the states (eta²) | 0.666 | <= 0.50 | design | Repeat delinquent uses earlier spells — the history the clean point scores (now limited to the last 24 months, which lowers the overlap). | Repeat delinquent duplicates the clean point: use option A, or keep it and tell the persona grid it is the same signal (only 1 of credibility's 5 points). |
+| E19 | PASS | Orthogonality: credibility score explained by the states (eta²) | 0.179 | <= 0.25 | design | Known overlap via stabilized (money in), slow roller (money in near bucket 4) and repeat delinquent (clean point); the states should not reproduce the score. | Use option A (drops repeat delinquent) or report stabilized under credibility instead. |
+| E19b | WARN | Orthogonality: credibility 'pre-delinquency clean' point explained by the states (eta²) | 0.665 | <= 0.50 | design | Repeat delinquent uses earlier spells — the history the clean point scores (now limited to the last 24 months, which lowers the overlap). | Repeat delinquent duplicates the clean point: use option A, or keep it and tell the persona grid it is the same signal (only 1 of credibility's 5 points). |
 | E20 | PASS | Orthogonality: ability score explained by the states (eta²) | 0.000 | <= 0.10 | design | DPD shape should carry little of salary/inflow/CASA. | Straight vs slow roller may proxy income loss — fine, but say so in the persona grid. |
 | E20b | PASS | Orthogonality: reachability / in-country explained by the states (max eta²) | 0.000 | <= 0.05 | design | Locatability is independent of how the debt was paid. | A state is acting as a departure proxy — report it to the persona owners. |
 | E21 | PASS | Stabilized accounts with money coming in (credibility component or DPD proxy) | 0.983 | >= 90% | design | Stabilized = paid one month's due most months, so money must be coming in. | Stabilized accounts without money in are frozen buckets (holiday/restructure) — flag them. |
-| E22 | INFO | INFO — residual clusters: option-B ARI gain over option A at k=6 | 0.279 | report | synthetic | Diagnostic only: any finer partition built on the clustered features gains ARI (a meaningless tenure split gained 0.16 in review), so this is not evidence for B over A. | — |
+| E22 | INFO | INFO — residual clusters: option-B ARI gain over option A at k=6 | 0.259 | report | synthetic | Diagnostic only: any finer partition built on the clustered features gains ARI (a meaningless tenure split gained 0.16 in review), so this is not evidence for B over A. | — |
 | E23 | INFO | INFO — one paid month: straight minus one-hold slow roller, next-month roll (bucket-std) | 0.027 | report | synthetic | 41% of slow rollers rest on a single hold. Unknowable from synthetic data (same post-4 dynamics). | Near 0 and E28 shows artefacts: the straight/slow split rests on noise — escalate whether a single hold should still make a slow roller (straight_max_runup = 4). |
 | E24 | PASS | 'Paying since 4' stays rejected: share still in it next month at 0.5 | 0.588 | <= 75% | synthetic | Synthetic ~63%: an unstable current-behaviour state. | If it is stable on real data, reconsider Q3 — but it remains credibility's 'money in'. |
-| E25 | INFO | INFO — spread of exit to 8+ within 3 months across fixed states (option B, bucket-std) | 0.003 | report | synthetic | Standardised to the bucket mix and over 3 months, because 6-month exit saturates near 100% at 5–7. | >= 5pp means how they fell in carries risk information beyond stabilized. |
+| E25 | INFO | INFO — spread of exit to 8+ within 3 months across fixed states (option B, bucket-std) | 0.005 | report | synthetic | Standardised to the bucket mix and over 3 months, because 6-month exit saturates near 100% at 5–7. | >= 5pp means how they fell in carries risk information beyond stabilized. |
 | E26 | PASS | Stabilized bounce-backs: ever-stabilized accounts that left and came back within k months | 0.047 | <= 10% | synthetic | Synthetic ~5–7% with the long-run clause vs ~8% on the bank's rule alone; oscillating payers bounce 41% less. Remaining bounces are mostly staircases (hold, step, hold). | Too many bounce: look at shapes; +2 tolerance or a sticky rule widen the definition — escalate. |
 | E27 | PASS | Uncropped string lengths vary (p95 minus p05 of history length, months) | 18 | >= 6 | data | Full history from the first billed month gives very different lengths across accounts. | Strings look fixed-length (padded or truncated): EPD and early-life cannot be judged from the string — confirm the convention (PROMPTS P1) before reading those states. |
 | E28 | PASS | Run-up holds by calendar month: largest month vs its neighbours (artefact check) | 1.795 | <= 2.5 | data | Customer payments spread over calendar months; a spike means a system event (cycle-date change, reversal batch, deferral). | Find the month (section 5b) and ask the data owners; holds from that month should not count. |
@@ -143,8 +143,8 @@ Share:
 | early_payment_default | 0.043 |
 | stabilized | 0.078 |
 | repeat_delinquent | 0.137 |
-| straight_roller_seasoned | 0.534 |
-| straight_roller_early_life | 0.058 |
+| straight_roller_seasoned | 0.545 |
+| straight_roller_early_life | 0.046 |
 | slow_roller | 0.151 |
 
 Mix by current bucket (column shares):
@@ -155,8 +155,8 @@ Mix by current bucket (column shares):
 | early_payment_default | 0.043 | 0.044 | 0.043 | 0.041 |
 | stabilized | 0.150 | 0.088 | 0.039 | 0.010 |
 | repeat_delinquent | 0.134 | 0.132 | 0.145 | 0.139 |
-| straight_roller_seasoned | 0.503 | 0.529 | 0.549 | 0.564 |
-| straight_roller_early_life | 0.036 | 0.056 | 0.072 | 0.073 |
+| straight_roller_seasoned | 0.503 | 0.540 | 0.564 | 0.588 |
+| straight_roller_early_life | 0.036 | 0.044 | 0.057 | 0.050 |
 | slow_roller | 0.133 | 0.151 | 0.153 | 0.172 |
 
 ### C_detailed_7
@@ -169,8 +169,8 @@ Share:
 | early_payment_default | 0.043 |
 | stabilized | 0.078 |
 | repeat_delinquent | 0.137 |
-| straight_roller_seasoned | 0.534 |
-| straight_roller_early_life | 0.058 |
+| straight_roller_seasoned | 0.545 |
+| straight_roller_early_life | 0.046 |
 | slow_roller_intermittent | 0.093 |
 | slow_roller_erratic | 0.057 |
 
@@ -182,8 +182,8 @@ Mix by current bucket (column shares):
 | early_payment_default | 0.043 | 0.044 | 0.043 | 0.041 |
 | stabilized | 0.150 | 0.088 | 0.039 | 0.010 |
 | repeat_delinquent | 0.134 | 0.132 | 0.145 | 0.139 |
-| straight_roller_seasoned | 0.503 | 0.529 | 0.549 | 0.564 |
-| straight_roller_early_life | 0.036 | 0.056 | 0.072 | 0.073 |
+| straight_roller_seasoned | 0.503 | 0.540 | 0.564 | 0.588 |
+| straight_roller_early_life | 0.036 | 0.044 | 0.057 | 0.050 |
 | slow_roller_intermittent | 0.084 | 0.091 | 0.094 | 0.107 |
 | slow_roller_erratic | 0.049 | 0.060 | 0.059 | 0.065 |
 
@@ -223,10 +223,10 @@ Variance of each axis explained by the states (eta², 0 = orthogonal):
 
 | axis | A_minimal_4 | B_balanced_6 | C_detailed_7 |
 |---|---|---|---|
-| credibility_score | 0.105 | 0.180 | 0.182 |
+| credibility_score | 0.105 | 0.179 | 0.180 |
 | cred_ptp_points | 0.000 | 0.000 | 0.000 |
-| cred_money_in_points | 0.181 | 0.185 | 0.188 |
-| cred_clean_point | 0.031 | 0.666 | 0.666 |
+| cred_money_in_points | 0.181 | 0.183 | 0.186 |
+| cred_clean_point | 0.031 | 0.665 | 0.665 |
 | ability_score | 0.000 | 0.000 | 0.000 |
 | reachable_flag | 0.000 | 0.000 | 0.000 |
 | in_country_flag | 0.000 | 0.000 | 0.000 |
@@ -238,8 +238,8 @@ Mean of each axis by state (B_balanced_6):
 | early_payment_default | 1.889 | 0.684 | 0.204 | 1.000 | 49.537 | 0.700 | 0.827 |
 | stabilized | 3.508 | 0.681 | 1.962 | 0.865 | 50.470 | 0.702 | 0.841 |
 | repeat_delinquent | 1.381 | 0.717 | 0.664 | 0.000 | 49.799 | 0.705 | 0.853 |
-| straight_roller_seasoned | 2.295 | 0.713 | 0.668 | 0.914 | 50.166 | 0.694 | 0.855 |
-| straight_roller_early_life | 2.767 | 0.723 | 1.052 | 0.992 | 50.528 | 0.684 | 0.847 |
+| straight_roller_seasoned | 2.305 | 0.713 | 0.677 | 0.915 | 50.169 | 0.694 | 0.854 |
+| straight_roller_early_life | 2.764 | 0.723 | 1.051 | 0.990 | 50.576 | 0.684 | 0.854 |
 | slow_roller | 2.904 | 0.708 | 1.201 | 0.995 | 50.009 | 0.689 | 0.846 |
 
 Stabilized vs money coming in:
@@ -257,8 +257,8 @@ Money coming in by state and current bucket (slow rollers paid on the way down, 
 | early_payment_default | 0.155 | 0.187 | 0.242 | 0.250 |
 | stabilized | 1.000 | 0.949 | 0.983 | 1.000 |
 | repeat_delinquent | 0.405 | 0.422 | 0.423 | 0.345 |
-| straight_roller_seasoned | 0.346 | 0.442 | 0.450 | 0.406 |
-| straight_roller_early_life | 0.462 | 0.666 | 0.638 | 0.503 |
+| straight_roller_seasoned | 0.346 | 0.448 | 0.454 | 0.408 |
+| straight_roller_early_life | 0.462 | 0.641 | 0.651 | 0.525 |
 | slow_roller | 1.000 | 0.650 | 0.452 | 0.443 |
 
 ## 5. Backtest — spine as of 6 months ago, outcomes since
@@ -288,8 +288,8 @@ Money coming in by state and current bucket (slow rollers paid on the way down, 
 | early_payment_default | 0.044 | 877 | 0.909 | 0.909 | 0.625 | 0.986 | 0.000 | 4.000 | 0.890 | 0.890 | 0.210 |
 | stabilized | 0.081 | 1624 | 0.474 | 0.508 | 0.425 | 0.587 | 0.046 | 3.000 | 0.600 | 0.600 | 0.210 |
 | repeat_delinquent | 0.103 | 2066 | 0.815 | 0.814 | 0.623 | 0.917 | 0.024 | 3.000 | 0.985 | 1.000 | 0.285 |
-| straight_roller_seasoned | 0.474 | 9482 | 0.843 | 0.851 | 0.623 | 0.940 | 0.008 | 4.000 | 0.990 | 1.000 | 0.202 |
-| straight_roller_early_life | 0.138 | 2768 | 0.894 | 0.836 | 0.625 | 0.976 | 0.005 | 2.000 | 0.947 | 0.999 | 0.487 |
+| straight_roller_seasoned | 0.568 | 11366 | 0.856 | 0.850 | 0.622 | 0.948 | 0.007 | 3.000 | 0.984 | 1.000 | 0.266 |
+| straight_roller_early_life | 0.044 | 884 | 0.846 | 0.836 | 0.626 | 0.949 | 0.015 | 3.000 | 0.970 | 0.997 | 0.281 |
 | slow_roller | 0.159 | 3183 | 0.828 | 0.825 | 0.625 | 0.922 | 0.041 | 3.000 | 0.969 | 1.000 | 0.260 |
 
 ### C_detailed_7
@@ -299,8 +299,8 @@ Money coming in by state and current bucket (slow rollers paid on the way down, 
 | early_payment_default | 0.044 | 877 | 0.909 | 0.909 | 0.625 | 0.986 | 0.000 | 4.000 | 0.890 | 0.890 | 0.210 |
 | stabilized | 0.081 | 1624 | 0.474 | 0.508 | 0.425 | 0.587 | 0.046 | 3.000 | 0.600 | 0.600 | 0.210 |
 | repeat_delinquent | 0.103 | 2066 | 0.815 | 0.814 | 0.623 | 0.917 | 0.024 | 3.000 | 0.985 | 1.000 | 0.285 |
-| straight_roller_seasoned | 0.474 | 9482 | 0.843 | 0.851 | 0.623 | 0.940 | 0.008 | 4.000 | 0.990 | 1.000 | 0.202 |
-| straight_roller_early_life | 0.138 | 2768 | 0.894 | 0.836 | 0.625 | 0.976 | 0.005 | 2.000 | 0.947 | 0.999 | 0.487 |
+| straight_roller_seasoned | 0.568 | 11366 | 0.856 | 0.850 | 0.622 | 0.948 | 0.007 | 3.000 | 0.984 | 1.000 | 0.266 |
+| straight_roller_early_life | 0.044 | 884 | 0.846 | 0.836 | 0.626 | 0.949 | 0.015 | 3.000 | 0.970 | 0.997 | 0.281 |
 | slow_roller_intermittent | 0.101 | 2029 | 0.818 | 0.816 | 0.624 | 0.913 | 0.054 | 3.000 | 0.962 | 1.000 | 0.260 |
 | slow_roller_erratic | 0.058 | 1154 | 0.845 | 0.840 | 0.628 | 0.938 | 0.017 | 3.000 | 0.982 | 1.000 | 0.262 |
 
@@ -414,10 +414,10 @@ Each month is compared with its neighbours (±2 months); a month far above them 
 
 | seasoned_min_months | seasoned | early_life |
 |---|---|---|
-| 12 | 0.474 | 0.138 |
-| 18 | 0.000 | 0.613 |
-| 24 | 0.000 | 0.613 |
-| 36 | 0.000 | 0.613 |
+| 12 | 0.568 | 0.044 |
+| 18 | 0.561 | 0.051 |
+| 24 | 0.561 | 0.051 |
+| 36 | 0.561 | 0.051 |
 
 ### paying_since_4_test
 
@@ -431,13 +431,13 @@ Each month is compared with its neighbours (±2 months); a month far above them 
 
 | k | agree_A_minimal_4 | agree_B_balanced_6 | agree_C_detailed_7 |
 |---|---|---|---|
-| 2 | -0.058 | 0.368 | 0.349 |
-| 3 | 0.329 | 0.575 | 0.583 |
-| 4 | 0.180 | 0.452 | 0.457 |
-| 5 | 0.177 | 0.440 | 0.464 |
-| 6 | 0.270 | 0.550 | 0.573 |
-| 7 | 0.284 | 0.573 | 0.597 |
-| 8 | 0.183 | 0.398 | 0.418 |
+| 2 | -0.058 | 0.386 | 0.366 |
+| 3 | 0.329 | 0.598 | 0.606 |
+| 4 | 0.180 | 0.438 | 0.443 |
+| 5 | 0.177 | 0.426 | 0.449 |
+| 6 | 0.270 | 0.529 | 0.553 |
+| 7 | 0.284 | 0.552 | 0.576 |
+| 8 | 0.183 | 0.382 | 0.402 |
 
 ## 8. Most common journey shapes and motifs
 
@@ -475,13 +475,13 @@ Shapes (N clean, R roll, H hold = paid one month, P paid 2+ months; run lengths 
 | HPPN | 0.023 | 18.040 | repeat_delinquent | 0.993 |
 | HHPP | 0.012 | 9.917 | repeat_delinquent | 0.887 |
 | HPNN | 0.083 | 7.484 | straight_roller_seasoned | 0.492 |
-| RRRH | 0.183 | 6.990 | straight_roller_seasoned | 0.563 |
-| RRRR | 0.532 | 5.916 | straight_roller_seasoned | 0.624 |
+| RRRH | 0.183 | 6.990 | straight_roller_seasoned | 0.578 |
+| RRRR | 0.532 | 5.916 | straight_roller_seasoned | 0.632 |
 | RHRH | 0.071 | 5.804 | slow_roller | 0.423 |
-| RRHR | 0.152 | 5.624 | straight_roller_seasoned | 0.387 |
+| RRHR | 0.152 | 5.624 | straight_roller_seasoned | 0.397 |
 | RRPH | 0.046 | 5.337 | slow_roller | 0.309 |
 | RRHH | 0.058 | 5.236 | stabilized | 0.308 |
-| NRRR | 0.746 | 4.921 | straight_roller_seasoned | 0.699 |
+| NRRR | 0.746 | 4.921 | straight_roller_seasoned | 0.710 |
 | RHPN | 0.043 | 4.876 | repeat_delinquent | 0.523 |
 | RHRR | 0.119 | 4.742 | slow_roller | 0.585 |
 | RPHR | 0.041 | 4.731 | slow_roller | 0.356 |

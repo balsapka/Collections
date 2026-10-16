@@ -163,7 +163,8 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
         gap = f[f"gap_prior_peak{min(max(int(p['repeat_min_prior_peak']), 2), 4)}"]
         add(gap <= p["repeat_window_months"], "repeat_delinquent")
     if p["seasoned_min_months"] is not None:
-        add(fast & (f.months_before_spell >= p["seasoned_min_months"]), "straight_roller_seasoned")
+        # a cropped string means the account is older than the window: seasoned
+        add(fast & ((f.months_before_spell >= p["seasoned_min_months"]) | cropped), "straight_roller_seasoned")
         add(fast, "straight_roller_early_life")
     else:
         add(fast, "straight_roller")

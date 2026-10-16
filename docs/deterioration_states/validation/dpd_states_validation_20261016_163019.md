@@ -1,4 +1,4 @@
-# DPD deterioration states — synthetic validation 20261016_131615
+# DPD deterioration states — synthetic validation 20261016_163019
 
 20,000 calibrated synthetic spine accounts (current bucket 4–7). Strings: leftmost = current bucket. 0 ≡ 1.
 
