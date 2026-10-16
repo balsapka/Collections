@@ -87,11 +87,12 @@ def _cure(path: list[int], rng) -> None:
 # --- archetypes: each returns a full lifecycle ending at EXIT ----------------
 
 def bust_out(rng) -> list[int]:
-    """0 2 0 0 2 3 4 5 — short tenure, maybe paid off once from 2 (never higher), then gone."""
-    path = [0] * (1 + int(rng.gamma(1.2, 2.5)))
+    """0 0 2 3 4 5 or 0 2 0 2 3 4 — at most 3 months of history before rolling in, at most
+    one blip (a payoff from 2, never higher) inside it, then gone."""
     if rng.random() < 0.3:
-        path += [2, 0]                            # one-shot payoff, only ever from 2
-        path += [0] * int(rng.integers(0, 3))
+        path = [0, 2, 0]                          # one-shot payoff, only ever from 2
+    else:
+        path = [0] * int(rng.integers(1, 4))
     _roll_to(path, 4)
     _post4(path, rng)
     return path

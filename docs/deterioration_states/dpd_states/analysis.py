@@ -247,7 +247,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
         return float((b[m[m].index] == name).mean()) if m.any() else None
 
     rows = []
-    for v in (3, 6, 9, 12, 18, 24):
+    for v in (2, 3, 4, 6, 9, 12):
         st = assign_states(base, bust_max_history=v)
         b_ = st == "bust_out"
         rows.append({"bust_max_history": v, "share": b_.mean(),
@@ -273,7 +273,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
                      "gradual_share": (st == "gradual_decline").mean()})
     sw["sudden_max_runup"] = rows
     rows = []
-    for v in (24, 36, 48, 60):
+    for v in (12, 18, 24, 36):
         st = assign_states(base, **{**OPTIONS[RECOMMENDED], "established_min": v})
         rows.append({"established_min": v, "established": (st == "sudden_established").mean(),
                      "early_life": (st == "sudden_early_life").mean()})

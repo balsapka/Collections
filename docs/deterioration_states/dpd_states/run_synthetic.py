@@ -73,7 +73,7 @@ def sweep(f: pd.DataFrame, nx: pd.DataFrame) -> str:
     planted = f.true_archetype
 
     rows = []
-    for v in (3, 6, 9, 12, 18, 24):
+    for v in (2, 3, 4, 6, 9, 12):
         s = assign_states(f, bust_max_history=v)
         b = s == "bust_out"
         rows.append({"bust_max_history": v, "bust_share": b.mean(), "exit_6m": f.exit_6m[b].mean(),
@@ -128,7 +128,7 @@ def sweep(f: pd.DataFrame, nx: pd.DataFrame) -> str:
     out.append("### Q5 sudden vs gradual — max run-up months\n\n" + md(pd.DataFrame(rows)))
 
     rows = []
-    for v in (24, 36, 48, 60):
+    for v in (12, 18, 24, 36):
         s = assign_states(f, **{**OPTIONS[RECOMMENDED], "established_min": v})
         rows.append({"established_min": v, "established": (s == "sudden_established").mean(),
                      "early_life": (s == "sudden_early_life").mean()})

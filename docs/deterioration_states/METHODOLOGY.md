@@ -82,13 +82,13 @@ computed for diagnostics and discovery only.
 Questions are asked **in order**; the first "yes" assigns the state.
 
 ```
-Q1  Bust-out?   <= 6 months of history before this spell
-                AND no earlier spell above bucket 2 (a payoff from 2 is allowed)
+Q1  Bust-out?   <= 3 months of history before this spell
+                (at most one blip inside it — a payoff from 2 — and no earlier real spell)
                 AND run-up to 4 took <= 3 months                     -> bust_out
 Q2  Holding?    >= 5 of the last 6 months within today's bucket ±1   -> holding
 Q4  Relapse?    [B, C] an earlier spell reached bucket 3 and cured   -> relapse
 Q5  Fell fast?  run-up (last clean month -> first month at 4) <= 3 months
-      yes -> sudden    [B, C: >= 36 months of history before the spell
+      yes -> sudden    [B, C: >= 12 months of history before the spell
                         -> sudden_established, else sudden_early_life]
       no  -> gradual   [C: paid 2+ months at once on the way down
                         -> gradual_fought_back, else gradual_slide]
@@ -108,17 +108,17 @@ Q5  Fell fast?  run-up (last clean month -> first month at 4) <= 3 months
 
 | State | Reads as | Action flavour | Share *(synthetic)* |
 |---|---|---|---|
-| **bust_out** | Short history, rolled straight in, never really paid | Fraud / first-party review, early legal; no restructuring | 6% (bank: 6%) |
+| **bust_out** | At most 3 months of history (one blip allowed), rolled straight in, never really paid | Fraud / first-party review, early legal; no restructuring | 6% (bank: 6%) |
 | **holding** | Paying about one month's due each month for 5 of 6 months | **Offer restructuring to break the hardship** | 7% (bank's stabilized: 6%) |
-| **relapse** | Has been here before and cured from bucket 3 | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 17% |
-| **sudden_established** | Years clean (≥ 36 months), then a straight roll | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 35% |
-| **sudden_early_life** | Under 3 years of clean history, then a straight roll | Same triage; also an underwriting signal for acquisition | 20% |
+| **relapse** | Has been here before and cured from bucket 3 | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 16% |
+| **sudden_established** | At least a year of clean history (≥ 12 months), then a straight roll | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 52% |
+| **sudden_early_life** | 4–11 months of clean history (first year on book), then a straight roll | Same triage; also an underwriting signal for acquisition | 3% — below the 5% floor in synthetic data; the real share decides (E16) |
 | **gradual_decline** | Paid something on the way down but kept slipping | Over-indebted: longer-tenor restructure or settlement | 16% |
 | ↳ gradual_slide *(C)* | Paid one month here and there, never caught up | Chronic insufficiency: restructure to what they actually pay | 10% |
 | ↳ gradual_fought_back *(C)* | Paid 2+ months at once, then rolled anyway | Lumpy / irregular income: plan aligned to inflow timing | 6% |
 
 **Holding is the only state that moves month to month** — it describes what the customer
-is doing now (*synthetic:* 60% are still holding next month). Every other state is fixed
+is doing now (*synthetic:* 62% are still holding next month). Every other state is fixed
 once the account is past bucket 4 (*synthetic:* 97–100% keep their state next month).
 
 ---
@@ -127,12 +127,12 @@ once the account is past bucket 4 (*synthetic:* 97–100% keep their state next 
 
 | Threshold | Value | Why this value | What moving it does |
 |---|---|---|---|
-| Bust-out history | **≤ 6 months** | Matches the bank's "max a few months". No natural knee in the data, so it is a definition | 6 m: catches ~80% of planted bust-outs at ~80% purity. 12 m: ~97% caught but purity falls to ~63% — short-history clean customers flood in |
-| Bust-out earlier peak | **≤ 2** | A bust-out may pay off once, but only from bucket 2 (business rule) | `0 2 3 4 0 0 2 3 4 5 6` is therefore relapse, not bust-out |
+| Bust-out history | **≤ 3 months, at most one blip** | Business definition (agreed): a customer who never pays misses the first or second bill, so 2–3 clean months at most (`0 0 2 3 4`, `0 0 0 2 3 4`, `0 2 0 2 3 4`). No natural knee in the data | *Synthetic:* at 3 months 93% of the state is a planted bust-out; at 6 months 79%, at 12 months 55% — longer histories are early-life defaults and land in sudden_early_life. Sweep reported in every run (2–12 months) |
+| Bust-out earlier spells | **none; one blip allowed** | A bust-out may pay off once, but only from bucket 2 (a blip) | `0 2 3 4 0 0 2 3 4 5 6` is therefore relapse, not bust-out; two blips (`0 2 0 2 0 2 3 4`) is not a bust-out |
 | Run-up for "sudden" | **≤ 3 months** | The one sharp threshold: any single paid month on the way down makes it gradual | ≤ 4 moves ~70% of genuine slow slides into sudden (slides in gradual: 98% → ~30%) |
 | Holding band | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%, persistence ~63%. 6 of 6: ~5%, ~32%, ~80% |
 | Relapse depth | **earlier spell reached 3** | The bank counts ~85% single-spell; spells from 3 give 83% *(synthetic)* | From 2: 19%. From 4: 5% (cures from 4+ are rare) |
-| Established | **≥ 36 months** | Where the residual clusters split (§6.1); gives two usable groups | 24 m: 43% / 11%. 48 m: 27% / 28% |
+| Established | **≥ 12 months** | Business definition (agreed): the first year on book is the standard early-life default window. Bust-out already takes ≤ 3 months, so early life = 4–11 months | *Synthetic:* 12 m gives early life only 3.4% (below the 5% floor), 18 m 7%, 24 m 11%, 36 m 20% — but these shares come from the generator's assumed tenure distribution, so the real share decides (E16) |
 
 **Rule order.** Bust-out is asked before holding (the bank's order). Only ~0.2% of the
 spine is a bust-out that is also holding today, so the order barely matters.
@@ -156,9 +156,12 @@ spine is a bust-out that is also holding today, so the order barely matters.
 - **Residual clustering (after bust-out and holding) — kept as a diagnostic.** k-means at
   k = 6 on the remaining ~88% found six clean, nameable groups: long-clean straight roll,
   short-clean straight roll, earlier spell to 3+, paying after 4 but still rolling, held on
-  the way, paid 2+ on the way. Agreement with option A 0.16, **B 0.55, C 0.58** — the
-  evidence that two residual states were too few. Every B/C split maps to one of these
-  clusters with a one-line rule; the clusters themselves are not the states.
+  the way, paid 2+ on the way. With the final thresholds, agreement at k = 6 is A 0.11,
+  **B 0.32, C 0.34** (best at k = 3: B 0.65 vs A 0.31) — the evidence that two residual
+  states were too few. Every B/C split maps to one of these clusters with a one-line
+  rule; the clusters themselves are not the states. The clusters split clean history
+  near 36 months, but that reflects the generator's assumed tenure distribution; the
+  established cut is a business definition (12 months, §5).
 
 ### 6.2 A "mixed" / residual state
 Dropped. An ordered tree with a default branch is MECE without one, and a residual
@@ -226,7 +229,17 @@ has billing-cycle effects (example: `…3 4 3 5 4…`).
 ### 6.13 Payment-promise or inflow inputs in any state
 Never used — credibility and ability own them. Their overlap is *measured* (§7).
 
-### 6.14 Established / early-life split in option A
+### 6.14 Bust-out with up to 6 months of history
+The first version allowed ≤ 6 months before the spell, chosen to match "a few months".
+It made `0 0 0 0 0 0 2 3 4` a bust-out — but six clean months means about four bills were
+paid (or nothing was due): an **early-life default**, not a customer who never paid. The
+synthetic 6% match did not support 6 months either: the generator's bust-out volume had
+been tuned to hit 6% *under that rule*, so the match was circular. Replaced by the agreed
+business definition: **≤ 3 months, at most one blip**. Under it the generator still gives
+5.8% bust-out; every planted bust-out is caught, and 93% of the state is a planted
+bust-out (79% under the old 6-month rule).
+
+### 6.15 Established / early-life split in option A
 Not in A because, in synthetic data, it adds no risk separation (both ~94–95% exit within
 6 months, by construction). It is in B/C for its action difference (life event vs
 underwriting signal). Real outcomes decide whether it earns its place.
@@ -267,7 +280,7 @@ outcomes (the snippet detects and warns).
 | E07 | One spell only (from bucket 3) | 78–92% | Bank ~85% |
 | E08 / E09 | Bust-out / holding share | 4–8% / 4–9% | Bank 6% / 6% |
 | E10 / E11 | Recall of the bank's existing flags | ≥ 80% / ≥ 90% | Same definitions |
-| E12 | Holding next-month roll below the fixed states | ≥ 20pp gap | *Synthetic:* 44% vs ~85% |
+| E12 | Holding next-month roll below the fixed states | ≥ 20pp gap | *Synthetic:* 40% vs ~85% |
 | E13 | Fixed states keep their state next month | ≥ 95% | Run-up fixed once past 4 |
 | E14 | Holding persistence next month | 45–85% | Current behaviour |
 | E15 | Option A sudden share | 55–80% | Most roll straight |
@@ -276,7 +289,7 @@ outcomes (the snippet detects and warns).
 | E18 | Holding at bucket 4 vs 7 | ≥ 2× | 90–95% roll at 6–7 |
 | E19 / E19b / E20 | eta² of credibility / clean point / ability by state | ≤ 0.25 / ≤ 0.50 / ≤ 0.10 | Orthogonality |
 | E21 | Holders with money coming in | ≥ 90% | Holding = paying |
-| E22 | Residual clusters favour B over A | ARI gain ≥ 0.15 | *Synthetic:* 0.39 |
+| E22 | Residual clusters favour B over A | ARI gain ≥ 0.15 | *Synthetic:* 0.20 |
 | E23 | One paid month matters (gradual at run-up ≤ 4 / ≤ 3) | ≤ 0.70 | Most gradual held once |
 | E24 | Partial payer stays rejected | persistence ≤ 75% | *Synthetic:* 63% |
 | E25 | INFO: exit spread across fixed states | report | Unknowable from synthetic |
@@ -298,12 +311,14 @@ Every check carries an "if not met" action in the code and in the report.
   (bust-out, clean abrupt shock, slow slide, staircase, stabilized, repeat episodes,
   dip-and-roll, volatile); full lifecycles to exit; length-biased snapshot like a real
   spine; payment holidays (frozen buckets) and billing-cycle +2 jumps; one continuous
-  tenure distribution. Matches the bank's figures: roll rates 70/79/89/94% (target
-  70/80/90/95%), bust-out 5.8% (6%), stabilized 6.6% (6%), single spell 83% from bucket 3 (85%).
+  tenure distribution. Matches the bank's figures: roll rates 70/80/89/95% (target
+  70/80/90/95%), bust-out 5.8% (6%), stabilized 6.5% (6%), single spell 83% from bucket 3 (85%).
 - **Method report:** `validation/dpd_states_validation_*.md` (`python -m dpd_states.run_synthetic`).
 - **Real-data path self-test:** `validation/selftest_report_*.md` (`python -m dpd_states.selftest`)
   runs the exact analysis and expectations the workplace run uses, on synthetic data with
-  fake axis columns. All checks pass except E19b (expected WARN, §6.6).
+  fake axis columns. All checks pass except two expected WARNs: E19b (relapse ≈
+  credibility clean point, §6.6) and E16 (sudden_early_life 3.4% under the 12-month
+  established cut — a property of the synthetic tenure distribution, §5).
 
 **What synthetic data cannot tell you:** whether the rolling states differ in outcome (they
 share post-4 dynamics by construction), how big the real overlaps with credibility and
