@@ -15,6 +15,7 @@ deterioration_states/
 ├── README.md                 this file
 ├── METHODOLOGY.md            design, thresholds, dropped states + reasons, expectations
 ├── PROMPTS.md                prompts for Sonnet 5 at the workplace (P0–P6)
+├── BUNDLE.md                 ALL source files in one .md + extractor (for .py-blocked viewers)
 ├── dpd_states/               the package (pandas + numpy + scikit-learn; no Spark)
 │   ├── config.py             ← the ONLY file to edit: dataset + column names (<<FILL-IN>>)
 │   ├── features.py           string → encoding → journey features (clock-safe)
@@ -24,12 +25,19 @@ deterioration_states/
 │   ├── discover.py           shapes, n-gram motifs, clustering helpers
 │   ├── synth.py              calibrated synthetic generator (method validation only)
 │   ├── run_synthetic.py      method validation report  → validation/
-│   └── selftest.py           real-data code path on synthetic data + 14 edge-case regressions → validation/
+│   ├── selftest.py           real-data code path on synthetic data + 14 edge-case regressions → validation/
+│   └── bundle.py             rebuilds BUNDLE.md (python -m dpd_states.bundle)
 ├── snippets/
 │   └── dpd_states_validate.py   PROD entry point: main(catalog, model_id=None, ...)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
 ```
+
+## Can't open .py files?
+
+`BUNDLE.md` holds every source file in one markdown file plus a 40-line extractor that
+recreates the folder and verifies each file's SHA-256 — see the instructions at its top.
+Regenerate it after any change: `python -m dpd_states.bundle`.
 
 ## Assign states in your own code
 
