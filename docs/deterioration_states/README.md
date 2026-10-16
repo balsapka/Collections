@@ -13,6 +13,7 @@ workplace with Sonnet are in **[PROMPTS.md](PROMPTS.md)**.
 ```
 deterioration_states/
 ├── README.md                 this file
+├── run.py                    run the tools from ANY folder: selftest | synthetic | bundle
 ├── METHODOLOGY.md            design, thresholds, dropped states + reasons, expectations
 ├── PROMPTS.md                prompts for Sonnet 5 at the workplace (P0–P6)
 ├── BUNDLE.md                 ALL source files in one .md + extractor (for .py-blocked viewers)
@@ -26,7 +27,7 @@ deterioration_states/
 │   ├── synth.py              calibrated synthetic generator (method validation only)
 │   ├── run_synthetic.py      method validation report  → validation/
 │   ├── selftest.py           real-data code path on synthetic data + 14 edge-case regressions → validation/
-│   └── bundle.py             rebuilds BUNDLE.md (python -m dpd_states.bundle)
+│   └── bundle.py             rebuilds BUNDLE.md
 ├── snippets/
 │   └── dpd_states_validate.py   PROD entry point: main(catalog, model_id=None, ...)
 ├── validation/               evidence from synthetic runs (committed)
@@ -37,7 +38,7 @@ deterioration_states/
 
 `BUNDLE.md` holds every source file in one markdown file plus a 40-line extractor that
 recreates the folder and verifies each file's SHA-256 — see the instructions at its top.
-Regenerate it after any change: `python -m dpd_states.bundle`.
+Regenerate it after any change: `python docs/deterioration_states/run.py bundle`.
 
 ## Assign states in your own code
 
@@ -56,9 +57,8 @@ Only accounts whose current bucket is 4–7 belong to the spine.
 ## Run locally (no data needed)
 
 ```bash
-cd docs/deterioration_states
-python -m dpd_states.selftest          # real-data path on synthetic data: expect "SELFTEST PASSED"
-python -m dpd_states.run_synthetic     # method validation report (~1 min)
+python docs/deterioration_states/run.py selftest     # real-data path on synthetic data: expect "SELFTEST PASSED"
+python docs/deterioration_states/run.py synthetic    # method validation report (~1 min)
 ```
 
 ## Run at the workplace (PROD, Kedro notebook)

@@ -1,7 +1,7 @@
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
 for environments that can open .md but not .py files.
 
-    cd docs/deterioration_states && python -m dpd_states.bundle
+    python docs/deterioration_states/run.py bundle                      # from any folder
 
 The bundle starts with instructions and a small extractor script. Running the extractor on
 the saved BUNDLE.md recreates every file and checks each against its SHA-256, so nothing
@@ -21,6 +21,7 @@ OUT = ROOT / "BUNDLE.md"
 # are not code and are left out; empty folders are recreated by the extractor.
 FILES = [
     "README.md",
+    "run.py",
     "METHODOLOGY.md",
     "PROMPTS.md",
     "dpd_states/__init__.py",
@@ -42,8 +43,18 @@ LANG = {".py": "python", ".md": "markdown"}
 
 EXTRACTOR = '''"""Recreate docs/deterioration_states/ from BUNDLE.md and verify every file.
 
-    python extract_bundle.py BUNDLE.md            # writes next to BUNDLE.md
-    python extract_bundle.py BUNDLE.md <folder>   # or into <folder>
+Run from the repo root, in this order:
+
+    1. python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md
+         -> must end with "N files OK, 0 mismatched"
+    2. python docs/deterioration_states/run.py selftest
+         -> must end with "SELFTEST PASSED" (~1 minute; needs pandas, numpy, scikit-learn)
+    3. Fill in docs/deterioration_states/dpd_states/config.py and the <<FILL-IN>> in
+       snippets/dpd_states_validate.py (PROMPTS.md P1), then in a Kedro notebook:
+         main(catalog, check_only=True)   # dry run
+         main(catalog)                    # full validation
+
+Optional second argument writes somewhere else: extract_bundle.py BUNDLE.md <folder>
 """
 import hashlib
 import pathlib
@@ -86,6 +97,8 @@ for d in re.findall(r"^- empty folder: `([^`]+)`", "\\n".join(lines), flags=re.M
     (root / d).mkdir(parents=True, exist_ok=True)
     (root / d / ".gitkeep").touch()
 print(f"\\n{ok} files OK, {bad} mismatched -> {root}")
+if not bad:
+    print("Next: python docs/deterioration_states/run.py selftest   (from the repo root)")
 sys.exit(1 if bad else 0)
 '''
 
@@ -114,10 +127,39 @@ def build() -> Path:
 
     doc = f"""# Deterioration states — full source bundle
 
+## Run this (from the repo root)
+
+```bash
+# 1. recreate every file and verify checksums  -> "N files OK, 0 mismatched"
+python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md
+
+# 2. self-test on synthetic data              -> "SELFTEST PASSED"  (~1 min)
+python docs/deterioration_states/run.py selftest
+
+# 3. optional: rebuild the synthetic method-validation report
+python docs/deterioration_states/run.py synthetic
+```
+
+Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
+time. Then fill in `dpd_states/config.py` and the `<<FILL-IN>>` in
+`snippets/dpd_states_validate.py` (PROMPTS.md P1) and, in a Kedro notebook:
+
+```python
+import sys, pathlib
+_c = pathlib.Path.cwd()
+ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
+sys.path.insert(0, str(ROOT / "docs" / "deterioration_states" / "snippets"))
+from dpd_states_validate import main
+main(catalog, check_only=True)   # dry run: schema, counts, example strings
+result = main(catalog)           # full validation -> results/ (aggregates only)
+```
+
+---
+
 Generated {date.today().isoformat()} by `dpd_states/bundle.py`. {len(FILES)} files, {total:,} lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
-`python -m dpd_states.bundle` (from `docs/deterioration_states/`).
+`python docs/deterioration_states/run.py bundle`.
 
 ## Instructions for the assistant recreating the files (read first)
 
@@ -132,9 +174,11 @@ environments where `.py` files cannot be opened. Regenerate it after any change 
    **"N files OK, 0 mismatched"**. A mismatch means the copy of this markdown was altered
    (line endings, smart quotes, a rendered instead of raw copy) — recopy the raw file;
    do not hand-fix the code.
-3. Then run the self-test from `docs/deterioration_states/`:
-   `python -m dpd_states.selftest` → must print **SELFTEST PASSED** (needs pandas, numpy,
-   scikit-learn; ~1 minute).
+3. Then run the self-test — from any folder, e.g. the repo root:
+   `python docs/deterioration_states/run.py selftest` → must print **SELFTEST PASSED**
+   (needs pandas, numpy, scikit-learn; ~1 minute). Do not use `python -m dpd_states...`
+   from the repo root: the package sits inside `docs/deterioration_states/`, so Python
+   will not find it there.
 4. Only after that, follow `PROMPTS.md` (P0 → P1 → P2). The only files to edit are
    `dpd_states/config.py` and the marked `<<FILL-IN>>` spot in
    `snippets/dpd_states_validate.py`.
@@ -158,7 +202,7 @@ environments where `.py` files cannot be opened. Regenerate it after any change 
 - empty folder: `validation`
 
 `results/` receives the real-data outputs; `validation/` holds the synthetic evidence
-(regenerate with `python -m dpd_states.selftest` and `python -m dpd_states.run_synthetic`).
+(regenerate with `python docs/deterioration_states/run.py selftest` and `... run.py synthetic`).
 
 ## Files
 

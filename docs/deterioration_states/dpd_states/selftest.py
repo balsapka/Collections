@@ -4,7 +4,7 @@ Builds the two frames the Spark snippet would collect — today's spine with opt
 axis columns, and latest-month strings for the backtest — runs analysis.run and the
 expectations, and writes the same report the workplace run produces.
 
-    cd docs/deterioration_states && python -m dpd_states.selftest [n_accounts]
+    python docs/deterioration_states/run.py selftest [n_accounts]       # from any folder
 
 Pass = no FAIL and E01 (MECE) PASS. WARNs are reported, not asserted: synthetic data is
 calibrated to the bank's figures but is not the bank's book.

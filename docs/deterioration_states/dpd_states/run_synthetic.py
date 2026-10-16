@@ -1,7 +1,7 @@
 """METHOD validation on synthetic data: generate a calibrated synthetic spine with planted
 patterns, assign the states, and write the evidence report to ../validation/.
 
-    cd docs/deterioration_states && python -m dpd_states.run_synthetic [n_accounts]
+    python docs/deterioration_states/run.py synthetic [n_accounts]      # from any folder
 """
 from __future__ import annotations
 

@@ -380,8 +380,8 @@ state.
   spine; payment holidays (frozen buckets) and billing-cycle +2 jumps; one continuous
   tenure distribution. Matches the bank's figures: roll rates 70/80/89/95% (target
   70/80/90/95%), EPD 5.8% (6%), stabilized 6.5% (6%), single spell 83% from bucket 3 (85%).
-- **Method report:** `validation/dpd_states_validation_*.md` (`python -m dpd_states.run_synthetic`).
-- **Real-data path self-test:** `validation/selftest_report_*.md` (`python -m dpd_states.selftest`)
+- **Method report:** `validation/dpd_states_validation_*.md` (`python docs/deterioration_states/run.py synthetic`).
+- **Real-data path self-test:** `validation/selftest_report_*.md` (`python docs/deterioration_states/run.py selftest`)
   runs the exact analysis and expectations the workplace run uses, on synthetic data with
   fake axis columns. All checks pass except two expected WARNs: E19b (repeat delinquent ≈
   credibility clean point, §6.6) and E16 (early-life straight roller 3.4% under the 12-month
