@@ -29,6 +29,8 @@ def _band(letter: str, n: int) -> str:
 def shape(dpd: str, max_runs: int = 8) -> str:
     """Run-length encoded journey with banded run lengths, last `max_runs` runs."""
     _, _, c = encode(dpd)
+    if len(c) == 0:
+        return "(one month only)"
     runs, prev, n = [], None, 0
     for code in c:
         if code == prev:

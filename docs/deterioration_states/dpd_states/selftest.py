@@ -45,7 +45,40 @@ CASES = [
     ("0000000000000023455555", "stabilized", "holding at 5"),
     ("00000000234443345433456554", "stabilized", "oscillating payer (example 1)"),
     ("00000000234443345433456654", "stabilized", "oscillating payer that just paid down 6-5-4 (example 2)"),
+    ("0 0 2 3 4 4 4 4 4 4", "stabilized", "entered like EPD but pays the monthly due since: not EPD"),
+    ("0 0 2 3 4 4 5 6", "straight_roller_early_life", "entered like EPD, paid once at 4: EPD needs no payment"),
+    ("4 5 6 7", "history_starts_delinquent", "string starts delinquent (restructured / missing history)"),
+    ("0000000000000000224", "straight_roller_seasoned", "+2 jump after a hold at 2: repaired to 2 3 4"),
+    ("00000000000000002244", "straight_roller_seasoned", "same account a month later: fixed state must not change"),
+    ("000034", "straight_roller_early_life", "jump from clean to 3: no clean month is borrowed"),
+    ("0 2 3 4" + " 0" * 30 + " 2 3 4", "straight_roller_seasoned", "cured 30 months earlier: outside 24-month window"),
+    ("0 2 3 4" + " 0" * 20 + " 2 3 4 5", "repeat_delinquent", "cured 20 months earlier: repeat delinquent"),
+    ("0000000000000000 2 3 4 4 0 4 5", "stabilized", "single 0 inside a spell at 4 is a glitch, not a cure"),
+    ("0000 3 0000000000000 2 3 4", "straight_roller_seasoned", "single spike 0 3 0 is a glitch, not an earlier spell"),
 ]
+
+
+def check_file_mode() -> bool:
+    """File mode end to end on a temporary CSV (no openpyxl needed): reading the text column,
+    filtering to today's spine, survivor-only checks, results written outside the repo."""
+    import contextlib
+    import io
+    import tempfile
+    from . import config, file_mode
+    df = synth.generate(1500, seed=21)[["dpd_string"]].rename(columns={"dpd_string": config.COL_DPD})
+    df.loc[df.index[:100], config.COL_DPD] = "3" + df[config.COL_DPD][:100].str[1:]   # outside the spine
+    df["derived_column"] = 1
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "mock.csv"
+        df.to_csv(src, index=False)
+        with contextlib.redirect_stdout(io.StringIO()):
+            payload = file_mode.main(str(src), out_dir=tmp)
+    good = (payload["counts"]["current_spine"] == 1400
+            and payload["results"]["states_today"][RECOMMENDED]["mece"]
+            and isinstance(payload["results"].get("survivor_checks"), dict))
+    print(f"\nFile mode on a temporary CSV: {'OK' if good else 'FAIL'} "
+          f"(spine {payload['counts']['current_spine']} of {payload['counts']['rows']} rows)")
+    return good
 
 
 def check_cases() -> list[str]:
@@ -56,7 +89,7 @@ def check_cases() -> list[str]:
     for (c, want, why), g in zip(CASES, got):
         ok = g == want
         bad += not ok
-        lines.append(f"{'OK  ' if ok else 'FAIL'} {c:<30} -> {g:<27} {'' if ok else '(expected ' + want + ') '}{why}")
+        lines.append(f"{'OK  ' if ok else 'FAIL'} {c[:36]:<37} -> {g:<27} {'' if ok else '(expected ' + want + ') '}{why}")
     return lines, bad
 
 
@@ -104,13 +137,14 @@ def main(n: int = 20_000) -> int:
 
     print(md(checks[["id", "status", "observed", "expected", "check"]], index=False))
     case_lines, bad = check_cases()
+    file_ok = check_file_mode()
     print("\nEdge cases (oldest -> newest, option B):\n" + "\n".join(case_lines))
     (OUT / f"selftest_report_{stamp}.md").write_text(
         (OUT / f"selftest_report_{stamp}.md").read_text().replace(
             "## 0. Expectation checks", "## 0a. Edge cases (oldest → newest, option B)\n\n```\n"
             + "\n".join(case_lines) + "\n```\n\n## 0. Expectation checks"))
     ok = ((checks.status != "FAIL").all() and checks.set_index("id").loc["E01", "status"] == "PASS"
-          and bad == 0)
+          and bad == 0 and file_ok)
     print("\nSELFTEST", "PASSED" if ok else "FAILED", f"-> {OUT}")
     return 0 if ok else 1
 

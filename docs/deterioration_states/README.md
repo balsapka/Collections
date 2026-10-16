@@ -1,71 +1,85 @@
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
 
 One state per account, from the DPD bucket history alone, assigned by a short decision
-tree (MECE, no residual bucket). Three options: **A** (4 states), **B** (6, recommended),
-**C** (7). States use common card-risk names — early payment default (formerly
-"bust-out"), stabilized, repeat delinquent, seasoned / early-life straight roller, slow
-roller (partial payer); code names and display names are kept separate. The design, thresholds, evidence and everything that was tried and dropped
-are in **[METHODOLOGY.md](METHODOLOGY.md)**. Copy-paste prompts for running this at the
-workplace with Sonnet are in **[PROMPTS.md](PROMPTS.md)**.
+tree (MECE, no residual behaviour bucket). Three options: **A** (4 states), **B** (6,
+recommended), **C** (7). States use common card-risk names — early payment default
+(formerly "bust-out"), stabilized, repeat delinquent, seasoned / early-life straight
+roller, slow roller (partial payer); code names and display names are kept separate.
+
+- Design, thresholds, evidence and everything tried and dropped: **[METHODOLOGY.md](METHODOLOGY.md)**
+- Independent review — 24 findings and what was done: **[REVIEW.md](REVIEW.md)**
+- Copy-paste prompts for running this at the workplace with Sonnet: **[PROMPTS.md](PROMPTS.md)**
+
+## Quick start (from the repo root)
+
+```bash
+python docs/deterioration_states/run.py selftest    # must end "SELFTEST PASSED" (~1 min)
+python docs/deterioration_states/run.py validate    # REAL data: INPUT_FILE / COL_DPD from config.py
+```
+
+`validate` reads `data/input/dpd_synthetic_data.xlsx`, column `dpd_history_str` (leftmost =
+current month), keeps today's spine (current bucket 4–7) and writes
+`results/dpd_states_file_<file>_<date>.json` + `.md` (aggregates only). Another file:
+`run.py validate path/to/file.xlsx`. Needs pandas, numpy, scikit-learn, and openpyxl for
+`.xlsx`. A snapshot file has no outcomes, so roll-rate / exit checks are SKIPPED; the Spark
+backtest (PROMPTS P6) adds them.
 
 ## Layout
 
 ```
 deterioration_states/
 ├── README.md                 this file
-├── run.py                    run the tools from ANY folder: selftest | synthetic | bundle
+├── run.py                    run the tools from ANY folder: validate | selftest | synthetic | bundle
 ├── METHODOLOGY.md            design, thresholds, dropped states + reasons, expectations
-├── PROMPTS.md                prompts for Sonnet 5 at the workplace (P0–P6)
+├── REVIEW.md                 independent review: findings and dispositions
+├── PROMPTS.md                prompts for Sonnet 5 at the workplace (P0–P7)
 ├── BUNDLE.md                 ALL source files in one .md + extractor (for .py-blocked viewers)
 ├── dpd_states/               the package (pandas + numpy + scikit-learn; no Spark)
-│   ├── config.py             ← the ONLY file to edit: dataset + column names (<<FILL-IN>>)
-│   ├── features.py           string → encoding → journey features (clock-safe)
-│   ├── states.py             the state tree, options A/B/C, thresholds, DISPLAY_NAMES / REMARKS
-│   ├── analysis.py           real-data analysis: states, backtest, overlap, sweeps, clusters
-│   ├── expectations.py       E01–E25: expected values, PASS/WARN/FAIL, "if not met" actions
+│   ├── config.py             ← the ONLY file to edit: input file / dataset + column names
+│   ├── features.py           string → cleaning → encoding → journey features
+│   ├── states.py             the state tree, options A/B/C, [business] thresholds, DISPLAY_NAMES / REMARKS
+│   ├── analysis.py           real-data analysis: states, backtest / survivor checks, overlap, sweeps
+│   ├── expectations.py       E01–E28: expected values with anchors, PASS/WARN/FAIL, "if not met"
+│   ├── file_mode.py          run on an xlsx / csv / parquet file (no Spark)
 │   ├── discover.py           shapes, n-gram motifs, clustering helpers
 │   ├── synth.py              calibrated synthetic generator (method validation only)
 │   ├── run_synthetic.py      method validation report  → validation/
-│   ├── selftest.py           real-data code path on synthetic data + 14 edge-case regressions → validation/
+│   ├── selftest.py           real-data code path on synthetic data + 24 edge-case regressions → validation/
 │   └── bundle.py             rebuilds BUNDLE.md
 ├── snippets/
-│   └── dpd_states_validate.py   PROD entry point: main(catalog, model_id=None, ...)
+│   └── dpd_states_validate.py   Spark / Kedro entry point: main(catalog, model_id=None, ...)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
 ```
 
 ## Can't open .py files?
 
-`BUNDLE.md` holds every source file in one markdown file plus a 40-line extractor that
+`BUNDLE.md` holds every source file in one markdown file plus a short extractor that
 recreates the folder and verifies each file's SHA-256 — see the instructions at its top.
 Regenerate it after any change: `python docs/deterioration_states/run.py bundle`.
 
 ## Assign states in your own code
 
 ```python
+from dpd_states.analysis import clean_strings
 from dpd_states.features import build_features
 from dpd_states.states import assign_states, OPTIONS, DISPLAY_NAMES
 
-f = build_features(df)                                   # df has a 'dpd_string' column
-f["state"] = assign_states(f, **OPTIONS["B_balanced_6"])  # or A_minimal_4 / C_detailed_7
-f["state_label"] = f.state.map(DISPLAY_NAMES)             # business label for reports
+s, ok = clean_strings(df.dpd_history_str, char_map={}, strip_chars=" ")
+spine = df.assign(dpd_string=s)[ok & s.str[0].isin(list("4567"))]   # today's spine only
+f = build_features(spine)
+f["state"] = assign_states(f, **OPTIONS["B_balanced_6"])            # or A_minimal_4 / C_detailed_7
+f["state_label"] = f.state.map(DISPLAY_NAMES)                       # business label for reports
 ```
 
 `dpd_string` must be digits only, **leftmost = current month**, 0 and 1 both mean normal.
-Only accounts whose current bucket is 4–7 belong to the spine.
+`build_features` raises a clear error for an account not in a delinquent spell.
 
-## Run locally (no data needed)
+## Spark mode (later, for outcomes and production)
 
-```bash
-python docs/deterioration_states/run.py selftest     # real-data path on synthetic data: expect "SELFTEST PASSED"
-python docs/deterioration_states/run.py synthetic    # method validation report (~1 min)
-```
-
-## Run at the workplace (PROD, Kedro notebook)
-
-1. Fill in `dpd_states/config.py` (dataset, key, DPD-string column, optional axis columns)
-   and the `globals_dev` accessor in `snippets/dpd_states_validate.py` → **PROMPTS.md P1**.
-2. Dry run — schema, counts, example strings:
+1. Fill in `dpd_states/config.py` (dataset, key, optional as-of / snapshot columns) and the
+   `globals_dev` accessor in `snippets/dpd_states_validate.py` → **PROMPTS.md P6**.
+2. Dry run in a Kedro notebook — schema, counts, orientation, all as aggregates:
    ```python
    import sys, pathlib
    _c = pathlib.Path.cwd()
@@ -75,26 +89,26 @@ python docs/deterioration_states/run.py synthetic    # method validation report 
    main(catalog, check_only=True)
    ```
 3. Full run: `result = main(catalog)` — writes
-   `results/dpd_states_validation_<model_id>_<date>.json` + `.md` and prints the
-   expectation checks between `=== DPD_STATES OUTPUT START/END ===`. Interpret with
-   **PROMPTS.md P2**.
+   `results/dpd_states_validation_<model_id>_<date>.json` + `.md` and prints the checks
+   between `=== DPD_STATES OUTPUT START/END ===`. Config edits apply on the next call (no
+   kernel restart; a config fingerprint is printed).
 
 ## Rules this code follows
 
 - **Read-only.** Nothing is written to the warehouse.
-- **Aggregates only** in the results JSON — no account keys, no row-level data. The
-  markdown report shows a few example DPD strings without keys.
-- **`model_id` comes from the caller or `globals_dev`**, never hardcoded, and is in the
-  output filename, the payload and the first printed line.
-- **Scope first:** the configured filter and latest snapshot are applied before anything
-  else; only two samples (≤ `sample_n` rows each, default 100k) of the string plus the
-  configured optional columns are collected.
+- **Aggregates only** in results — no account keys, no raw DPD strings (examples are banded
+  journey shapes shared by ≥ 10 accounts).
+- **`model_id` comes from the caller or `globals_dev`** (Spark mode), never hardcoded, and is
+  in the output filename, the payload and the first printed line.
+- **Scope first**, then sample (≤ `sample_n` rows, default 100k).
 - **Never guess a dataset or column name** — every unknown is a `<<FILL-IN>>`.
+- **[business] parameters** in `states.py` change only with the business owner.
 
 ## Tested / not tested
 
-- `dpd_states` (features, states, analysis, expectations): tested end to end on synthetic
-  data (`selftest` passes; Python 3.13, pandas 3.0, scikit-learn 1.9).
-- `snippets/dpd_states_validate.py`: the Spark part (load, filter, count, sample,
-  `toPandas`) is **not executed here** (no Spark available) — syntax-checked only. The
-  `check_only=True` dry run is there to catch problems before the full run.
+- `dpd_states` (features, states, analysis, expectations, file mode): tested end to end on
+  synthetic data and a mock Excel file (Python 3.13, pandas 3.0, scikit-learn 1.9); the
+  independent review also ran it on Python 3.10 / pandas 1.5.3.
+- `snippets/dpd_states_validate.py`: the Spark part is **not executed here** (no Spark) —
+  syntax-checked and reviewed by reading. The `check_only=True` dry run catches problems
+  before the full run.

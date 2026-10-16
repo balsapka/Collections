@@ -29,7 +29,7 @@ result = main(catalog)           # full validation -> results/ (aggregates only)
 
 ---
 
-Generated 2026-10-16 by `dpd_states/bundle.py`. 16 files, 2,954 lines.
+Generated 2026-10-16 by `dpd_states/bundle.py`. 18 files, 3,668 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -130,6 +130,7 @@ docs/deterioration_states/
 ├── README.md
 ├── run.py
 ├── METHODOLOGY.md
+├── REVIEW.md
 ├── PROMPTS.md
 ├── dpd_states/__init__.py
 ├── dpd_states/config.py
@@ -137,6 +138,7 @@ docs/deterioration_states/
 ├── dpd_states/states.py
 ├── dpd_states/analysis.py
 ├── dpd_states/expectations.py
+├── dpd_states/file_mode.py
 ├── dpd_states/discover.py
 ├── dpd_states/synth.py
 ├── dpd_states/run_synthetic.py
@@ -156,77 +158,91 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `e9997587da056c880d5a9b876167db94c51bfc3a8cbcd3a74acfc264d49df185` · 100 lines · trailing newline: yes
+sha256 `cbb9462729d0755f7fadc40d67763411e193ed3b4900a2f0f83ba9eed3a4db62` · 114 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
 
 One state per account, from the DPD bucket history alone, assigned by a short decision
-tree (MECE, no residual bucket). Three options: **A** (4 states), **B** (6, recommended),
-**C** (7). States use common card-risk names — early payment default (formerly
-"bust-out"), stabilized, repeat delinquent, seasoned / early-life straight roller, slow
-roller (partial payer); code names and display names are kept separate. The design, thresholds, evidence and everything that was tried and dropped
-are in **[METHODOLOGY.md](METHODOLOGY.md)**. Copy-paste prompts for running this at the
-workplace with Sonnet are in **[PROMPTS.md](PROMPTS.md)**.
+tree (MECE, no residual behaviour bucket). Three options: **A** (4 states), **B** (6,
+recommended), **C** (7). States use common card-risk names — early payment default
+(formerly "bust-out"), stabilized, repeat delinquent, seasoned / early-life straight
+roller, slow roller (partial payer); code names and display names are kept separate.
+
+- Design, thresholds, evidence and everything tried and dropped: **[METHODOLOGY.md](METHODOLOGY.md)**
+- Independent review — 24 findings and what was done: **[REVIEW.md](REVIEW.md)**
+- Copy-paste prompts for running this at the workplace with Sonnet: **[PROMPTS.md](PROMPTS.md)**
+
+## Quick start (from the repo root)
+
+```bash
+python docs/deterioration_states/run.py selftest    # must end "SELFTEST PASSED" (~1 min)
+python docs/deterioration_states/run.py validate    # REAL data: INPUT_FILE / COL_DPD from config.py
+```
+
+`validate` reads `data/input/dpd_synthetic_data.xlsx`, column `dpd_history_str` (leftmost =
+current month), keeps today's spine (current bucket 4–7) and writes
+`results/dpd_states_file_<file>_<date>.json` + `.md` (aggregates only). Another file:
+`run.py validate path/to/file.xlsx`. Needs pandas, numpy, scikit-learn, and openpyxl for
+`.xlsx`. A snapshot file has no outcomes, so roll-rate / exit checks are SKIPPED; the Spark
+backtest (PROMPTS P6) adds them.
 
 ## Layout
 
 ```
 deterioration_states/
 ├── README.md                 this file
-├── run.py                    run the tools from ANY folder: selftest | synthetic | bundle
+├── run.py                    run the tools from ANY folder: validate | selftest | synthetic | bundle
 ├── METHODOLOGY.md            design, thresholds, dropped states + reasons, expectations
-├── PROMPTS.md                prompts for Sonnet 5 at the workplace (P0–P6)
+├── REVIEW.md                 independent review: findings and dispositions
+├── PROMPTS.md                prompts for Sonnet 5 at the workplace (P0–P7)
 ├── BUNDLE.md                 ALL source files in one .md + extractor (for .py-blocked viewers)
 ├── dpd_states/               the package (pandas + numpy + scikit-learn; no Spark)
-│   ├── config.py             ← the ONLY file to edit: dataset + column names (<<FILL-IN>>)
-│   ├── features.py           string → encoding → journey features (clock-safe)
-│   ├── states.py             the state tree, options A/B/C, thresholds, DISPLAY_NAMES / REMARKS
-│   ├── analysis.py           real-data analysis: states, backtest, overlap, sweeps, clusters
-│   ├── expectations.py       E01–E25: expected values, PASS/WARN/FAIL, "if not met" actions
+│   ├── config.py             ← the ONLY file to edit: input file / dataset + column names
+│   ├── features.py           string → cleaning → encoding → journey features
+│   ├── states.py             the state tree, options A/B/C, [business] thresholds, DISPLAY_NAMES / REMARKS
+│   ├── analysis.py           real-data analysis: states, backtest / survivor checks, overlap, sweeps
+│   ├── expectations.py       E01–E28: expected values with anchors, PASS/WARN/FAIL, "if not met"
+│   ├── file_mode.py          run on an xlsx / csv / parquet file (no Spark)
 │   ├── discover.py           shapes, n-gram motifs, clustering helpers
 │   ├── synth.py              calibrated synthetic generator (method validation only)
 │   ├── run_synthetic.py      method validation report  → validation/
-│   ├── selftest.py           real-data code path on synthetic data + 14 edge-case regressions → validation/
+│   ├── selftest.py           real-data code path on synthetic data + 24 edge-case regressions → validation/
 │   └── bundle.py             rebuilds BUNDLE.md
 ├── snippets/
-│   └── dpd_states_validate.py   PROD entry point: main(catalog, model_id=None, ...)
+│   └── dpd_states_validate.py   Spark / Kedro entry point: main(catalog, model_id=None, ...)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
 ```
 
 ## Can't open .py files?
 
-`BUNDLE.md` holds every source file in one markdown file plus a 40-line extractor that
+`BUNDLE.md` holds every source file in one markdown file plus a short extractor that
 recreates the folder and verifies each file's SHA-256 — see the instructions at its top.
 Regenerate it after any change: `python docs/deterioration_states/run.py bundle`.
 
 ## Assign states in your own code
 
 ```python
+from dpd_states.analysis import clean_strings
 from dpd_states.features import build_features
 from dpd_states.states import assign_states, OPTIONS, DISPLAY_NAMES
 
-f = build_features(df)                                   # df has a 'dpd_string' column
-f["state"] = assign_states(f, **OPTIONS["B_balanced_6"])  # or A_minimal_4 / C_detailed_7
-f["state_label"] = f.state.map(DISPLAY_NAMES)             # business label for reports
+s, ok = clean_strings(df.dpd_history_str, char_map={}, strip_chars=" ")
+spine = df.assign(dpd_string=s)[ok & s.str[0].isin(list("4567"))]   # today's spine only
+f = build_features(spine)
+f["state"] = assign_states(f, **OPTIONS["B_balanced_6"])            # or A_minimal_4 / C_detailed_7
+f["state_label"] = f.state.map(DISPLAY_NAMES)                       # business label for reports
 ```
 
 `dpd_string` must be digits only, **leftmost = current month**, 0 and 1 both mean normal.
-Only accounts whose current bucket is 4–7 belong to the spine.
+`build_features` raises a clear error for an account not in a delinquent spell.
 
-## Run locally (no data needed)
+## Spark mode (later, for outcomes and production)
 
-```bash
-python docs/deterioration_states/run.py selftest     # real-data path on synthetic data: expect "SELFTEST PASSED"
-python docs/deterioration_states/run.py synthetic    # method validation report (~1 min)
-```
-
-## Run at the workplace (PROD, Kedro notebook)
-
-1. Fill in `dpd_states/config.py` (dataset, key, DPD-string column, optional axis columns)
-   and the `globals_dev` accessor in `snippets/dpd_states_validate.py` → **PROMPTS.md P1**.
-2. Dry run — schema, counts, example strings:
+1. Fill in `dpd_states/config.py` (dataset, key, optional as-of / snapshot columns) and the
+   `globals_dev` accessor in `snippets/dpd_states_validate.py` → **PROMPTS.md P6**.
+2. Dry run in a Kedro notebook — schema, counts, orientation, all as aggregates:
    ```python
    import sys, pathlib
    _c = pathlib.Path.cwd()
@@ -236,41 +252,43 @@ python docs/deterioration_states/run.py synthetic    # method validation report 
    main(catalog, check_only=True)
    ```
 3. Full run: `result = main(catalog)` — writes
-   `results/dpd_states_validation_<model_id>_<date>.json` + `.md` and prints the
-   expectation checks between `=== DPD_STATES OUTPUT START/END ===`. Interpret with
-   **PROMPTS.md P2**.
+   `results/dpd_states_validation_<model_id>_<date>.json` + `.md` and prints the checks
+   between `=== DPD_STATES OUTPUT START/END ===`. Config edits apply on the next call (no
+   kernel restart; a config fingerprint is printed).
 
 ## Rules this code follows
 
 - **Read-only.** Nothing is written to the warehouse.
-- **Aggregates only** in the results JSON — no account keys, no row-level data. The
-  markdown report shows a few example DPD strings without keys.
-- **`model_id` comes from the caller or `globals_dev`**, never hardcoded, and is in the
-  output filename, the payload and the first printed line.
-- **Scope first:** the configured filter and latest snapshot are applied before anything
-  else; only two samples (≤ `sample_n` rows each, default 100k) of the string plus the
-  configured optional columns are collected.
+- **Aggregates only** in results — no account keys, no raw DPD strings (examples are banded
+  journey shapes shared by ≥ 10 accounts).
+- **`model_id` comes from the caller or `globals_dev`** (Spark mode), never hardcoded, and is
+  in the output filename, the payload and the first printed line.
+- **Scope first**, then sample (≤ `sample_n` rows, default 100k).
 - **Never guess a dataset or column name** — every unknown is a `<<FILL-IN>>`.
+- **[business] parameters** in `states.py` change only with the business owner.
 
 ## Tested / not tested
 
-- `dpd_states` (features, states, analysis, expectations): tested end to end on synthetic
-  data (`selftest` passes; Python 3.13, pandas 3.0, scikit-learn 1.9).
-- `snippets/dpd_states_validate.py`: the Spark part (load, filter, count, sample,
-  `toPandas`) is **not executed here** (no Spark available) — syntax-checked only. The
-  `check_only=True` dry run is there to catch problems before the full run.
+- `dpd_states` (features, states, analysis, expectations, file mode): tested end to end on
+  synthetic data and a mock Excel file (Python 3.13, pandas 3.0, scikit-learn 1.9); the
+  independent review also ran it on Python 3.10 / pandas 1.5.3.
+- `snippets/dpd_states_validate.py`: the Spark part is **not executed here** (no Spark) —
+  syntax-checked and reviewed by reading. The `check_only=True` dry run catches problems
+  before the full run.
 `````
 
 ### FILE: `run.py`
-sha256 `e250047f43c7f793bfef0b45712c78560f36cc32b7d9b703f5ed3bf9625144c2` · 37 lines · trailing newline: yes
+sha256 `dd2718c37073920057e7edff88d2efcced698e35a9c81b5869ba69c1e63cbf87` · 46 lines · trailing newline: yes
 
 `````python
 """Run the package's tools from ANY folder (repo root, a notebook folder, anywhere):
 
-    python docs/deterioration_states/run.py selftest [n_accounts]    # real-data path on synthetic data
-    python docs/deterioration_states/run.py synthetic [n_accounts]   # method validation report
-    python docs/deterioration_states/run.py bundle                   # rebuild BUNDLE.md
+    python docs/deterioration_states/run.py validate [file] [sample_n]   # REAL data from a file
+    python docs/deterioration_states/run.py selftest [n_accounts]        # real-data path on synthetic data
+    python docs/deterioration_states/run.py synthetic [n_accounts]       # method validation report
+    python docs/deterioration_states/run.py bundle                       # rebuild BUNDLE.md
 
+`validate` without a file reads INPUT_FILE / COL_DPD from dpd_states/config.py.
 Equivalent to `python -m dpd_states.<tool>` run from inside docs/deterioration_states/.
 """
 import pathlib
@@ -278,11 +296,18 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))   # makes dpd_states importable
 
-TOOLS = ("selftest", "synthetic", "bundle")
+TOOLS = ("validate", "selftest", "synthetic", "bundle")
 
 
 def main() -> int:
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "validate":
+        from dpd_states.file_mode import main as run
+        args = sys.argv[2:]
+        path = next((a for a in args if not a.isdigit()), None)
+        n = next((int(a) for a in args if a.isdigit()), 100_000)
+        run(path, sample_n=n)
+        return 0
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 20_000
     if cmd == "selftest":
         from dpd_states.selftest import main as run
@@ -305,7 +330,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `METHODOLOGY.md`
-sha256 `5a19a9a217cf72a2567571a45362a726ad918ca15fe3da0bf8fe5d7f3ca43db7` · 412 lines · trailing newline: yes
+sha256 `259c28f3d2c6d5aeb01ef26740306394d63448b8e0dbbbe164ebe7b7855c0609` · 462 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — methodology
@@ -315,10 +340,11 @@ read from its DPD bucket history only. One state per account, assigned by a shor
 decision tree. MECE by construction, simple enough to explain to the risk team in one
 slide, and designed to stay out of the way of the other persona axes.
 
-> **Status.** Designed and validated on calibrated **synthetic** data. Not yet run on the
-> bank's book. Every number below marked *(synthetic)* is from simulation and is a
-> *method check*, not a finding about the portfolio. The real-data run is
-> `snippets/dpd_states_validate.py`; its expectations are in §8.
+> **Status.** Designed and validated on calibrated **synthetic** data, then independently
+> reviewed (24 findings — see [REVIEW.md](REVIEW.md) for each finding and what was done).
+> Not yet run on the bank's book. Every number marked *(synthetic)* is a *method check*,
+> not a finding about the portfolio. The real-data run is `run.py validate` on a file
+> (now) or `snippets/dpd_states_validate.py` on Spark (production); expectations in §8.
 
 ---
 
@@ -333,7 +359,7 @@ slide, and designed to stay out of the way of the other persona axes.
 
 Design rules agreed with the business owner:
 
-1. **MECE** — every account gets exactly one state; no "other" bucket.
+1. **MECE** — every account gets exactly one state; no "other" bucket for behaviour.
 2. **Simplicity beats precision** — a rule a collector can repeat beats a better-fitting
    one nobody can explain. Thresholds are round numbers.
 3. **Orthogonal where possible** — the states must not rebuild the credibility or ability
@@ -345,9 +371,15 @@ Design rules agreed with the business owner:
 ## 2. Population and data conventions
 
 - **Spine:** credit-card accounts whose **current** bucket is 4, 5, 6 or 7. Bucket 8+ is
-  a separate category. Full history is available for every account.
+  a separate category. The input file for sign-off is the CC 60–180 DPD segment
+  (Aug 2026); accounts at bucket 3 in it are outside the spine and filtered out.
 - **The string:** one digit per month, **leftmost = current month**
-  (`54320002000` → today 5, last month 4, …). Configurable if a source is reversed.
+  (`54320002000` → today 5, last month 4, …). The **oldest (rightmost) digit is the first
+  billed month**, so it is almost always 0 or 1. Exceptions: rare missing history, 180+
+  accounts without history (start at 9, outside the spine), and restructured cards/loans
+  re-opened as a new account at their previous bucket.
+- **Read it as text.** A numeric column drops digits (Excel keeps 15 significant digits;
+  leading zeros vanish). The file reader refuses number-like values.
 - **0 ≡ 1.** Bucket 1 (a few days late) is treated as normal.
 - **Monthly movement `d` = bucket this month − bucket last month**, which reads as a payment:
 
@@ -362,30 +394,37 @@ Design rules agreed with the business owner:
   account is in today.
 - **Blip:** an earlier spell of 1–2 months that never passed bucket 2 (`0 0 2 0 0`).
   Blips do not count as earlier spells and do not end the clean history.
-- **Billing-cycle jumps:** a +2 move next to a hold (`3 3 5` or `3 5 5`) is the reporting
-  artefact of a straight roll and is repaired to `3 4 5`. Any other +2 is read as a roll.
+- **Data artefacts are cleaned before anything else, and counted:**
+  - *Impossible one-month glitches.* A single 0/1 month between two months at 3+
+    (`4 0 4`: a cure cannot jump straight back to 4) is read as a hold; a single month at
+    3+ between two clean months (`0 3 0`: an account cannot jump from 0 to 3) is read as
+    clean. Neither creates an earlier spell.
+  - *Billing-cycle +2 jumps.* A true `3 4 5` reported as `3 3 5` or `3 5 5` is repaired.
+    The hold *before* the jump is preferred as the artefact (it is already observed); the
+    hold after is used only if that does not move a month observed at 4 back below 4; a
+    hold at 0/1 is never an artefact. The repair is therefore causal: a state assigned
+    today does not change when next month's digit arrives. Any other +2 is read as a roll.
 
 ---
 
 ## 3. Features used by the states
 
-Only features that **do not drift with time since reaching 4** are used to assign states.
-For most of the spine the current bucket is a clock (one bucket per month), so any
-count over a fixed window, or any rate over the whole spell, changes with the bucket
-rather than with behaviour.
-
 | Feature | Definition | Fixed once past 4? |
 |---|---|---|
-| `months_before_spell` | months of history before the current spell started | yes |
-| `n_blips` | earlier excursions of 1–2 months that never passed bucket 2 (EPD allows one) | yes |
+| `left_censored` | the oldest month in the string is already at bucket 2+ | yes |
+| `months_before_spell` | months of history before the current spell started (blip months included) | yes |
+| `n_blips` | earlier 1–2 month excursions that never passed bucket 2 (EPD allows one) | yes |
 | `n_prior_episodes` | earlier real (non-blip) spells (EPD requires none) | yes |
-| `max_prior_bucket` | deepest bucket reached in any earlier (non-blip) spell; 0 if none (repeat delinquent) | yes |
+| `gap_prior_peak3` | clean months between the end of the most recent earlier spell that reached bucket 3 and the start of this one (repeat delinquent: ≤ 24) | yes |
+| `spell_pay_events` | months in the current spell with any payment (hold or move back); EPD requires 0 | **no** — EPD ends when they pay, by design |
 | `runup_len` | months from the last clean month to the first month at bucket 4 (3 = straight 2→3→4) | yes |
 | `runup_pays` | months on the way to 4 in which 2+ months were paid (moved back) | yes |
-| `last6_in_band` | of the last 6 months (incl. today), how many were within today's bucket ±1 | no — current behaviour, by design |
+| `last6_in_band` | of the last 6 months (incl. today), how many were within today's bucket ±1 | **no** — current behaviour, by design |
+| `months_since_4`, `chg_6m` | months since first reaching 4 in this spell; today's bucket minus the bucket 6 months ago (long-run clause) | **no** — current behaviour, by design |
 
-Other features (`runup_holds`, `post4_paid_rate`, `max_hold_run`, …) are
-computed for diagnostics and discovery only.
+All other features (`runup_holds`, `post4_paid_rate`, `max_hold_run`, …) are diagnostics
+only. The current-behaviour inputs are confined to the stabilized question and the EPD
+"never paid" condition, so every other state is fixed once the account is past 4.
 
 ---
 
@@ -394,15 +433,18 @@ computed for diagnostics and discovery only.
 Questions are asked **in order**; the first "yes" assigns the state.
 
 ```
-Q1  Early payment default?  <= 3 months of history before this spell
-                            (at most one blip inside it — a payoff from 2 — and no
-                            earlier real spell) AND run-up to 4 took <= 3 months
-                                                           -> early_payment_default
+Q0  History starts delinquent?  oldest month already at bucket 2+ (restructured re-open,
+                                migrated or missing history)  -> history_starts_delinquent
+Q1  Early payment default?  <= 3 months of history before this spell (at most one blip,
+                            no earlier real spell) AND never paid since crossing bucket 2
+                            (every month of the spell a roll — still falling)
+                                                               -> early_payment_default
 Q2  Stabilized?             >= 5 of the last 6 months within today's bucket ±1
-                            OR (>= 6 months in buckets 4+ AND at most 1 bucket
-                                higher than 6 months ago)  -> stabilized
-Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3 and cured
-                                                           -> repeat_delinquent
+                            OR (>= 6 months since first reaching 4 AND at most 1 bucket
+                                higher than 6 months ago)      -> stabilized
+Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and ended
+                            <= 24 months before this spell started
+                                                               -> repeat_delinquent
 Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
       yes -> straight_roller  [B, C: >= 12 months of history before the spell
                                -> straight_roller_seasoned, else straight_roller_early_life]
@@ -410,43 +452,52 @@ Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 m
                                -> slow_roller_erratic, else slow_roller_intermittent]
 ```
 
-(Q3 "paying since bucket 4" was tested and rejected — §6.4.)
+(Q3 "paying since bucket 4" was tested and rejected — §6.4.) Q0 is a data-quality guard,
+not a behaviour state: it stops truncated or restructured histories from being forced
+into EPD. It should be rare (E04); restructured accounts are a deferred decision.
 
 ### Three options
 
 | Option | States | Use when |
 |---|---|---|
 | **A — minimal (4)** | EPD, stabilized, straight roller, slow roller | Strict orthogonality: prior-spell history is left entirely to credibility |
-| **B — balanced (6), recommended** | EPD, stabilized, repeat delinquent, seasoned straight roller, early-life straight roller, slow roller | Default. Matches the natural groups in the data (§6.1) and the 5–6 target |
+| **B — balanced (6), recommended** | EPD, stabilized, repeat delinquent, seasoned straight roller, early-life straight roller, slow roller | Default; the 5–6 target |
 | **C — detailed (7)** | B with slow roller split into intermittent payer / erratic payer | The risk team has a different action for each and both are ≥ 4% |
+
+Early-life straight roller stays a state in B and C, but if real data puts it under 5%
+(E16) it is merged into straight roller and kept as an early-life flag (agreed).
 
 ### What each state means and the action it points to
 
 | State (display name · `code`) | Reads as | Action flavour | Share *(synthetic)* |
 |---|---|---|---|
-| **Early payment default (EPD)** · `early_payment_default` | At most 3 months of history (one blip allowed), rolled straight in, never really paid | Early-risk / first-party-fraud review, early legal; no restructuring | 6% (bank: 6%) |
-| **Stabilized** · `stabilized` | Paying about one month's due each month for 5 of 6 months — or, after 6+ months in buckets 4+, still within one bucket of where it was 6 months ago (pays what is due on average, unevenly) | **Offer restructuring to break the hardship** | 8% (bank's rule alone: 7%; bank: 6%) |
-| **Repeat delinquent (re-default)** · `repeat_delinquent` | Has been here before and cured from bucket 3 | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 16% |
-| **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book (≥ 12 months clean), then rolled every month without paying | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 52% |
-| **Early-life straight roller** · `straight_roller_early_life` | 4–11 months on book, then rolled every month without paying | Same triage; also an underwriting signal for acquisition | 3% — below the 5% floor in synthetic data; the real share decides (E16) |
-| **Slow roller (partial payer)** · `slow_roller` | Paid something on the way down but kept rolling | Over-indebted: longer-tenor restructure or settlement | 16% |
-| ↳ **Intermittent payer** *(C)* · `slow_roller_intermittent` | Paid one month here and there, never caught up | Chronic insufficiency: restructure to what they actually pay | 10% |
-| ↳ **Erratic payer** *(C)* · `slow_roller_erratic` | Caught up 2+ months at once, then rolled again | Lumpy / irregular income: plan aligned to inflow timing | 6% |
+| **Early payment default (EPD)** · `early_payment_default` | At most 3 months of history (one blip allowed), rolled straight in and has **never paid since crossing bucket 2** — still falling, so short-tenure by nature | Early-risk / first-party-fraud review, early legal; no restructuring | 4.3% (bank's broader rule: 6%) |
+| **Stabilized** · `stabilized` | Paying about one month's due each month for 5 of 6 months — or, 6+ months after first reaching 4, still within one bucket of where it was 6 months ago (pays what is due on average, unevenly) | **Offer restructuring to break the hardship** | 7.8% (bank's rule alone: 6.9%; bank: 6%) |
+| **Repeat delinquent (re-default)** · `repeat_delinquent` | Cured a spell that reached bucket 3 and fell back in within 24 months | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 14.8% |
+| **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book, then rolled straight to bucket 4 with no payment on the way down (some have paid since) | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 53.4% |
+| **Early-life straight roller** · `straight_roller_early_life` | 4–11 months on book, then rolled straight to bucket 4 | Same triage; also an underwriting signal for acquisition | 4.7% — under the 5% floor in synthetic data; the real share decides (E16) |
+| **Slow roller (partial payer)** · `slow_roller` | Paid something on the way down to bucket 4 but kept rolling | Over-indebted: longer-tenor restructure or settlement | 15.1% |
+| ↳ **Intermittent payer** *(C)* · `slow_roller_intermittent` | Paid one month here and there on the way down, never caught up | Chronic insufficiency: restructure to what they actually pay | 9.3% |
+| ↳ **Erratic payer** *(C)* · `slow_roller_erratic` | Caught up 2+ months at once on the way down, then rolled again | Lumpy / irregular income: plan aligned to inflow timing | 5.7% |
+| **Not classified — history starts delinquent** · `history_starts_delinquent` | Data quality: the string starts already delinquent | Fix the data / treat restructured accounts separately (deferred) | 0% *(synthetic has none)*; expect < 1% |
 
 In option A the two straight-roller states are one: **Straight roller** · `straight_roller`.
 
-**Stabilized is the only state that moves month to month** — it describes what the
-customer is doing now (*synthetic:* 62% are still stabilized next month). Every other
-state is fixed once the account is past bucket 4 (*synthetic:* 97–100% keep their state
-next month).
+**What moves month to month.** Stabilized is current behaviour (*synthetic:* 60% are still
+stabilized next month). EPD ends the month the account pays (it then becomes stabilized
+or a straight roller). Every other state describes how the account fell in and is fixed
+once it is past bucket 4 — it can only move into stabilized (*synthetic:* 99.7%+ keep their
+state or move into stabilized next month). Read "straight roller" as *rolled straight to
+bucket 4*, not *never paid since*: 32–36% of straight rollers have paid at least one
+month since reaching 4 *(review, synthetic)*.
 
 ### 4.1 Names
 
 The names use established card-risk and collections terms, and follow two rules:
 
 1. **Describe behaviour, not intent.** These labels reach collector screens, audit trails
-   and possibly complaint files. They say what the DPD history shows ("never really
-   paid", "rolled every month", "paid one month at a time"), never why ("fraud",
+   and possibly complaint files. They say what the DPD history shows ("never paid since
+   crossing 2", "rolled straight to 4", "paid one month at a time"), never why ("fraud",
    "won't pay"), which the history cannot prove.
 2. **Code names are stable; display names are free.** Code uses short identifiers
    (`early_payment_default`, `straight_roller_seasoned`, …). `DISPLAY_NAMES` and `REMARKS`
@@ -457,28 +508,34 @@ The names use established card-risk and collections terms, and follow two rules:
 |---|---|---|
 | **Early payment default (EPD)** | Early-risk monitoring (FPD / SPD / TPD = first / second / third payment default; EPD = default early in the life of the account) | **Formerly "bust-out"** — the bank's internal name, kept in remarks. Classic *bust-out* fraud is different: a customer builds a good record and limit, maxes out (often with cash advances) and disappears. Its DPD history is clean-then-straight-roll, so it lands in **seasoned straight roller**; spotting it needs spend / utilisation spikes before delinquency — a fraud overlay, not this axis |
 | **Stabilized** | The bank's own term; roll-rate "stay" behaviour | Industry has no single standard label for "pays enough to stay in the bucket" |
-| **Repeat delinquent / re-default** | Collections recidivism; re-default rates after cure or restructure | |
-| **Straight roller** | Core card-collections term: rolls through every bucket without a payment | |
+| **Repeat delinquent / re-default** | Collections recidivism; re-default rates after cure or restructure, usually within 12–24 months | |
+| **Straight roller** | Core card-collections term: rolls through the buckets without a payment | Here: on the way down to bucket 4 |
 | **Seasoned / early-life** | Seasoning and months on book (MOB); the first 12 months is the standard early-life window | |
 | **Slow roller (partial payer)** | Roll-rate language: the counterpart of the straight roller | **Also called partial payer** — the more common collections term. The rejected Q3 state was renamed `paying_since_4` so "partial payer" means only this state |
 | **Intermittent / erratic payer** | Collections payment-pattern labels | |
 
 ---
 
-## 5. Thresholds and the evidence behind them *(synthetic sweeps)*
+## 5. Thresholds and the evidence behind them
 
-| Threshold (`parameter`) | Value | Why this value | What moving it does |
+Parameters marked **[business]** are agreed business definitions. They change only with
+the business owner — never to make a share or an expectation check come out right (a
+share-matching tune is circular: §6.14). Sweeps are reported in every run to show
+sensitivity, not as a menu.
+
+| Threshold (`parameter`) | Value | Why this value | What moving it does *(synthetic)* |
 |---|---|---|---|
-| EPD history (`epd_max_history`, `epd_max_blips`) | **≤ 3 months, at most one blip** | Business definition (agreed): a customer who never pays misses the first or second bill, so 2–3 clean months at most (`0 0 2 3 4`, `0 0 0 2 3 4`, `0 2 0 2 3 4`). No natural knee in the data | *Synthetic:* at 3 months 93% of the state is a planted early defaulter; at 6 months 79%, at 12 months 55% — longer histories are early-life defaults and land in early-life straight roller. Sweep reported in every run (2–12 months) |
-| EPD earlier spells | **none; one blip allowed** | An early defaulter may pay off once, but only from bucket 2 (a blip) | `0 2 3 4 0 0 2 3 4 5 6` is therefore repeat delinquent, not EPD; two blips (`0 2 0 2 0 2 3 4`) is not EPD |
-| Straight-roller run-up (`straight_max_runup`) | **≤ 3 months** | The one sharp threshold: any single paid month on the way down makes it a slow roller | ≤ 4 moves ~70% of genuine slow rollers into straight roller |
-| Stabilized band (`stabilized_min_in_band`) | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%, persistence ~63%. 6 of 6: ~5%, ~32%, ~80% |
-| Stabilized long-run clause (`stabilized_long_run_months`, `stabilized_long_run_max_rise`) | **≥ 6 months in 4+, at most +1 bucket over 6 months** | Fixes the two edge cases in §6.15: oscillating payers and accounts that just paid down. Straight rollers cannot meet it (they leave the spine within ~4 months) | Adds ~1% of the spine to stabilized, which still rolls far less than the rest (~44% vs ~85% next month). +2 would take in slow drifters paying ~4 of 6 dues; `None` switches the clause off |
-| Repeat-delinquent depth (`repeat_min_prior_peak`) | **earlier spell reached 3** | The bank counts ~85% single-spell; spells from 3 give 83% *(synthetic)* | From 2: 19%. From 4: 5% (cures from 4+ are rare) |
-| Seasoned (`seasoned_min_months`) | **≥ 12 months** | Business definition (agreed): the first year on book is the standard early-life window. EPD already takes ≤ 3 months, so early life = 4–11 months | *Synthetic:* 12 m gives early life only 3.4% (below the 5% floor), 18 m 7%, 24 m 11%, 36 m 20% — but these shares come from the generator's assumed tenure distribution, so the real share decides (E16) |
+| EPD history (`epd_max_history`, `epd_max_blips`) [business] | **≤ 3 months, at most one blip** | A customer who never pays misses the first or second bill: 2–3 clean months at most (`0 0 2 3 4`, `0 0 0 2 3 4`, `0 2 0 2 3 4`) | At 6 or 12 months the state fills with early-life defaults (`0 0 0 0 0 0 2 3 4`), which now land in early-life straight roller |
+| EPD "never paid" [business] | **no hold or move back in the current spell** | Owner: an EPD never pays after crossing bucket 2, it keeps falling and leaves the spine | `0 0 2 3 4 4 4 4 4 4` (paying monthly) is stabilized, not EPD; `0 0 2 3 4 4 5 6` (paid once) is an early-life straight roller |
+| Straight-roller run-up (`straight_max_runup`) | **≤ 3 months** | Any single paid month on the way down makes it a slow roller | ≤ 4 moves ~70% of slow rollers into straight roller. 41% of slow rollers rest on one hold — E23 / E28 test whether that month is real |
+| Stabilized band (`stabilized_min_in_band`) [business] | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%. 6 of 6: ~5%, ~32% |
+| Stabilized long-run clause (`stabilized_long_run_months`, `_max_rise`) [business] | **≥ 6 months since first reaching 4, at most +1 bucket over 6 months** | Fixes oscillating payers and accounts that just paid down (§6.15). Straight rollers cannot meet it (they leave the spine within ~4 months) | Adds ~1% of the spine to stabilized. +2 would take in slow drifters paying ~4 of 6 dues; `None` switches it off |
+| Repeat-delinquent depth (`repeat_min_prior_peak`) [business] | **earlier spell reached 3** | Cures from 4+ are rare; spells reaching 3 give 83% one-spell vs the bank's ~85% | From 2: more; from 4: ~5% |
+| Repeat-delinquent window (`repeat_window_months`) [business] | **ended ≤ 24 months before this spell** | Owner decision; the common re-default window. Measured to the start of this spell, so the state stays fixed | Lowers the overlap with credibility's lifetime clean point (eta² 0.81 → 0.72) |
+| Seasoned (`seasoned_min_months`) [business] | **≥ 12 months** | The first year on book is the standard early-life window; EPD already takes ≤ 3 months, so early life = 4–11 months | Early life 4.7% at 12 m; it depends on the book's tenure mix, so the real share decides (E16) |
 
-**Rule order.** EPD is asked before stabilized (the bank's order). Only ~0.2% of the spine
-is an early defaulter that is also stabilized today, so the order barely matters.
+**Rule order.** Q0 and EPD come before stabilized; since an EPD has never paid in its
+spell, an account cannot be both, so the order no longer matters for them.
 
 ---
 
@@ -493,57 +550,51 @@ is an early defaulter that is also stabilized today, so the order barely matters
 - **GMM:** BIC never reached a minimum (kept improving to 12 components) because the
   features are spiky — 56–93% of accounts sit on a single value (run-up = 3, no earlier
   spell, …), and GMM fits narrow components to the spikes. Under 1% of accounts were
-  ambiguous, so the soft-assignment advantage disappears. Best ARI vs planted 0.48 but
-  stability fell to 0.67–0.93. Not used. GMM fits continuous inputs (ability scores,
-  balances) far better than DPD-derived counts.
-- **Residual clustering (after EPD and stabilized) — kept as a diagnostic.** k-means at
-  k = 6 on the remaining ~88% found six clean, nameable groups: long-clean straight roll,
-  short-clean straight roll, earlier spell to 3+, paying after 4 but still rolling, held on
-  the way, paid 2+ on the way. With the final thresholds, agreement at k = 6 is A 0.11,
-  **B 0.32, C 0.34** (best at k = 3: B 0.65 vs A 0.31) — the evidence that two residual
-  states were too few. Every B/C split maps to one of these clusters with a one-line
-  rule; the clusters themselves are not the states. The clusters split clean history
-  near 36 months, but that reflects the generator's assumed tenure distribution; the
-  seasoned cut is a business definition (12 months, §5).
+  ambiguous, so the soft-assignment advantage disappears. Not used. GMM fits continuous
+  inputs (ability scores, balances) far better than DPD-derived counts.
+- **Residual clustering (after EPD and stabilized) — a diagnostic only.** k-means at k = 6
+  on the rest found six nameable groups (long-clean straight roll, short-clean straight
+  roll, earlier spell to 3+, paying after 4 but still rolling, held on the way, paid 2+ on
+  the way), and every B/C split maps to one of them with a one-line rule. Its agreement
+  score (ARI) is **not** evidence for B over A: the independent review showed that any
+  finer partition built on the clustered features gains ARI — a meaningless split at
+  median tenure gained 0.16. E22 is therefore INFO only.
 
 ### 6.2 A "mixed" / residual state
 Dropped. An ordered tree with a default branch is MECE without one, and a residual
-bucket invites "everything we don't understand" to grow.
+bucket invites "everything we don't understand" to grow. (Q0 is a data-quality guard, not
+a behaviour bucket.)
 
 ### 6.3 Staircase (holds for months at each level, then steps up)
 Merged. While it is holding a bucket it *is* stabilized (that is the actionable fact);
-just after a step it reads as a slow roller. Telling a genuine holder from a staircase mid-hold needs more
-than 6 months of history and an extra rule, and the next-month risk was the same
-(*synthetic:* 0.28 vs 0.29). It separates only over 6 months (exit 33% vs 50%).
+just after a step it reads as a slow roller. Telling a genuine holder from a staircase
+mid-hold needs more than 6 months of history and an extra rule, and the next-month risk
+was the same (*synthetic:* 0.28 vs 0.29).
 
 ### 6.4 "Paying since bucket 4" — pays after reaching 4 but still rolling (Q3)
 Tested at 0.34 / 0.5 / 0.67 months paid per month since 4. Rejected:
 - barely separates risk (next-month roll ~80% vs ~86%);
-- unstable — ~37% leave it every month — and it **drags the stability of the fixed
-  states from ~98% to ~91%**, because accounts flip in and out of it;
+- unstable — ~37% leave it every month — and it drags the stability of the fixed states
+  down by ~7pp, because accounts flip in and out of it;
 - 79% of it is "paid in the last 3 months" — the credibility axis's 2-point component.
 
-It is one of the six natural residual clusters, so it is real behaviour — but it belongs
-to credibility, not here. The switch is kept in code (`paying_since_4_min_rate`, state `paying_since_4` — renamed
-from "partial payer" so that term means only the slow roller) so the
-test can be repeated (expectation E24).
+It is one of the natural residual clusters, so it is real behaviour — but it belongs to
+credibility. The switch is kept (`paying_since_4_min_rate`) so the test can be repeated (E24).
 
 ### 6.5 Separate states for slow slide, dip-and-roll, volatile
 Merged into slow roller (A, B) or split once by "paid 2+ months on the way" (C). The three
-confuse each other in every view (shapes, clusters, trees), and the risk actions are close.
-Much of "volatile" (cure then relapse) is a repeat delinquent by definition.
+confuse each other in every view, and the risk actions are close. Much of "volatile"
+(cure then relapse) is a repeat delinquent by definition.
 
 ### 6.6 Repeat delinquent in option A
-Left out of A on purpose. Repeat delinquent is built from earlier spells — the same history
-credibility's 1-point "pre-delinquency clean" flag scores. In the self-test (with a clean
-point defined as "no earlier spell") the states explained **84%** of that point's
-variance. It is included in B/C because it is only 1 of credibility's 5 points and it
-carries more than a yes/no: *cured from bucket 3 before* is evidence of catch-up capacity.
-Expectation E19b measures the real overlap and decides A vs B.
+Left out of A on purpose. Repeat delinquent is built from earlier spells — the history
+credibility's 1-point "pre-delinquency clean" flag scores. In the self-test the states
+explain **72%** of that point's variance (81% before the 24-month window). It is in B/C
+because it is only 1 of credibility's 5 points and *cured from bucket 3 recently* is
+evidence of catch-up capacity. E19b measures the real overlap and decides A vs B.
 
 ### 6.7 "Stabilized or improving" clause (today's bucket ≤ 6 months ago)
-Dropped. It changed **0.0%** of assignments. Straight / slow roller describe how the account fell
-in, so an improving account carries no misleading label without it.
+Dropped. It changed **0.0%** of assignments; the long-run clause (§6.15) covers the real cases.
 
 ### 6.8 Payment-based refinement of stabilized
 Tested: "≤ 1 roll in 6 months AND paid 2+ months at least once" separated holders from
@@ -551,37 +602,33 @@ staircases at 99% precision — but only because the synthetic generator built i
 and it leans on payment behaviour (credibility). Replaced by the bank's own 5-of-6 rule.
 
 ### 6.9 Features that drift with time since bucket 4
-Dropped from assignment: whole-spell roll rate, fixed-window counts (rolls in the last 6
-or 12 months), months paid since 4 as a count. Straight rollers at bucket 4 and 7 looked
-different only because of the clock. Replaced by run-up features (fixed once past 4) and
-rates within the current spell.
+Dropped from assignment: whole-spell roll rate, fixed-window counts, months paid since 4
+as a count. Replaced by run-up features (fixed once past 4). The remaining
+current-behaviour inputs (§3) are deliberate and confined to stabilized and EPD.
 
 ### 6.10 Shape table as the assignment
 Kept for discovery and stakeholder examples only. ~5–6k distinct banded shapes; the top
 30 cover ~35–40% of accounts — too fragmented to assign everyone.
 
 ### 6.11 n-gram ranking by planted-label purity
-Fixed. The first version had a meaningless "lift" (per-account presence divided by
-per-month code frequencies, rescaled by an arbitrary constant) and ranked by planted
-labels that real data does not have. Lift is now measured against each account's own
-codes in shuffled order: lift > 1 means the order of moves matters.
+Fixed. Lift is measured against each account's own codes in shuffled order: lift > 1
+means the order of moves matters. No planted labels are needed.
 
-### 6.12 Treating +2 jumps as impossible
-Replaced by repair (+2 next to a hold → straight roll) and "otherwise a roll". Real data
-has billing-cycle effects (example: `…3 4 3 5 4…`).
+### 6.12 Treating +2 jumps as impossible — and the first repair
+Replaced by repair. The first version of the repair looked ahead (it used next month's
+digit) and also treated clean months as holds, so a "fixed" straight roller could become a
+slow roller when the next month arrived (`…0224` → `…02244`), and `000034` borrowed a clean
+month and became EPD. The repair is now causal and only uses holds at bucket 2+ (§2).
 
 ### 6.13 Payment-promise or inflow inputs in any state
 Never used — credibility and ability own them. Their overlap is *measured* (§7).
 
 ### 6.14 EPD ("bust-out") with up to 6 months of history
-The first version allowed ≤ 6 months before the spell, chosen to match "a few months".
-It made `0 0 0 0 0 0 2 3 4` a bust-out (now EPD) — but six clean months means about four bills were
-paid (or nothing was due): an **early-life default**, not a customer who never paid. The
-synthetic 6% match did not support 6 months either: the generator's bust-out volume had
-been tuned to hit 6% *under that rule*, so the match was circular. Replaced by the agreed
-business definition: **≤ 3 months, at most one blip**. Under it the generator still gives
-5.8% EPD; every planted early defaulter is caught, and 93% of the state is a planted
-early defaulter (79% under the old 6-month rule).
+The first version allowed ≤ 6 months, chosen to match "a few months". It made
+`0 0 0 0 0 0 2 3 4` an EPD — but six clean months means about four bills were paid: an
+**early-life default**. Its synthetic 6% match was circular: the generator's bust-out
+volume had been tuned to hit 6% under that rule. Replaced by the agreed definition
+(≤ 3 months, one blip) and, after review, the owner's "never paid since crossing 2".
 
 ### 6.15 Stabilized measured only around today's bucket (edge cases)
 The bank's rule — 5 of the last 6 months within ±1 of **today's** bucket — misreads two
@@ -589,33 +636,28 @@ uncommon but real histories (oldest → newest, today is the last digit):
 
 - **Oscillating payer** `0000 0000 2344 4334 5433 4565 54` — swings between 3 and 6 for over
   a year, paying roughly what is due on average. The rule flipped it between stabilized and
-  "straight roller" **5 times in 16 months**; every time it left the band it was called a
-  straight roller, which it is not.
+  "straight roller" **5 times in 16 months**.
 - **Just paid down** `… 3 4 5 6 6 5 4` — paid two months twice (6 → 5 → 4). The band around
   today's 4 excludes the two 6s, so the rule called it a straight roller *because* it paid.
 
 Fix adopted: the **long-run clause** (§5). Both cases are now stabilized from their sixth
-month at 4+ onwards; the only remaining dip is the single month at the top of a
-3-month roll (3 → 4 → 5 → 6), which is a fair description of that month. Rejected
-alternatives: allowing +2 over 6 months (takes in slow drifters), and a "sticky" rule
-that remembers last month's state (harder to explain and audit).
-
-Measured on synthetic data with oscillating payers added (1.2% of the spine): of the
-accounts ever stabilized during the 6 backtest months, the share that **left and came
-back** fell from ~8% (bank's rule) to ~5–7%, and oscillating payers bounced 41% less.
-The rest are staircases (hold, step up, hold) and swingers in their first 6 months at 4.
-Expectation E26 tracks this on real data. Both examples are permanent regression cases
-in the self-test.
-
-**Known limitation.** After an oscillating or stabilized account breaks out and rolls,
-its fixed state comes from the original run-up (often "straight roller"). That is by
-design — post-4 payment history belongs to credibility — but read "straight roller" as
-*how they fell in*, not *never paid since*.
+month after first reaching 4; the only remaining dip is the single month at the top of a
+3-month roll (3 → 4 → 5 → 6). Rejected alternatives: allowing +2 over 6 months (takes in
+slow drifters), and a "sticky" rule that remembers last month's state (harder to audit).
+Measured *(synthetic, with oscillating payers at 1.2% of the spine)*: of accounts ever
+stabilized over 6 months, the share that **left and came back** is ~5% with the clause vs
+~5.5–8% on the bank's rule alone. E26 tracks this on real data; both examples are
+permanent regression cases.
 
 ### 6.16 Seasoned / early-life split in option A
-Not in A because, in synthetic data, it adds no risk separation (both ~94–95% exit within
-6 months, by construction). It is in B/C for its action difference (life event vs
-underwriting signal). Real outcomes decide whether it earns its place.
+Not in A: in synthetic data it adds no risk separation (by construction). It is in B/C for
+its action difference (life event vs underwriting signal), with the merge rule in §4.
+
+### 6.17 EPD that has started paying
+Before the review, an account that entered like an EPD but then paid its monthly due for
+6–10 months (`0 0 2 3 4 4 4 4 4 4`) stayed EPD, with the action "early legal; no
+restructuring". The owner's rule — an EPD never pays after crossing bucket 2 — now sends it
+to stabilized.
 
 ---
 
@@ -623,62 +665,86 @@ underwriting signal). Real outcomes decide whether it earns its place.
 
 | Overlap | Size *(synthetic)* | Treatment |
 |---|---|---|
-| stabilized ↔ credibility "money coming in" (2 pts) | 100% of stabilized have money in; 44% of the rest do too | One-directional: stabilized is stricter (enough to hold the bucket, 6 months). Accept and state it. E21 |
-| repeat delinquent ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.84 of the clean point explained by B states | Decides A vs B. E19b |
+| stabilized ↔ credibility "money coming in" (2 pts) | 98% of stabilized have money in; ~44% of the rest do too | One-directional: stabilized is stricter (enough to hold the bucket, 6 months). Accept and state it. E21 |
+| slow roller ↔ credibility "money coming in" | near bucket 4 almost all slow rollers paid in the last 3 months (they paid on the way down); by bucket 7 far fewer | A clock effect of the run-up, not a separate signal. Reported by state × bucket in every run |
+| stabilized ↔ credibility "promises kept" (2 pts) | likely (paying monthly) — not testable without the score | E19 measures the total |
+| repeat delinquent ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.72 of the clean point explained by B states | Decides A vs B. E19b |
 | straight / slow roller ↔ ability | none in synthetic (by construction) | Straight rolling may proxy income loss on real data — fine, but say so. E20 |
-| any state ↔ locatability | none expected | E19/E20 report it |
+| any state ↔ locatability | none expected | E20b |
 
 ---
 
 ## 8. Real-data validation
 
-### How the backtest works from a single table
+### Two ways to run
+- **File mode — for sign-off, no Spark.** `python docs/deterioration_states/run.py validate`
+  reads `INPUT_FILE` (`data/input/dpd_synthetic_data.xlsx`, column `dpd_history_str`,
+  CC 60–180 DPD, Aug 2026). A snapshot of today's segment has **no outcomes**: accounts that
+  rolled to 8+ since are not in it, so roll rates and exits are SKIPPED. What it can show:
+  shares, data quality, shapes, overlaps (if axis columns are in the file), and stability
+  among the survivors (E13, E14, E26 run on accounts in the spine last month and today).
+- **Spark mode — production.** `snippets/dpd_states_validate.py`, `main(catalog)`.
+
+### How the backtest works from a single table (Spark mode)
 Today's string holds the past: dropping its newest *k* digits gives the string as it was
-*k* months ago, and the dropped digits are what happened next. So one table of
-latest-month strings gives the spine as of *k* months ago **and** its outcomes (next-month
-roll, exit to 8+ within *k*, cure, next-month state). This needs the table to **keep
-accounts that have since rolled to 8+ or closed** — a survivor-only table biases the
-outcomes (the snippet detects and warns).
+*k* months ago, and the dropped digits are what happened next. Assumptions, each checked:
+1. The table **keeps accounts that have since rolled to 8+ or closed** (a survivor-only
+   table biases outcomes — the snippet warns when no backtest account is at 8+ today).
+2. **Every string ends in the same (latest) month.** Strings frozen at charge-off or
+   closure are not "today" — set `COL_STRING_AS_OF` to exclude them. Even 20% frozen exits
+   bias bucket-4 roll by ~5pp while E03 still passes *(review)*.
+3. **Exit codes are digits** — a write-off letter must be mapped in `CHAR_MAP`, or those
+   accounts silently drop out (E02 now covers the backtest and the whole table).
+4. The bank's roll rates (E03) are compared like for like (count- vs balance-weighted).
+
+Outcome comparisons are **standardised to the bucket mix** (stabilized sits mostly at
+bucket 4) and use exit within **3 months**, because 6-month exit saturates near 100% at
+buckets 5–7.
 
 ### Expectations (checked automatically — `dpd_states/expectations.py`)
 
-| | Check | Expected | Basis |
-|---|---|---|---|
-| E01 | Exactly one state per account | True (FAIL otherwise) | Tree with default branch |
-| E02 | Unparseable strings | ≤ 2% (FAIL) | CHAR_MAP / STRIP_CHARS set right |
-| E03 | Backtest monthly roll rates vs 70/80/90/95% | ≤ 7pp off (FAIL) | Confirms orientation and reconstruction |
-| E04 | Histories starting inside the spell | ≤ 10% | Full history exists |
-| E05 | Unrepaired +2 jumps | ≤ 2% | Most jumps sit next to a hold |
-| E06 | Bucket mix declines 4 → 7 | yes | Rising roll rates |
-| E07 | One spell only (from bucket 3) | 78–92% | Bank ~85% |
-| E08 / E09 | EPD / stabilized share | 4–8% / 4–9% | Bank 6% / 6% |
-| E10 / E11 | Recall of the bank's existing flags | ≥ 80% / ≥ 90% | Same definitions |
-| E12 | Stabilized next-month roll below the fixed states | ≥ 20pp gap | *Synthetic:* 40% vs ~85% |
-| E13 | Fixed states keep their state next month | ≥ 95% | Run-up fixed once past 4 |
-| E14 | Stabilized persistence next month | 45–85% | Current behaviour |
-| E15 | Option A straight-roller share | 55–80% | Most roll straight |
-| E16 | Smallest option-B state | ≥ 5% | Actionable size |
-| E17 | Smaller slow-roller split (C) | ≥ 4% | Actionable size |
-| E18 | Stabilized at bucket 4 vs 7 | ≥ 2× | 90–95% roll at 6–7 |
-| E19 / E19b / E20 | eta² of credibility / clean point / ability by state | ≤ 0.25 / ≤ 0.50 / ≤ 0.10 | Orthogonality |
-| E21 | Stabilized with money coming in | ≥ 90% | Stabilized = paying |
-| E22 | Residual clusters favour B over A | ARI gain ≥ 0.15 | *Synthetic:* 0.20 |
-| E23 | One paid month matters (slow roller at run-up ≤ 4 / ≤ 3) | ≤ 0.70 | Most slow rollers held once |
-| E24 | "Paying since 4" stays rejected | persistence ≤ 75% | *Synthetic:* 63% |
-| E25 | INFO: exit spread across fixed states | report | Unknowable from synthetic |
-| E26 | Stabilized accounts that leave and come back within k months | ≤ 10% | *Synthetic:* ~5–7% (§6.15) |
+Anchor: **bank** = the bank's figures or rules · **design** = follows from the rules ·
+**synthetic** = calibrated on the generator only (a WARN is a prompt to look) · **data**.
 
-Every check carries an "if not met" action in the code and in the report. The self-test
-also runs 14 **edge cases** from the design discussion (EPD with a blip, six clean months,
-two blips, payoff from 4, staircase, both oscillating payers, …) and fails if any changes
-state.
+| | Check | Expected | Anchor |
+|---|---|---|---|
+| E01 | Exactly one known state per account | True (FAIL) | design |
+| E02 | Unparseable strings (spine, backtest, whole table) | ≤ 2% (FAIL) | data |
+| E03 | Backtest monthly roll rates vs 70/80/90/95% | ≤ 7pp (FAIL) | bank |
+| E04 | Histories that start delinquent | ≤ 1% | bank |
+| E05 | Unrepaired +2 jumps | ≤ 2% | synthetic |
+| E06 | Bucket mix declines 4 → 7 | yes | bank |
+| E07 | INFO: one-spell share, four definitions vs ~85% | report | bank |
+| E08 / E09 | EPD / stabilized share | 3–8% / 4–10% | bank |
+| E10 / E11 | Recall of the bank's existing flags | ≥ 80% / ≥ 90% | bank |
+| E12 | Stabilized next-month roll below the rest (bucket-standardised) | ≥ 20pp | synthetic |
+| E13 | Fixed states keep their state (or move into stabilized) | ≥ 95% | design |
+| E14 | Stabilized persistence next month | 45–85% | synthetic |
+| E15 | Option A straight-roller share | 55–80% | bank |
+| E16 | Smallest optional option-B state (EPD and stabilized are required at any size; empty = 0) | ≥ 5% | design |
+| E17 | Smaller slow-roller split (C) | ≥ 4% | design |
+| E18 | Stabilized at bucket 4 vs 7 | ≥ 2× | bank |
+| E19 / E19b / E20 / E20b | eta² of credibility / clean point / ability / locatability by state | ≤ 0.25 / 0.50 / 0.10 / 0.05 | design |
+| E21 | Stabilized with money coming in | ≥ 90% | design |
+| E22 | INFO: residual-cluster ARI gain (diagnostic only) | report | synthetic |
+| E23 | INFO: straight vs one-hold slow roller, next-month roll | report | — |
+| E24 | "Paying since 4" stays rejected | persistence ≤ 75% | synthetic |
+| E25 | INFO: exit-within-3m spread across fixed states (bucket-std) | report | — |
+| E26 | Stabilized accounts that leave and come back | ≤ 10% | synthetic |
+| E27 | String lengths vary (not padded / fixed-length) | p95 − p05 ≥ 6 | data |
+| E28 | Run-up holds: largest calendar month vs its neighbours | ≤ 2.5× | data |
+
+Every check carries an "if not met" action in the code and in the report; none of them
+says "tune a business parameter until it passes". The self-test also runs **24 edge
+cases** from the design discussion and the review, and fails if any changes state.
 
 ### Choosing the option on real data
 1. Any **FAIL** → fix config/data first; read nothing else.
-2. **E19b high** (repeat delinquent ≈ credibility clean point) **and** the risk team does not want the
-   cured-before nuance → **A**. Otherwise **B**.
+2. **E19b high** (repeat delinquent ≈ credibility clean point) **and** the risk team does
+   not want the cured-recently nuance → **A**. Otherwise **B**.
 3. **E17 passes and** the risk team has distinct actions for intermittent vs erratic payers → **C**.
-4. **E25 ≥ 5pp** → the mechanism carries risk on its own; report it to the risk team as a bonus.
+4. **E16 fails on early-life straight roller** → merge it into straight roller (agreed).
+5. **E25 ≥ 5pp** → how they fell in carries risk on its own; report it to the risk team.
 
 ---
 
@@ -686,32 +752,41 @@ state.
 
 - **Calibrated generator** (`dpd_states/synth.py`): eight planted journey patterns
   (bust-out, clean abrupt shock, slow slide, staircase, stabilized, repeat episodes,
-  dip-and-roll, volatile) plus a rare oscillating payer (1.2% of the spine); full lifecycles to exit; length-biased snapshot like a real
-  spine; payment holidays (frozen buckets) and billing-cycle +2 jumps; one continuous
-  tenure distribution. Matches the bank's figures: roll rates 70/80/89/95% (target
-  70/80/90/95%), EPD 5.8% (6%), stabilized 6.5% (6%), single spell 83% from bucket 3 (85%).
-- **Method report:** `validation/dpd_states_validation_*.md` (`python docs/deterioration_states/run.py synthetic`).
-- **Real-data path self-test:** `validation/selftest_report_*.md` (`python docs/deterioration_states/run.py selftest`)
-  runs the exact analysis and expectations the workplace run uses, on synthetic data with
-  fake axis columns. All checks pass except two expected WARNs: E19b (repeat delinquent ≈
-  credibility clean point, §6.6) and E16 (early-life straight roller 3.4% under the 12-month
-  seasoned cut — a property of the synthetic tenure distribution, §5).
+  dip-and-roll, volatile) plus a rare oscillating payer; full lifecycles to exit;
+  length-biased snapshot like a real spine; payment holidays and billing-cycle +2 jumps;
+  one continuous tenure distribution. Matches the bank's roll rates (71/78/89/94% vs
+  70/80/90/95%), single spell 83% from bucket 3 (85%) and stabilized 6.9% under the
+  bank's rule (6%).
+- **Known calibration gap:** "never paid since reaching 4" is 59% in the generator vs the
+  owner's first estimate of ~90% (which the owner later called overkill). The generator's
+  holders are therefore probably over-represented; this affects synthetic shares of
+  stabilized and slow roller, not the rules.
+- **Method report:** `validation/dpd_states_validation_*.md` (`run.py synthetic`).
+- **Real-data path self-test:** `validation/selftest_report_*.md` (`run.py selftest`) runs the
+  exact analysis and expectations the workplace run uses, with fake axis columns, plus the
+  24 edge cases. All checks pass except two expected WARNs: E16 (early-life straight roller
+  4.7%) and E19b (repeat delinquent ≈ clean point).
+- **Independent review:** 24 findings, none critical — see [REVIEW.md](REVIEW.md).
 
-**What synthetic data cannot tell you:** whether the rolling states differ in outcome (they
-share post-4 dynamics by construction), how big the real overlaps with credibility and
-ability are, and how much payment holidays contaminate stabilized. The real-data run answers
-all three.
+**What synthetic data cannot tell you:** whether the rolling states differ in outcome
+(they share post-4 dynamics by construction), how big the real overlaps with credibility
+and ability are, and how much payment holidays contaminate stabilized.
 
 ---
 
 ## 10. Open decisions
 
 1. Option A, B or C — decide from E19b, E17 and the risk team's actions (§8).
-2. Spell definition (from bucket 3 or 4) — E07 shows which matches the bank's 85%.
-3. EPD history threshold — confirm 3 months (one blip) against the bank's existing bust-out rule (E10).
-4. Payment holidays / restructurings — if flags exist, exclude frozen months before Q2.
-5. The long-run clause widens the bank's stabilized definition (+~1% of the spine) —
-   confirm it with the owners of the existing rule (E11 will show the agreement drop).
+2. The bank's exact spell definition — E07 reports four; it matters for the 85% check
+   and for the repeat-delinquent depth.
+3. EPD vs the bank's existing bust-out rule — ours is stricter ("never paid since
+   crossing 2"); E10 shows the agreement.
+4. Restructured accounts re-opened at their old bucket (Q0) — deferred by the owner.
+5. Payment holidays / restructurings — account-level flags only show how often stabilized
+   accounts carry them (E21, section 4 of the report); month-level exclusion needs
+   month-level flags.
+6. The long-run clause widens the bank's stabilized definition (~+1% of the spine) —
+   confirm with the owners of the existing rule (E11).
 
 ## Glossary
 
@@ -722,17 +797,71 @@ Spine — accounts currently at 4–7 · eta² — share of an axis score's vari
 the states (0 = orthogonal) · ARI — agreement between two groupings (0 = chance, 1 = identical).
 `````
 
+### FILE: `REVIEW.md`
+sha256 `dfc00a2572ce7c2cdb687d82e81b79e136842a4142782ff5b351e32554ddc579` · 48 lines · trailing newline: yes
+
+`````markdown
+# Independent review — findings and what was done
+
+An independent reviewer (fresh context, no part in the design) reviewed the methodology and
+code on 2026-10-16: read every file, probed the rules with crafted DPD strings, ran the
+real-data path on Python 3.10 / pandas 1.5.3 as well as 3.13 / pandas 3.0, and reviewed the
+Spark snippet by reading. **24 findings, none critical; 9 high or medium-high.** The
+rules were confirmed MECE and the original edge cases passed. Business decisions were
+taken by the owner (marked **owner**); everything else was fixed in code and documents.
+
+Case strings are written oldest → newest (last digit = today's bucket).
+
+| # | Sev. | Finding | Disposition |
+|---|---|---|---|
+| F01 | High | EPD depends on where the string starts; padded / fixed-length strings, numeric columns (lost digits), re-keyed cards and a `{"X": "9"}` example could all fake or hide EPD; E08's action invited circular tuning | **owner:** the oldest digit is the first billed month (0/1). Fixed: file reader refuses number-like values; Spark warns on non-string type; E27 flags fixed-length strings; `STRIP_CHARS` strips only the ends; `CHAR_MAP` example corrected; E08 action → compare and escalate |
+| F02 | High | Strings that start inside the spell (`4567`, `444444`) became EPD; E04 (≤ 10%) too loose | **owner:** such histories are restructured re-opens or missing data. New Q0 data-quality state `history_starts_delinquent`; E04 tightened to ≤ 1%. Restructured accounts deferred |
+| F03 | High | One-table backtest assumes all strings end in the same month; frozen / purged exits and letter exit codes bias it silently, with misleading diagnostics | Fixed: `COL_STRING_AS_OF` excludes stale strings; E02 covers backtest and whole table; E03 action lists frozen strings, letter codes, count vs balance; assumptions in METHODOLOGY §8. A T−k snapshot join remains an option if strings freeze |
+| F04 | Med-high | +2 repair looked ahead and treated clean months as holds: `…0224` straight → `…02244` slow; `000034` became EPD | Fixed: causal repair (hold before the jump first), only holds at 2+, never moves a 4 below 4. Both cases are regression tests; E13 now 99.7% |
+| F05 | Medium | Long-run clause documented as "6 months in 4+" but code counts months since first reaching 4; features used by rules missing from §3 and P6 | Fixed wording everywhere; §3 lists every input incl. `months_since_4`, `chg_6m`, `spell_pay_events`, `gap_prior_peak3`; P6 audit list updated |
+| F06 | Medium | E16 passed when a state was empty | Fixed: shares reindexed to the option's full state list (empty = 0); E16 scoped to optional states |
+| F07 | Medium | Crashes: a length-1 string (in `shape`), empty spine, < 8 residual rows, `"0000"`; an account at 0 silently labelled | Fixed: guards in `shape`, `build_features`, `run`, clustering; `journey_features` raises a clear error below bucket 2; P6 applies cleaning + spine filter first |
+| F08 | Medium | Y/N flag columns silently became all-false | Fixed: `parse_flag` reads 1/0, Y/N, Yes/No, True/False; reports and skips when unparseable |
+| F09 | Medium | E22 (residual-cluster ARI gain) cannot discriminate — a meaningless split passes | Demoted to INFO; METHODOLOGY no longer cites it as evidence for B |
+| F10 | Medium | E25 already fired on synthetic (claim "cannot show" was false); 6-month exit saturates; E12 bucket-confounded | Fixed: bucket-standardised next-month roll and exit within 3 months; documentation corrected |
+| F11 | Medium | Labels overclaim ("never paid"); an EPD paying monthly for 6–10 months stayed EPD → "early legal" | **owner:** an EPD never pays after crossing bucket 2 (new condition). Remarks now say "rolled straight to bucket 4 … some have paid since" |
+| F12 | Medium | Slow roller overlaps credibility "money in" near bucket 4 (clock effect), undisclosed | Disclosed in §7; money-in by state × bucket reported every run |
+| F13 | Medium | Straight vs slow rests on a single month for 41% of slow rollers; holds may be artefacts | Added E23 (outcome of one-hold slow rollers vs straight rollers) and E28 (calendar-month spike test of run-up holds). Business call deferred until real data |
+| F14 | Medium | E07 spell definition ambiguous ("run at ≥4" also ≈ 85%) | E07 now INFO reporting four definitions; bank's exact definition is an open decision |
+| F15 | Medium | Results contained raw 30-month DPD strings, against the stated governance | Fixed: only banded shapes shared by ≥ 10 accounts in results; check-only prints aggregates (newest/oldest digit counts, shapes) |
+| F16 | Medium | Re-running in the same kernel used stale config | Fixed: snippet reloads the package each call and prints a config fingerprint |
+| F17 | Medium | Expectation actions invited tuning agreed business definitions to hit shares | Fixed: `[business]` markers in `states.py`; all such actions say escalate; PROMPTS P3 forbids it |
+| F18 | Low-med | Checks differed when re-run from the saved JSON (int vs str bucket keys) | Fixed: results are JSON-safe (str keys, no NaN) before checks run |
+| F19 | Low-med | E02 blind to backtest / table; `STRIP_CHARS` removed mid-string characters | Fixed (see F01, F03) |
+| F20 | Low-med | Repeat delinquent had no recency window; a one-month glitch created it | **owner:** earlier spell must end within 24 months of this one. Fixed: impossible one-month glitches (`4 0 4`, `0 3 0`) cleaned and counted; both are regression tests |
+| F21 | Low | Ranges anchored on synthetic data not labelled; "never paid since 4" gap (59% vs ~90%) undiscussed | Every check now has an anchor (bank / design / synthetic / data); gap discussed in §9 |
+| F22 | Low | `model_id` resolved before the config guard; E01 could never fail; hard-coded spine; NaN in JSON; Spark re-scans | Fixed all: guard first; E01 also checks unknown states; spine from config; JSON-safe; `cache()` |
+| F23 | Low | Document inconsistencies (E01–E25 vs E26, stale names, quoted shares, "first three payments" vs "first or second bill") | Fixed in README, METHODOLOGY, PROMPTS, config |
+| F24 | Low | Early-life straight roller acts for underwriting, small in synthetic; seasoned straight roller is in practice the residual | **owner:** keep early-life as a state; merge into straight roller if real share < 5% (E16). Seasoned straight roller's action is "read the other axes" by design |
+
+## Verified independently before acting
+F02 (`4567`, `444444` → EPD), F04 (`…0224` vs `…02244`; `000034` → EPD) and F11
+(`00234444444444` → EPD) were reproduced before any change; all are now regression cases
+in `dpd_states/selftest.py`.
+
+## Still open
+- The bank's exact spell definition (F14) and existing bust-out rule (F01 / E10).
+- Restructured accounts re-opened at their old bucket (F02) — deferred by the owner.
+- Whether a single paid month should separate slow from straight rollers (F13) — decide
+  from E23 / E28 on real outcomes.
+`````
+
 ### FILE: `PROMPTS.md`
-sha256 `857bce12219ab06d2ee27cdc5c67598e44264f1d205913f6aa55bce77b7d68b8` · 197 lines · trailing newline: yes
+sha256 `097b899f0ffcd9f54ef7114be781d0ed7cbe26ff516085cb2215b5bc28987c5f` · 217 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
 
-Copy-paste prompts for a Sonnet 5 session in the workplace (PROD) repository. Each prompt
-is self-contained. **Paste P0 first in every new session**, then the prompt for the step.
+Copy-paste prompts for a Sonnet 5 session in the workplace repository. Each prompt is
+self-contained. **Paste P0 first in every new session**, then the prompt for the step.
 
-Order: **P0 → P1 → P2**, then P3 / P4 as the results require, then P5. P6 only once an
-option is chosen.
+Order: **P0 → P1 (file mode) → P2**, then P3 / P4 as the results require, then P5.
+**P6 (Spark) and P7 (production)** only after the methodology and states are signed off.
 
 ---
 
@@ -743,27 +872,31 @@ You are working in our workplace repository on the "deterioration states" packag
 docs/deterioration_states/. Read these first, fully, before doing anything:
   1. docs/deterioration_states/README.md
   2. docs/deterioration_states/METHODOLOGY.md
-  3. docs/deterioration_states/dpd_states/config.py
-  4. docs/deterioration_states/snippets/dpd_states_validate.py
+  3. docs/deterioration_states/REVIEW.md
+  4. docs/deterioration_states/dpd_states/config.py
+  5. docs/deterioration_states/dpd_states/states.py
 
 What it is: one state per credit-card account in DPD buckets 4–7, assigned from the DPD
-bucket-history string by a short decision tree (options A/B/C). The state logic and
-thresholds are FINAL for this round — they were designed and validated elsewhere.
+bucket-history string (leftmost digit = current month, rightmost = first billed month) by
+a short decision tree (options A/B/C). The state logic and thresholds were designed,
+validated and independently reviewed elsewhere.
 
 Ground rules — follow all of them:
 - Do NOT change the state logic, thresholds or expectations in dpd_states/states.py or
-  dpd_states/expectations.py unless a prompt explicitly asks you to. If you think one is
-  wrong, say so and explain why; do not edit it.
+  dpd_states/expectations.py unless a prompt explicitly asks you to. Parameters marked
+  [business] in states.py are agreed business definitions: never change them to make a
+  share or a check come out right — report and escalate to me instead.
 - NEVER invent a dataset, table or column name. Find it in the repo (Kedro catalog
-  conf/**/catalog*.yml, pipeline code, existing notebooks) or ask me. Leave <<FILL-IN>>
+  conf/**/catalog*.yml, pipeline code, notebooks, data/) or ask me. Leave <<FILL-IN>>
   where you cannot confirm a name.
-- model_id is never hardcoded. It comes from the caller or the project globals
-  (globals_dev). Find the real accessor in this repo.
-- Read-only: nothing may be written to the warehouse. Results files contain aggregates
-  only — no account keys, CIFs, names or row-level data.
+- Run every tool from the repo root as `python docs/deterioration_states/run.py <tool>`
+  (validate | selftest | synthetic | bundle). `python -m dpd_states...` only works from
+  inside docs/deterioration_states/.
+- Results files contain aggregates only — no account keys, CIFs, names, raw DPD strings
+  or other row-level data. Do not paste raw DPD strings into this chat.
 - Never present a number you have not seen in actual output. If something has not run,
   say it has not run.
-- Keep code changes minimal and confined to config.py and the clearly marked
+- Keep code changes minimal and confined to dpd_states/config.py and the clearly marked
   <<FILL-IN>> spots unless asked otherwise.
 
 Reply with a 5-line summary of what the package does and which names need filling in.
@@ -771,63 +904,56 @@ Reply with a 5-line summary of what the package does and which names need fillin
 
 ---
 
-## P1 — Wire up names and do the dry run
+## P1 — File mode: check the input and do the first run
 
 ```
-Task: make docs/deterioration_states runnable in this repo, then run the dry run.
+Task: run the package on our DPD-history file, without Spark.
 
-1. Find the dataset that holds one DPD bucket-history string per credit-card account.
-   Requirements (from config.py): it must have the account key and the DPD string; for
-   the backtest it must still contain accounts that have since rolled to bucket 8+ or
-   closed — not only today's bucket 4–7 spine. Search the Kedro catalog and pipelines.
-   If several candidates exist, list them with their columns and ask me which to use.
-2. Fill in dpd_states/config.py:
-   - DS_STRINGS_TMPL (keep the "{model_id}." prefix only if the dataset is model_id
-     namespaced), KEY, COL_DPD
-   - COL_SNAPSHOT if the dataset has several snapshots per account; ROW_FILTER if it
-     mixes products (we want credit cards only)
-   - LEFTMOST_IS_CURRENT: check on real strings — the leftmost digit must be the
-     current month. Verify against a current-bucket column if one exists.
-   - CHAR_MAP / STRIP_CHARS if strings contain anything other than digits
-   - DS_STRINGS_HAS_EXITED: False if the dataset only has today's spine
-   - Optional columns, ONLY if they exist on the same dataset (or tell me they live
-     elsewhere — do not build joins yet): credibility score and its three components,
-     ability score, reachability and in-country flags, the bank's existing bust-out
-     (= our early payment default) and stabilized flags, payment-holiday / restructuring flags. Flags must be 1/0.
-3. Fill in _resolve_model_id in snippets/dpd_states_validate.py with the real
-   globals_dev accessor from this repo.
-4. Show me the diff of config.py and the snippet, then give me the notebook cell for
-   main(catalog, check_only=True) (it is in the snippet docstring).
-5. When I paste back the CHECK output, verify: counts are plausible, rows == accounts,
-   example strings look right (leftmost = today, digits only), no WARNING lines. Fix
-   config and repeat until clean. Do not start the full run until I say so.
+1. The input is data/input/dpd_synthetic_data.xlsx (CC 60–180 DPD segment, Aug 2026),
+   DPD string column "dpd_history_str". These are already the defaults in
+   dpd_states/config.py (INPUT_FILE, COL_DPD). The file has other derived columns — ignore
+   them unless they are one of the optional columns below.
+2. Before running, check with a few lines of pandas (print aggregates only, no raw strings):
+   - the column reads as TEXT (dtype object/string) when loaded with dtype={"dpd_history_str": str};
+     if Excel stored it as a number, digits are lost — stop and tell me;
+   - the share of strings whose LEFTMOST digit is 4–7 (today's spine) and the
+     distribution of the RIGHTMOST digit (should be mostly 0/1 = first billed month);
+   - min / median / max string length;
+   - any characters other than 0–9 (if so, list them with counts; do not guess a mapping).
+3. Optional columns: if the file (or another file I point you to) has any of the persona
+   scores (credibility total and its three components, ability score, reachability /
+   in-country flags), the bank's existing bust-out / stabilized flags, or payment-holiday /
+   restructured flags, map them in AXIS_COLS / EXISTING_RULE_COLS / FLAG_COLS in config.py.
+   Show me the diff. Do not build joins without asking.
+4. Install openpyxl if pandas cannot read .xlsx, then run from the repo root:
+       python docs/deterioration_states/run.py selftest     (must end "SELFTEST PASSED")
+       python docs/deterioration_states/run.py validate
+5. Paste me the block between === DPD_STATES OUTPUT START === and END.
 ```
 
 ---
 
-## P2 — Full run and interpretation
+## P2 — Interpret the run
 
 ```
-Task: run the full validation and interpret it against the written expectations.
+Task: interpret the latest results/dpd_states_file_<file>_<date>.json and .md (file mode)
+or results/dpd_states_validation_<model_id>_<date>.json (Spark mode).
 
-1. Give me the notebook cell: result = main(catalog)   (model_id from globals), or
-   main(catalog, model_id="<variant>") for a specific variant.
-2. When I paste back the block between === DPD_STATES OUTPUT START === and END (or point
-   you to results/dpd_states_validation_<model_id>_<date>.json), read the JSON and .md.
-3. Report, in this order:
-   a. Any FAIL (E01, E02, E03). If present, STOP: diagnose and propose the config fix.
-      Nothing else is trustworthy until these pass.
-   b. Each WARN: the observed value, the expected range, and the "if_not_met" action
-      written in the check. Say whether the action needs a config change, a decision from
-      me, or nothing.
-   c. The recommended option (B_balanced_6) scorecard from the backtest: share,
-      roll_next_month, exit_8plus_within_k, same_state_next_month per state.
-   d. Orthogonality: the eta² table and stabilized-vs-money-in. Name the largest overlap.
-   e. Which option the data supports, using METHODOLOGY.md §8 "Choosing the option":
-      E19b (repeat delinquent vs credibility clean point), E17 (slow-roller split size), E22 (residual
-      clusters), E25 (outcome spread across the fixed states).
-4. Keep it factual: every number you quote must come from the output. Mark anything
-   you infer as an inference.
+Report, in this order:
+a. Any FAIL (E01, E02, E03). If present, STOP: diagnose and propose the config fix.
+b. In FILE mode, outcome checks (E03, E10–E12, E23–E25) are SKIPPED because a snapshot of
+   today's segment has no accounts that left it — say so once; that is expected. E13, E14
+   and E26 run on survivors.
+c. Each WARN: observed value, expected range, the check's anchor (bank / design /
+   synthetic / data) and its "if_not_met" action. Say whether the action needs a config
+   change, a decision from me, or nothing. A WARN on a "synthetic" anchor is a prompt to
+   look, not proof of a problem.
+d. The option-B state shares, and how they compare with the bank's figures (EPD ~6% under
+   the bank's broader bust-out rule; stabilized ~6%).
+e. E07: which of the four spell definitions comes closest to the bank's ~85%.
+f. E04 (histories that start delinquent) and E27 / E28 (padding, calendar artefacts).
+g. Which option the data supports, using METHODOLOGY.md §8 "Choosing the option".
+Every number you quote must come from the output. Mark anything you infer as an inference.
 ```
 
 ---
@@ -837,22 +963,21 @@ Task: run the full validation and interpret it against the written expectations.
 ```
 Task: address the WARN checks from the last run, within strict limits.
 
-Allowed without asking me:
-- config.py changes (names, CHAR_MAP, STRIP_CHARS, filters, flags).
+Allowed without asking me: config.py changes (names, CHAR_MAP, STRIP_CHARS, filters,
+optional columns, COL_STRING_AS_OF).
 
-Allowed only after I approve, one at a time, each justified by a sweep table in the
-report (section 6) and the check's "if_not_met" text:
-- epd_max_history (sweep: epd_max_history), stabilized_min_in_band,
-  stabilized_long_run_months / stabilized_long_run_max_rise (see E26), repeat_min_prior_peak
-  (spell from 3 vs 4, see E07), seasoned_min_months.
+Allowed only after I approve, one at a time: the technical parameter
+straight_max_runup, and merging early-life straight roller into straight roller if E16
+shows it under 5% (set seasoned_min_months=None in the option — this was pre-agreed).
 
-Not allowed: changing the tree structure, adding or removing states, editing
-expectations to make a check pass, using payment-promise / inflow / ability columns
-inside states.py.
+Never: changing [business] parameters (epd_max_history, epd_max_blips,
+stabilized_min_in_band, stabilized_long_run_*, repeat_min_prior_peak,
+repeat_window_months, seasoned_min_months) to hit a share; changing the tree; adding or
+removing states; editing expectations to make a check pass; using payment-promise /
+inflow / ability columns inside states.py. For those, write me the evidence (the sweep
+rows in section 6 of the report) and I decide.
 
-For each WARN: propose the smallest change, show the sweep row that supports it, predict
-which checks it affects, and wait for my OK. After approved changes, give me the cell to
-re-run and compare old vs new check tables.
+After approved changes, re-run and compare old vs new check tables.
 ```
 
 ---
@@ -863,15 +988,16 @@ re-run and compare old vs new check tables.
 Task: compare this package's early_payment_default (the bank calls it bust-out) and
 stabilized with the bank's existing implementations.
 
-1. Find the existing bust-out and stabilized logic in this repo (search for
-   "bust", "stabil", "dpd", pipeline nodes, SQL). List the files and quote the rules.
-2. Translate each into the terms of METHODOLOGY.md §4 (history before the spell, earlier
-   peak, run-up length, months within ±1 of today's bucket out of the last 6).
+1. Find the existing bust-out and stabilized logic in this repo (search for "bust",
+   "stabil", "dpd", pipeline nodes, SQL). List the files and quote the rules.
+2. Translate each into the terms of METHODOLOGY.md §4 (history before the spell, blips,
+   earlier spells, "never paid since crossing bucket 2", months within ±1 of today's
+   bucket out of the last 6, the long-run clause).
 3. List every difference and its likely effect on the shares (E08/E09) and recall
    (E10/E11). If the existing flags are available as columns, wire them into
-   EXISTING_RULE_COLS in config.py so the next run measures agreement directly.
-4. Do not change states.py. If our definition should move toward the bank's, propose
-   the parameter change for P3.
+   EXISTING_RULE_COLS in config.py so the next run measures agreement directly
+   (1/0, Y/N and True/False are all read correctly).
+4. Do not change states.py. Report the differences to me for a decision.
 ```
 
 ---
@@ -879,28 +1005,49 @@ stabilized with the bank's existing implementations.
 ## P5 — One-page summary for the risk team
 
 ```
-Task: write a one-page summary for the Group Retail Risk team from the latest
-results/dpd_states_validation_<model_id>_<date>.json (and .md).
+Task: write a one-page summary for the Group Retail Risk team from the latest results
+file (and its .md).
 
 Audience: risk managers, not data scientists. No code, no eta², no ARI.
 Structure:
-1. What the states are (one line each) and the action each points to — use the display
-   names and the table in METHODOLOGY.md §4 (and §4.1 for the names: EPD was formerly
-   called bust-out; slow roller is also called partial payer), with the REAL shares from
-   the results.
-2. What the backtest shows: which states roll, which stay stabilized, how stable they are month to
-   month — real numbers only.
+1. What the states are (one line each, display names) and the action each points to —
+   use the table in METHODOLOGY.md §4 and §4.1 (EPD was formerly called bust-out; slow
+   roller is also called partial payer), with the REAL shares from the results.
+2. What the run shows — real numbers only. In file mode: shares, stability, data quality;
+   say that outcomes need the Spark backtest.
 3. How this fits with locatability, ability and credibility: where it adds information
    and where it overlaps (stabilized ↔ money coming in; repeat delinquent ↔ clean history).
 4. The option we recommend (A/B/C) and why, in two sentences.
 5. Open decisions for the risk team (METHODOLOGY.md §10), as questions.
-Every number must come from the results file. Write it to
-docs/deterioration_states/results/risk_summary_<model_id>_<date>.md.
+Write it to docs/deterioration_states/results/risk_summary_<date>.md.
 ```
 
 ---
 
-## P6 — Productionise the chosen option (only after a decision)
+## P6 — Spark validation with outcomes (after file-mode sign-off)
+
+```
+Task: run the Spark validation, which adds the outcome backtest.
+
+1. Find the dataset with one DPD-history string per credit-card account at the latest
+   month. For outcomes it must still contain accounts that have since rolled to 8+ or
+   closed, and every string must end in the same month (if strings freeze at charge-off,
+   find the column with the string's as-of date for COL_STRING_AS_OF). If several
+   candidates exist, list them with their columns and ask me.
+2. Fill in DS_STRINGS_TMPL, KEY, COL_SNAPSHOT / ROW_FILTER / COL_STRING_AS_OF as needed in
+   config.py, and the globals_dev accessor in snippets/dpd_states_validate.py
+   (_resolve_model_id). The string column must be a string type.
+3. Give me the notebook cell from the snippet docstring for main(catalog, check_only=True).
+   When I paste the CHECK block back, verify: counts plausible, rows == accounts, newest
+   digit 4–7 / oldest digit mostly 0/1, no WARNING lines. Then the full run:
+   result = main(catalog). Config edits take effect without a kernel restart (the config
+   fingerprint is printed).
+4. Interpret with P2 (now E03 and the outcome checks run).
+```
+
+---
+
+## P7 — Productionise the chosen option (only after sign-off)
 
 ```
 Task: add the deterioration state as a pipeline output, using the option I name:
@@ -908,20 +1055,22 @@ Task: add the deterioration state as a pipeline output, using the option I name:
 
 1. Follow this repo's existing pipeline patterns (find a comparable node and copy its
    structure, naming, catalog entries and tests). Do not invent conventions.
-2. The node takes the spine's DPD strings and returns: account key, snapshot date,
-   state code, display name (dpd_states.states.DISPLAY_NAMES), option name, and the
-   assignment features (months_before_spell, n_blips,
-   n_prior_episodes, max_prior_bucket, runup_len, runup_pays, last6_in_band) for auditability.
-   Call dpd_states.features.build_features and dpd_states.states.assign_states — do not
-   re-implement the logic. If the data is large, apply them per partition
-   (mapInPandas / applyInPandas).
-3. model_id from globals, never hardcoded; new catalog entries model_id-namespaced like
+2. The node takes the DPD strings and, in this order: cleans them with
+   dpd_states.analysis.clean_strings, keeps today's spine (current bucket 4–7), then calls
+   dpd_states.features.build_features and dpd_states.states.assign_states — do not
+   re-implement the logic. Apply per partition (mapInPandas / applyInPandas).
+3. Output: account key, snapshot date, state code, display name
+   (dpd_states.states.DISPLAY_NAMES), option name, and the assignment features for
+   auditability: left_censored, months_before_spell, n_blips, n_prior_episodes,
+   gap_prior_peak3, spell_pay_events, runup_len, runup_pays, last6_in_band,
+   months_since_4, chg_6m, n_glitches, n_jumps_repaired.
+4. model_id from globals, never hardcoded; new catalog entries model_id-namespaced like
    the existing ones.
-4. Ship a validation snippet to the same contract as snippets/dpd_states_validate.py:
+5. Ship a validation snippet to the same contract as snippets/dpd_states_validate.py:
    row counts, null rates, share per state, MECE check (exactly one state per account),
-   agreement with the last validation run's shares (within 1pp), and a few example
-   strings without keys.
-5. Show me the diff and the catalog entries before anything runs.
+   agreement with the last validation run's shares (within 1pp), and banded journey
+   shapes (no raw strings, no keys).
+6. Show me the diff and the catalog entries before anything runs.
 ```
 `````
 
@@ -933,43 +1082,61 @@ sha256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` · 0 l
 `````
 
 ### FILE: `dpd_states/config.py`
-sha256 `d26c4fa79d7807166f9ad77459a0e94d21bc5b95b023876e6948cc16c9201172` · 56 lines · trailing newline: yes
+sha256 `1c228fae11e2c44c89686e29c068a8b270b56aa1149e9cf68a9cb47315b19439` · 75 lines · trailing newline: yes
 
 `````python
 """Workplace configuration — the ONLY file that needs editing to run on real data.
 
 Every <<FILL-IN>> must be replaced with a name discovered in the workplace repo / Kedro
 catalog. Never guess a dataset or column name: if it cannot be found, ask the user.
-`model_id` is NOT configured here — the snippet resolves it from the caller or globals.
+`model_id` is NOT configured here — the Spark snippet resolves it from the caller or globals.
+
+Two ways to run:
+  * FILE mode (methodology sign-off, no Spark):  python docs/deterioration_states/run.py validate
+    reads INPUT_FILE / COL_DPD below.
+  * SPARK mode (PROD, later):  snippets/dpd_states_validate.py  main(catalog)
+    reads DS_STRINGS_TMPL / KEY / COL_DPD.
 """
 
-# --- dataset -------------------------------------------------------------------
+# --- file mode -------------------------------------------------------------------------
+# Path relative to the repo root (or absolute). One row per account, today's snapshot.
+INPUT_FILE = "data/input/dpd_synthetic_data.xlsx"   # CC 60–180 DPD segment, Aug 2026
+
+# --- the DPD string (both modes) --------------------------------------------------------
+# Must be read as TEXT: a numeric column drops digits (Excel keeps only 15 significant
+# digits; leading zeros vanish). The first billed month is the OLDEST (rightmost) digit.
+COL_DPD = "dpd_history_str"
+
+# --- Spark mode dataset ----------------------------------------------------------------
 # One row per credit-card account with its DPD bucket-history string AS OF THE LATEST
 # MONTH. For the backtest it must contain ALL card accounts that were in buckets 4–7
-# `BACKTEST_MONTHS` ago — including those that have since rolled to 8+ or closed —
-# not only today's spine. If only today's spine is available, the backtest is skipped
-# (set DS_STRINGS_HAS_EXITED = False) and the outcome checks report SKIPPED.
+# `BACKTEST_MONTHS` ago — including those that have since rolled to 8+ or closed — and
+# every string must end in the same (latest) month. If only today's spine is available,
+# set DS_STRINGS_HAS_EXITED = False: outcome checks are skipped, stability checks run on
+# the survivors.
 DS_STRINGS_TMPL = "{model_id}.<<FILL-IN: dataset with one DPD-history string per card account>>"
 DS_STRINGS_HAS_EXITED = True
-
 KEY = "<<FILL-IN: account key column>>"          # used only for counting distinct accounts
-COL_DPD = "<<FILL-IN: DPD bucket-history string column>>"
 
-# If the dataset holds several snapshots per account, name the snapshot column; the
-# latest snapshot is used. None = the dataset is already one row per account.
+# Several snapshots per account? Name the snapshot column; the latest snapshot is used.
 COL_SNAPSHOT = None
+# Date the string was last updated, if it can lag the snapshot (strings frozen at
+# charge-off / closure). Rows whose string is older than the latest are excluded from the
+# backtest, because their newest digit is not "today". None = all strings are current.
+COL_STRING_AS_OF = None
 # Optional Spark SQL filter applied first (scope), e.g. "product_type = 'CREDIT_CARD'".
 ROW_FILTER = None
 
-# --- string conventions ----------------------------------------------------------
+# --- string conventions ------------------------------------------------------------------
 LEFTMOST_IS_CURRENT = True    # '54320002000': leftmost digit = current month's bucket
-CHAR_MAP = {}                 # non-digit codes -> digit, e.g. {"X": "9", "W": "9"}
-STRIP_CHARS = " "             # characters removed before parsing (padding, separators)
+CHAR_MAP = {}                 # non-digit BUCKET codes -> digit, e.g. a write-off letter {"W": "9"}.
+                              # Never map a pre-opening / padding character to a bucket.
+STRIP_CHARS = " "             # removed from the two ENDS only (padding); never mid-string
 SPINE_BUCKETS = (4, 5, 6, 7)  # today's spine
 EXIT_BUCKET = 8               # 8+ is a different category (leaves the spine)
 BACKTEST_MONTHS = 6           # outcomes are read from the newest k digits
 
-# --- optional columns on the same dataset (None = not available) -----------------
+# --- optional columns on the same dataset / file (None = not available) -------------------
 # Other persona axes, at the latest month. Used only to MEASURE overlap with the
 # deterioration states (orthogonality), never to assign states.
 AXIS_COLS = {
@@ -982,7 +1149,8 @@ AXIS_COLS = {
     "in_country_flag": None,        # locatability
 }
 # The bank's existing implementations of the two known states, if they exist as columns
-# (1/0). Used to measure agreement with this package's bust_out and holding.
+# (1/0, Y/N or True/False). Used to measure agreement with this package's
+# early_payment_default (the bank's "bust-out") and stabilized.
 EXISTING_RULE_COLS = {
     "existing_bust_out": None,
     "existing_stabilized": None,
@@ -995,7 +1163,7 @@ FLAG_COLS = {
 `````
 
 ### FILE: `dpd_states/features.py`
-sha256 `bee2fa01e483a8554e9515c797a782865f5875a08c64a97fd3e56df3536c7ebc` · 133 lines · trailing newline: yes
+sha256 `a748b3314dc2bd84dcc03295ce9c73ce85ed10a5788059c1d4c45eb8371c47ac` · 177 lines · trailing newline: yes
 
 `````python
 """Encode DPD strings and derive per-account journey features.
@@ -1010,14 +1178,19 @@ Encoding (time runs oldest -> newest after reversing the string):
         2 = H  hold at >=2, paid one month (d = 0)
         3 = P  moved back, paid 2+ months (d < 0); back to <=1 is a cure
 
-Billing-cycle artefacts are repaired before encoding: a +2 jump next to a hold
-(3 3 5 or 3 5 5) is rewritten as the straight roll it was (3 4 5). A +2 jump with no
-neighbouring hold stays and is read as a roll (paid nothing); both are counted.
+Data artefacts are cleaned before encoding (all counted, never silent):
+  * impossible one-month glitches — a single month at 0/1 between two months at 3+ (a cure
+    cannot be followed by a jump to 3+), or a single month at 3+ between two clean months
+    (an account cannot jump from 0 to 3) — are read as a hold and as a clean month;
+  * billing-cycle +2 jumps (3 3 5 or 3 5 5 for a true 3 4 5) are rewritten as the straight
+    roll. The hold BEFORE the jump is preferred as the artefact (it is already observed), the
+    hold after only if that does not move a month observed at 4 back below 4; a hold at 0/1
+    is never treated as an artefact. Any other +2 stays and is read as a roll.
 
-Features are built to be invariant to the current bucket, which for most of the
-spine is only a clock (months since reaching 4): lifetime and run-up features are
-fixed once the account passes 4, and recent-behaviour features are rates within the
-current spell.
+Features are built to be invariant to the current bucket, which for most of the spine is
+only a clock (months since reaching 4): lifetime and run-up features are fixed once the
+account passes 4. The two exceptions are deliberate current-behaviour inputs to the
+'stabilized' question: last6_in_band, and months_since_4 + chg_6m (long-run clause).
 """
 from __future__ import annotations
 
@@ -1026,27 +1199,50 @@ import pandas as pd
 
 N, R, H, P = 0, 1, 2, 3
 LETTERS = "NRHP"
+NO_PRIOR = 9999          # gap value when there is no qualifying earlier spell
+
+
+def _glitches(b: np.ndarray) -> tuple[np.ndarray, int]:
+    """Impossible single-month glitches. Returns (b, n_fixed)."""
+    b = b.copy()
+    n = 0
+    for t in range(1, len(b) - 1):
+        if b[t] <= 1 and b[t - 1] >= 3 and b[t + 1] >= 3:      # 4 0 4 -> 4 4 4
+            b[t] = b[t - 1]
+            n += 1
+        elif b[t] >= 3 and b[t - 1] <= 1 and b[t + 1] <= 1:    # 0 3 0 -> 0 0 0
+            b[t] = 1
+            n += 1
+    return b, n
 
 
 def _repair(b: np.ndarray) -> tuple[np.ndarray, int, int]:
-    """Undo +2 billing-cycle jumps that sit next to a hold. Returns (b, repaired, left)."""
+    """Undo +2 billing-cycle jumps next to a hold at >=2. Returns (b, repaired, left)."""
     b = b.copy()
     repaired = 0
-    for i in np.flatnonzero(np.diff(b) == 2):
-        if i + 2 < len(b) and b[i + 2] == b[i + 1]:          # 3 5 5 -> 3 4 5
-            b[i + 1] -= 1
-            repaired += 1
-        elif i >= 1 and b[i] == b[i - 1]:                     # 3 3 5 -> 3 4 5
+    for i in range(len(b) - 1):
+        if b[i + 1] - b[i] != 2:
+            continue
+        if i >= 1 and b[i] == b[i - 1] and b[i] >= 2:                     # 3 3 5 -> 3 4 5
             b[i] += 1
+            repaired += 1
+        elif i + 2 < len(b) and b[i + 2] == b[i + 1] and b[i + 1] != 4:    # 3 5 5 -> 3 4 5
+            b[i + 1] -= 1
             repaired += 1
     left = int((np.diff(b) >= 2).sum())
     return b, repaired, left
 
 
+def _digits(dpd: str) -> np.ndarray:
+    if not isinstance(dpd, str) or not dpd.isdigit():
+        raise ValueError(f"DPD string must be digits only, got {dpd!r}")
+    return np.maximum(np.array([int(ch) for ch in reversed(dpd)]), 1)
+
+
 def encode(dpd: str, repair: bool = True) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    b = np.maximum(np.array([int(ch) for ch in reversed(dpd)]), 1)
+    b = _digits(dpd)
     if repair:
-        b = _repair(b)[0]
+        b = _repair(_glitches(b)[0])[0]
     d = np.diff(b)
     cur = b[1:]
     c = np.full(len(d), R)                  # +1 and any leftover +2 read as a roll
@@ -1063,9 +1259,12 @@ def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
 
 
 def journey_features(dpd: str) -> dict:
-    raw = np.maximum(np.array([int(ch) for ch in reversed(dpd)]), 1)
-    _, n_repaired, n_jumps_left = _repair(raw)
+    g, n_glitches = _glitches(_digits(dpd))
+    _, n_repaired, n_jumps_left = _repair(g)
     b, d, c = encode(dpd)
+    if b[-1] < 2:
+        raise ValueError(f"not in a delinquent spell (current bucket < 2): {dpd!r} — "
+                         "apply the spine filter (current bucket 4–7) before build_features")
     paid = np.clip(1 - d, 0, None)                      # months paid per month
 
     episodes = _runs(b >= 2)                            # current spell is the last one
@@ -1074,6 +1273,12 @@ def journey_features(dpd: str) -> dict:
     is_blip = [e - s <= 2 and b[s:e].max() <= 2 for s, e in episodes[:-1]]
     prior = [ep for ep, blip in zip(episodes[:-1], is_blip) if not blip]
     first_spell = (prior + [episodes[-1]])[0][0]        # blips don't end clean tenure
+
+    def gap_prior(peak: int) -> int:
+        """Clean months between the end of the most recent earlier (non-blip) spell that
+        reached `peak` and the start of the current spell. Fixed once the spell starts."""
+        ends = [e for s, e in prior if b[s:e].max() >= peak]
+        return int(sp_start - ends[-1]) if ends else NO_PRIOR
 
     # transitions landing inside the current spell
     t0 = max(sp_start - 1, 0)
@@ -1105,14 +1310,18 @@ def journey_features(dpd: str) -> dict:
         "n_prior_episodes": len(prior),
         "max_prior_bucket": int(max((b[s:e].max() for s, e in prior), default=0)),
         "clean_gap_before_current": int(sp_start - (prior[-1][1] if prior else 0)),
+        "gap_prior_peak2": gap_prior(2),
+        "gap_prior_peak3": gap_prior(3),
+        "gap_prior_peak4": gap_prior(4),
         # run-up (fixed once past 4)
         "runup_len": int(first4 - sp_start + 1),        # 3 = straight 2-3-4
         "runup_holds": int((ru_c == H).sum()),
         "runup_pays": int((ru_c == P).sum()),
         # current spell
         "spell_len": int(sp_end - sp_start),
+        "spell_pay_events": int((sp_c != R).sum()),     # months in this spell with a payment
         "max_hold_run": int(max(hold_runs, default=0)),
-        "months_since_4": int(months_since_4),          # months in buckets 4+ this spell
+        "months_since_4": int(months_since_4),          # months since first reaching 4 this spell
         "post4_paid_rate": float(paid[first4:].mean()) if months_since_4 > 0 else 0.0,
         # recent behaviour (rates within the current spell, last 6 months)
         "rec_roll_rate": float((w_c == R).mean()) if len(w_c) else 1.0,
@@ -1123,18 +1332,21 @@ def journey_features(dpd: str) -> dict:
         "chg_6m": int(b_now - b[max(len(b) - 7, 0)]),
         # data quality
         "left_censored": bool(sp_start == 0),           # history starts inside the spell
+        "n_glitches": n_glitches,
         "n_jumps_repaired": n_repaired,
         "n_jumps_left": n_jumps_left,
     }
 
 
 def build_features(df: pd.DataFrame, col: str = "dpd_string") -> pd.DataFrame:
+    if len(df) == 0:
+        raise ValueError("build_features got an empty frame — check the spine filter / sample")
     feats = pd.DataFrame([journey_features(s) for s in df[col]], index=df.index)
     return pd.concat([df, feats], axis=1)
 `````
 
 ### FILE: `dpd_states/states.py`
-sha256 `a9ac97495996d19b2f73dfaa4c74a956dd7b3573774ca48562c27c6c89842ae8` · 152 lines · trailing newline: yes
+sha256 `e3343f203c7282925a0de53028950f09e3b1872a07aecc5183fbf8b05a2e9f95` · 191 lines · trailing newline: yes
 
 `````python
 """Deterioration states for the bucket 4–7 spine: a small decision tree, MECE by construction.
@@ -1142,15 +1354,21 @@ sha256 `a9ac97495996d19b2f73dfaa4c74a956dd7b3573774ca48562c27c6c89842ae8` · 152
 Questions are asked in order; the first 'yes' assigns the state. Optional questions are
 switched on per option (A / B / C) and never break MECE.
 
+    Q0  History starts delinquent?  the string's oldest month is already at bucket 2+
+                                (restructured account opened at its old bucket, migrated
+                                or missing history) — data quality, not behaviour
+                                                               -> history_starts_delinquent
     Q1  Early payment default?  <=3 months of history before this spell (at most one
-                                blip inside it, no earlier real spell), run-up to 4
-                                took <=3 months                -> early_payment_default
+                                blip inside it, no earlier real spell) AND never paid
+                                since crossing bucket 2: every month of the spell a
+                                roll, still falling            -> early_payment_default
     Q2  Stabilized?             5 of the last 6 months within today's bucket ±1,
-                                OR (>= 6 months in buckets 4+ AND at most 1 bucket
-                                higher than 6 months ago)      -> stabilized
+                                OR (>= 6 months since first reaching 4 AND at most 1
+                                bucket higher than 6 months ago) -> stabilized
     Q3  Paying since 4?         [tested, NOT recommended] paid >= half a month's
                                 due per month since first reaching 4 -> paying_since_4
-    Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3 and cured
+    Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and
+                                ended within 24 months before this spell started
                                                                -> repeat_delinquent
     Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
           yes -> straight_roller   [B, C split: >=12 months of history before the spell
@@ -1163,8 +1381,12 @@ Code names are stable identifiers; DISPLAY_NAMES / REMARKS carry the business la
 Orthogonality: Q3 (paying now) and Q4 (earlier spell) overlap the payment-credibility
 axis (money coming in; pre-delinquency clean), which is why Q3 is off everywhere and Q4
 is off in option A. Q1, Q5 and the splits use only the run-up and history length.
-Q2 describes current behaviour and moves month to month; every other state is fixed once
-the account has passed bucket 4.
+Q2 describes current behaviour and moves month to month; EPD ends the month the account
+pays; every other state is fixed once the account has passed bucket 4 (it can only move
+into stabilized).
+
+Parameters marked [business] are agreed business definitions: change them only with the
+business owner — never to make a share or an expectation check come out right.
 """
 from __future__ import annotations
 
@@ -1172,23 +1394,24 @@ import numpy as np
 import pandas as pd
 
 DEFAULTS = {
-    "epd_max_history": 3,           # months of history before the current spell (blip incl.)
-    "epd_max_blips": 1,             # at most one blip (1–2 months at 2, paid off) in that history
+    "epd_max_history": 3,           # [business] months of history before the spell (blip incl.)
+    "epd_max_blips": 1,             # [business] at most one blip (1–2 months at 2, paid off)
     "straight_max_runup": 3,        # months from last clean month to first month at 4
-    "stabilized_min_in_band": 5,    # of the last 6 months within today's bucket ±1
-    # Long-run clause: an account that has stayed in buckets 4+ for 6 months while rising
-    # at most one bucket has paid roughly what was due, even if unevenly (oscillating
-    # payers, accounts that just paid down). Straight rollers cannot meet it: they leave
-    # the spine within ~4 months. None disables it.
+    "stabilized_min_in_band": 5,    # [business] of the last 6 months within today's bucket ±1
+    # [business] Long-run clause: an account 6+ months past first reaching 4 that has risen
+    # at most one bucket in 6 months has paid roughly what was due, even if unevenly
+    # (oscillating payers, accounts that just paid down). Straight rollers cannot meet it:
+    # they leave the spine within ~4 months. None disables it.
     "stabilized_long_run_months": 6,
     "stabilized_long_run_max_rise": 1,
     # Q3 tested and NOT recommended: unstable (~37% leave it each month), drags the
     # stability of other states to ~90%, barely separates risk, and is mostly the
     # credibility axis's 'money coming in'. Kept only so the test can be repeated.
     "paying_since_4_min_rate": None,  # e.g. 0.5 -> Q3 on
-    "repeat_min_prior_peak": None,  # e.g. 3   -> Q4 on (spell counted from bucket 3)
-    "seasoned_min_months": None,    # e.g. 12  -> split straight roller (first year on book = early life)
-    "split_slow_roller": False,     # True     -> split slow roller by 2+ month payments in run-up
+    "repeat_min_prior_peak": None,  # [business] e.g. 3 -> Q4 on (earlier spell reached 3)
+    "repeat_window_months": 24,     # [business] earlier spell ended <= 24 months before this one
+    "seasoned_min_months": None,    # [business] e.g. 12 -> split straight roller (first year = early life)
+    "split_slow_roller": False,     # True -> split slow roller by 2+ month payments in run-up
 }
 
 OPTIONS = {
@@ -1198,14 +1421,21 @@ OPTIONS = {
 }
 RECOMMENDED = "B_balanced_6"
 
-STATE_ORDER = ["early_payment_default", "stabilized", "paying_since_4", "repeat_delinquent",
-               "straight_roller", "straight_roller_seasoned", "straight_roller_early_life",
-               "slow_roller", "slow_roller_intermittent", "slow_roller_erratic"]
-FIXED_STATES = [s for s in STATE_ORDER if s not in ("stabilized", "paying_since_4")]
+STATE_ORDER = ["history_starts_delinquent", "early_payment_default", "stabilized", "paying_since_4",
+               "repeat_delinquent", "straight_roller", "straight_roller_seasoned",
+               "straight_roller_early_life", "slow_roller", "slow_roller_intermittent",
+               "slow_roller_erratic"]
+# States that never change once the account is past bucket 4 (how they fell in). EPD is
+# not one of them: it ends the month the account pays. Stabilized / paying_since_4 describe
+# current behaviour. A fixed state may legitimately move INTO stabilized.
+FIXED_STATES = [s for s in STATE_ORDER
+                if s not in ("early_payment_default", "stabilized", "paying_since_4")]
+CURRENT_STATES = ["stabilized", "paying_since_4"]
 
 # Business labels (common card-risk / collections terms). Change freely: code never
 # reads these, so renaming for the risk team cannot break the pipeline or old results.
 DISPLAY_NAMES = {
+    "history_starts_delinquent": "Not classified — history starts delinquent",
     "early_payment_default": "Early payment default (EPD)",
     "stabilized": "Stabilized",
     "paying_since_4": "Paying since bucket 4 (tested, not used)",
@@ -1218,22 +1448,41 @@ DISPLAY_NAMES = {
     "slow_roller_erratic": "Erratic payer",
 }
 REMARKS = {
-    "early_payment_default": "Never really paid: defaulted within the first three payments. Called "
-                             "'bust-out' internally — but classic bust-out fraud (good history, limit "
-                             "build-up, then max-out) shows as a seasoned straight roller and needs a "
-                             "fraud overlay on spend data.",
-    "stabilized": "The bank's 5-of-6 stabilized rule, plus a long-run clause (6+ months in "
-                  "buckets 4+, at most one bucket higher than 6 months ago) so oscillating "
+    "history_starts_delinquent": "Data quality, not behaviour: the oldest month in the string is "
+                                 "already delinquent — typically a restructured card/loan re-opened at "
+                                 "its old bucket, a migrated account or missing history. Rare; treatment "
+                                 "of restructured accounts is deferred.",
+    "early_payment_default": "Never paid since crossing bucket 2 and still falling, at most 3 months "
+                             "after the first bill. Called 'bust-out' internally — but classic bust-out "
+                             "fraud (good history, limit build-up, then max-out) shows as a seasoned "
+                             "straight roller and needs a fraud overlay on spend data.",
+    "stabilized": "The bank's 5-of-6 stabilized rule, plus a long-run clause (6+ months since "
+                  "first reaching 4, at most one bucket higher than 6 months ago) so oscillating "
                   "payers and accounts that just paid down are not mislabelled.",
     "paying_since_4": "Rejected — current-behaviour state that belongs to credibility (money coming in).",
-    "repeat_delinquent": "Re-default after a cured spell; collections 'recidivism'.",
-    "straight_roller": "Rolled through every bucket without paying.",
-    "straight_roller_seasoned": "Straight roller after at least a year on book (seasoned).",
-    "straight_roller_early_life": "Straight roller in the first year on book (early-life default).",
-    "slow_roller": "Paid something on the way down but kept rolling. Also called partial payer.",
-    "slow_roller_intermittent": "Slow roller that paid one month here and there.",
-    "slow_roller_erratic": "Slow roller that caught up 2+ months at once, then rolled again.",
+    "repeat_delinquent": "Re-default within 24 months of curing a spell that reached bucket 3; "
+                         "collections 'recidivism'.",
+    "straight_roller": "Rolled straight to bucket 4 (no payment on the way down). Describes how "
+                       "they fell in — some have paid since.",
+    "straight_roller_seasoned": "Rolled straight to bucket 4 after at least a year on book (seasoned).",
+    "straight_roller_early_life": "Rolled straight to bucket 4 in the first year on book (early-life default).",
+    "slow_roller": "Paid something on the way down to bucket 4 but kept rolling. Also called partial payer.",
+    "slow_roller_intermittent": "Slow roller that paid one month here and there on the way down.",
+    "slow_roller_erratic": "Slow roller that caught up 2+ months at once on the way down, then rolled again.",
 }
+
+
+def option_states(option: str) -> list[str]:
+    """Every state an option can produce (for share tables that must show empty states)."""
+    p = {**DEFAULTS, **OPTIONS[option]}
+    out = ["history_starts_delinquent", "early_payment_default", "stabilized"]
+    out += ["paying_since_4"] if p["paying_since_4_min_rate"] is not None else []
+    out += ["repeat_delinquent"] if p["repeat_min_prior_peak"] is not None else []
+    out += (["straight_roller_seasoned", "straight_roller_early_life"]
+            if p["seasoned_min_months"] is not None else ["straight_roller"])
+    out += (["slow_roller_erratic", "slow_roller_intermittent"] if p["split_slow_roller"]
+            else ["slow_roller"])
+    return order(out)
 
 
 def assign_states(f: pd.DataFrame, **params) -> pd.Series:
@@ -1246,8 +1495,9 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
         conds.append(cond)
         names.append(name)
 
+    add(f.left_censored, "history_starts_delinquent")
     add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])
-        & (f.n_prior_episodes == 0) & fast, "early_payment_default")
+        & (f.n_prior_episodes == 0) & (f.spell_pay_events == 0), "early_payment_default")
     stab = f.last6_in_band >= p["stabilized_min_in_band"]
     if p["stabilized_long_run_months"] is not None:
         stab |= ((f.months_since_4 >= p["stabilized_long_run_months"])
@@ -1256,7 +1506,8 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
     if p["paying_since_4_min_rate"] is not None:
         add(f.post4_paid_rate >= p["paying_since_4_min_rate"], "paying_since_4")
     if p["repeat_min_prior_peak"] is not None:
-        add(f.max_prior_bucket >= p["repeat_min_prior_peak"], "repeat_delinquent")
+        gap = f[f"gap_prior_peak{min(max(int(p['repeat_min_prior_peak']), 2), 4)}"]
+        add(gap <= p["repeat_window_months"], "repeat_delinquent")
     if p["seasoned_min_months"] is not None:
         add(fast & (f.months_before_spell >= p["seasoned_min_months"]), "straight_roller_seasoned")
         add(fast, "straight_roller_early_life")
@@ -1292,13 +1543,13 @@ def state_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series | N
 `````
 
 ### FILE: `dpd_states/analysis.py`
-sha256 `62e3fe95ec69da9d63b0a9bbf60bee146411d31d28231beafa898dc664f9492c` · 377 lines · trailing newline: yes
+sha256 `f00e888012aef0fb5fa0eaa81a7f23e347a31ed102a8a78da55596033eb3a96f` · 544 lines · trailing newline: yes
 
 `````python
 """Real-data analysis of deterioration states — pure pandas, no Spark.
 
-`run(current, latest_bt, cfg)` takes two small pandas frames that the Spark snippet has
-already scoped and sampled:
+`run(current, latest_bt, cfg, spark_counts=None)` takes two small pandas frames that the
+Spark snippet has already scoped and sampled:
 
     current    accounts in today's spine (current bucket 4–7): `dpd_string` plus any
                optional columns named as the keys of cfg.AXIS_COLS / EXISTING_RULE_COLS /
@@ -1306,23 +1557,27 @@ already scoped and sampled:
     latest_bt  accounts that were in the spine k = cfg.BACKTEST_MONTHS months ago, with
                their string AS OF TODAY (k newer digits on the left). Dropping those k
                digits gives the string as it was k months ago; the dropped digits are what
-               happened next. None = no backtest (outcome checks are skipped).
+               happened next. ASSUMES every string ends in the same (latest) month — strings
+               frozen at charge-off or closure break this (see METHODOLOGY §8). None = no
+               backtest (outcome checks are skipped).
 
-Returns (results, markdown). `results` is JSON-serialisable aggregates only — no keys,
-no row-level data — so it can be committed. The markdown adds a handful of example
-DPD strings (no keys) for eyeballing.
+Returns (results, markdown). Both hold aggregates only — no keys and no raw DPD strings;
+examples are banded journey shapes shared by at least MIN_SHAPE_COUNT accounts.
 """
 from __future__ import annotations
 
+import math
 import re
 
 import numpy as np
 import pandas as pd
 
 from . import discover as dv
-from .features import build_features, encode, _runs
+from .features import H, P, build_features, encode, _runs
 from .states import (DISPLAY_NAMES, FIXED_STATES, OPTIONS, RECOMMENDED, REMARKS,
-                     assign_states, order)
+                     assign_states, option_states, order)
+
+MIN_SHAPE_COUNT = 10          # governance: never show a journey shape rarer than this
 
 
 # --- helpers ---------------------------------------------------------------------
@@ -1339,29 +1594,56 @@ def md(df: pd.DataFrame, index: bool = True, floatfmt: str = "{:.3f}") -> str:
     return "\n".join([head, sep] + ["| " + " | ".join(r) + " |" for r in cells])
 
 
+def _num(v):
+    if isinstance(v, (float, np.floating)):
+        return None if math.isnan(v) else round(float(v), 4)
+    return v.item() if hasattr(v, "item") else v
+
+
 def _records(df: pd.DataFrame) -> list[dict]:
-    out = df.reset_index().replace({np.nan: None})
-    return [{k: (round(v, 4) if isinstance(v, (float, np.floating)) else
-                 (v.item() if hasattr(v, "item") else v)) for k, v in r.items()}
-            for r in out.to_dict("records")]
+    return [{str(k): _num(v) for k, v in r.items()} for r in df.reset_index().to_dict("records")]
+
+
+def _json_safe(obj):
+    """Recursively make results JSON-safe: str keys, NaN -> None, numpy -> python."""
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return _num(obj)
 
 
 def clean_strings(s: pd.Series, char_map: dict, strip_chars: str, leftmost_is_current: bool = True):
-    """Normalise strings; returns (clean series, valid mask)."""
+    """Normalise strings; returns (clean series, valid mask). STRIP_CHARS are removed from
+    the two ends only — removing them mid-string would shift every older month."""
     s = s.astype(str)
     if strip_chars:
-        s = s.str.replace(f"[{re.escape(strip_chars)}]", "", regex=True)
+        s = s.str.strip(strip_chars)
     for a, b in (char_map or {}).items():
         s = s.str.replace(a, b, regex=False)
     if not leftmost_is_current:
         s = s.str[::-1]
-    valid = s.str.fullmatch(r"\d+").fillna(False) & (s.str.len() > 0)
+    valid = s.str.fullmatch(r"\d+").fillna(False).astype(bool) & (s.str.len() > 0)
     return s, valid
 
 
-def _spells(s: str, from_bucket: int) -> int:
+_TRUE = {"1", "y", "yes", "true", "t"}
+_FALSE = {"0", "n", "no", "false", "f"}
+
+
+def parse_flag(x: pd.Series) -> tuple[pd.Series, float]:
+    """1/0, Y/N, Yes/No, True/False (any case) -> bool. Returns (flag, share unparsed)."""
+    t = x.astype(str).str.strip().str.lower()
+    known = t.isin(_TRUE | _FALSE)
+    return t.isin(_TRUE), float(1 - known[x.notna()].mean()) if x.notna().any() else 1.0
+
+
+def _spells(s: str, from_bucket: int, how: str) -> int:
+    """'reached': runs at >=2 that reached the bucket; 'at': runs of months at >= the bucket."""
     b = encode(s)[0]
-    return sum(1 for a, e in _runs(b >= 2) if b[a:e].max() >= from_bucket)
+    if how == "reached":
+        return sum(1 for a, e in _runs(b >= 2) if b[a:e].max() >= from_bucket)
+    return len(_runs(b >= from_bucket))
 
 
 def _eta2(y: pd.Series, g: pd.Series) -> float:
@@ -1380,6 +1662,18 @@ def _ari(a, b) -> float:
     return float(adjusted_rand_score(a, b))
 
 
+def _std_rate(outcome: pd.Series, state: pd.Series, bucket: pd.Series) -> pd.Series:
+    """Outcome rate per state, standardised to the population's current-bucket mix, so a
+    state concentrated at bucket 4 is not flattered (or penalised) by where it sits."""
+    mix = bucket.value_counts(normalize=True)
+    rates = outcome.astype(float).groupby([state, bucket]).mean().unstack()
+    out = {}
+    for s_, row in rates.iterrows():
+        w = mix[row.dropna().index]
+        out[s_] = float((row.dropna() * w).sum() / w.sum()) if w.sum() else float("nan")
+    return pd.Series(out)
+
+
 # --- backtest frame ---------------------------------------------------------------
 
 def backtest_frame(latest: pd.Series, k: int, spine, exit_bucket: int) -> pd.DataFrame:
@@ -1396,21 +1690,27 @@ def backtest_frame(latest: pd.Series, k: int, spine, exit_bucket: int) -> pd.Dat
         "next_string": latest.str[k - 1:],
         "bucket_k": latest.str[0].astype(int),
         "exit_k": digits.apply(lambda d: max(d) >= exit_bucket),
+        "exit_3m": digits.apply(lambda d: max(d[-3:]) >= exit_bucket),   # first 3 future months
         "cure_k": digits.apply(lambda d: min(d) <= 1),
     })
 
 
-def backtest_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series) -> pd.DataFrame:
+def backtest_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series, spine) -> pd.DataFrame:
     g = f.assign(state=state)
+    rolled = g.next_bucket >= g.b_now + 1
     out = pd.DataFrame({"share": g.state.value_counts(normalize=True),
                         "n": g.state.value_counts()})
-    out["roll_next_month"] = (g.next_bucket >= g.b_now + 1).groupby(g.state).mean()
+    out["roll_next_month"] = rolled.groupby(g.state).mean()
+    out["roll_next_month_bucket_std"] = _std_rate(rolled, g.state, g.b_now)
+    out["exit_8plus_within_3m_bucket_std"] = _std_rate(g.exit_3m, g.state, g.b_now)
     out["exit_8plus_within_k"] = g.groupby("state").exit_k.mean()
     out["cure_within_k"] = g.groupby("state").cure_k.mean()
     out["median_bucket_change_k"] = (g.bucket_k.clip(upper=9) - g.b_now).groupby(g.state).median()
     idx = state_next.index
     out["same_state_next_month"] = (state.loc[idx] == state_next).groupby(state.loc[idx]).mean()
-    out["left_spine_next_month"] = (~g.next_bucket.between(4, 7)).groupby(g.state).mean()
+    kept = (state.loc[idx] == state_next) | (state_next == "stabilized")
+    out["kept_or_stabilized_next_month"] = kept.groupby(state.loc[idx]).mean()
+    out["left_spine_next_month"] = (~g.next_bucket.isin(spine)).groupby(g.state).mean()
     return out.loc[order(out.index)]
 
 
@@ -1425,8 +1725,10 @@ def stabilized_flips(latest: pd.Series, k: int, spine, n: int = 10_000, seed: in
             for i, s_ in latest.items() for j in range(k + 1)]
     panel = pd.DataFrame(rows)
     panel = panel[panel.dpd_string.str[0].astype(int).isin(spine)]
-    pf = build_features(panel)
     out = {"n_accounts": int(latest.size)}
+    if not len(panel):
+        return out
+    pf = build_features(panel)
     for name, kw in (("with_long_run_clause", {}), ("bank_rule_only", {"stabilized_long_run_months": None})):
         st = (assign_states(pf, **OPTIONS[RECOMMENDED], **kw) == "stabilized")
         g = pf.assign(stab=st).sort_values(["acct", "j"])
@@ -1444,72 +1746,110 @@ def stabilized_flips(latest: pd.Series, k: int, spine, n: int = 10_000, seed: in
     return out
 
 
+def runup_hold_calendar(f: pd.DataFrame, max_months_ago: int = 36) -> pd.DataFrame:
+    """When did run-up holds happen, in calendar months before today? Strings share an
+    as-of month, so a spike at one 'months ago' means a system artefact (cycle-date change,
+    reversal batch, deferral), not customer behaviour."""
+    counts = pd.Series(0, index=range(1, max_months_ago + 1), dtype=float)
+    for s in f.dpd_string[f.runup_holds > 0]:
+        b, d, c = encode(s)
+        ep = _runs(b >= 2)[-1]
+        first4 = ep[0] + int(np.argmax(b[ep[0]:ep[1]] >= 4))
+        for t in range(max(ep[0] - 1, 0), first4):
+            if c[t] == H:
+                ago = len(b) - 1 - (t + 1)
+                if 1 <= ago <= max_months_ago:
+                    counts[ago] += 1
+    total = counts.sum()
+    return (counts / total).rename("share_of_runup_holds").rename_axis("months_ago").to_frame() if total else counts.to_frame()
+
+
 # --- main ----------------------------------------------------------------------------
 
-def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 7):
+def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts: dict | None = None,
+        seed: int = 7):
     k = cfg.BACKTEST_MONTHS
     spine = tuple(cfg.SPINE_BUCKETS)
     R, M = {}, []            # results (JSON) and markdown sections
-    rng = np.random.default_rng(seed)
 
     # ---- data quality + current spine --------------------------------------------
     s, ok = clean_strings(current.dpd_string, cfg.CHAR_MAP, cfg.STRIP_CHARS)
     cur = current.assign(dpd_string=s)[ok]
     cur = cur[cur.dpd_string.str[0].astype(int).isin(spine)]
+    if not len(cur):
+        raise ValueError("no account in today's spine after cleaning — check COL_DPD, "
+                         "LEFTMOST_IS_CURRENT, CHAR_MAP and SPINE_BUCKETS in config.py")
     f = build_features(cur)
-    f["state"] = assign_states(f, **OPTIONS[RECOMMENDED])
     opts = {o: assign_states(f, **kw) for o, kw in OPTIONS.items()}
+    f["state"] = opts[RECOMMENDED]
 
-    one3 = (f.dpd_string.map(lambda x: _spells(x, 3)) == 1).mean()
-    one4 = (f.dpd_string.map(lambda x: _spells(x, 4)) == 1).mean()
+    q = f.hist_len.quantile([.05, .5, .95])
     dq = {
         "n_current_rows": int(len(current)),
-        "share_invalid_strings": float(1 - ok.mean()),
+        "share_invalid_strings_current": float(1 - ok.mean()),
+        "share_non_digit_strings_table": (float(spark_counts["non_digit_strings"] / max(spark_counts["rows"], 1))
+                                          if spark_counts else None),
         "n_current_spine_analysed": int(len(f)),
-        "string_length_p05_p50_p95": [int(x) for x in f.hist_len.quantile([.05, .5, .95])],
-        "share_left_censored": float(f.left_censored.mean()),
+        "string_length_p05_p50_p95": [int(x) for x in q],
+        "string_length_spread": int(q.iloc[2] - q.iloc[0]),
+        "share_history_starts_delinquent": float(f.left_censored.mean()),
+        "share_glitch_fixed": float((f.n_glitches > 0).mean()),
         "share_jump_repaired": float((f.n_jumps_repaired > 0).mean()),
         "share_jump_left": float((f.n_jumps_left > 0).mean()),
-        "share_one_spell_from3": float(one3),
-        "share_one_spell_from4": float(one4),
-        "bucket_mix": {int(b): float(v) for b, v in f.b_now.value_counts(normalize=True).sort_index().items()},
+        "one_spell_share": {f"{how}_{x}": float((f.dpd_string.map(lambda v: _spells(v, x, how)) == 1).mean())
+                            for how in ("reached", "at") for x in (3, 4)},
+        "bucket_mix": {str(b): float(v) for b, v in f.b_now.value_counts(normalize=True).sort_index().items()},
     }
     R["data_quality"] = dq
-    R["state_names"] = {s: {"display": DISPLAY_NAMES[s], "remark": REMARKS[s]} for s in DISPLAY_NAMES}
+    R["state_names"] = {s_: {"display": DISPLAY_NAMES[s_], "remark": REMARKS[s_]} for s_ in DISPLAY_NAMES}
     M.append("## State names\n\n" + md(pd.DataFrame(
-        [{"code": s, "display name": DISPLAY_NAMES[s], "remark": REMARKS[s]} for s in DISPLAY_NAMES]),
+        [{"code": s_, "display name": DISPLAY_NAMES[s_], "remark": REMARKS[s_]} for s_ in DISPLAY_NAMES]),
         index=False))
-    M.append("## 1. Data quality and population\n\n" + md(pd.Series(dq, name="value").rename_axis("metric").to_frame()))
+    dq_tbl = {kk: v for kk, v in dq.items() if not isinstance(v, dict)}
+    M.append("## 1. Data quality and population\n\n" + md(pd.Series(dq_tbl, name="value").rename_axis("metric").to_frame())
+             + "\n\nShare of the spine with ONE spell only, by definition (the bank quotes ~85% — "
+             "the matching row tells which definition the bank uses):\n\n"
+             + md(pd.Series({"run at >=2 that reached 3": dq["one_spell_share"]["reached_3"],
+                             "run at >=2 that reached 4": dq["one_spell_share"]["reached_4"],
+                             "run of months at >=3": dq["one_spell_share"]["at_3"],
+                             "run of months at >=4": dq["one_spell_share"]["at_4"]},
+                            name="share").rename_axis("spell definition").to_frame()))
 
     # ---- states today, all options ----------------------------------------------
     R["states_today"] = {}
     parts = ["## 2. States today (current spine)"]
     for o, st in opts.items():
-        share = st.value_counts(normalize=True)
-        by_b = pd.crosstab(st, f.b_now, normalize="columns")
-        share = share.loc[order(share.index)].rename_axis("state")
-        by_b = by_b.loc[order(by_b.index)].rename_axis(index="state", columns="bucket")
+        allowed = option_states(o)
+        share = st.value_counts(normalize=True).reindex(allowed, fill_value=0.0).rename_axis("state")
+        by_b = pd.crosstab(st, f.b_now, normalize="columns").reindex(allowed, fill_value=0.0)
+        by_b = by_b.rename_axis(index="state", columns="bucket")
         R["states_today"][o] = {"share": share.round(4).to_dict(),
-                                "by_bucket": {int(c): by_b[c].round(4).to_dict() for c in by_b.columns},
-                                "mece": bool(st.notna().all())}
+                                "by_bucket": {str(c): by_b[c].round(4).to_dict() for c in by_b.columns},
+                                "mece": bool(st.notna().all()),
+                                "n_unknown_state": int((~st.isin(allowed)).sum())}
         parts.append(f"### {o}\n\nShare:\n\n" + md(share.to_frame("share"))
                      + "\n\nMix by current bucket (column shares):\n\n" + md(by_b))
-    ex = (f.sample(frac=1.0, random_state=seed).groupby("state").head(3)[["state", "dpd_string"]]
-          .sort_values("state", key=lambda x: x.map({s: i for i, s in enumerate(order(x))}))
-          .assign(last_30_months_oldest_to_newest=lambda x: x.dpd_string.str[:30].str[::-1]))
-    parts.append(f"Examples ({RECOMMENDED}, no keys):\n\n"
-                 + md(ex[["state", "last_30_months_oldest_to_newest"]], index=False))
+    shp = f.assign(shape=f.dpd_string.map(dv.shape)).groupby(["state", "shape"]).size().rename("accounts")
+    shp = shp[shp >= MIN_SHAPE_COUNT].reset_index()
+    shp = shp.sort_values(["state", "accounts"], ascending=[True, False]).groupby("state").head(3)
+    shp = shp.sort_values("state", key=lambda x: x.map({s_: i for i, s_ in enumerate(order(x))}))
+    parts.append(f"Most common journey shapes per state ({RECOMMENDED}; N clean, R roll, H hold, P paid "
+                 f"2+ months; only shapes shared by >= {MIN_SHAPE_COUNT} accounts):\n\n" + md(shp, index=False))
     M.append("\n\n".join(parts))
 
     # ---- agreement with the bank's existing rules -------------------------------
     agree = {}
     for col, ours in (("existing_bust_out", "early_payment_default"), ("existing_stabilized", "stabilized")):
         if col in f and f[col].notna().any():
-            theirs = pd.to_numeric(f[col], errors="coerce").fillna(0).astype(bool)
+            theirs, unparsed = parse_flag(f[col])
+            if unparsed > 0.5:
+                agree[ours] = {"skipped": f"{unparsed:.0%} of {col} values not recognised as 1/0, Y/N, True/False"}
+                continue
             mine = f.state == ours
             agree[ours] = {"their_share": float(theirs.mean()), "our_share": float(mine.mean()),
                            "recall_of_theirs": float((mine & theirs).sum() / max(theirs.sum(), 1)),
-                           "precision_vs_theirs": float((mine & theirs).sum() / max(mine.sum(), 1))}
+                           "precision_vs_theirs": float((mine & theirs).sum() / max(mine.sum(), 1)),
+                           "share_unparsed": unparsed}
     R["existing_rule_agreement"] = agree or "SKIPPED (no existing rule columns configured)"
     M.append("## 3. Agreement with the bank's existing EPD ('bust-out') / stabilized rules\n\n"
              + (md(pd.DataFrame(agree).T.rename_axis("state")) if agree else "_Skipped — no existing rule columns configured._"))
@@ -1518,10 +1858,9 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
     axes = [c for c in cfg.AXIS_COLS if c in f and f[c].notna().any()]
     ov = {}
     if axes:
-        eta = pd.DataFrame({o: {a: _eta2(f[a], st) for a in axes} for o, st in opts.items()})
+        eta = pd.DataFrame({o: {a: _eta2(f[a], st) for a in axes} for o, st in opts.items()}).rename_axis("axis")
         means = f.groupby("state")[axes].agg(lambda x: pd.to_numeric(x, errors="coerce").mean())
         means = means.loc[order(means.index)]
-        eta = eta.rename_axis("axis")
         ov = {"eta2_by_option": _records(eta), "mean_by_state": _records(means)}
         txt = ("Variance of each axis explained by the states (eta², 0 = orthogonal):\n\n" + md(eta)
                + f"\n\nMean of each axis by state ({RECOMMENDED}):\n\n" + md(means))
@@ -1529,39 +1868,67 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
         txt = "_No axis columns configured — using the DPD proxy for 'money coming in' only._"
     money = "cred_money_in_points" if "cred_money_in_points" in axes else None
     paid_now = (pd.to_numeric(f[money], errors="coerce") > 0) if money else f.paid_any_3m
-    hold = f.state == "stabilized"
+    stab = f.state == "stabilized"
     ov["stabilized_vs_money_in"] = {"source": money or "DPD proxy (paid >= 1 month in last 3)",
-                                    "stabilized_with_money_in": float(paid_now[hold].mean()) if hold.any() else None,
-                                    "others_with_money_in": float(paid_now[~hold].mean())}
-    flags = {c: float(pd.to_numeric(f.loc[hold, c], errors="coerce").fillna(0).astype(bool).mean())
-             for c in cfg.FLAG_COLS if c in f and f[c].notna().any()}
+                                    "stabilized_with_money_in": float(paid_now[stab].mean()) if stab.any() else None,
+                                    "others_with_money_in": float(paid_now[~stab].mean())}
+    mib = paid_now.groupby([f.state, f.b_now]).mean().unstack()
+    mib = mib.loc[order(mib.index)].rename_axis(index="state", columns="bucket")
+    ov["money_in_by_state_and_bucket"] = {str(c): mib[c].round(4).to_dict() for c in mib.columns}
+    flags = {}
+    for c in cfg.FLAG_COLS:
+        if c in f and f[c].notna().any():
+            fl, unparsed = parse_flag(f[c])
+            flags[c] = float(fl[stab].mean()) if unparsed <= 0.5 else None
     ov["stabilized_flagged"] = flags
     R["overlap_other_axes"] = ov
     M.append("## 4. Overlap with the other persona axes\n\n" + txt + "\n\nStabilized vs money coming in:\n\n"
              + md(pd.Series(ov["stabilized_vs_money_in"], name="value").rename_axis("metric").to_frame())
+             + "\n\nMoney coming in by state and current bucket (slow rollers paid on the way down, so "
+             "near bucket 4 they overlap credibility's 'money in' — a clock effect):\n\n" + md(mib)
              + ("\n\nShare of stabilized accounts carrying a data flag (frozen bucket, not a payment):\n\n"
                 + md(pd.Series(flags, name="share").to_frame()) if flags else ""))
 
     # ---- backtest: outcomes and stability ----------------------------------------
-    bt = None
+    bt = nf = None
     if latest_bt is not None and len(latest_bt):
         s2, ok2 = clean_strings(latest_bt.dpd_string, cfg.CHAR_MAP, cfg.STRIP_CHARS)
+        dq["share_invalid_strings_backtest"] = float(1 - ok2.mean())
         btf = backtest_frame(s2[ok2], k, spine, cfg.EXIT_BUCKET)
+    else:
+        btf = None
+    if btf is not None and len(btf):
         bt = build_features(btf)
         nxt = btf[btf.next_bucket.isin(spine)][["next_string"]].rename(columns={"next_string": "dpd_string"})
-        nf = build_features(nxt)
+        nf = build_features(nxt) if len(nxt) else None
         roll = (bt.next_bucket >= bt.b_now + 1).groupby(bt.b_now).mean()
         R["backtest"] = {"k_months": k, "n_analysed": int(len(bt)),
                          "share_exited_within_k": float(bt.exit_k.mean()),
-                         "monthly_roll_rate": {int(b): float(v) for b, v in roll.items()},
+                         "monthly_roll_rate": {str(b): float(v) for b, v in roll.items()},
                          "scorecards": {}}
         parts = [f"## 5. Backtest — spine as of {k} months ago, outcomes since\n\n"
                  f"{len(bt):,} accounts. Monthly roll rate by bucket (should match the bank's "
                  "~70/80/90/95%):\n\n" + md(roll.rename_axis("bucket").to_frame("roll_rate"))]
         for o, kw in OPTIONS.items():
-            card = backtest_scorecard(bt, assign_states(bt, **kw), assign_states(nf, **kw))
+            nxt_st = assign_states(nf, **kw) if nf is not None else pd.Series(dtype=object)
+            card = backtest_scorecard(bt, assign_states(bt, **kw), nxt_st, spine)
             R["backtest"]["scorecards"][o] = _records(card)
             parts.append(f"### {o}\n\n" + md(card))
+        # slow roller resting on a single paid month vs straight roller
+        a_bt = assign_states(bt, **OPTIONS["A_minimal_4"])
+        one = (a_bt == "slow_roller") & (bt.runup_holds == 1) & (bt.runup_pays == 0)
+        grp = pd.Series(np.select([one, a_bt == "slow_roller", a_bt == "straight_roller"],
+                                  ["slow roller: exactly one hold", "slow roller: more than one payment",
+                                   "straight roller"], "other"), index=bt.index)
+        keep = grp != "other"
+        rolled = bt.next_bucket >= bt.b_now + 1
+        one_hold = pd.DataFrame({
+            "share_of_spine": grp[keep].value_counts() / len(bt),
+            "roll_next_month_bucket_std": _std_rate(rolled[keep], grp[keep], bt.b_now[keep]),
+            "exit_8plus_within_3m_bucket_std": _std_rate(bt.exit_3m[keep], grp[keep], bt.b_now[keep])})
+        R["backtest"]["one_hold_slow_rollers"] = _records(one_hold)
+        parts.append("### Is one paid month enough to separate slow from straight rollers?\n\n"
+                     + md(one_hold.rename_axis("group")))
         flips = stabilized_flips(s2[ok2], k, spine, seed=seed)
         R["backtest"]["stabilized_flips"] = flips
         parts.append(f"### Stabilized bounce-backs over the {k} backtest months "
@@ -1571,11 +1938,55 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
                           .rename_axis("stabilized rule")))
         M.append("\n\n".join(parts))
     else:
-        R["backtest"] = "SKIPPED (no latest-month strings for the backtest population)"
-        M.append("## 5. Backtest\n\n_Skipped — no backtest population supplied._")
+        R["backtest"] = ("SKIPPED (no backtest population: outcomes need strings for accounts that have "
+                         "since left the spine — a snapshot of today's segment is survivor-only)")
+        # What a snapshot CAN show: stability among accounts that stayed in the spine.
+        prev = f[f.dpd_string.str.len() > 1].dpd_string.str[1:]
+        prev = prev[prev.str[0].astype(int).isin(spine)]
+        surv = {"note": "survivor-only: accounts in the spine both last month and today"}
+        if len(prev):
+            pf = build_features(prev.to_frame("dpd_string"))
+            st_prev = assign_states(pf, **OPTIONS[RECOMMENDED])
+            now = f.loc[pf.index, "state"]
+            same = pd.DataFrame({
+                "same_state_next_month": (st_prev == now).groupby(st_prev).mean(),
+                "kept_or_stabilized_next_month": ((st_prev == now) | (now == "stabilized")).groupby(st_prev).mean(),
+                "n": st_prev.value_counts()})
+            same = same.loc[order(same.index)]
+            surv["same_state_next_month"] = _records(same.rename_axis("state"))
+        surv["stabilized_flips"] = stabilized_flips(f.dpd_string, k, spine, seed=seed)
+        R["survivor_checks"] = surv
+        M.append("## 5. Backtest\n\n_Skipped — outcomes (roll rates, exits) need strings for accounts that "
+                 "have since left the spine; a snapshot of today's segment only has the survivors._\n\n"
+                 "### Survivor-only stability (accounts in the spine last month and today)\n\n"
+                 + (md(same) if len(prev) else "_(none)_")
+                 + f"\n\nStabilized bounce-backs over the last {k} months:\n\n"
+                 + md(pd.DataFrame({kk: v for kk, v in surv["stabilized_flips"].items() if isinstance(v, dict)}).T
+                      .rename_axis("stabilized rule")))
+
+    # ---- run-up holds by calendar month (artefact check) ---------------------------
+    cal = runup_hold_calendar(f)
+    if len(cal) and cal.iloc[:, 0].sum():
+        v = cal.iloc[:, 0]
+        # a month compared with the median of its neighbours (±2 months): the natural shape
+        # (more holds in recent months) cancels out, a one-month system event does not
+        ratios = {}
+        for m in v.index:
+            nb_ = v[[x for x in range(m - 2, m + 3) if x != m and x in v.index]]
+            base_ = float(nb_.median())
+            if base_ > 0 and v[m] * len(f) >= 20:                 # ignore near-empty months
+                ratios[m] = float(v[m] / base_)
+        R["runup_hold_calendar_spike"] = max(ratios.values()) if ratios else None
+        R["runup_hold_calendar"] = {str(i): float(x) for i, x in v.items()}
+        spike = R["runup_hold_calendar_spike"]
+        M.append("## 5b. Run-up holds by calendar month (months before today)\n\nEach month is "
+                 "compared with its neighbours (±2 months); a month far above them points to a system "
+                 "artefact (cycle-date change, reversal batch, deferral), not customer behaviour. "
+                 f"Largest month / neighbour-median ratio: {spike if spike is None else round(spike, 2)}\n\n" + md(cal))
 
     # ---- threshold sweeps (on the backtest population when available) ------------
-    base, nb = (bt, nf) if bt is not None else (f, None)
+    base = bt if bt is not None else f
+    nb = nf if bt is not None else None
     sw = {}
 
     def _stay(kw, name):
@@ -1590,21 +2001,23 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
         st = assign_states(base, epd_max_history=v)
         b_ = st == "early_payment_default"
         rows.append({"epd_max_history": v, "share": b_.mean(),
-                     "exit_within_k": base.exit_k[b_].mean() if bt is not None else None})
+                     "exit_within_k": base.exit_k[b_].mean() if bt is not None and b_.any() else None})
     sw["epd_max_history"] = rows
     rows = []
     for v in (4, 5, 6):
         st = assign_states(base, stabilized_min_in_band=v)
         h = st == "stabilized"
         rows.append({"stabilized_min_in_band": v, "share": h.mean(),
-                     "roll_next_month": (base.next_bucket[h] >= base.b_now[h] + 1).mean() if bt is not None else None,
+                     "roll_next_month": (base.next_bucket[h] >= base.b_now[h] + 1).mean() if bt is not None and h.any() else None,
                      "still_stabilized_next_month": _stay({"stabilized_min_in_band": v}, "stabilized")})
     sw["stabilized_min_in_band"] = rows
     rows = []
     for v in (2, 3, 4):
-        st = assign_states(base, **{**OPTIONS[RECOMMENDED], "repeat_min_prior_peak": v})
-        rows.append({"repeat_min_prior_peak": v, "share": (st == "repeat_delinquent").mean()})
-    sw["repeat_min_prior_peak"] = rows
+        for w in (12, 24, 36, 9999):
+            st = assign_states(base, **{**OPTIONS[RECOMMENDED], "repeat_min_prior_peak": v, "repeat_window_months": w})
+            rows.append({"repeat_min_prior_peak": v, "repeat_window_months": "any" if w == 9999 else w,
+                         "share": (st == "repeat_delinquent").mean()})
+    sw["repeat_delinquent"] = rows
     rows = []
     for v in (3, 4, 5):
         st = assign_states(base, straight_max_runup=v)
@@ -1633,80 +2046,95 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
             row["stability_of_fixed_states_without_q3"] = float((a0[fx0] == b0[fx0]).mean())
         rows.append(row)
     sw["paying_since_4_test"] = rows
-    R["sweeps"] = {kk: [{a: (round(b, 4) if isinstance(b, float) else b) for a, b in r.items()} for r in v]
-                   for kk, v in sw.items()}
+    R["sweeps"] = {kk: [{a: _num(b) for a, b in r.items()} for r in v] for kk, v in sw.items()}
     M.append("## 6. Threshold sweeps (" + ("backtest population" if bt is not None else "current spine")
-             + ")\n\n" + "\n\n".join(f"### {kk}\n\n" + md(pd.DataFrame(v), index=False) for kk, v in sw.items()))
+             + "). Parameters marked [business] in states.py are agreed definitions — the sweeps "
+             "show sensitivity; they are not a menu for matching a share.\n\n"
+             + "\n\n".join(f"### {kk}\n\n" + md(pd.DataFrame(v), index=False) for kk, v in sw.items()))
 
-    # ---- residual clustering agreement -------------------------------------------
-    from sklearn.cluster import KMeans
-    from sklearn.preprocessing import StandardScaler
+    # ---- residual clustering agreement (diagnostic only) ---------------------------
     a_states = opts["A_minimal_4"]
-    res = ~a_states.isin(["early_payment_default", "stabilized"])
-    r = f[res]
+    r = f[~a_states.isin(["early_payment_default", "stabilized", "history_starts_delinquent"])]
     if len(r) > 30_000:
         r = r.sample(30_000, random_state=seed)
-    feats = ["months_before_spell", "n_blips", "n_prior_episodes", "max_prior_bucket",
-             "clean_gap_before_current", "runup_len", "runup_holds", "runup_pays",
-             "post4_paid_rate", "rec_paid_rate"]
-    X = r[feats].astype(float).copy()
-    for c in ("months_before_spell", "clean_gap_before_current", "runup_len"):
-        X[c] = np.log1p(X[c])
-    X = StandardScaler().fit_transform(X)
-    rows = []
-    for kk in range(2, 9):
-        lab = KMeans(kk, n_init=10, random_state=seed).fit_predict(X)
-        rows.append({"k": kk, **{f"agree_{o}": _ari(lab, st.loc[r.index]) for o, st in opts.items()}})
-    R["residual_cluster_agreement"] = rows
-    M.append("## 7. Clustering the residual (after EPD and stabilized) — agreement (ARI) with "
-             "each option\n\n" + md(pd.DataFrame(rows), index=False))
+    if len(r) >= 50:
+        from sklearn.cluster import KMeans
+        from sklearn.preprocessing import StandardScaler
+        feats = ["months_before_spell", "n_blips", "n_prior_episodes", "max_prior_bucket",
+                 "clean_gap_before_current", "runup_len", "runup_holds", "runup_pays",
+                 "post4_paid_rate", "rec_paid_rate"]
+        X = r[feats].astype(float).copy()
+        for c in ("months_before_spell", "clean_gap_before_current", "runup_len"):
+            X[c] = np.log1p(X[c])
+        X = StandardScaler().fit_transform(X)
+        rows = []
+        for kk in range(2, 9):
+            lab = KMeans(kk, n_init=10, random_state=seed).fit_predict(X)
+            rows.append({"k": kk, **{f"agree_{o}": _ari(lab, st.loc[r.index]) for o, st in opts.items()}})
+        R["residual_cluster_agreement"] = rows
+        M.append("## 7. Clustering the residual (after EPD and stabilized) — agreement (ARI) with each "
+                 "option. Diagnostic only: a finer partition built on the clustered features always "
+                 "gains ARI, so this is not evidence for B over A.\n\n" + md(pd.DataFrame(rows), index=False))
+    else:
+        R["residual_cluster_agreement"] = "SKIPPED (fewer than 50 residual accounts)"
 
     # ---- shapes and motifs ---------------------------------------------------------
     smp = f.sample(min(len(f), 30_000), random_state=seed)
     shapes = dv.shape_table(smp, label="state", top=20)
+    shapes = shapes[shapes.n >= MIN_SHAPE_COUNT]
     grams = dv.ngram_table(smp, n=4, label="state", top=15)
     R["top_shapes"] = _records(shapes.set_index("shape"))
-    R["top_4grams"] = _records(grams.set_index("gram"))
+    R["top_4grams"] = _records(grams.set_index("gram")) if len(grams) else []
     M.append("## 8. Most common journey shapes and motifs\n\nShapes (N clean, R roll, H hold = paid "
-             "one month, P paid 2+ months; run lengths banded):\n\n" + md(shapes, index=False)
-             + "\n\n4-grams by lift vs shuffled order:\n\n" + md(grams, index=False))
+             f"one month, P paid 2+ months; run lengths banded; shared by >= {MIN_SHAPE_COUNT} accounts):\n\n"
+             + md(shapes, index=False) + "\n\n4-grams by lift vs shuffled order:\n\n" + md(grams, index=False))
 
-    return R, "\n\n".join(M)
+    return _json_safe(R), "\n\n".join(M)
 `````
 
 ### FILE: `dpd_states/expectations.py`
-sha256 `bec4c39af79539ab4dea7cdcefcdada6def8e665c07f8dbe5e1c5d5995a19ed9` · 247 lines · trailing newline: yes
+sha256 `01ca019f4ea6bb1dbd9ef3a41e2b4d526369d193686b2394c63c374b7088c682` · 349 lines · trailing newline: yes
 
 `````python
 """What we expect to see on real data, as checkable rules.
 
-Each expectation states the metric, the expected range, why we expect it (synthetic
-validation or the bank's own figures), and what to do if it is not met. `evaluate(R)`
-reads the results dict from analysis.run and returns one row per check with
-PASS / WARN / FAIL / SKIPPED / INFO.
+Each expectation states the metric, the expected range, what the range is anchored on,
+why we expect it, and what to do if it is not met. `evaluate(R)` reads the results dict
+from analysis.run (in memory or re-loaded from the saved JSON — same answer) and returns
+one row per check with PASS / WARN / FAIL / SKIPPED / INFO.
 
 Severity: FAIL = the run itself is not trustworthy (fix config/data before reading
 anything else). WARN = the run is fine but an assumption behind the design is off —
-follow the 'if not met' action. INFO = reported, no expectation.
+follow the 'if not met' action. INFO = reported, no pass/fail.
+
+Anchor: bank = the bank's own figures or rules · design = follows from the rules by
+construction · synthetic = calibrated on the synthetic generator only (a WARN there is a
+prompt to look, not proof of a problem) · data = data-quality expectation.
+
+Actions never say "tune a [business] parameter until the check passes": business
+definitions change only with the business owner (escalate).
 """
 from __future__ import annotations
 
 import pandas as pd
 
-from .states import FIXED_STATES, RECOMMENDED
+from .states import FIXED_STATES, RECOMMENDED, option_states
 
 ROLL_TARGET = {4: 0.70, 5: 0.80, 6: 0.90, 7: 0.95}
+MIN_N = 100                    # states smaller than this are not used in stability checks
 
 
 def _card(R, option):
     bt = R.get("backtest")
     if not isinstance(bt, dict):
         return None
-    return pd.DataFrame(bt["scorecards"][option]).set_index("state" if "state" in bt["scorecards"][option][0] else "index")
+    rows = bt["scorecards"][option]
+    return pd.DataFrame(rows).set_index("state" if "state" in rows[0] else "index") if rows else None
 
 
 def _share(R, option):
-    return pd.Series(R["states_today"][option]["share"])
+    allowed = [s for s in option_states(option) if s != "history_starts_delinquent"]
+    return pd.Series(R["states_today"][option]["share"]).reindex(allowed).fillna(0.0)
 
 
 def _sweep(R, name):
@@ -1718,199 +2146,291 @@ def _eta(R, axis, option=RECOMMENDED):
     if "eta2_by_option" not in ov:
         return None
     eta = pd.DataFrame(ov["eta2_by_option"]).set_index("axis")
-    return float(eta.loc[axis, option]) if axis in eta.index else None
+    return float(eta.loc[axis, option]) if axis in eta.index and eta.loc[axis, option] is not None else None
 
 
 def _agree(R, state, key):
     a = R.get("existing_rule_agreement")
-    return a[state][key] if isinstance(a, dict) and state in a else None
+    return a[state].get(key) if isinstance(a, dict) and state in a else None
+
+
+def _bucket(d, b):
+    return d.get(str(b), d.get(b))
 
 
 def _stab_gap(R):
     c = _card(R, RECOMMENDED)
     if c is None or "stabilized" not in c.index:
         return None
-    rolling = c.loc[[s for s in c.index if s in FIXED_STATES], "roll_next_month"]
+    col = "roll_next_month_bucket_std"
+    rolling = c.loc[[s for s in c.index if s in FIXED_STATES or s == "early_payment_default"], col].dropna()
     w = c.loc[rolling.index, "share"]
-    return float((rolling * w).sum() / w.sum() - c.loc["stabilized", "roll_next_month"])
+    return float((rolling * w).sum() / w.sum() - c.loc["stabilized", col])
+
+
+def _surv_card(R):
+    sc = R.get("survivor_checks", {})
+    rows = sc.get("same_state_next_month")
+    return pd.DataFrame(rows).set_index("state") if rows else None
 
 
 def _fixed_stability(R):
     c = _card(R, RECOMMENDED)
     if c is None:
+        c = _surv_card(R)                 # snapshot-only run: survivors in the spine both months
+    if c is None:
         return None
-    return float(c.loc[[s for s in c.index if s in FIXED_STATES], "same_state_next_month"].min())
+    c = c[(c.index.isin(FIXED_STATES)) & (c.n >= MIN_N)]
+    return float(c.kept_or_stabilized_next_month.min()) if len(c) else None
+
+
+def _stab_persist(R):
+    c = _card(R, RECOMMENDED)
+    if c is None:
+        c = _surv_card(R)
+    return float(c.loc["stabilized", "same_state_next_month"]) if c is not None and "stabilized" in c.index else None
+
+
+def _flips(R):
+    bt = R.get("backtest")
+    fl = bt.get("stabilized_flips") if isinstance(bt, dict) else R.get("survivor_checks", {}).get("stabilized_flips")
+    return (fl or {}).get("with_long_run_clause", {}).get("bounce_back_share_of_ever_stabilized")
 
 
 def _roll_dev(R):
     bt = R.get("backtest")
     if not isinstance(bt, dict):
         return None
-    rr = {int(k): v for k, v in bt["monthly_roll_rate"].items()}
-    return max(abs(rr.get(b, float("nan")) - t) for b, t in ROLL_TARGET.items())
+    rr = bt["monthly_roll_rate"]
+    return max(abs((_bucket(rr, b) if _bucket(rr, b) is not None else float("nan")) - t)
+               for b, t in ROLL_TARGET.items())
+
+
+def _invalid(R):
+    dq = R["data_quality"]
+    vals = [dq.get("share_invalid_strings_current"), dq.get("share_invalid_strings_backtest"),
+            dq.get("share_non_digit_strings_table")]
+    vals = [v for v in vals if v is not None]
+    return max(vals) if vals else None
+
+
+def _spell_closest(R):
+    one = R["data_quality"]["one_spell_share"]
+    name = min(one, key=lambda kk: abs(one[kk] - 0.85))
+    return f"{name}: {one[name]:.2f}"
 
 
 def _resid_gain(R):
-    rows = pd.DataFrame(R["residual_cluster_agreement"]).set_index("k")
+    rows = R.get("residual_cluster_agreement")
+    if not isinstance(rows, list):
+        return None
+    rows = pd.DataFrame(rows).set_index("k")
     return float(rows.loc[6, f"agree_{RECOMMENDED}"] - rows.loc[6, "agree_A_minimal_4"])
 
 
-def _runup_sharpness(R):
-    sw = _sweep(R, "straight_max_runup").set_index("straight_max_runup")
-    g3 = sw.loc[3, "slow_share"]
-    return float(sw.loc[4, "slow_share"] / g3) if g3 else None
+def _one_hold(R):
+    bt = R.get("backtest")
+    if not isinstance(bt, dict) or "one_hold_slow_rollers" not in bt:
+        return None
+    t = pd.DataFrame(bt["one_hold_slow_rollers"]).set_index("index")
+    a = t.loc["slow roller: exactly one hold", "roll_next_month_bucket_std"]
+    b = t.loc["straight roller", "roll_next_month_bucket_std"]
+    return float(b - a)
 
 
 def _partial(R):
     sw = _sweep(R, "paying_since_4_test").set_index("paying_since_4_min_rate")
-    if "stability_of_fixed_states" not in sw:
+    if "stability_of_fixed_states" not in sw or 0.5 not in sw.index:
         return None
-    r = sw.loc[0.5]
-    return {"still_partial": r["still_paying_since_4_next_month"],
-            "stability_drop": r["stability_of_fixed_states_without_q3"] - r["stability_of_fixed_states"]}
+    return sw.loc[0.5, "still_paying_since_4_next_month"]
 
 
 def _spread(R):
     c = _card(R, RECOMMENDED)
     if c is None:
         return None
-    x = c.loc[[s for s in c.index if s in FIXED_STATES], "exit_8plus_within_k"]
-    return float(x.max() - x.min())
+    x = c.loc[[s for s in c.index if s in FIXED_STATES and s != "history_starts_delinquent"],
+              "exit_8plus_within_3m_bucket_std"].dropna()
+    return float(x.max() - x.min()) if len(x) > 1 else None
 
 
-# id, title, metric(R), check(value)->bool, expected (text), severity, why, if not met
+def _by_bucket_ratio(R):
+    bb = R["states_today"][RECOMMENDED]["by_bucket"]
+    at4 = (_bucket(bb, 4) or {}).get("stabilized", 0)
+    at7 = (_bucket(bb, 7) or {}).get("stabilized", 0)
+    return at4 / max(at7, 1e-9)
+
+
+def _bucket_mix_drop(R):
+    mix = R["data_quality"]["bucket_mix"]
+    return (_bucket(mix, 4) or 0) - (_bucket(mix, 7) or 0)
+
+
+def _max_eta(R, axes):
+    vals = [v for v in (_eta(R, a) for a in axes) if v is not None]
+    return max(vals) if vals else None
+
+
+# id, title, metric(R), check(value)->bool, expected, severity, anchor, why, if not met
 EXPECTATIONS = [
-    ("E01", "Every account gets exactly one state (all options)",
-     lambda R: all(v["mece"] for v in R["states_today"].values()), lambda v: v is True,
-     "True", "FAIL", "The tree has a default branch, so it is MECE by construction.",
+    ("E01", "Every account gets exactly one known state (all options)",
+     lambda R: all(v["mece"] and v["n_unknown_state"] == 0 for v in R["states_today"].values()),
+     lambda v: v is True, "True", "FAIL", "design",
+     "The tree ends in a default branch, so it is MECE by construction; unknown labels mean a code change broke it.",
      "A code or data-type bug — stop and fix before reading anything else."),
-    ("E02", "Share of DPD strings that cannot be parsed",
-     lambda R: R["data_quality"]["share_invalid_strings"], lambda v: v <= 0.02,
-     "<= 2%", "FAIL", "Strings should be digits once CHAR_MAP / STRIP_CHARS are set.",
-     "Inspect the non-digit characters; extend CHAR_MAP or STRIP_CHARS in config.py."),
-    ("E03", "Backtest monthly roll rates match the bank's 70/80/90/95% (max abs deviation)",
-     _roll_dev, lambda v: v <= 0.07,
-     "<= 7pp", "FAIL", "Confirms the string orientation and the backtest reconstruction are right.",
-     "Check LEFTMOST_IS_CURRENT and that DS_STRINGS keeps accounts that left the spine "
-     "(survivor-only data shows roll rates that are too low)."),
-    ("E04", "Share of histories that start inside the current spell (no clean month seen)",
-     lambda R: R["data_quality"]["share_left_censored"], lambda v: v <= 0.10,
-     "<= 10%", "WARN", "Full history is available for everyone.",
-     "Strings are truncated; EPD (short history) will be over-assigned — cap the "
-     "EPD rule to accounts with full history or raise the threshold."),
-    ("E05", "Share of accounts with an unrepaired +2 jump",
+    ("E02", "Unparseable strings (worst of: today's spine, backtest, whole table)",
+     _invalid, lambda v: v <= 0.02, "<= 2%", "FAIL", "data",
+     "Strings should be digits once CHAR_MAP / STRIP_CHARS are set.",
+     "Inspect the non-digit characters (check-only output); extend CHAR_MAP (e.g. a write-off letter "
+     "-> 9). Untreated letters silently drop accounts from the backtest."),
+    ("E03", "Backtest monthly roll rates vs the bank's 70/80/90/95% (max abs deviation)",
+     _roll_dev, lambda v: v <= 0.07, "<= 7pp", "FAIL", "bank",
+     "Confirms the string orientation and that the one-table backtest is valid.",
+     "Check, in order: LEFTMOST_IS_CURRENT; that every string ends in the SAME month (strings frozen at "
+     "charge-off/closure, or exited accounts dropped from the table, make roll rates too low — set "
+     "COL_STRING_AS_OF); letter exit codes missing from CHAR_MAP; whether the bank's roll rates are "
+     "count- or balance-weighted."),
+    ("E04", "Histories that start already delinquent (history_starts_delinquent)",
+     lambda R: R["data_quality"]["share_history_starts_delinquent"], lambda v: v <= 0.01,
+     "<= 1%", "WARN", "bank",
+     "The first digit is the first billed month (0/1); exceptions are rare data issues and restructured "
+     "accounts re-opened at their old bucket.",
+     "Confirm the string-start convention (PROMPTS P1). Many cases point to restructured accounts or "
+     "truncated strings — their treatment is a deferred business decision."),
+    ("E05", "Accounts with an unrepaired +2 jump",
      lambda R: R["data_quality"]["share_jump_left"], lambda v: v <= 0.02,
-     "<= 2%", "WARN", "Billing-cycle jumps are mostly next to a hold and get repaired.",
-     "Look at examples; if a systematic code (e.g. 2-cycle buckets) exists, adjust the encoding."),
-    ("E06", "Current bucket mix declines from 4 to 7",
-     lambda R: R["data_quality"]["bucket_mix"].get(4, 0) - R["data_quality"]["bucket_mix"].get(7, 0),
-     lambda v: v >= 0, ">= 0", "WARN", "Flow-driven book with rising roll rates (synthetic 29/26/23/22%).",
+     "<= 2%", "WARN", "synthetic",
+     "Billing-cycle jumps mostly sit next to a hold and get repaired.",
+     "Look at the shapes; a systematic code (e.g. 2-cycle buckets) needs an encoding change."),
+    ("E06", "Current bucket mix declines from 4 to 7 (share at 4 minus share at 7)",
+     _bucket_mix_drop, lambda v: v >= 0, ">= 0", "WARN", "bank",
+     "Rising roll rates 70→95% thin the spine out towards bucket 7.",
      "Check the spine filter and whether a cohort shock is passing through."),
-    ("E07", "One spell only, spell counted from bucket 3",
-     lambda R: R["data_quality"]["share_one_spell_from3"], lambda v: 0.78 <= v <= 0.92,
-     "78–92%", "WARN", "Bank figure ~85% (synthetic 83%). If the 'from 4' figure is the one "
-     "near 85%, the bank counts spells from 4.",
-     "Set repeat_min_prior_peak to whichever spell definition matches the bank's 85%."),
-    ("E08", "Early payment default (EPD, 'bust-out') share (today)",
-     lambda R: _share(R, RECOMMENDED).get("early_payment_default", 0), lambda v: 0.04 <= v <= 0.08,
-     "4–8%", "WARN", "Bank's own rule gives ~6% (synthetic 5.8%).",
-     "Move epd_max_history along the sweep until the share matches the bank's rule."),
+    ("E07", "INFO — one-spell share: definition closest to the bank's ~85%",
+     _spell_closest, None, "report", "INFO", "bank",
+     "Four spell definitions are reported in section 1; the bank's exact one is unconfirmed.",
+     "Get the bank's definition; if it is 'reached 4' or 'run at >=4', discuss repeat_min_prior_peak."),
+    ("E08", "Early payment default share (today)",
+     lambda R: float(_share(R, RECOMMENDED).get("early_payment_default", 0)), lambda v: 0.03 <= v <= 0.08,
+     "3–8%", "WARN", "bank",
+     "Bank's own bust-out rule gives ~6%; the agreed definition is stricter (never paid since crossing 2).",
+     "Compare with the bank's rule (E10, PROMPTS P4) and escalate to the business owner. Do not move "
+     "epd_max_history to match a share."),
     ("E09", "Stabilized share (today)",
-     lambda R: _share(R, RECOMMENDED).get("stabilized", 0), lambda v: 0.04 <= v <= 0.09,
-     "4–9%", "WARN", "Bank's own stabilized rule gives ~6% (synthetic 6.6%).",
-     "Compare with the bank's implementation of the 5-of-6 rule (E10/E11)."),
-    ("E10", "Recall of the bank's existing bust-out (EPD) flag",
+     lambda R: float(_share(R, RECOMMENDED).get("stabilized", 0)), lambda v: 0.04 <= v <= 0.10,
+     "4–10%", "WARN", "bank",
+     "Bank's 5-of-6 rule gives ~6%; the long-run clause adds about one point.",
+     "Compare with the bank's implementation (E11, PROMPTS P4) and escalate."),
+    ("E10", "Recall of the bank's existing bust-out flag by our EPD",
      lambda R: _agree(R, "early_payment_default", "recall_of_theirs"), lambda v: v >= 0.80,
-     ">= 80%", "WARN", "Same concept; thresholds may differ slightly.",
-     "Read the bank's rule and align epd_max_history / epd_max_blips."),
-    ("E11", "Recall of the bank's existing stabilized flag",
+     ">= 80%", "WARN", "bank",
+     "Same concept; ours additionally requires no payment since crossing bucket 2.",
+     "Read the bank's rule (PROMPTS P4), list the differences and escalate."),
+    ("E11", "Recall of the bank's existing stabilized flag by our stabilized",
      lambda R: _agree(R, "stabilized", "recall_of_theirs"), lambda v: v >= 0.90,
-     ">= 90%", "WARN", "Stabilized IS the bank's 5-of-6 rule; only EPD-first ordering differs.",
-     "Check the band definition (±1 of today's bucket, 5 of last 6 months incl. today)."),
-    ("E12", "Stabilized separates risk: weighted next-month roll of fixed states minus stabilized",
-     _stab_gap, lambda v: v >= 0.20,
-     ">= 20pp", "WARN", "Synthetic: stabilized 40% vs ~85% for the rest.",
-     "Stabilized is not behaving as 'stable'; check payment holidays / restructuring flags (E21) "
-     "and try stabilized_min_in_band = 6."),
-    ("E13", "Fixed states keep their state next month (minimum over fixed states)",
-     _fixed_stability, lambda v: v >= 0.95,
-     ">= 95%", "WARN", "Run-up and history are fixed once past 4 (synthetic 98–100%).",
-     "A feature is drifting with time since 4 — inspect which state leaks and why."),
+     ">= 90%", "WARN", "bank",
+     "Ours is the bank's 5-of-6 rule plus the long-run clause; differences: EPD/ordering, glitch and "
+     "+2-jump cleaning.",
+     "Check the band definition (±1 of today's bucket, 5 of the last 6 months incl. today)."),
+    ("E12", "Stabilized separates risk: fixed states' next-month roll minus stabilized (bucket-standardised)",
+     _stab_gap, lambda v: v >= 0.20, ">= 20pp", "WARN", "synthetic",
+     "Synthetic: ~0.37. Standardised to the same bucket mix, because stabilized sits mostly at bucket 4.",
+     "Stabilized is not behaving as stable: check payment holidays / restructuring flags (E21) and "
+     "escalate whether to use 6 of 6."),
+    ("E13", f"Fixed states keep their state (or move into stabilized) next month — min over states with n >= {MIN_N}",
+     _fixed_stability, lambda v: v >= 0.95, ">= 95%", "WARN", "design",
+     "Run-up, history and the repairs are causal: how they fell in never changes once past 4. EPD is "
+     "not fixed (it ends when the account pays) and moving into stabilized is not a leak.",
+     "A feature is drifting with time or with the next month's data — find the leaking state."),
     ("E14", "Stabilized persistence next month",
-     lambda R: (_card(R, RECOMMENDED).loc["stabilized", "same_state_next_month"]
-                if _card(R, RECOMMENDED) is not None else None),
-     lambda v: 0.45 <= v <= 0.85, "45–85%", "WARN",
-     "Stabilized is current behaviour; it should persist but not forever (synthetic 62%).",
-     "Too low: the band is too loose. Too high: frozen buckets (holidays) are being read as payments."),
+     _stab_persist,
+     lambda v: 0.45 <= v <= 0.85, "45–85%", "WARN", "synthetic",
+     "Stabilized is current behaviour; it should persist but not forever (synthetic ~60%).",
+     "Too low: the band is too loose. Too high: frozen buckets (holidays) are read as payments."),
     ("E15", "Option A: straight-roller share",
-     lambda R: _share(R, "A_minimal_4").get("straight_roller", 0), lambda v: 0.55 <= v <= 0.80,
-     "55–80%", "WARN", "Most accounts roll straight 2-3-4 (synthetic 70%).",
-     "If much lower, many run-ups contain a hold — check +2/billing artefacts before trusting slow roller."),
-    ("E16", "Every option-B state holds at least 5% of the spine",
-     lambda R: float(_share(R, "B_balanced_6").min()), lambda v: v >= 0.05,
-     ">= 5%", "WARN", "Actionable size. Synthetic: straight_roller_early_life 3.4% under the 12-month "
-     "seasoned cut (depends on the book's tenure mix).",
-     "Merge the small state into its neighbour (repeat_delinquent→straight_roller, "
-     "early-life→seasoned), or move seasoned_min_months along its sweep (12 → 18 → 24 months)."),
-    ("E17", "Option C: smaller of intermittent / erratic payer (slow-roller split)",
+     lambda R: float(_share(R, "A_minimal_4").get("straight_roller", 0)), lambda v: 0.55 <= v <= 0.80,
+     "55–80%", "WARN", "bank",
+     "Most accounts roll straight 2-3-4 (synthetic ~70%).",
+     "If much lower, many run-ups contain a hold — look at E28 (artefacts) before trusting slow roller."),
+    ("E16", "Smallest optional state in option B (EPD and stabilized are required; empty = 0)",
+     lambda R: float(_share(R, "B_balanced_6").drop(["early_payment_default", "stabilized"]).min()),
+     lambda v: v >= 0.05, ">= 5%", "WARN", "design",
+     "Actionable size for the optional splits; the bank's two known states are kept at any size. "
+     "Synthetic: early-life straight roller ~4.7% under the 12-month cut.",
+     "If it is early-life straight roller: merge it into straight roller (agreed with the owner: set "
+     "seasoned_min_months=None and keep early life as a flag). Any other state: escalate."),
+    ("E17", "Option C: smaller of intermittent / erratic payer",
      lambda R: float(_share(R, "C_detailed_7").reindex(["slow_roller_intermittent", "slow_roller_erratic"]).fillna(0).min()),
-     lambda v: v >= 0.04, ">= 4%", "WARN", "Synthetic 10% / 6%.",
-     "Too small to act on — use option B."),
+     lambda v: v >= 0.04, ">= 4%", "WARN", "design",
+     "Synthetic 10% / 6%.", "Too small to act on — use option B."),
     ("E18", "Stabilized sits low in the spine: share at bucket 4 / share at bucket 7",
-     lambda R: (R["states_today"][RECOMMENDED]["by_bucket"].get(4, {}).get("stabilized", 0)
-                / max(R["states_today"][RECOMMENDED]["by_bucket"].get(7, {}).get("stabilized", 0), 1e-9)),
-     lambda v: v >= 2, ">= 2x", "WARN", "90–95% roll rates at 6–7 leave little room to hold there.",
+     _by_bucket_ratio, lambda v: v >= 2, ">= 2x", "WARN", "bank",
+     "90–95% roll rates at 6–7 leave little room to hold there.",
      "Stabilized accounts at 6–7 are unusual — check for frozen buckets (payment holidays)."),
     ("E19", "Orthogonality: credibility score explained by the states (eta²)",
-     lambda R: _eta(R, "credibility_score"), lambda v: v <= 0.25,
-     "<= 0.25", "WARN", "Known overlap via stabilized (money in) and repeat delinquent (clean point), but "
-     "the states should not reproduce the score.",
+     lambda R: _eta(R, "credibility_score"), lambda v: v <= 0.25, "<= 0.25", "WARN", "design",
+     "Known overlap via stabilized (money in), slow roller (money in near bucket 4) and repeat "
+     "delinquent (clean point); the states should not reproduce the score.",
      "Use option A (drops repeat delinquent) or report stabilized under credibility instead."),
     ("E19b", "Orthogonality: credibility 'pre-delinquency clean' point explained by the states (eta²)",
-     lambda R: _eta(R, "cred_clean_point"), lambda v: v <= 0.50,
-     "<= 0.50", "WARN", "Repeat delinquent is defined from earlier spells — the same history the clean point "
-     "scores. Synthetic (with a clean point = 'no earlier spell'): 0.84 → WARN.",
-     "Repeat delinquent duplicates the credibility clean point: use option A, or keep it and "
-     "tell the persona grid it is the same signal (it is only 1 of credibility's 5 points)."),
+     lambda R: _eta(R, "cred_clean_point"), lambda v: v <= 0.50, "<= 0.50", "WARN", "design",
+     "Repeat delinquent uses earlier spells — the history the clean point scores (now limited to the "
+     "last 24 months, which lowers the overlap).",
+     "Repeat delinquent duplicates the clean point: use option A, or keep it and tell the persona grid "
+     "it is the same signal (only 1 of credibility's 5 points)."),
     ("E20", "Orthogonality: ability score explained by the states (eta²)",
-     lambda R: _eta(R, "ability_score"), lambda v: v <= 0.10,
-     "<= 0.10", "WARN", "DPD shape should carry little of salary/inflow/CASA.",
-     "Straight vs slow roller may be a proxy for income loss — fine, but say so in the persona grid."),
+     lambda R: _eta(R, "ability_score"), lambda v: v <= 0.10, "<= 0.10", "WARN", "design",
+     "DPD shape should carry little of salary/inflow/CASA.",
+     "Straight vs slow roller may proxy income loss — fine, but say so in the persona grid."),
+    ("E20b", "Orthogonality: reachability / in-country explained by the states (max eta²)",
+     lambda R: _max_eta(R, ["reachable_flag", "in_country_flag"]), lambda v: v <= 0.05, "<= 0.05",
+     "WARN", "design", "Locatability is independent of how the debt was paid.",
+     "A state is acting as a departure proxy — report it to the persona owners."),
     ("E21", "Stabilized accounts with money coming in (credibility component or DPD proxy)",
      lambda R: R["overlap_other_axes"]["stabilized_vs_money_in"]["stabilized_with_money_in"],
-     lambda v: v >= 0.90, ">= 90%", "WARN",
-     "Stabilized = paid one month's due most months, so money must be coming in (synthetic 100%).",
-     "Stabilized accounts without money in are frozen buckets (holiday/restructure) — exclude those months."),
-    ("E22", "Residual clusters agree more with option B than with A (ARI gain at k=6)",
-     _resid_gain, lambda v: v >= 0.15, ">= 0.15", "WARN",
-     "Synthetic at k=6: 0.32 (B) vs 0.11 (A) — the data has more than two residual groups.",
-     "The extra B splits are not natural groups in this book — prefer option A."),
-    ("E23", "One paid month on the way down matters: slow-roller share at run-up<=4 / at <=3",
-     _runup_sharpness, lambda v: v <= 0.70, "<= 0.70", "WARN",
-     "Synthetic ~0.58: most slow rollers held exactly once.",
-     "Slow roller is driven by long run-ups, not single payments — keep 3 but review examples."),
+     lambda v: v >= 0.90, ">= 90%", "WARN", "design",
+     "Stabilized = paid one month's due most months, so money must be coming in.",
+     "Stabilized accounts without money in are frozen buckets (holiday/restructure) — flag them."),
+    ("E22", "INFO — residual clusters: option-B ARI gain over option A at k=6",
+     _resid_gain, None, "report", "INFO", "synthetic",
+     "Diagnostic only: any finer partition built on the clustered features gains ARI (a meaningless "
+     "tenure split gained 0.16 in review), so this is not evidence for B over A.",
+     "—"),
+    ("E23", "INFO — one paid month: straight minus one-hold slow roller, next-month roll (bucket-std)",
+     _one_hold, None, "report", "INFO", "synthetic",
+     "41% of slow rollers rest on a single hold. Unknowable from synthetic data (same post-4 dynamics).",
+     "Near 0 and E28 shows artefacts: the straight/slow split rests on noise — escalate whether a single "
+     "hold should still make a slow roller (straight_max_runup = 4)."),
     ("E24", "'Paying since 4' stays rejected: share still in it next month at 0.5",
-     lambda R: (_partial(R) or {}).get("still_partial"), lambda v: v <= 0.75, "<= 75%", "WARN",
-     "Synthetic 63%: unstable current-behaviour state.",
+     _partial, lambda v: v <= 0.75, "<= 75%", "WARN", "synthetic",
+     "Synthetic ~63%: an unstable current-behaviour state.",
      "If it is stable on real data, reconsider Q3 — but it remains credibility's 'money in'."),
+    ("E25", "INFO — spread of exit to 8+ within 3 months across fixed states (option B, bucket-std)",
+     _spread, None, "report", "INFO", "synthetic",
+     "Standardised to the bucket mix and over 3 months, because 6-month exit saturates near 100% at 5–7.",
+     ">= 5pp means how they fell in carries risk information beyond stabilized."),
     ("E26", "Stabilized bounce-backs: ever-stabilized accounts that left and came back within k months",
-     lambda R: R["backtest"]["stabilized_flips"]["with_long_run_clause"]["bounce_back_share_of_ever_stabilized"],
-     lambda v: v <= 0.10, "<= 10%", "WARN",
-     "Synthetic ~5–7% with the long-run clause vs ~8% on the bank's rule alone; oscillating "
-     "payers bounce 41% less. Remaining bounces are mostly staircases (hold, step, hold) "
-     "and swingers in their first 6 months at 4 (both rules are reported).",
-     "Too many accounts bounce: look at examples; consider stabilized_long_run_max_rise = 2 "
-     "or a sticky rule — but both widen the definition, so agree it with the business."),
-    ("E25", "INFO — spread of exit-within-k across fixed states (option B)",
-     _spread, None, "report", "INFO",
-     "Synthetic data cannot show this (same post-4 dynamics by construction).",
-     ">= 5pp means the mechanism carries risk information beyond stabilized."),
+     _flips,
+     lambda v: v <= 0.10, "<= 10%", "WARN", "synthetic",
+     "Synthetic ~5–7% with the long-run clause vs ~8% on the bank's rule alone; oscillating payers "
+     "bounce 41% less. Remaining bounces are mostly staircases (hold, step, hold).",
+     "Too many bounce: look at shapes; +2 tolerance or a sticky rule widen the definition — escalate."),
+    ("E27", "String lengths vary (p95 minus p05 of history length, months)",
+     lambda R: R["data_quality"]["string_length_spread"], lambda v: v >= 6, ">= 6", "WARN", "data",
+     "Full history from the first billed month gives very different lengths across accounts.",
+     "Strings look fixed-length (padded or truncated): EPD and early-life cannot be judged from the "
+     "string — confirm the convention (PROMPTS P1) before reading those states."),
+    ("E28", "Run-up holds by calendar month: largest month vs its neighbours (artefact check)",
+     lambda R: R.get("runup_hold_calendar_spike"), lambda v: v <= 2.5, "<= 2.5", "WARN", "data",
+     "Customer payments spread over calendar months; a spike means a system event (cycle-date change, "
+     "reversal batch, deferral).",
+     "Find the month (section 5b) and ask the data owners; holds from that month should not count."),
 ]
 
 
 def evaluate(R: dict) -> pd.DataFrame:
     rows = []
-    for eid, title, metric, check, expected, sev, why, action in EXPECTATIONS:
+    for eid, title, metric, check, expected, sev, anchor, why, action in EXPECTATIONS:
         try:
             v = metric(R)
         except (KeyError, TypeError, ValueError, IndexError, AttributeError, ZeroDivisionError):
@@ -1923,12 +2443,135 @@ def evaluate(R: dict) -> pd.DataFrame:
             status = "PASS" if check(v) else sev
         rows.append({"id": eid, "status": status, "check": title,
                      "observed": round(v, 3) if isinstance(v, float) else v,
-                     "expected": expected, "why": why, "if_not_met": action})
+                     "expected": expected, "anchor": anchor, "why": why, "if_not_met": action})
     return pd.DataFrame(rows)
 `````
 
+### FILE: `dpd_states/file_mode.py`
+sha256 `459464c28c496f0b80ec218b4ab2b3d4717479fcf67e4d42764d76c5a2438d29` · 117 lines · trailing newline: yes
+
+`````python
+"""Validate the states on a DPD-history FILE (xlsx / csv / parquet) — no Spark needed.
+
+    python docs/deterioration_states/run.py validate                              # cfg.INPUT_FILE
+    python docs/deterioration_states/run.py validate data/input/other_file.xlsx   # another file
+
+Reads cfg.COL_DPD (leftmost = most recent month) as TEXT, keeps today's spine (current
+bucket in cfg.SPINE_BUCKETS), runs analysis.run + the expectations, and writes
+results/dpd_states_file_<file>_<date>.json + .md (aggregates only, no keys, no raw strings).
+
+A snapshot of today's segment has no outcomes: accounts that rolled to 8+ since are not
+in it, so roll rates / exits are SKIPPED. Stability checks run on the survivors.
+"""
+from __future__ import annotations
+
+import datetime
+import json
+import pathlib
+import re
+
+import pandas as pd
+
+from . import config as cfg
+from .analysis import md, run
+from .expectations import evaluate
+from .states import DISPLAY_NAMES, RECOMMENDED
+
+
+def _repo_root() -> pathlib.Path:
+    here = pathlib.Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / ".git").exists() or (parent / "conf").is_dir():
+            return parent
+    return here.parents[3]
+
+
+def _read(path: pathlib.Path, col: str) -> pd.DataFrame:
+    suffix = path.suffix.lower()
+    if suffix in (".xlsx", ".xlsm", ".xls"):
+        try:
+            return pd.read_excel(path, dtype={col: str})
+        except ImportError as e:                       # openpyxl missing
+            raise SystemExit(f"{e}\nInstall it with: python -m pip install openpyxl") from None
+    if suffix == ".csv":
+        return pd.read_csv(path, dtype={col: str})
+    if suffix == ".parquet":
+        return pd.read_parquet(path)
+    raise SystemExit(f"unsupported file type {suffix!r} — use .xlsx, .csv or .parquet")
+
+
+def main(path: str | None = None, sample_n: int = 100_000, out_dir: str | None = None, seed: int = 42) -> dict:
+    root = _repo_root()
+    src = pathlib.Path(path) if path else pathlib.Path(cfg.INPUT_FILE)
+    if not src.is_absolute() and not src.exists():
+        src = root / src
+    if not src.exists():
+        raise SystemExit(f"input file not found: {src}")
+    col = cfg.COL_DPD
+    df = _read(src, col)
+    if col not in df.columns:
+        raise SystemExit(f"column {col!r} not in {src.name}. Available: {sorted(map(str, df.columns))}\n"
+                         "Set COL_DPD in dpd_states/config.py.")
+
+    s = df[col].astype("string")
+    looks_numeric = s.str.contains(r"[.eE+]", regex=True, na=False).mean()
+    if looks_numeric > 0.01:
+        raise SystemExit(f"{looks_numeric:.0%} of {col} look like numbers (e.g. '5.4e+10'): the column was "
+                         "stored as a number, which drops digits. Re-export it as text.")
+
+    keep = {"dpd_string": s}
+    optional = {**cfg.AXIS_COLS, **cfg.EXISTING_RULE_COLS, **cfg.FLAG_COLS}
+    present = {name: c for name, c in optional.items() if c and c in df.columns}
+    for name, c in present.items():
+        keep[name] = df[c]
+    cur = pd.DataFrame(keep).dropna(subset=["dpd_string"])
+    cur["dpd_string"] = cur.dpd_string.astype(str)
+
+    lead = cur.dpd_string.str.strip(cfg.STRIP_CHARS or None).str[:1]
+    in_spine = lead.isin([str(b) for b in cfg.SPINE_BUCKETS])
+    counts = {"rows": int(len(df)), "rows_with_string": int(len(cur)),
+              "current_spine": int(in_spine.sum()),
+              "non_digit_strings": int((~cur.dpd_string.str.strip(cfg.STRIP_CHARS or None)
+                                        .str.fullmatch(r"\d+").fillna(False)).sum())}
+    cur = cur[in_spine]
+    if len(cur) > sample_n:
+        cur = cur.sample(sample_n, random_state=seed)
+
+    R, report = run(cur.reset_index(drop=True), None, cfg, spark_counts=counts)
+    checks = evaluate(R)
+
+    stamp = datetime.date.today().strftime("%Y%m%d")
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", src.stem).strip("_")
+    out = pathlib.Path(out_dir) if out_dir else pathlib.Path(__file__).resolve().parents[1] / "results"
+    out.mkdir(parents=True, exist_ok=True)
+    scope = (f"file {src.name}, column {col}; today's spine = leftmost digit in "
+             f"{list(cfg.SPINE_BUCKETS)}; sampled to <= {sample_n:,}")
+    payload = {"task": "DPD_STATES_VALIDATION_FILE", "run_date": datetime.date.today().isoformat(),
+               "source": src.name, "scope": scope, "counts": counts,
+               "optional_columns_present": sorted(present), "results": R,
+               "expectations": checks.to_dict("records")}
+    jf = out / f"dpd_states_file_{slug}_{stamp}.json"
+    jf.write_text(json.dumps(payload, indent=2, default=str))
+    mf = jf.with_suffix(".md")
+    mf.write_text(f"# DPD deterioration states — validation on {src.name}\n\nRun {payload['run_date']} · "
+                  f"{scope}\n\n## 0. Expectation checks\n\n" + md(checks, index=False) + "\n\n" + report + "\n")
+
+    rec = R["states_today"][RECOMMENDED]["share"]
+    print("=== DPD_STATES OUTPUT START ===")
+    print(f"source: {src.name}")
+    print(f"scope: {scope}")
+    print(f"counts: {counts}")
+    print(f"expectations: {checks.status.value_counts().to_dict()}")
+    for r in checks.itertuples():
+        print(f"  {r.id:<4} {r.status:<7} observed={r.observed!s:<14} expected={r.expected:<8} {r.check[:70]}")
+    print(f"{RECOMMENDED} shares today: " + ", ".join(f"{DISPLAY_NAMES[k]}={v:.1%}" for k, v in rec.items()))
+    print(f"wrote: {jf} and {mf.name}")
+    print("=== DPD_STATES OUTPUT END ===")
+    return payload
+`````
+
 ### FILE: `dpd_states/discover.py`
-sha256 `b2d4b8c967fb02377cd4be537cae42f29f56d163499033cb0dc1dcbf96a09155` · 134 lines · trailing newline: yes
+sha256 `b78da74aa467ec7d9029a99e489ad9266aa765946c3c0f44d289a5c9fba94bbd` · 136 lines · trailing newline: yes
 
 `````python
 """Pattern discovery on encoded DPD journeys: shapes, n-grams, feature clusters, rule tree."""
@@ -1962,6 +2605,8 @@ def _band(letter: str, n: int) -> str:
 def shape(dpd: str, max_runs: int = 8) -> str:
     """Run-length encoded journey with banded run lengths, last `max_runs` runs."""
     _, _, c = encode(dpd)
+    if len(c) == 0:
+        return "(one month only)"
     runs, prev, n = [], None, 0
     for code in c:
         if code == prev:
@@ -2654,7 +3299,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/selftest.py`
-sha256 `7f7fb03d9ba0016e22ed544d030806ea57b76a779fc2c616a7ec74fe4e2e8c36` · 119 lines · trailing newline: yes
+sha256 `0a9d05d1cdd138d3c29a48df573582a77c763374e5396ab07c9d23a5231613fc` · 153 lines · trailing newline: yes
 
 `````python
 """End-to-end self-test of the REAL-DATA path on synthetic data (no Spark needed).
@@ -2704,7 +3349,40 @@ CASES = [
     ("0000000000000023455555", "stabilized", "holding at 5"),
     ("00000000234443345433456554", "stabilized", "oscillating payer (example 1)"),
     ("00000000234443345433456654", "stabilized", "oscillating payer that just paid down 6-5-4 (example 2)"),
+    ("0 0 2 3 4 4 4 4 4 4", "stabilized", "entered like EPD but pays the monthly due since: not EPD"),
+    ("0 0 2 3 4 4 5 6", "straight_roller_early_life", "entered like EPD, paid once at 4: EPD needs no payment"),
+    ("4 5 6 7", "history_starts_delinquent", "string starts delinquent (restructured / missing history)"),
+    ("0000000000000000224", "straight_roller_seasoned", "+2 jump after a hold at 2: repaired to 2 3 4"),
+    ("00000000000000002244", "straight_roller_seasoned", "same account a month later: fixed state must not change"),
+    ("000034", "straight_roller_early_life", "jump from clean to 3: no clean month is borrowed"),
+    ("0 2 3 4" + " 0" * 30 + " 2 3 4", "straight_roller_seasoned", "cured 30 months earlier: outside 24-month window"),
+    ("0 2 3 4" + " 0" * 20 + " 2 3 4 5", "repeat_delinquent", "cured 20 months earlier: repeat delinquent"),
+    ("0000000000000000 2 3 4 4 0 4 5", "stabilized", "single 0 inside a spell at 4 is a glitch, not a cure"),
+    ("0000 3 0000000000000 2 3 4", "straight_roller_seasoned", "single spike 0 3 0 is a glitch, not an earlier spell"),
 ]
+
+
+def check_file_mode() -> bool:
+    """File mode end to end on a temporary CSV (no openpyxl needed): reading the text column,
+    filtering to today's spine, survivor-only checks, results written outside the repo."""
+    import contextlib
+    import io
+    import tempfile
+    from . import config, file_mode
+    df = synth.generate(1500, seed=21)[["dpd_string"]].rename(columns={"dpd_string": config.COL_DPD})
+    df.loc[df.index[:100], config.COL_DPD] = "3" + df[config.COL_DPD][:100].str[1:]   # outside the spine
+    df["derived_column"] = 1
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "mock.csv"
+        df.to_csv(src, index=False)
+        with contextlib.redirect_stdout(io.StringIO()):
+            payload = file_mode.main(str(src), out_dir=tmp)
+    good = (payload["counts"]["current_spine"] == 1400
+            and payload["results"]["states_today"][RECOMMENDED]["mece"]
+            and isinstance(payload["results"].get("survivor_checks"), dict))
+    print(f"\nFile mode on a temporary CSV: {'OK' if good else 'FAIL'} "
+          f"(spine {payload['counts']['current_spine']} of {payload['counts']['rows']} rows)")
+    return good
 
 
 def check_cases() -> list[str]:
@@ -2715,7 +3393,7 @@ def check_cases() -> list[str]:
     for (c, want, why), g in zip(CASES, got):
         ok = g == want
         bad += not ok
-        lines.append(f"{'OK  ' if ok else 'FAIL'} {c:<30} -> {g:<27} {'' if ok else '(expected ' + want + ') '}{why}")
+        lines.append(f"{'OK  ' if ok else 'FAIL'} {c[:36]:<37} -> {g:<27} {'' if ok else '(expected ' + want + ') '}{why}")
     return lines, bad
 
 
@@ -2763,13 +3441,14 @@ def main(n: int = 20_000) -> int:
 
     print(md(checks[["id", "status", "observed", "expected", "check"]], index=False))
     case_lines, bad = check_cases()
+    file_ok = check_file_mode()
     print("\nEdge cases (oldest -> newest, option B):\n" + "\n".join(case_lines))
     (OUT / f"selftest_report_{stamp}.md").write_text(
         (OUT / f"selftest_report_{stamp}.md").read_text().replace(
             "## 0. Expectation checks", "## 0a. Edge cases (oldest → newest, option B)\n\n```\n"
             + "\n".join(case_lines) + "\n```\n\n## 0. Expectation checks"))
     ok = ((checks.status != "FAIL").all() and checks.set_index("id").loc["E01", "status"] == "PASS"
-          and bad == 0)
+          and bad == 0 and file_ok)
     print("\nSELFTEST", "PASSED" if ok else "FAILED", f"-> {OUT}")
     return 0 if ok else 1
 
@@ -2779,7 +3458,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `4a714ce4b9da1459c1c93087e943a36d8a87c9c5b72d4e2d549ecab48003285c` · 216 lines · trailing newline: yes
+sha256 `6117c212db36d252253672b11ae7a4091b4d761fbf6f591d694ef36da83a3060` · 218 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -2807,6 +3486,7 @@ FILES = [
     "README.md",
     "run.py",
     "METHODOLOGY.md",
+    "REVIEW.md",
     "PROMPTS.md",
     "dpd_states/__init__.py",
     "dpd_states/config.py",
@@ -2814,6 +3494,7 @@ FILES = [
     "dpd_states/states.py",
     "dpd_states/analysis.py",
     "dpd_states/expectations.py",
+    "dpd_states/file_mode.py",
     "dpd_states/discover.py",
     "dpd_states/synth.py",
     "dpd_states/run_synthetic.py",
@@ -3001,7 +3682,7 @@ if __name__ == "__main__":
 ``````
 
 ### FILE: `snippets/dpd_states_validate.py`
-sha256 `88d15f86343211a90c4eaf0eca63bd094abfc8d6c5662e0a5afe93b3622a13e1` · 200 lines · trailing newline: yes
+sha256 `ed57a1f7da1efdb29e9c7fa33bd11b539b11b6d214e654357d6380508f80cbed` · 247 lines · trailing newline: yes
 
 `````python
 """DPD deterioration states — validation on real data (PROD).
@@ -3019,13 +3700,16 @@ Run in a Kedro notebook where `catalog` exists. Works from any notebook location
     sys.path.insert(0, str(ROOT / "docs" / "deterioration_states" / "snippets"))
 
     from dpd_states_validate import main
-    result = main(catalog, check_only=True)        # 1st: schema, counts, examples only
+    result = main(catalog, check_only=True)        # 1st: schema, counts, orientation (aggregates only)
     result = main(catalog)                         # full run, model_id from globals_dev
     result = main(catalog, model_id="<variant>")   # or one variant explicitly
 
 READ-ONLY: writes nothing to the warehouse. Writes one aggregates-only JSON (+ a markdown
-report) to docs/deterioration_states/results/ — no account keys, no row-level data.
-The markdown contains a handful of example DPD strings (no keys) for eyeballing.
+report) to docs/deterioration_states/results/ — no account keys, no raw DPD strings
+(examples are banded journey shapes shared by >= 10 accounts). Config and threshold edits
+take effect on the next call; no kernel restart needed (the config fingerprint is printed).
+
+Before sign-off, validate in FILE mode without Spark: python docs/deterioration_states/run.py validate
 
 FILL IN before running:
   * docs/deterioration_states/dpd_states/config.py — dataset and column names
@@ -3066,29 +3750,44 @@ def _sample(sdf, n_rows, sample_n, seed):
     return sdf.sample(False, min(1.0, 1.1 * sample_n / n_rows), seed).limit(sample_n)
 
 
+def _load_package():
+    """Import (and RE-import) the package, so config / threshold edits made since the last
+    run in the same notebook kernel take effect without a restart."""
+    import hashlib
+    import importlib
+    sys.path.insert(0, str(_pkg_root()))
+    import dpd_states.config, dpd_states.features, dpd_states.states, dpd_states.discover  # noqa: E401
+    import dpd_states.analysis, dpd_states.expectations                                    # noqa: E401
+    for m in (dpd_states.config, dpd_states.features, dpd_states.states, dpd_states.discover,
+              dpd_states.analysis, dpd_states.expectations):
+        importlib.reload(m)
+    cfg, st = dpd_states.config, dpd_states.states
+    fingerprint = hashlib.sha256(repr(
+        ({k_: getattr(cfg, k_) for k_ in dir(cfg) if k_.isupper()}, st.DEFAULTS, st.OPTIONS)).encode()).hexdigest()[:12]
+    return cfg, dpd_states.analysis, dpd_states.expectations, st, fingerprint
+
+
 def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=False, seed=42):
     from pyspark.sql import functions as F
 
-    sys.path.insert(0, str(_pkg_root()))
-    from dpd_states import config as cfg
-    from dpd_states.analysis import md, run
-    from dpd_states.expectations import evaluate
-    from dpd_states.states import DISPLAY_NAMES, OPTIONS, RECOMMENDED
+    cfg, an, ex, st, fingerprint = _load_package()
+    md, run, evaluate = an.md, an.run, ex.evaluate
+    DISPLAY_NAMES, RECOMMENDED = st.DISPLAY_NAMES, st.RECOMMENDED
 
+    unfilled = [n for n, v in (("DS_STRINGS_TMPL", cfg.DS_STRINGS_TMPL), ("KEY", cfg.KEY), ("COL_DPD", cfg.COL_DPD))
+                if "<<FILL-IN" in str(v)]
+    if unfilled:
+        print(f"CONFIG NOT FILLED: {unfilled} in dpd_states/config.py (see PROMPTS.md P1)")
+        return None
     model_id = _resolve_model_id(model_id)
     out_dir = pathlib.Path(out_dir) if out_dir else _pkg_root() / "results"
     k = cfg.BACKTEST_MONTHS
     ds = cfg.DS_STRINGS_TMPL.format(model_id=model_id)
 
-    unfilled = [n for n, v in (("DS_STRINGS_TMPL", ds), ("KEY", cfg.KEY), ("COL_DPD", cfg.COL_DPD))
-                if "<<FILL-IN" in str(v)]
-    if unfilled:
-        print(f"CONFIG NOT FILLED: {unfilled} in dpd_states/config.py")
-        return None
-
     # 1. load + schema guard ---------------------------------------------------------
     sdf = catalog.load(ds)
-    required = [cfg.KEY, cfg.COL_DPD] + ([cfg.COL_SNAPSHOT] if cfg.COL_SNAPSHOT else [])
+    required = ([cfg.KEY, cfg.COL_DPD] + ([cfg.COL_SNAPSHOT] if cfg.COL_SNAPSHOT else [])
+                + ([cfg.COL_STRING_AS_OF] if cfg.COL_STRING_AS_OF else []))
     missing = [c for c in required if c not in sdf.columns]
     if missing:
         print(f"SCHEMA MISMATCH in {ds}. missing={missing}")
@@ -3097,6 +3796,11 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
     optional = {**cfg.AXIS_COLS, **cfg.EXISTING_RULE_COLS, **cfg.FLAG_COLS}
     present = {name: col for name, col in optional.items() if col and col in sdf.columns}
     absent = {name: col for name, col in optional.items() if col and col not in sdf.columns}
+    warnings = []
+    dpd_type = dict(sdf.dtypes)[cfg.COL_DPD]
+    if dpd_type != "string":
+        warnings.append(f"{cfg.COL_DPD} is stored as {dpd_type}, not string — numbers drop digits "
+                        "(leading zeros, Excel's 15-digit limit). Use a string column.")
 
     # 2. scope FIRST: filter, latest snapshot, normalise the string -------------------
     if cfg.ROW_FILTER:
@@ -3105,14 +3809,21 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
         latest = sdf.agg(F.max(cfg.COL_SNAPSHOT)).first()[0]
         sdf = sdf.where(F.col(cfg.COL_SNAPSHOT) == F.lit(latest))
     s = F.col(cfg.COL_DPD).cast("string")
-    if cfg.STRIP_CHARS:
-        s = F.regexp_replace(s, "[" + re.escape(cfg.STRIP_CHARS) + "]", "")
+    if cfg.STRIP_CHARS:                          # padding at the two ENDS only, never mid-string
+        cls = "[" + re.escape(cfg.STRIP_CHARS) + "]+"
+        s = F.regexp_replace(s, f"^{cls}|{cls}$", "")
     for a, b in (cfg.CHAR_MAP or {}).items():
         s = F.regexp_replace(s, re.escape(a), b)
     if not cfg.LEFTMOST_IS_CURRENT:
         s = F.reverse(s)
-    sdf = sdf.select(F.col(cfg.KEY).alias("_key"), s.alias("dpd_string"),
-                     *[F.col(c).alias(n) for n, c in present.items()])
+    asof_cols = [F.col(cfg.COL_STRING_AS_OF).alias("_asof")] if cfg.COL_STRING_AS_OF else []
+    sdf = sdf.select(F.col(cfg.KEY).alias("_key"), s.alias("dpd_string"), *asof_cols,
+                     *[F.col(c).alias(n) for n, c in present.items()]).cache()
+    stale = None
+    if cfg.COL_STRING_AS_OF:                     # strings frozen at charge-off / closure
+        newest = sdf.agg(F.max("_asof")).first()[0]
+        stale = sdf.where(F.col("_asof") != F.lit(newest)).count()
+        sdf = sdf.where(F.col("_asof") == F.lit(newest)).drop("_asof")
 
     spine = [str(b) for b in cfg.SPINE_BUCKETS]
     is_cur = F.substring("dpd_string", 1, 1).isin(spine)
@@ -3127,13 +3838,13 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
         F.sum((~F.col("dpd_string").rlike("^[0-9]+$")).cast("int")).alias("non_digit_strings"),
         F.expr("percentile_approx(length(dpd_string), array(0.05, 0.5, 0.95))").alias("len_p05_p50_p95"),
     ).first().asDict()
+    counts["stale_strings_excluded"] = stale
     sdf = sdf.drop("_key")                      # keys never leave Spark
 
     scope_note = (f"{ds}" + (f" where {cfg.ROW_FILTER}" if cfg.ROW_FILTER else "")
                   + (f", latest {cfg.COL_SNAPSHOT}" if cfg.COL_SNAPSHOT else "")
                   + f"; today's spine = current digit in {spine}; backtest = digit {k + 1} in {spine}"
                   + f"; sampled to <= {sample_n:,} rows each")
-    warnings = []
     if counts["rows"] != counts["accounts"]:
         warnings.append("more rows than accounts — set COL_SNAPSHOT or de-duplicate")
     if cfg.DS_STRINGS_HAS_EXITED and counts["backtest_spine"] and not counts["backtest_now_8plus"]:
@@ -3142,14 +3853,29 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
                         "accounts, or set DS_STRINGS_HAS_EXITED = False")
 
     if check_only:
-        ex = [r.dpd_string[:36] for r in sdf.where(is_cur).select("dpd_string").limit(5).collect()]
+        # Orientation check from aggregates only (no raw strings leave the notebook): with the
+        # newest month on the left, today's spine starts with 4–7 and its oldest month is 0/1.
+        ends = (sdf.where(is_cur)
+                .select(F.substring("dpd_string", 1, 1).alias("newest"),
+                        F.expr("substring(dpd_string, length(dpd_string), 1)").alias("oldest"))
+                .groupBy("newest", "oldest").count().orderBy(F.desc("count")).limit(10).collect())
+        smp = [r.dpd_string for r in sdf.where(is_cur).select("dpd_string").limit(2000).collect()]
+        from dpd_states.discover import shape
+        from collections import Counter
+        shapes = [(sh, n) for sh, n in Counter(shape(x) for x in smp if x.isdigit()).most_common(8) if n >= 10]
         print("=== DPD_STATES CHECK START ===")
         print(f"model_id: {model_id}")
+        print(f"config fingerprint: {fingerprint}")
         print(f"scope: {scope_note}")
         print(f"counts: {counts}")
         print(f"optional columns present: {present}")
         print(f"optional columns configured but missing: {absent}")
-        print(f"example strings (no keys, newest first, 36 months): {ex}")
+        print("newest / oldest digit of today's spine (expect newest 4–7, oldest mostly 0/1):")
+        for r in ends:
+            print(f"  newest={r.newest} oldest={r.oldest}  n={r['count']:,}")
+        print("most common journey shapes in a 2,000-string sample (N clean, R roll, H hold, P paid 2+):")
+        for sh, n in shapes:
+            print(f"  {n:>5}  {sh}")
         for w in warnings:
             print(f"WARNING: {w}")
         print("=== DPD_STATES CHECK END ===")
@@ -3162,13 +3888,14 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
     if cfg.DS_STRINGS_HAS_EXITED and counts["backtest_spine"]:
         bt_pd = _sample(sdf.where(is_bt).select("dpd_string"), counts["backtest_spine"],
                         sample_n, seed).toPandas()
-    R, report = run(cur_pd, bt_pd, cfg)
+    R, report = run(cur_pd, bt_pd, cfg, spark_counts=counts)
     checks = evaluate(R)
 
     payload = {
         "task": "DPD_STATES_VALIDATION",
         "run_date": datetime.date.today().isoformat(),
         "model_id": model_id,
+        "config_fingerprint": fingerprint,
         "scope": scope_note,
         "counts": counts,
         "warnings": warnings,
@@ -3193,15 +3920,16 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
     rec = R["states_today"][RECOMMENDED]["share"]
     print("=== DPD_STATES OUTPUT START ===")
     print(f"model_id: {model_id}")
+    print(f"config fingerprint: {fingerprint}")
     print(f"scope: {scope_note}")
     print(f"counts: {counts}")
     for w in warnings:
         print(f"WARNING: {w}")
     print(f"expectations: {n_status}")
     for r in checks.itertuples():
-        print(f"  {r.id:<4} {r.status:<7} observed={r.observed!s:<8} expected={r.expected:<8} {r.check[:70]}")
+        print(f"  {r.id:<4} {r.status:<7} observed={r.observed!s:<14} expected={r.expected:<8} {r.check[:70]}")
     print(f"{RECOMMENDED} shares today: " + ", ".join(f"{DISPLAY_NAMES[s]}={v:.1%}" for s, v in rec.items()))
-    print(f"wrote: {out} and {rep.name} -> commit & push from PROD, pull in UAT")
+    print(f"wrote: {out} and {rep.name} (aggregates only) -> commit & push from PROD, pull in UAT")
     print("=== DPD_STATES OUTPUT END ===")
     return payload
 `````

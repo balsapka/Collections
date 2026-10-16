@@ -1,33 +1,45 @@
 {
   "data_quality": {
-    "n_current_rows": 5000,
-    "share_invalid_strings": 0.0,
-    "n_current_spine_analysed": 5000,
+    "n_current_rows": 20000,
+    "share_invalid_strings_current": 0.0,
+    "share_non_digit_strings_table": null,
+    "n_current_spine_analysed": 20000,
     "string_length_p05_p50_p95": [
       9,
-      54,
+      53,
       141
     ],
-    "share_left_censored": 0.0,
-    "share_jump_repaired": 0.0204,
-    "share_jump_left": 0.003,
-    "share_one_spell_from3": 0.8246,
-    "share_one_spell_from4": 0.9538,
+    "string_length_spread": 132,
+    "share_history_starts_delinquent": 0.0,
+    "share_glitch_fixed": 0.0,
+    "share_jump_repaired": 0.0194,
+    "share_jump_left": 0.0073,
+    "one_spell_share": {
+      "reached_3": 0.8266,
+      "reached_4": 0.9481,
+      "at_3": 0.7359,
+      "at_4": 0.8204
+    },
     "bucket_mix": {
-      "4": 0.2922,
-      "5": 0.2558,
-      "6": 0.2368,
-      "7": 0.2152
-    }
+      "4": 0.2908,
+      "5": 0.2646,
+      "6": 0.2266,
+      "7": 0.218
+    },
+    "share_invalid_strings_backtest": 0.0
   },
   "state_names": {
+    "history_starts_delinquent": {
+      "display": "Not classified \u2014 history starts delinquent",
+      "remark": "Data quality, not behaviour: the oldest month in the string is already delinquent \u2014 typically a restructured card/loan re-opened at its old bucket, a migrated account or missing history. Rare; treatment of restructured accounts is deferred."
+    },
     "early_payment_default": {
       "display": "Early payment default (EPD)",
-      "remark": "Never really paid: defaulted within the first three payments. Called 'bust-out' internally \u2014 but classic bust-out fraud (good history, limit build-up, then max-out) shows as a seasoned straight roller and needs a fraud overlay on spend data."
+      "remark": "Never paid since crossing bucket 2 and still falling, at most 3 months after the first bill. Called 'bust-out' internally \u2014 but classic bust-out fraud (good history, limit build-up, then max-out) shows as a seasoned straight roller and needs a fraud overlay on spend data."
     },
     "stabilized": {
       "display": "Stabilized",
-      "remark": "The bank's 5-of-6 stabilized rule, plus a long-run clause (6+ months in buckets 4+, at most one bucket higher than 6 months ago) so oscillating payers and accounts that just paid down are not mislabelled."
+      "remark": "The bank's 5-of-6 stabilized rule, plus a long-run clause (6+ months since first reaching 4, at most one bucket higher than 6 months ago) so oscillating payers and accounts that just paid down are not mislabelled."
     },
     "paying_since_4": {
       "display": "Paying since bucket 4 (tested, not used)",
@@ -35,953 +47,1165 @@
     },
     "repeat_delinquent": {
       "display": "Repeat delinquent (re-default)",
-      "remark": "Re-default after a cured spell; collections 'recidivism'."
+      "remark": "Re-default within 24 months of curing a spell that reached bucket 3; collections 'recidivism'."
     },
     "straight_roller": {
       "display": "Straight roller",
-      "remark": "Rolled through every bucket without paying."
+      "remark": "Rolled straight to bucket 4 (no payment on the way down). Describes how they fell in \u2014 some have paid since."
     },
     "straight_roller_seasoned": {
       "display": "Seasoned straight roller",
-      "remark": "Straight roller after at least a year on book (seasoned)."
+      "remark": "Rolled straight to bucket 4 after at least a year on book (seasoned)."
     },
     "straight_roller_early_life": {
       "display": "Early-life straight roller",
-      "remark": "Straight roller in the first year on book (early-life default)."
+      "remark": "Rolled straight to bucket 4 in the first year on book (early-life default)."
     },
     "slow_roller": {
       "display": "Slow roller (partial payer)",
-      "remark": "Paid something on the way down but kept rolling. Also called partial payer."
+      "remark": "Paid something on the way down to bucket 4 but kept rolling. Also called partial payer."
     },
     "slow_roller_intermittent": {
       "display": "Intermittent payer",
-      "remark": "Slow roller that paid one month here and there."
+      "remark": "Slow roller that paid one month here and there on the way down."
     },
     "slow_roller_erratic": {
       "display": "Erratic payer",
-      "remark": "Slow roller that caught up 2+ months at once, then rolled again."
+      "remark": "Slow roller that caught up 2+ months at once on the way down, then rolled again."
     }
   },
   "states_today": {
     "A_minimal_4": {
       "share": {
-        "early_payment_default": 0.0578,
-        "stabilized": 0.0832,
-        "straight_roller": 0.6902,
-        "slow_roller": 0.1688
+        "history_starts_delinquent": 0.0,
+        "early_payment_default": 0.043,
+        "stabilized": 0.0779,
+        "straight_roller": 0.7136,
+        "slow_roller": 0.1655
       },
       "by_bucket": {
         "4": {
-          "early_payment_default": 0.0452,
-          "stabilized": 0.1711,
-          "straight_roller": 0.6393,
-          "slow_roller": 0.1444
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0433,
+          "stabilized": 0.1499,
+          "straight_roller": 0.657,
+          "slow_roller": 0.1497
         },
         "5": {
-          "early_payment_default": 0.0649,
-          "stabilized": 0.0876,
-          "straight_roller": 0.6857,
-          "slow_roller": 0.1618
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0444,
+          "stabilized": 0.0885,
+          "straight_roller": 0.7048,
+          "slow_roller": 0.1624
         },
         "6": {
-          "early_payment_default": 0.0617,
-          "stabilized": 0.0405,
-          "straight_roller": 0.7179,
-          "slow_roller": 0.1799
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0428,
+          "stabilized": 0.0386,
+          "straight_roller": 0.7505,
+          "slow_roller": 0.1681
         },
         "7": {
-          "early_payment_default": 0.0623,
-          "stabilized": 0.0056,
-          "straight_roller": 0.7342,
-          "slow_roller": 0.198
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0413,
+          "stabilized": 0.0099,
+          "straight_roller": 0.7614,
+          "slow_roller": 0.1874
         }
       },
-      "mece": true
+      "mece": true,
+      "n_unknown_state": 0
     },
     "B_balanced_6": {
       "share": {
-        "early_payment_default": 0.0578,
-        "stabilized": 0.0832,
-        "repeat_delinquent": 0.1638,
-        "straight_roller_seasoned": 0.5082,
-        "straight_roller_early_life": 0.0298,
-        "slow_roller": 0.1572
+        "history_starts_delinquent": 0.0,
+        "early_payment_default": 0.043,
+        "stabilized": 0.0779,
+        "repeat_delinquent": 0.1477,
+        "straight_roller_seasoned": 0.534,
+        "straight_roller_early_life": 0.0468,
+        "slow_roller": 0.1506
       },
       "by_bucket": {
         "4": {
-          "early_payment_default": 0.0452,
-          "stabilized": 0.1711,
-          "repeat_delinquent": 0.167,
-          "straight_roller_seasoned": 0.4668,
-          "straight_roller_early_life": 0.0205,
-          "slow_roller": 0.1294
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0433,
+          "stabilized": 0.1499,
+          "repeat_delinquent": 0.1387,
+          "straight_roller_seasoned": 0.4989,
+          "straight_roller_early_life": 0.0364,
+          "slow_roller": 0.1327
         },
         "5": {
-          "early_payment_default": 0.0649,
-          "stabilized": 0.0876,
-          "repeat_delinquent": 0.147,
-          "straight_roller_seasoned": 0.5082,
-          "straight_roller_early_life": 0.0375,
-          "slow_roller": 0.1548
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0444,
+          "stabilized": 0.0885,
+          "repeat_delinquent": 0.1391,
+          "straight_roller_seasoned": 0.5317,
+          "straight_roller_early_life": 0.0454,
+          "slow_roller": 0.151
         },
         "6": {
-          "early_payment_default": 0.0617,
-          "stabilized": 0.0405,
-          "repeat_delinquent": 0.1765,
-          "straight_roller_seasoned": 0.5279,
-          "straight_roller_early_life": 0.0296,
-          "slow_roller": 0.1639
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0428,
+          "stabilized": 0.0386,
+          "repeat_delinquent": 0.1577,
+          "straight_roller_seasoned": 0.5504,
+          "straight_roller_early_life": 0.0576,
+          "slow_roller": 0.1529
         },
         "7": {
-          "early_payment_default": 0.0623,
-          "stabilized": 0.0056,
-          "repeat_delinquent": 0.1654,
-          "straight_roller_seasoned": 0.5428,
-          "straight_roller_early_life": 0.0335,
-          "slow_roller": 0.1905
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0413,
+          "stabilized": 0.0099,
+          "repeat_delinquent": 0.1597,
+          "straight_roller_seasoned": 0.5669,
+          "straight_roller_early_life": 0.0509,
+          "slow_roller": 0.1714
         }
       },
-      "mece": true
+      "mece": true,
+      "n_unknown_state": 0
     },
     "C_detailed_7": {
       "share": {
-        "early_payment_default": 0.0578,
-        "stabilized": 0.0832,
-        "repeat_delinquent": 0.1638,
-        "straight_roller_seasoned": 0.5082,
-        "straight_roller_early_life": 0.0298,
-        "slow_roller_intermittent": 0.0922,
-        "slow_roller_erratic": 0.065
+        "history_starts_delinquent": 0.0,
+        "early_payment_default": 0.043,
+        "stabilized": 0.0779,
+        "repeat_delinquent": 0.1477,
+        "straight_roller_seasoned": 0.534,
+        "straight_roller_early_life": 0.0468,
+        "slow_roller_intermittent": 0.0932,
+        "slow_roller_erratic": 0.0574
       },
       "by_bucket": {
         "4": {
-          "early_payment_default": 0.0452,
-          "stabilized": 0.1711,
-          "repeat_delinquent": 0.167,
-          "straight_roller_seasoned": 0.4668,
-          "straight_roller_early_life": 0.0205,
-          "slow_roller_intermittent": 0.0732,
-          "slow_roller_erratic": 0.0561
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0433,
+          "stabilized": 0.1499,
+          "repeat_delinquent": 0.1387,
+          "straight_roller_seasoned": 0.4989,
+          "straight_roller_early_life": 0.0364,
+          "slow_roller_intermittent": 0.0841,
+          "slow_roller_erratic": 0.0487
         },
         "5": {
-          "early_payment_default": 0.0649,
-          "stabilized": 0.0876,
-          "repeat_delinquent": 0.147,
-          "straight_roller_seasoned": 0.5082,
-          "straight_roller_early_life": 0.0375,
-          "slow_roller_intermittent": 0.0907,
-          "slow_roller_erratic": 0.0641
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0444,
+          "stabilized": 0.0885,
+          "repeat_delinquent": 0.1391,
+          "straight_roller_seasoned": 0.5317,
+          "straight_roller_early_life": 0.0454,
+          "slow_roller_intermittent": 0.0913,
+          "slow_roller_erratic": 0.0597
         },
         "6": {
-          "early_payment_default": 0.0617,
-          "stabilized": 0.0405,
-          "repeat_delinquent": 0.1765,
-          "straight_roller_seasoned": 0.5279,
-          "straight_roller_early_life": 0.0296,
-          "slow_roller_intermittent": 0.1005,
-          "slow_roller_erratic": 0.0633
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0428,
+          "stabilized": 0.0386,
+          "repeat_delinquent": 0.1577,
+          "straight_roller_seasoned": 0.5504,
+          "straight_roller_early_life": 0.0576,
+          "slow_roller_intermittent": 0.094,
+          "slow_roller_erratic": 0.0589
         },
         "7": {
-          "early_payment_default": 0.0623,
-          "stabilized": 0.0056,
-          "repeat_delinquent": 0.1654,
-          "straight_roller_seasoned": 0.5428,
-          "straight_roller_early_life": 0.0335,
-          "slow_roller_intermittent": 0.1106,
-          "slow_roller_erratic": 0.0799
+          "history_starts_delinquent": 0.0,
+          "early_payment_default": 0.0413,
+          "stabilized": 0.0099,
+          "repeat_delinquent": 0.1597,
+          "straight_roller_seasoned": 0.5669,
+          "straight_roller_early_life": 0.0509,
+          "slow_roller_intermittent": 0.1067,
+          "slow_roller_erratic": 0.0647
         }
       },
-      "mece": true
+      "mece": true,
+      "n_unknown_state": 0
     }
   },
   "existing_rule_agreement": {
     "early_payment_default": {
-      "their_share": 0.062,
-      "our_share": 0.0578,
-      "recall_of_theirs": 0.9258064516129032,
-      "precision_vs_theirs": 0.9930795847750865
+      "their_share": 0.0467,
+      "our_share": 0.043,
+      "recall_of_theirs": 0.9187,
+      "precision_vs_theirs": 0.9977,
+      "share_unparsed": 0.0
     },
     "stabilized": {
-      "their_share": 0.0776,
-      "our_share": 0.0832,
-      "recall_of_theirs": 0.9329896907216495,
-      "precision_vs_theirs": 0.8701923076923077
+      "their_share": 0.073,
+      "our_share": 0.0779,
+      "recall_of_theirs": 0.9411,
+      "precision_vs_theirs": 0.8813,
+      "share_unparsed": 0.0
     }
   },
   "overlap_other_axes": {
     "eta2_by_option": [
       {
         "axis": "credibility_score",
-        "A_minimal_4": 0.1129,
-        "B_balanced_6": 0.1932,
-        "C_detailed_7": 0.1949
+        "A_minimal_4": 0.1046,
+        "B_balanced_6": 0.1822,
+        "C_detailed_7": 0.1836
       },
       {
         "axis": "cred_ptp_points",
         "A_minimal_4": 0.0002,
-        "B_balanced_6": 0.0004,
-        "C_detailed_7": 0.0004
+        "B_balanced_6": 0.0002,
+        "C_detailed_7": 0.0002
       },
       {
         "axis": "cred_money_in_points",
-        "A_minimal_4": 0.1789,
-        "B_balanced_6": 0.1738,
-        "C_detailed_7": 0.1778
+        "A_minimal_4": 0.181,
+        "B_balanced_6": 0.1832,
+        "C_detailed_7": 0.1864
       },
       {
         "axis": "cred_clean_point",
-        "A_minimal_4": 0.0445,
-        "B_balanced_6": 0.8101,
-        "C_detailed_7": 0.8101
+        "A_minimal_4": 0.0308,
+        "B_balanced_6": 0.7229,
+        "C_detailed_7": 0.723
       },
       {
         "axis": "ability_score",
-        "A_minimal_4": 0.0008,
-        "B_balanced_6": 0.0011,
-        "C_detailed_7": 0.0011
+        "A_minimal_4": 0.0001,
+        "B_balanced_6": 0.0002,
+        "C_detailed_7": 0.0002
       },
       {
         "axis": "reachable_flag",
-        "A_minimal_4": 0.0004,
-        "B_balanced_6": 0.0005,
-        "C_detailed_7": 0.0005
+        "A_minimal_4": 0.0,
+        "B_balanced_6": 0.0001,
+        "C_detailed_7": 0.0001
       },
       {
         "axis": "in_country_flag",
-        "A_minimal_4": 0.0028,
-        "B_balanced_6": 0.0027,
-        "C_detailed_7": 0.0033
+        "A_minimal_4": 0.0003,
+        "B_balanced_6": 0.0003,
+        "C_detailed_7": 0.0004
       }
     ],
     "mean_by_state": [
       {
         "state": "early_payment_default",
-        "credibility_score": 2.2284,
-        "cred_ptp_points": 0.654,
-        "cred_money_in_points": 0.5744,
+        "credibility_score": 1.8885,
+        "cred_ptp_points": 0.6841,
+        "cred_money_in_points": 0.2044,
         "cred_clean_point": 1.0,
-        "ability_score": 50.2858,
-        "reachable_flag": 0.6713,
-        "in_country_flag": 0.8443
+        "ability_score": 49.5367,
+        "reachable_flag": 0.7003,
+        "in_country_flag": 0.8269
       },
       {
         "state": "stabilized",
-        "credibility_score": 3.5024,
-        "cred_ptp_points": 0.6779,
-        "cred_money_in_points": 1.9663,
-        "cred_clean_point": 0.8582,
-        "ability_score": 48.9442,
-        "reachable_flag": 0.7091,
-        "in_country_flag": 0.8534
+        "credibility_score": 3.5077,
+        "cred_ptp_points": 0.681,
+        "cred_money_in_points": 1.9621,
+        "cred_clean_point": 0.8646,
+        "ability_score": 50.4698,
+        "reachable_flag": 0.7022,
+        "in_country_flag": 0.8415
       },
       {
         "state": "repeat_delinquent",
-        "credibility_score": 1.3309,
-        "cred_ptp_points": 0.6703,
-        "cred_money_in_points": 0.6606,
+        "credibility_score": 1.3951,
+        "cred_ptp_points": 0.7251,
+        "cred_money_in_points": 0.6699,
         "cred_clean_point": 0.0,
-        "ability_score": 50.5895,
-        "reachable_flag": 0.7033,
-        "in_country_flag": 0.8523
+        "ability_score": 49.844,
+        "reachable_flag": 0.7038,
+        "in_country_flag": 0.8524
       },
       {
         "state": "straight_roller_seasoned",
-        "credibility_score": 2.3345,
-        "cred_ptp_points": 0.6985,
-        "cred_money_in_points": 0.6749,
-        "cred_clean_point": 0.961,
-        "ability_score": 50.4632,
-        "reachable_flag": 0.7127,
-        "in_country_flag": 0.8347
+        "credibility_score": 2.3185,
+        "cred_ptp_points": 0.7107,
+        "cred_money_in_points": 0.6745,
+        "cred_clean_point": 0.9333,
+        "ability_score": 50.1678,
+        "reachable_flag": 0.6937,
+        "in_country_flag": 0.8546
       },
       {
         "state": "straight_roller_early_life",
-        "credibility_score": 2.3624,
-        "cred_ptp_points": 0.7181,
-        "cred_money_in_points": 0.651,
-        "cred_clean_point": 0.9933,
-        "ability_score": 49.6624,
-        "reachable_flag": 0.698,
-        "in_country_flag": 0.8591
+        "credibility_score": 2.769,
+        "cred_ptp_points": 0.7241,
+        "cred_money_in_points": 1.0545,
+        "cred_clean_point": 0.9904,
+        "ability_score": 50.5696,
+        "reachable_flag": 0.6845,
+        "in_country_flag": 0.8524
       },
       {
         "state": "slow_roller",
-        "credibility_score": 2.8753,
-        "cred_ptp_points": 0.6997,
-        "cred_money_in_points": 1.1794,
-        "cred_clean_point": 0.9962,
-        "ability_score": 49.7585,
-        "reachable_flag": 0.7087,
-        "in_country_flag": 0.888
+        "credibility_score": 2.9044,
+        "cred_ptp_points": 0.7077,
+        "cred_money_in_points": 1.2013,
+        "cred_clean_point": 0.9954,
+        "ability_score": 49.9964,
+        "reachable_flag": 0.6891,
+        "in_country_flag": 0.8462
       }
     ],
     "stabilized_vs_money_in": {
       "source": "cred_money_in_points",
-      "stabilized_with_money_in": 0.9831730769230769,
-      "others_with_money_in": 0.4456806282722513
+      "stabilized_with_money_in": 0.9827,
+      "others_with_money_in": 0.4467
+    },
+    "money_in_by_state_and_bucket": {
+      "4": {
+        "early_payment_default": 0.1548,
+        "stabilized": 1.0,
+        "repeat_delinquent": 0.4027,
+        "straight_roller_seasoned": 0.346,
+        "straight_roller_early_life": 0.4623,
+        "slow_roller": 1.0
+      },
+      "5": {
+        "early_payment_default": 0.1872,
+        "stabilized": 0.9487,
+        "repeat_delinquent": 0.4239,
+        "straight_roller_seasoned": 0.4472,
+        "straight_roller_early_life": 0.6458,
+        "slow_roller": 0.6508
+      },
+      "6": {
+        "early_payment_default": 0.2423,
+        "stabilized": 0.9829,
+        "repeat_delinquent": 0.435,
+        "straight_roller_seasoned": 0.4509,
+        "straight_roller_early_life": 0.6513,
+        "slow_roller": 0.4517
+      },
+      "7": {
+        "early_payment_default": 0.25,
+        "stabilized": 1.0,
+        "repeat_delinquent": 0.352,
+        "straight_roller_seasoned": 0.4079,
+        "straight_roller_early_life": 0.5225,
+        "slow_roller": 0.4431
+      }
     },
     "stabilized_flagged": {}
   },
   "backtest": {
     "k_months": 6,
-    "n_analysed": 5000,
-    "share_exited_within_k": 0.9208,
+    "n_analysed": 20000,
+    "share_exited_within_k": 0.9131,
     "monthly_roll_rate": {
-      "4": 0.7152826238660154,
-      "5": 0.78515625,
-      "6": 0.8955479452054794,
-      "7": 0.9428060768543343
+      "4": 0.6991,
+      "5": 0.7871,
+      "6": 0.8883,
+      "7": 0.9404
     },
     "scorecards": {
       "A_minimal_4": [
         {
           "state": "early_payment_default",
-          "share": 0.0576,
-          "n": 288,
-          "roll_next_month": 0.8785,
-          "exit_8plus_within_k": 0.9757,
+          "share": 0.0439,
+          "n": 877,
+          "roll_next_month": 0.9088,
+          "roll_next_month_bucket_std": 0.9092,
+          "exit_8plus_within_3m_bucket_std": 0.6247,
+          "exit_8plus_within_k": 0.9863,
           "cure_within_k": 0.0,
-          "median_bucket_change_k": 3.0,
-          "same_state_next_month": 1.0,
-          "left_spine_next_month": 0.2743
+          "median_bucket_change_k": 4.0,
+          "same_state_next_month": 0.8903,
+          "kept_or_stabilized_next_month": 0.8903,
+          "left_spine_next_month": 0.2098
         },
         {
           "state": "stabilized",
-          "share": 0.0748,
-          "n": 374,
-          "roll_next_month": 0.4706,
-          "exit_8plus_within_k": 0.5668,
-          "cure_within_k": 0.0374,
+          "share": 0.0812,
+          "n": 1624,
+          "roll_next_month": 0.4741,
+          "roll_next_month_bucket_std": 0.5077,
+          "exit_8plus_within_3m_bucket_std": 0.4245,
+          "exit_8plus_within_k": 0.5868,
+          "cure_within_k": 0.0462,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.6438,
-          "left_spine_next_month": 0.1818
+          "same_state_next_month": 0.6002,
+          "kept_or_stabilized_next_month": 0.6002,
+          "left_spine_next_month": 0.21
         },
         {
           "state": "straight_roller",
-          "share": 0.6904,
-          "n": 3452,
-          "roll_next_month": 0.8531,
-          "exit_8plus_within_k": 0.9528,
-          "cure_within_k": 0.0107,
+          "share": 0.7026,
+          "n": 14051,
+          "roll_next_month": 0.8518,
+          "roll_next_month_bucket_std": 0.8464,
+          "exit_8plus_within_3m_bucket_std": 0.6217,
+          "exit_8plus_within_k": 0.9466,
+          "cure_within_k": 0.0083,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9828,
-          "left_spine_next_month": 0.2596
+          "same_state_next_month": 0.9837,
+          "kept_or_stabilized_next_month": 0.9998,
+          "left_spine_next_month": 0.2666
         },
         {
           "state": "slow_roller",
-          "share": 0.1772,
-          "n": 886,
-          "roll_next_month": 0.8544,
-          "exit_8plus_within_k": 0.9278,
-          "cure_within_k": 0.0384,
+          "share": 0.1724,
+          "n": 3448,
+          "roll_next_month": 0.8184,
+          "roll_next_month_bucket_std": 0.8153,
+          "exit_8plus_within_3m_bucket_std": 0.6264,
+          "exit_8plus_within_k": 0.9118,
+          "cure_within_k": 0.0444,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9777,
-          "left_spine_next_month": 0.2923
+          "same_state_next_month": 0.9693,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.2718
         }
       ],
       "B_balanced_6": [
         {
           "state": "early_payment_default",
-          "share": 0.0576,
-          "n": 288,
-          "roll_next_month": 0.8785,
-          "exit_8plus_within_k": 0.9757,
+          "share": 0.0439,
+          "n": 877,
+          "roll_next_month": 0.9088,
+          "roll_next_month_bucket_std": 0.9092,
+          "exit_8plus_within_3m_bucket_std": 0.6247,
+          "exit_8plus_within_k": 0.9863,
           "cure_within_k": 0.0,
-          "median_bucket_change_k": 3.0,
-          "same_state_next_month": 1.0,
-          "left_spine_next_month": 0.2743
+          "median_bucket_change_k": 4.0,
+          "same_state_next_month": 0.8903,
+          "kept_or_stabilized_next_month": 0.8903,
+          "left_spine_next_month": 0.2098
         },
         {
           "state": "stabilized",
-          "share": 0.0748,
-          "n": 374,
-          "roll_next_month": 0.4706,
-          "exit_8plus_within_k": 0.5668,
-          "cure_within_k": 0.0374,
+          "share": 0.0812,
+          "n": 1624,
+          "roll_next_month": 0.4741,
+          "roll_next_month_bucket_std": 0.5077,
+          "exit_8plus_within_3m_bucket_std": 0.4245,
+          "exit_8plus_within_k": 0.5868,
+          "cure_within_k": 0.0462,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.6438,
-          "left_spine_next_month": 0.1818
+          "same_state_next_month": 0.6002,
+          "kept_or_stabilized_next_month": 0.6002,
+          "left_spine_next_month": 0.21
         },
         {
           "state": "repeat_delinquent",
-          "share": 0.1624,
-          "n": 812,
-          "roll_next_month": 0.8485,
-          "exit_8plus_within_k": 0.9446,
-          "cure_within_k": 0.0185,
+          "share": 0.1501,
+          "n": 3002,
+          "roll_next_month": 0.8378,
+          "roll_next_month_bucket_std": 0.8306,
+          "exit_8plus_within_3m_bucket_std": 0.6273,
+          "exit_8plus_within_k": 0.934,
+          "cure_within_k": 0.022,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9797,
-          "left_spine_next_month": 0.2734
+          "same_state_next_month": 0.9855,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.2885
         },
         {
           "state": "straight_roller_seasoned",
-          "share": 0.5098,
-          "n": 2549,
-          "roll_next_month": 0.8501,
-          "exit_8plus_within_k": 0.9517,
-          "cure_within_k": 0.011,
+          "share": 0.521,
+          "n": 10419,
+          "roll_next_month": 0.8509,
+          "roll_next_month_bucket_std": 0.8465,
+          "exit_8plus_within_3m_bucket_std": 0.6202,
+          "exit_8plus_within_k": 0.9447,
+          "cure_within_k": 0.0071,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9824,
-          "left_spine_next_month": 0.2625
+          "same_state_next_month": 0.9836,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.2621
         },
         {
           "state": "straight_roller_early_life",
-          "share": 0.0324,
-          "n": 162,
-          "roll_next_month": 0.8765,
-          "exit_8plus_within_k": 0.963,
-          "cure_within_k": 0.0062,
+          "share": 0.0457,
+          "n": 915,
+          "roll_next_month": 0.8503,
+          "roll_next_month_bucket_std": 0.838,
+          "exit_8plus_within_3m_bucket_std": 0.6272,
+          "exit_8plus_within_k": 0.9508,
+          "cure_within_k": 0.0142,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9919,
-          "left_spine_next_month": 0.2346
+          "same_state_next_month": 0.9708,
+          "kept_or_stabilized_next_month": 0.9969,
+          "left_spine_next_month": 0.2896
         },
         {
           "state": "slow_roller",
-          "share": 0.163,
-          "n": 815,
-          "roll_next_month": 0.8638,
-          "exit_8plus_within_k": 0.935,
-          "cure_within_k": 0.0331,
+          "share": 0.1582,
+          "n": 3163,
+          "roll_next_month": 0.8318,
+          "roll_next_month_bucket_std": 0.8282,
+          "exit_8plus_within_3m_bucket_std": 0.6254,
+          "exit_8plus_within_k": 0.9254,
+          "cure_within_k": 0.037,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9796,
-          "left_spine_next_month": 0.2773
+          "same_state_next_month": 0.9705,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.2596
         }
       ],
       "C_detailed_7": [
         {
           "state": "early_payment_default",
-          "share": 0.0576,
-          "n": 288,
-          "roll_next_month": 0.8785,
-          "exit_8plus_within_k": 0.9757,
+          "share": 0.0439,
+          "n": 877,
+          "roll_next_month": 0.9088,
+          "roll_next_month_bucket_std": 0.9092,
+          "exit_8plus_within_3m_bucket_std": 0.6247,
+          "exit_8plus_within_k": 0.9863,
           "cure_within_k": 0.0,
-          "median_bucket_change_k": 3.0,
-          "same_state_next_month": 1.0,
-          "left_spine_next_month": 0.2743
+          "median_bucket_change_k": 4.0,
+          "same_state_next_month": 0.8903,
+          "kept_or_stabilized_next_month": 0.8903,
+          "left_spine_next_month": 0.2098
         },
         {
           "state": "stabilized",
-          "share": 0.0748,
-          "n": 374,
-          "roll_next_month": 0.4706,
-          "exit_8plus_within_k": 0.5668,
-          "cure_within_k": 0.0374,
+          "share": 0.0812,
+          "n": 1624,
+          "roll_next_month": 0.4741,
+          "roll_next_month_bucket_std": 0.5077,
+          "exit_8plus_within_3m_bucket_std": 0.4245,
+          "exit_8plus_within_k": 0.5868,
+          "cure_within_k": 0.0462,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.6438,
-          "left_spine_next_month": 0.1818
+          "same_state_next_month": 0.6002,
+          "kept_or_stabilized_next_month": 0.6002,
+          "left_spine_next_month": 0.21
         },
         {
           "state": "repeat_delinquent",
-          "share": 0.1624,
-          "n": 812,
-          "roll_next_month": 0.8485,
-          "exit_8plus_within_k": 0.9446,
-          "cure_within_k": 0.0185,
+          "share": 0.1501,
+          "n": 3002,
+          "roll_next_month": 0.8378,
+          "roll_next_month_bucket_std": 0.8306,
+          "exit_8plus_within_3m_bucket_std": 0.6273,
+          "exit_8plus_within_k": 0.934,
+          "cure_within_k": 0.022,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9797,
-          "left_spine_next_month": 0.2734
+          "same_state_next_month": 0.9855,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.2885
         },
         {
           "state": "straight_roller_seasoned",
-          "share": 0.5098,
-          "n": 2549,
-          "roll_next_month": 0.8501,
-          "exit_8plus_within_k": 0.9517,
-          "cure_within_k": 0.011,
+          "share": 0.521,
+          "n": 10419,
+          "roll_next_month": 0.8509,
+          "roll_next_month_bucket_std": 0.8465,
+          "exit_8plus_within_3m_bucket_std": 0.6202,
+          "exit_8plus_within_k": 0.9447,
+          "cure_within_k": 0.0071,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9824,
-          "left_spine_next_month": 0.2625
+          "same_state_next_month": 0.9836,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.2621
         },
         {
           "state": "straight_roller_early_life",
-          "share": 0.0324,
-          "n": 162,
-          "roll_next_month": 0.8765,
-          "exit_8plus_within_k": 0.963,
-          "cure_within_k": 0.0062,
+          "share": 0.0457,
+          "n": 915,
+          "roll_next_month": 0.8503,
+          "roll_next_month_bucket_std": 0.838,
+          "exit_8plus_within_3m_bucket_std": 0.6272,
+          "exit_8plus_within_k": 0.9508,
+          "cure_within_k": 0.0142,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9919,
-          "left_spine_next_month": 0.2346
+          "same_state_next_month": 0.9708,
+          "kept_or_stabilized_next_month": 0.9969,
+          "left_spine_next_month": 0.2896
         },
         {
           "state": "slow_roller_intermittent",
-          "share": 0.102,
-          "n": 510,
-          "roll_next_month": 0.8412,
-          "exit_8plus_within_k": 0.9196,
-          "cure_within_k": 0.0431,
+          "share": 0.1007,
+          "n": 2013,
+          "roll_next_month": 0.8236,
+          "roll_next_month_bucket_std": 0.8206,
+          "exit_8plus_within_3m_bucket_std": 0.6243,
+          "exit_8plus_within_k": 0.9185,
+          "cure_within_k": 0.0482,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9699,
-          "left_spine_next_month": 0.2843
+          "same_state_next_month": 0.9638,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.2593
         },
         {
           "state": "slow_roller_erratic",
-          "share": 0.061,
-          "n": 305,
-          "roll_next_month": 0.9016,
-          "exit_8plus_within_k": 0.9607,
-          "cure_within_k": 0.0164,
+          "share": 0.0575,
+          "n": 1150,
+          "roll_next_month": 0.8461,
+          "roll_next_month_bucket_std": 0.8416,
+          "exit_8plus_within_3m_bucket_std": 0.6271,
+          "exit_8plus_within_k": 0.9374,
+          "cure_within_k": 0.0174,
           "median_bucket_change_k": 3.0,
-          "same_state_next_month": 0.9955,
-          "left_spine_next_month": 0.2656
+          "same_state_next_month": 0.9824,
+          "kept_or_stabilized_next_month": 1.0,
+          "left_spine_next_month": 0.26
         }
       ]
     },
+    "one_hold_slow_rollers": [
+      {
+        "index": "slow roller: exactly one hold",
+        "share_of_spine": 0.0726,
+        "roll_next_month_bucket_std": 0.8246,
+        "exit_8plus_within_3m_bucket_std": 0.6568
+      },
+      {
+        "index": "slow roller: more than one payment",
+        "share_of_spine": 0.0998,
+        "roll_next_month_bucket_std": 0.8217,
+        "exit_8plus_within_3m_bucket_std": 0.6499
+      },
+      {
+        "index": "straight roller",
+        "share_of_spine": 0.7026,
+        "roll_next_month_bucket_std": 0.8512,
+        "exit_8plus_within_3m_bucket_std": 0.648
+      }
+    ],
     "stabilized_flips": {
-      "n_accounts": 5000,
+      "n_accounts": 10000,
       "with_long_run_clause": {
-        "ever_stabilized": 0.1222,
-        "bounce_back_share_of_ever_stabilized": 0.04091653027823241,
-        "mean_status_changes_per_account": 0.1128
+        "ever_stabilized": 0.1324,
+        "bounce_back_share_of_ever_stabilized": 0.0468,
+        "mean_status_changes_per_account": 0.1228
       },
       "bank_rule_only": {
-        "ever_stabilized": 0.1132,
-        "bounce_back_share_of_ever_stabilized": 0.04946996466431095,
-        "mean_status_changes_per_account": 0.1134
+        "ever_stabilized": 0.1247,
+        "bounce_back_share_of_ever_stabilized": 0.0545,
+        "mean_status_changes_per_account": 0.125
       }
     }
+  },
+  "runup_hold_calendar_spike": 1.2476,
+  "runup_hold_calendar": {
+    "1": 0.0669,
+    "2": 0.0979,
+    "3": 0.1264,
+    "4": 0.1245,
+    "5": 0.1048,
+    "6": 0.0708,
+    "7": 0.0497,
+    "8": 0.047,
+    "9": 0.0417,
+    "10": 0.0381,
+    "11": 0.0356,
+    "12": 0.0346,
+    "13": 0.0319,
+    "14": 0.0255,
+    "15": 0.0255,
+    "16": 0.022,
+    "17": 0.0144,
+    "18": 0.0113,
+    "19": 0.0096,
+    "20": 0.0074,
+    "21": 0.0051,
+    "22": 0.0039,
+    "23": 0.0028,
+    "24": 0.0012,
+    "25": 0.0007,
+    "26": 0.0004,
+    "27": 0.0002,
+    "28": 0.0,
+    "29": 0.0,
+    "30": 0.0,
+    "31": 0.0,
+    "32": 0.0,
+    "33": 0.0,
+    "34": 0.0,
+    "35": 0.0,
+    "36": 0.0
   },
   "sweeps": {
     "epd_max_history": [
       {
         "epd_max_history": 2,
-        "share": 0.025,
-        "exit_within_k": 0.992
+        "share": 0.019,
+        "exit_within_k": 0.9895
       },
       {
         "epd_max_history": 3,
-        "share": 0.0576,
-        "exit_within_k": 0.9757
+        "share": 0.0439,
+        "exit_within_k": 0.9863
       },
       {
         "epd_max_history": 4,
-        "share": 0.0592,
-        "exit_within_k": 0.9764
+        "share": 0.0455,
+        "exit_within_k": 0.9824
       },
       {
         "epd_max_history": 6,
-        "share": 0.0696,
-        "exit_within_k": 0.9713
+        "share": 0.0498,
+        "exit_within_k": 0.9759
       },
       {
         "epd_max_history": 9,
-        "share": 0.0812,
-        "exit_within_k": 0.9655
+        "share": 0.0578,
+        "exit_within_k": 0.974
       },
       {
         "epd_max_history": 12,
-        "share": 0.0958,
-        "exit_within_k": 0.9645
+        "share": 0.0682,
+        "exit_within_k": 0.9663
       }
     ],
     "stabilized_min_in_band": [
       {
         "stabilized_min_in_band": 4,
-        "share": 0.1322,
-        "roll_next_month": 0.5719,
-        "still_stabilized_next_month": 0.5558
+        "share": 0.1414,
+        "roll_next_month": 0.5667,
+        "still_stabilized_next_month": 0.5641
       },
       {
         "stabilized_min_in_band": 5,
-        "share": 0.0748,
-        "roll_next_month": 0.4706,
-        "still_stabilized_next_month": 0.6438
+        "share": 0.0812,
+        "roll_next_month": 0.4741,
+        "still_stabilized_next_month": 0.6002
       },
       {
         "stabilized_min_in_band": 6,
-        "share": 0.0494,
-        "roll_next_month": 0.4211,
-        "still_stabilized_next_month": 0.6986
+        "share": 0.0532,
+        "roll_next_month": 0.4197,
+        "still_stabilized_next_month": 0.6628
       }
     ],
-    "repeat_min_prior_peak": [
+    "repeat_delinquent": [
       {
         "repeat_min_prior_peak": 2,
-        "share": 0.1828
+        "repeat_window_months": 12,
+        "share": 0.1221
+      },
+      {
+        "repeat_min_prior_peak": 2,
+        "repeat_window_months": 24,
+        "share": 0.1729
+      },
+      {
+        "repeat_min_prior_peak": 2,
+        "repeat_window_months": 36,
+        "share": 0.1836
+      },
+      {
+        "repeat_min_prior_peak": 2,
+        "repeat_window_months": "any",
+        "share": 0.875
       },
       {
         "repeat_min_prior_peak": 3,
-        "share": 0.1624
+        "repeat_window_months": 12,
+        "share": 0.1064
+      },
+      {
+        "repeat_min_prior_peak": 3,
+        "repeat_window_months": 24,
+        "share": 0.1501
+      },
+      {
+        "repeat_min_prior_peak": 3,
+        "repeat_window_months": 36,
+        "share": 0.1625
+      },
+      {
+        "repeat_min_prior_peak": 3,
+        "repeat_window_months": "any",
+        "share": 0.875
       },
       {
         "repeat_min_prior_peak": 4,
-        "share": 0.045
+        "repeat_window_months": 12,
+        "share": 0.0369
+      },
+      {
+        "repeat_min_prior_peak": 4,
+        "repeat_window_months": 24,
+        "share": 0.0421
+      },
+      {
+        "repeat_min_prior_peak": 4,
+        "repeat_window_months": 36,
+        "share": 0.0449
+      },
+      {
+        "repeat_min_prior_peak": 4,
+        "repeat_window_months": "any",
+        "share": 0.875
       }
     ],
     "straight_max_runup": [
       {
         "straight_max_runup": 3,
-        "straight_share": 0.6904,
-        "slow_share": 0.1772
+        "straight_share": 0.7026,
+        "slow_share": 0.1724
       },
       {
         "straight_max_runup": 4,
-        "straight_share": 0.7646,
-        "slow_share": 0.1028
+        "straight_share": 0.7753,
+        "slow_share": 0.0997
       },
       {
         "straight_max_runup": 5,
-        "straight_share": 0.8374,
-        "slow_share": 0.03
+        "straight_share": 0.846,
+        "slow_share": 0.0289
       }
     ],
     "seasoned_min_months": [
       {
         "seasoned_min_months": 12,
-        "seasoned": 0.5098,
-        "early_life": 0.0324
+        "seasoned": 0.521,
+        "early_life": 0.0457
       },
       {
         "seasoned_min_months": 18,
-        "seasoned": 0.4722,
-        "early_life": 0.07
+        "seasoned": 0.4849,
+        "early_life": 0.0818
       },
       {
         "seasoned_min_months": 24,
-        "seasoned": 0.4306,
-        "early_life": 0.1116
+        "seasoned": 0.4441,
+        "early_life": 0.1226
       },
       {
         "seasoned_min_months": 36,
-        "seasoned": 0.3426,
-        "early_life": 0.1996
+        "seasoned": 0.361,
+        "early_life": 0.2056
       }
     ],
     "paying_since_4_test": [
       {
         "paying_since_4_min_rate": 0.34,
-        "share": 0.1924,
-        "still_paying_since_4_next_month": 0.7189,
-        "stability_of_fixed_states": 0.9062,
-        "stability_of_fixed_states_without_q3": 0.9829
+        "share": 0.2012,
+        "still_paying_since_4_next_month": 0.7084,
+        "stability_of_fixed_states": 0.8898,
+        "stability_of_fixed_states_without_q3": 0.9809
       },
       {
         "paying_since_4_min_rate": 0.5,
-        "share": 0.1742,
-        "still_paying_since_4_next_month": 0.6081,
-        "stability_of_fixed_states": 0.9093,
-        "stability_of_fixed_states_without_q3": 0.9829
+        "share": 0.1809,
+        "still_paying_since_4_next_month": 0.588,
+        "stability_of_fixed_states": 0.8912,
+        "stability_of_fixed_states_without_q3": 0.9809
       },
       {
         "paying_since_4_min_rate": 0.67,
-        "share": 0.0698,
-        "still_paying_since_4_next_month": 0.3358,
-        "stability_of_fixed_states": 0.9564,
-        "stability_of_fixed_states_without_q3": 0.9829
+        "share": 0.0725,
+        "still_paying_since_4_next_month": 0.2827,
+        "stability_of_fixed_states": 0.9496,
+        "stability_of_fixed_states_without_q3": 0.9809
       }
     ]
   },
   "residual_cluster_agreement": [
     {
       "k": 2,
-      "agree_A_minimal_4": -0.0744828060557491,
-      "agree_B_balanced_6": 0.4391367334906138,
-      "agree_C_detailed_7": 0.4144027934031258
+      "agree_A_minimal_4": -0.0646,
+      "agree_B_balanced_6": 0.3671,
+      "agree_C_detailed_7": 0.3467
     },
     {
       "k": 3,
-      "agree_A_minimal_4": 0.2974818675076302,
-      "agree_B_balanced_6": 0.6464866619285519,
-      "agree_C_detailed_7": 0.6564753436955808
+      "agree_A_minimal_4": 0.2958,
+      "agree_B_balanced_6": 0.5591,
+      "agree_C_detailed_7": 0.5678
     },
     {
       "k": 4,
-      "agree_A_minimal_4": 0.18907326894481088,
-      "agree_B_balanced_6": 0.47357084593025617,
-      "agree_C_detailed_7": 0.48013801508900456
+      "agree_A_minimal_4": 0.1662,
+      "agree_B_balanced_6": 0.4006,
+      "agree_C_detailed_7": 0.4048
     },
     {
       "k": 5,
-      "agree_A_minimal_4": 0.18332691032335388,
-      "agree_B_balanced_6": 0.4626599311304412,
-      "agree_C_detailed_7": 0.4912478385516352
+      "agree_A_minimal_4": 0.1136,
+      "agree_B_balanced_6": 0.3066,
+      "agree_C_detailed_7": 0.3061
     },
     {
       "k": 6,
-      "agree_A_minimal_4": 0.1119573517554154,
-      "agree_B_balanced_6": 0.3183940460271726,
-      "agree_C_detailed_7": 0.34045931307073024
+      "agree_A_minimal_4": 0.1106,
+      "agree_B_balanced_6": 0.2962,
+      "agree_C_detailed_7": 0.3146
     },
     {
       "k": 7,
-      "agree_A_minimal_4": 0.10480755410749676,
-      "agree_B_balanced_6": 0.29685272127811585,
-      "agree_C_detailed_7": 0.3175890551502624
+      "agree_A_minimal_4": 0.1006,
+      "agree_B_balanced_6": 0.2803,
+      "agree_C_detailed_7": 0.2979
     },
     {
       "k": 8,
-      "agree_A_minimal_4": 0.16032949673365368,
-      "agree_B_balanced_6": 0.3590380434483224,
-      "agree_C_detailed_7": 0.38069807065456723
+      "agree_A_minimal_4": 0.1681,
+      "agree_B_balanced_6": 0.3642,
+      "agree_C_detailed_7": 0.3829
     }
   ],
   "top_shapes": [
     {
       "shape": "N25+ R3+",
-      "n": 906,
+      "n": 3787,
       "top_label": "straight_roller_seasoned",
       "purity": 1.0,
-      "share": 0.1812,
-      "cum_share": 0.1812
+      "share": 0.1893,
+      "cum_share": 0.1893
     },
     {
       "shape": "N13-24 R3+",
-      "n": 192,
+      "n": 821,
       "top_label": "straight_roller_seasoned",
       "purity": 1.0,
-      "share": 0.0384,
-      "cum_share": 0.2196
+      "share": 0.0411,
+      "cum_share": 0.2304
     },
     {
       "shape": "N25+ R3+ H1",
-      "n": 81,
+      "n": 363,
       "top_label": "straight_roller_seasoned",
       "purity": 1.0,
-      "share": 0.0162,
-      "cum_share": 0.2358
-    },
-    {
-      "shape": "N2-3 R3+",
-      "n": 74,
-      "top_label": "early_payment_default",
-      "purity": 0.9189,
-      "share": 0.0148,
-      "cum_share": 0.2506
+      "share": 0.0181,
+      "cum_share": 0.2485
     },
     {
       "shape": "N7-12 R3+",
-      "n": 72,
+      "n": 334,
       "top_label": "straight_roller_early_life",
-      "purity": 0.625,
-      "share": 0.0144,
-      "cum_share": 0.265
+      "purity": 0.6826,
+      "share": 0.0167,
+      "cum_share": 0.2652
     },
     {
-      "shape": "N25+ R2 P1 R3+",
-      "n": 68,
-      "top_label": "slow_roller",
-      "purity": 0.9412,
-      "share": 0.0136,
-      "cum_share": 0.2786
+      "shape": "N2-3 R3+",
+      "n": 274,
+      "top_label": "early_payment_default",
+      "purity": 0.8686,
+      "share": 0.0137,
+      "cum_share": 0.2789
     },
     {
       "shape": "N25+ R3+ H1 R1",
-      "n": 66,
+      "n": 248,
       "top_label": "straight_roller_seasoned",
       "purity": 1.0,
-      "share": 0.0132,
-      "cum_share": 0.2918
+      "share": 0.0124,
+      "cum_share": 0.2913
     },
     {
       "shape": "R1 P1 R3+",
-      "n": 63,
+      "n": 234,
       "top_label": "early_payment_default",
       "purity": 1.0,
-      "share": 0.0126,
-      "cum_share": 0.3044
+      "share": 0.0117,
+      "cum_share": 0.303
     },
     {
-      "shape": "N25+ R3+ H1 R2",
-      "n": 52,
-      "top_label": "straight_roller_seasoned",
-      "purity": 1.0,
-      "share": 0.0104,
-      "cum_share": 0.3148
+      "shape": "N25+ R2 P1 R3+",
+      "n": 217,
+      "top_label": "slow_roller",
+      "purity": 0.9309,
+      "share": 0.0109,
+      "cum_share": 0.3139
     },
     {
       "shape": "N1 R3+",
-      "n": 49,
+      "n": 202,
       "top_label": "early_payment_default",
       "purity": 1.0,
-      "share": 0.0098,
-      "cum_share": 0.3246
+      "share": 0.0101,
+      "cum_share": 0.324
     },
     {
       "shape": "R3+",
-      "n": 48,
+      "n": 186,
       "top_label": "early_payment_default",
       "purity": 1.0,
-      "share": 0.0096,
-      "cum_share": 0.3342
-    },
-    {
-      "shape": "N25+ R1 H1 R3+",
-      "n": 45,
-      "top_label": "slow_roller",
-      "purity": 1.0,
-      "share": 0.009,
-      "cum_share": 0.3432
+      "share": 0.0093,
+      "cum_share": 0.3333
     },
     {
       "shape": "N25+ R3+ P1 R3+",
-      "n": 40,
+      "n": 181,
       "top_label": "straight_roller_seasoned",
       "purity": 1.0,
-      "share": 0.008,
-      "cum_share": 0.3512
+      "share": 0.0091,
+      "cum_share": 0.3423
     },
     {
-      "shape": "N25+ R3+ P1 R2",
-      "n": 35,
+      "shape": "N25+ R3+ H1 R2",
+      "n": 174,
       "top_label": "straight_roller_seasoned",
       "purity": 1.0,
-      "share": 0.007,
-      "cum_share": 0.3582
+      "share": 0.0087,
+      "cum_share": 0.351
     },
     {
-      "shape": "N4-6 R3+",
-      "n": 32,
-      "top_label": "straight_roller_early_life",
+      "shape": "N25+ R1 H1 R3+",
+      "n": 168,
+      "top_label": "slow_roller",
       "purity": 1.0,
-      "share": 0.0064,
-      "cum_share": 0.3646
+      "share": 0.0084,
+      "cum_share": 0.3594
     },
     {
       "shape": "N25+ R3+ P1 R1",
-      "n": 27,
+      "n": 165,
       "top_label": "straight_roller_seasoned",
       "purity": 1.0,
-      "share": 0.0054,
-      "cum_share": 0.37
+      "share": 0.0083,
+      "cum_share": 0.3677
+    },
+    {
+      "shape": "N25+ R3+ P1 R2",
+      "n": 113,
+      "top_label": "straight_roller_seasoned",
+      "purity": 1.0,
+      "share": 0.0056,
+      "cum_share": 0.3733
+    },
+    {
+      "shape": "N4-6 R3+",
+      "n": 113,
+      "top_label": "straight_roller_early_life",
+      "purity": 1.0,
+      "share": 0.0056,
+      "cum_share": 0.379
+    },
+    {
+      "shape": "N25+ R2 P1 R2",
+      "n": 104,
+      "top_label": "slow_roller",
+      "purity": 1.0,
+      "share": 0.0052,
+      "cum_share": 0.3842
     },
     {
       "shape": "N25+ R2 H1 R1",
-      "n": 25,
+      "n": 102,
       "top_label": "slow_roller",
-      "purity": 1.0,
-      "share": 0.005,
-      "cum_share": 0.375
+      "purity": 0.951,
+      "share": 0.0051,
+      "cum_share": 0.3893
     },
     {
       "shape": "N25+ R2 H1 R3+",
-      "n": 22,
+      "n": 99,
       "top_label": "slow_roller",
-      "purity": 1.0,
-      "share": 0.0044,
-      "cum_share": 0.3794
+      "purity": 0.9798,
+      "share": 0.005,
+      "cum_share": 0.3942
     },
     {
-      "shape": "N25+ R2 H1 R2",
-      "n": 20,
+      "shape": "N25+ R2 P1 H1 R3+",
+      "n": 77,
       "top_label": "slow_roller",
       "purity": 1.0,
-      "share": 0.004,
-      "cum_share": 0.3834
-    },
-    {
-      "shape": "N13-24 R3+ H1 R1",
-      "n": 20,
-      "top_label": "straight_roller_seasoned",
-      "purity": 1.0,
-      "share": 0.004,
-      "cum_share": 0.3874
+      "share": 0.0039,
+      "cum_share": 0.3981
     }
   ],
   "top_4grams": [
     {
       "gram": "RHHP",
-      "support": 0.0946,
-      "lift": 94.6,
+      "support": 0.0925,
+      "lift": 92.5,
       "top_label": "repeat_delinquent",
-      "purity": 0.7209
-    },
-    {
-      "gram": "HRHP",
-      "support": 0.0304,
-      "lift": 50.6667,
-      "top_label": "repeat_delinquent",
-      "purity": 0.875
-    },
-    {
-      "gram": "RRPH",
-      "support": 0.047,
-      "lift": 47.0,
-      "top_label": "slow_roller",
-      "purity": 0.3787
-    },
-    {
-      "gram": "RHPP",
-      "support": 0.023,
-      "lift": 38.3333,
-      "top_label": "repeat_delinquent",
-      "purity": 0.9217
+      "purity": 0.587
     },
     {
       "gram": "HHPP",
-      "support": 0.0208,
-      "lift": 34.6667,
+      "support": 0.0232,
+      "lift": 66.2857,
       "top_label": "repeat_delinquent",
-      "purity": 0.9135
-    },
-    {
-      "gram": "RHRH",
-      "support": 0.095,
-      "lift": 31.6667,
-      "top_label": "repeat_delinquent",
-      "purity": 0.5263
-    },
-    {
-      "gram": "HRPP",
-      "support": 0.0188,
-      "lift": 31.3333,
-      "top_label": "repeat_delinquent",
-      "purity": 0.7872
+      "purity": 0.8082
     },
     {
       "gram": "HHPN",
-      "support": 0.0772,
-      "lift": 29.6923,
+      "support": 0.0732,
+      "lift": 36.6,
       "top_label": "repeat_delinquent",
-      "purity": 0.7124
+      "purity": 0.5581
     },
     {
-      "gram": "RRRH",
-      "support": 0.1894,
-      "lift": 29.5938,
-      "top_label": "straight_roller_seasoned",
-      "purity": 0.5438
+      "gram": "HRHP",
+      "support": 0.0291,
+      "lift": 30.6842,
+      "top_label": "repeat_delinquent",
+      "purity": 0.7599
+    },
+    {
+      "gram": "RHRH",
+      "support": 0.0989,
+      "lift": 29.9697,
+      "top_label": "repeat_delinquent",
+      "purity": 0.4449
+    },
+    {
+      "gram": "RHPP",
+      "support": 0.0226,
+      "lift": 28.25,
+      "top_label": "repeat_delinquent",
+      "purity": 0.8142
     },
     {
       "gram": "RRHH",
-      "support": 0.0782,
-      "lift": 27.9286,
+      "support": 0.0749,
+      "lift": 25.3898,
       "top_label": "repeat_delinquent",
-      "purity": 0.4527
+      "purity": 0.3985
+    },
+    {
+      "gram": "PRHP",
+      "support": 0.0117,
+      "lift": 23.3,
+      "top_label": "repeat_delinquent",
+      "purity": 0.5408
     },
     {
       "gram": "RPRP",
-      "support": 0.0948,
-      "lift": 22.5714,
+      "support": 0.0959,
+      "lift": 23.0964,
       "top_label": "repeat_delinquent",
-      "purity": 0.3502
+      "purity": 0.3448
+    },
+    {
+      "gram": "HPPN",
+      "support": 0.0408,
+      "lift": 19.9268,
+      "top_label": "repeat_delinquent",
+      "purity": 0.8629
+    },
+    {
+      "gram": "RRPH",
+      "support": 0.0471,
+      "lift": 18.0962,
+      "top_label": "slow_roller",
+      "purity": 0.3018
+    },
+    {
+      "gram": "RRRH",
+      "support": 0.1885,
+      "lift": 17.289,
+      "top_label": "straight_roller_seasoned",
+      "purity": 0.5492
+    },
+    {
+      "gram": "HRPP",
+      "support": 0.0163,
+      "lift": 17.1579,
+      "top_label": "repeat_delinquent",
+      "purity": 0.7055
     },
     {
       "gram": "RHRP",
-      "support": 0.0496,
-      "lift": 19.0769,
+      "support": 0.0513,
+      "lift": 16.2857,
       "top_label": "repeat_delinquent",
-      "purity": 0.7016
+      "purity": 0.6023
     },
     {
-      "gram": "RPRH",
-      "support": 0.0378,
-      "lift": 18.9,
-      "top_label": "stabilized",
-      "purity": 0.381
-    },
-    {
-      "gram": "RPHR",
-      "support": 0.04,
-      "lift": 18.1818,
-      "top_label": "slow_roller",
-      "purity": 0.445
-    },
-    {
-      "gram": "HHRP",
-      "support": 0.0108,
-      "lift": 18.0,
-      "top_label": "stabilized",
-      "purity": 0.5556
+      "gram": "RRHP",
+      "support": 0.0433,
+      "lift": 15.4643,
+      "top_label": "repeat_delinquent",
+      "purity": 0.6905
     }
   ]
 }
