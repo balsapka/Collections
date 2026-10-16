@@ -46,7 +46,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-16 by `dpd_states/bundle.py`. 18 files, 3,775 lines.
+Generated 2026-10-16 by `dpd_states/bundle.py`. 18 files, 3,796 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -886,7 +886,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `118f3e4c33e022a1a2b78182dc362c5a5d11f1e7d43c0113eda4a6c077389dc6` · 219 lines · trailing newline: yes
+sha256 `17aca49e87dd81a3f4b9f5549a299d18fb5f62d88ded84245db9b10255a5818e` · 240 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -1038,24 +1038,45 @@ stabilized with the bank's existing implementations.
 
 ---
 
-## P5 — One-page summary for the risk team
+## P5 — Short stakeholder report: rules and results
 
 ```
-Task: write a one-page summary for the Group Retail Risk team from the latest results
-file (and its .md).
+Task: write the shortest possible report for the Group Retail Risk stakeholders from the
+latest results/dpd_states_file_<file>_<date>.json and .md (or the Spark results file).
+Target: one screen. No code, no eta², no ARI, no check IDs.
 
-Audience: risk managers, not data scientists. No code, no eta², no ARI.
-Structure:
-1. What the states are (one line each, display names) and the action each points to —
-   use the table in METHODOLOGY.md §4 and §4.1 (EPD was formerly called bust-out; slow
-   roller is also called partial payer), with the REAL shares from the results.
-2. What the run shows — real numbers only. In file mode: shares, stability, data quality;
-   say that outcomes need the Spark backtest.
-3. How this fits with locatability, ability and credibility: where it adds information
-   and where it overlaps (stabilized ↔ money coming in; repeat delinquent ↔ clean history).
-4. The option we recommend (A/B/C) and why, in two sentences.
-5. Open decisions for the risk team (METHODOLOGY.md §10), as questions.
-Write it to docs/deterioration_states/results/risk_summary_<date>.md.
+Write exactly these sections:
+
+1. Title + one sentence: what the states are (one state per credit-card account in
+   90–180+ DPD, buckets 4–7, from its DPD history since Jan 2024) and the data used
+   (file, snapshot month, number of accounts).
+
+2. The rules — one table, rows in this order (option B), columns: State | Rule (one line,
+   plain words) | Share | Action. Use the display names and these rules:
+   - Early payment default (EPD, formerly "bust-out"): at most 3 months on book before
+     falling in (one paid-off blip allowed) and never paid since — still rolling.
+   - Stabilized: paying about one month's due each month — 5 of the last 6 months within
+     one bucket of today's, or 6+ months past bucket 4 and at most one bucket higher than
+     6 months ago.
+   - Repeat delinquent: cured a spell that reached 60+ DPD and fell back in within 24 months.
+   - Seasoned straight roller: 12+ months on book, then rolled straight to bucket 4 with no
+     payment on the way down.
+   - Early-life straight roller: same, within the first 12 months on book.
+   - Slow roller (partial payer): paid something on the way down but kept rolling.
+   Actions: from METHODOLOGY.md §4. Shares: from the results file only.
+   Add one line under the table: states are checked in this order, first match wins, so
+   every account gets exactly one state.
+
+3. Results — at most 5 bullets, real numbers only: the biggest state(s), stabilized vs
+   the bank's ~6%, EPD vs the bank's ~6% bust-out, data quality in one line (accounts
+   excluded and why), and that outcome checks (roll rates, exits) come with the Spark
+   backtest.
+
+4. Decisions needed — at most 3 bullets, from METHODOLOGY.md §10.
+
+Every number must come from the results file. If a check FAILED (e.g. unparseable
+strings), say so in one line under Results with the count and what is being done.
+Write it to docs/deterioration_states/results/stakeholder_report_<date>.md and show it to me.
 ```
 
 ---
