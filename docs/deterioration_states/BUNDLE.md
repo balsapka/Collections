@@ -46,7 +46,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-16 by `dpd_states/bundle.py`. 19 files, 3,991 lines.
+Generated 2026-10-16 by `dpd_states/bundle.py`. 19 files, 3,993 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -2690,7 +2690,7 @@ def main(path: str | None = None, sample_n: int = 100_000, out_dir: str | None =
 `````
 
 ### FILE: `dpd_states/segment_180.py`
-sha256 `757f70d7de64f116a99618f336517a104f84673eb9c20994ae578de554c77f87` · 179 lines · trailing newline: yes
+sha256 `acea7b4a5cb8206e4233c8a778c8a03b9b92886eb4083cc1e40b70073e150cf6` · 181 lines · trailing newline: yes
 
 `````python
 """PROTOTYPE — deterioration states for the 180+ segment (current bucket 8 or 9; 9 is the cap).
@@ -2704,8 +2704,9 @@ that only exist at 180+, plus an honest state when the path in is outside the wi
     Q2  Broken payer?          was stabilized (bank's 5-of-6 rule) for 6+ months while in
                                buckets 4–7, then rolled on to 9 (visible even when the
                                run-up is not)                     -> broken_payer
-    Q0  History not available? the string starts already delinquent: the path in is older
-                               than the window or missing        -> history_not_available
+    Q0  History not available? every month in the window is 8 or 9: nothing before 180+
+                               is visible (in default since before the window, or no
+                               history)                           -> history_not_available
     Q3  Early payment default? <=3 months on book before the spell (<=1 blip), no earlier
                                spell, no payment between bucket 2 and reaching 9
                                                                   -> early_payment_default
@@ -2818,7 +2819,8 @@ def features_180(df: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
         for t in range(sp0, first8):
             if 4 <= b[t] <= 7 and t >= 5 and (np.abs(b[t - 5:t + 1] - b[t]) <= 1).sum() >= 5:
                 stab_months += 1
-        extra.append({"months_in_default": len(b) - 1 - first8,
+        extra.append({"all_default": bool(set(x) <= {"8", "9"}),
+                      "months_in_default": len(b) - 1 - first8,
                       "default_left_censored": first8 == 0,
                       "pay_events_before_9": int((pre9 != 1).sum()),
                       "paid_in_default": bool((after9 < 0).any()),
@@ -2831,7 +2833,7 @@ def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: in
     conds = [
         f.paid_in_default,
         f.stabilized_months_in_4_7 >= 6,            # visible even when the run-up is not
-        f.left_censored,
+        f.all_default,
         (f.months_before_spell <= 3) & (f.n_blips <= 1) & (f.n_prior_episodes == 0)
         & (f.pay_events_before_9 == 0) & ~f.history_truncated,
         f.gap_prior_peak3 <= repeat_window,
