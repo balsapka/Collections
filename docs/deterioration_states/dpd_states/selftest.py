@@ -58,6 +58,28 @@ CASES = [
 ]
 
 
+CROP_CASES = [   # (oldest -> newest, max months kept, expected option-B state, why)
+    ("0" * 10 + "234" + "45" * 18 + "4", 32, "stabilized",
+     "spell older than the window: not a data-quality case; long-run holder -> stabilized"),
+    ("0" * 40 + "234", 32, "straight_roller_seasoned", "long clean history cropped: still seasoned"),
+    ("0000000000234", 6, "straight_roller_early_life", "cropped to 0 0 0 2 3 4: looks like EPD but is not new"),
+    ("0 0 0 2 3 4", 32, "early_payment_default", "short history, not cropped: EPD"),
+]
+
+
+def check_crop() -> tuple[list[str], int]:
+    import pandas as pd
+    from .analysis import crop_history
+    lines, bad = [], 0
+    for chron, n, want, why in CROP_CASES:
+        s, tr = crop_history(pd.Series([chron.replace(" ", "")[::-1]]), n)
+        f = build_features(pd.DataFrame({"dpd_string": s, "history_truncated": tr}))
+        got = assign_states(f, **OPTIONS[RECOMMENDED]).iloc[0]
+        bad += got != want
+        lines.append(f"{'OK  ' if got == want else 'FAIL'} keep {n:>2}: {chron[-24:]:<25} -> {got:<27} {why}")
+    return lines, bad
+
+
 def check_file_mode() -> bool:
     """File mode end to end on a temporary CSV (no openpyxl needed): reading the text column,
     filtering to today's spine, survivor-only checks, results written outside the repo."""
@@ -137,6 +159,9 @@ def main(n: int = 20_000) -> int:
 
     print(md(checks[["id", "status", "observed", "expected", "check"]], index=False))
     case_lines, bad = check_cases()
+    crop_lines, bad_crop = check_crop()
+    print("\nReliable-window cropping:\n" + "\n".join(crop_lines))
+    bad += bad_crop
     file_ok = check_file_mode()
     print("\nEdge cases (oldest -> newest, option B):\n" + "\n".join(case_lines))
     (OUT / f"selftest_report_{stamp}.md").write_text(

@@ -40,6 +40,24 @@ COL_STRING_AS_OF = None
 # Optional Spark SQL filter applied first (scope), e.g. "product_type = 'CREDIT_CARD'".
 ROW_FILTER = None
 
+# --- reliable history window --------------------------------------------------------------
+# DPD history is only reliable from RELIABLE_FROM onwards. Every string is cropped to the
+# months from RELIABLE_FROM to SNAPSHOT_MONTH (the month of the leftmost digit), inclusive;
+# older (rightmost) digits are dropped. A cropped string's oldest digit is NOT the first
+# billed month, so a cropped account can never be EPD, and a spell that started before
+# the window is not a data-quality case. Set RELIABLE_FROM = None to keep full strings.
+SNAPSHOT_MONTH = "2026-08"
+RELIABLE_FROM = "2024-01"
+
+
+def _months_between(first: str, last: str) -> int:
+    y0, m0 = map(int, first.split("-"))
+    y1, m1 = map(int, last.split("-"))
+    return (y1 - y0) * 12 + (m1 - m0) + 1
+
+
+MAX_HISTORY_MONTHS = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
+
 # --- string conventions ------------------------------------------------------------------
 LEFTMOST_IS_CURRENT = True    # '54320002000': leftmost digit = current month's bucket
 CHAR_MAP = {}                 # non-digit BUCKET codes -> digit, e.g. a write-off letter {"W": "9"}.

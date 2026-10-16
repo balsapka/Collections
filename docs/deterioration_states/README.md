@@ -18,7 +18,8 @@ python docs/deterioration_states/run.py validate    # REAL data: INPUT_FILE / CO
 ```
 
 `validate` reads `data/input/dpd_synthetic_data.xlsx`, column `dpd_history_str` (leftmost =
-current month), keeps today's spine (current bucket 4–7) and writes
+current month), crops it to the reliable window (2024-01 → 2026-08 = 32 months, set in
+`config.py`), keeps today's spine (current bucket 4–7) and writes
 `results/dpd_states_file_<file>_<date>.json` + `.md` (aggregates only). Another file:
 `run.py validate path/to/file.xlsx`. Needs pandas, numpy, scikit-learn, and openpyxl for
 `.xlsx`. A snapshot file has no outcomes, so roll-rate / exit checks are SKIPPED; the Spark

@@ -29,7 +29,7 @@ result = main(catalog)           # full validation -> results/ (aggregates only)
 
 ---
 
-Generated 2026-10-16 by `dpd_states/bundle.py`. 18 files, 3,668 lines.
+Generated 2026-10-16 by `dpd_states/bundle.py`. 18 files, 3,756 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -158,7 +158,7 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `cbb9462729d0755f7fadc40d67763411e193ed3b4900a2f0f83ba9eed3a4db62` · 114 lines · trailing newline: yes
+sha256 `521f28f20b40038c3cabb9dd2f3703830472f143ff00baeccb05acf8d7845f60` · 115 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
@@ -181,7 +181,8 @@ python docs/deterioration_states/run.py validate    # REAL data: INPUT_FILE / CO
 ```
 
 `validate` reads `data/input/dpd_synthetic_data.xlsx`, column `dpd_history_str` (leftmost =
-current month), keeps today's spine (current bucket 4–7) and writes
+current month), crops it to the reliable window (2024-01 → 2026-08 = 32 months, set in
+`config.py`), keeps today's spine (current bucket 4–7) and writes
 `results/dpd_states_file_<file>_<date>.json` + `.md` (aggregates only). Another file:
 `run.py validate path/to/file.xlsx`. Needs pandas, numpy, scikit-learn, and openpyxl for
 `.xlsx`. A snapshot file has no outcomes, so roll-rate / exit checks are SKIPPED; the Spark
@@ -330,7 +331,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `METHODOLOGY.md`
-sha256 `259c28f3d2c6d5aeb01ef26740306394d63448b8e0dbbbe164ebe7b7855c0609` · 462 lines · trailing newline: yes
+sha256 `0fec7f3f70043efa4f79ecd65510f2e71497cd3ec6f7a5e71286378d9fe5fc75` · 476 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — methodology
@@ -378,6 +379,20 @@ Design rules agreed with the business owner:
   billed month**, so it is almost always 0 or 1. Exceptions: rare missing history, 180+
   accounts without history (start at 9, outside the spine), and restructured cards/loans
   re-opened as a new account at their previous bucket.
+- **Reliable window: January 2024 onwards.** Older DPD history is unreliable, so every
+  string is cropped to the newest months from `RELIABLE_FROM` (2024-01) to
+  `SNAPSHOT_MONTH` (2026-08) — **32 months** for the Aug 2026 sample (recomputed from the
+  two dates in `config.py`). Effects, all handled:
+  - EPD is unaffected: an EPD has at most 3 clean months plus a short straight roll, so its
+    string is under 12 digits and never cropped. As a safety net, a cropped string can
+    never be EPD (its oldest digit is no longer the first billed month).
+  - A spell that started before 2024 makes a cropped string start delinquent. That is
+    normal history, not a data issue, so Q0 skips cropped strings; these accounts (0.16%
+    of the synthetic spine) are classified normally — in practice mostly stabilized.
+  - Seasoned (≥ 12 months) and the 24-month repeat window fit inside 32 months; earlier
+    spells that ended before 2024 are invisible, which can slightly under-count repeat
+    delinquents whose spell began in early 2024.
+  *(Synthetic: 74% of strings cropped; option-B shares essentially unchanged.)*
 - **Read it as text.** A numeric column drops digits (Excel keeps 15 significant digits;
   leading zeros vanish). The file reader refuses number-like values.
 - **0 ≡ 1.** Bucket 1 (a few days late) is treated as normal.
@@ -731,7 +746,7 @@ Anchor: **bank** = the bank's figures or rules · **design** = follows from the 
 | E24 | "Paying since 4" stays rejected | persistence ≤ 75% | synthetic |
 | E25 | INFO: exit-within-3m spread across fixed states (bucket-std) | report | — |
 | E26 | Stabilized accounts that leave and come back | ≤ 10% | synthetic |
-| E27 | String lengths vary (not padded / fixed-length) | p95 − p05 ≥ 6 | data |
+| E27 | Uncropped string lengths vary (not padded / fixed-length) | p95 − p05 ≥ 6 | data |
 | E28 | Run-up holds: largest calendar month vs its neighbours | ≤ 2.5× | data |
 
 Every check carries an "if not met" action in the code and in the report; none of them
@@ -852,7 +867,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `097b899f0ffcd9f54ef7114be781d0ed7cbe26ff516085cb2215b5bc28987c5f` · 217 lines · trailing newline: yes
+sha256 `118f3e4c33e022a1a2b78182dc362c5a5d11f1e7d43c0113eda4a6c077389dc6` · 219 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -918,7 +933,9 @@ Task: run the package on our DPD-history file, without Spark.
      if Excel stored it as a number, digits are lost — stop and tell me;
    - the share of strings whose LEFTMOST digit is 4–7 (today's spine) and the
      distribution of the RIGHTMOST digit (should be mostly 0/1 = first billed month);
-   - min / median / max string length;
+   - min / median / max string length (strings are cropped to the reliable window,
+     RELIABLE_FROM = 2024-01 to SNAPSHOT_MONTH = 2026-08 = 32 months, inside the package —
+     do not crop them yourself; if the snapshot month differs, update SNAPSHOT_MONTH);
    - any characters other than 0–9 (if so, list them with counts; do not guess a mapping).
 3. Optional columns: if the file (or another file I point you to) has any of the persona
    scores (credibility total and its three components, ability score, reachability /
@@ -1082,7 +1099,7 @@ sha256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` · 0 l
 `````
 
 ### FILE: `dpd_states/config.py`
-sha256 `1c228fae11e2c44c89686e29c068a8b270b56aa1149e9cf68a9cb47315b19439` · 75 lines · trailing newline: yes
+sha256 `d0dc44974896f1cda6baec3b3d944b8e5a432831370486d7468966b62d5e79ac` · 93 lines · trailing newline: yes
 
 `````python
 """Workplace configuration — the ONLY file that needs editing to run on real data.
@@ -1126,6 +1143,24 @@ COL_SNAPSHOT = None
 COL_STRING_AS_OF = None
 # Optional Spark SQL filter applied first (scope), e.g. "product_type = 'CREDIT_CARD'".
 ROW_FILTER = None
+
+# --- reliable history window --------------------------------------------------------------
+# DPD history is only reliable from RELIABLE_FROM onwards. Every string is cropped to the
+# months from RELIABLE_FROM to SNAPSHOT_MONTH (the month of the leftmost digit), inclusive;
+# older (rightmost) digits are dropped. A cropped string's oldest digit is NOT the first
+# billed month, so a cropped account can never be EPD, and a spell that started before
+# the window is not a data-quality case. Set RELIABLE_FROM = None to keep full strings.
+SNAPSHOT_MONTH = "2026-08"
+RELIABLE_FROM = "2024-01"
+
+
+def _months_between(first: str, last: str) -> int:
+    y0, m0 = map(int, first.split("-"))
+    y1, m1 = map(int, last.split("-"))
+    return (y1 - y0) * 12 + (m1 - m0) + 1
+
+
+MAX_HISTORY_MONTHS = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
 
 # --- string conventions ------------------------------------------------------------------
 LEFTMOST_IS_CURRENT = True    # '54320002000': leftmost digit = current month's bucket
@@ -1346,7 +1381,7 @@ def build_features(df: pd.DataFrame, col: str = "dpd_string") -> pd.DataFrame:
 `````
 
 ### FILE: `dpd_states/states.py`
-sha256 `e3343f203c7282925a0de53028950f09e3b1872a07aecc5183fbf8b05a2e9f95` · 191 lines · trailing newline: yes
+sha256 `2be349b42fd42abd8594b9397540e133becf958d1051f466d98db25ef759dba1` · 196 lines · trailing newline: yes
 
 `````python
 """Deterioration states for the bucket 4–7 spine: a small decision tree, MECE by construction.
@@ -1356,12 +1391,15 @@ switched on per option (A / B / C) and never break MECE.
 
     Q0  History starts delinquent?  the string's oldest month is already at bucket 2+
                                 (restructured account opened at its old bucket, migrated
-                                or missing history) — data quality, not behaviour
+                                or missing history) — data quality, not behaviour. Not
+                                asked when the string was cropped to the reliable window
+                                (a spell older than the window is normal history)
                                                                -> history_starts_delinquent
     Q1  Early payment default?  <=3 months of history before this spell (at most one
                                 blip inside it, no earlier real spell) AND never paid
                                 since crossing bucket 2: every month of the spell a
-                                roll, still falling            -> early_payment_default
+                                roll, still falling; and the string was not cropped (it
+                                must start at the first billed month) -> early_payment_default
     Q2  Stabilized?             5 of the last 6 months within today's bucket ±1,
                                 OR (>= 6 months since first reaching 4 AND at most 1
                                 bucket higher than 6 months ago) -> stabilized
@@ -1495,9 +1533,11 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
         conds.append(cond)
         names.append(name)
 
-    add(f.left_censored, "history_starts_delinquent")
+    # cropped to the reliable window: the oldest digit is not the first billed month
+    cropped = f["history_truncated"].astype(bool) if "history_truncated" in f else False
+    add(f.left_censored & ~cropped, "history_starts_delinquent")
     add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])
-        & (f.n_prior_episodes == 0) & (f.spell_pay_events == 0), "early_payment_default")
+        & (f.n_prior_episodes == 0) & (f.spell_pay_events == 0) & ~cropped, "early_payment_default")
     stab = f.last6_in_band >= p["stabilized_min_in_band"]
     if p["stabilized_long_run_months"] is not None:
         stab |= ((f.months_since_4 >= p["stabilized_long_run_months"])
@@ -1543,7 +1583,7 @@ def state_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series | N
 `````
 
 ### FILE: `dpd_states/analysis.py`
-sha256 `f00e888012aef0fb5fa0eaa81a7f23e347a31ed102a8a78da55596033eb3a96f` · 544 lines · trailing newline: yes
+sha256 `c157a3300df8b897e6e50fb915b646b74b82e956f455a1d6cb182d05e4623955` · 567 lines · trailing newline: yes
 
 `````python
 """Real-data analysis of deterioration states — pure pandas, no Spark.
@@ -1638,6 +1678,14 @@ def parse_flag(x: pd.Series) -> tuple[pd.Series, float]:
     return t.isin(_TRUE), float(1 - known[x.notna()].mean()) if x.notna().any() else 1.0
 
 
+def crop_history(s: pd.Series, max_len: int | None) -> tuple[pd.Series, pd.Series]:
+    """Keep the newest max_len months (leftmost digits) — history older than the reliable
+    window is dropped. Returns (cropped strings, truncated flag)."""
+    if not max_len:
+        return s, pd.Series(False, index=s.index)
+    return s.str[:max_len], s.str.len() > max_len
+
+
 def _spells(s: str, from_bucket: int, how: str) -> int:
     """'reached': runs at >=2 that reached the bucket; 'at': runs of months at >= the bucket."""
     b = encode(s)[0]
@@ -1714,14 +1762,16 @@ def backtest_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series,
     return out.loc[order(out.index)]
 
 
-def stabilized_flips(latest: pd.Series, k: int, spine, n: int = 10_000, seed: int = 7) -> dict:
+def stabilized_flips(latest: pd.Series, k: int, spine, n: int = 10_000, seed: int = 7,
+                     truncated: pd.Series | None = None) -> dict:
     """Month-by-month stabilized status over the k backtest months, for a sample of the
     backtest population. A 'bounce-back' is an account that LEFT stabilized and later came
     BACK while staying in the spine (S . S). Entering once and leaving once (. S S .) is a
     normal lifecycle and is not counted. Reported with and without the long-run clause."""
     latest = latest[latest.str.len() > k]
     latest = latest.sample(min(n, len(latest)), random_state=seed)
-    rows = [{"acct": i, "j": j, "dpd_string": s_[k - j:]}
+    tr = truncated if truncated is not None else pd.Series(False, index=latest.index)
+    rows = [{"acct": i, "j": j, "dpd_string": s_[k - j:], "history_truncated": bool(tr.get(i, False))}
             for i, s_ in latest.items() for j in range(k + 1)]
     panel = pd.DataFrame(rows)
     panel = panel[panel.dpd_string.str[0].astype(int).isin(spine)]
@@ -1773,8 +1823,10 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
     R, M = {}, []            # results (JSON) and markdown sections
 
     # ---- data quality + current spine --------------------------------------------
+    max_len = getattr(cfg, "MAX_HISTORY_MONTHS", None)
     s, ok = clean_strings(current.dpd_string, cfg.CHAR_MAP, cfg.STRIP_CHARS)
-    cur = current.assign(dpd_string=s)[ok]
+    s, trunc = crop_history(s, max_len)
+    cur = current.assign(dpd_string=s, history_truncated=trunc)[ok]
     cur = cur[cur.dpd_string.str[0].astype(int).isin(spine)]
     if not len(cur):
         raise ValueError("no account in today's spine after cleaning — check COL_DPD, "
@@ -1790,9 +1842,14 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
         "share_non_digit_strings_table": (float(spark_counts["non_digit_strings"] / max(spark_counts["rows"], 1))
                                           if spark_counts else None),
         "n_current_spine_analysed": int(len(f)),
+        "max_history_months": max_len,
+        "share_history_cropped_to_window": float(f.history_truncated.mean()),
+        "share_spell_started_before_window": float((f.left_censored & f.history_truncated).mean()),
         "string_length_p05_p50_p95": [int(x) for x in q],
-        "string_length_spread": int(q.iloc[2] - q.iloc[0]),
-        "share_history_starts_delinquent": float(f.left_censored.mean()),
+        "string_length_spread": (int(f.hist_len[~f.history_truncated].quantile(.95)
+                                     - f.hist_len[~f.history_truncated].quantile(.05))
+                                 if (~f.history_truncated).sum() >= 20 else None),
+        "share_history_starts_delinquent": float((f.left_censored & ~f.history_truncated).mean()),
         "share_glitch_fixed": float((f.n_glitches > 0).mean()),
         "share_jump_repaired": float((f.n_jumps_repaired > 0).mean()),
         "share_jump_left": float((f.n_jumps_left > 0).mean()),
@@ -1894,12 +1951,16 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
     if latest_bt is not None and len(latest_bt):
         s2, ok2 = clean_strings(latest_bt.dpd_string, cfg.CHAR_MAP, cfg.STRIP_CHARS)
         dq["share_invalid_strings_backtest"] = float(1 - ok2.mean())
-        btf = backtest_frame(s2[ok2], k, spine, cfg.EXIT_BUCKET)
+        s2, trunc2 = crop_history(s2[ok2], max_len)
+        btf = backtest_frame(s2, k, spine, cfg.EXIT_BUCKET)
+        btf["history_truncated"] = trunc2.loc[btf.index]
+        ok2 = pd.Series(True, index=s2.index)
     else:
         btf = None
     if btf is not None and len(btf):
         bt = build_features(btf)
-        nxt = btf[btf.next_bucket.isin(spine)][["next_string"]].rename(columns={"next_string": "dpd_string"})
+        nxt = (btf[btf.next_bucket.isin(spine)][["next_string", "history_truncated"]]
+               .rename(columns={"next_string": "dpd_string"}))
         nf = build_features(nxt) if len(nxt) else None
         roll = (bt.next_bucket >= bt.b_now + 1).groupby(bt.b_now).mean()
         R["backtest"] = {"k_months": k, "n_analysed": int(len(bt)),
@@ -1929,7 +1990,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
         R["backtest"]["one_hold_slow_rollers"] = _records(one_hold)
         parts.append("### Is one paid month enough to separate slow from straight rollers?\n\n"
                      + md(one_hold.rename_axis("group")))
-        flips = stabilized_flips(s2[ok2], k, spine, seed=seed)
+        flips = stabilized_flips(s2, k, spine, seed=seed, truncated=trunc2)
         R["backtest"]["stabilized_flips"] = flips
         parts.append(f"### Stabilized bounce-backs over the {k} backtest months "
                      f"({flips['n_accounts']:,} accounts)\n\nShare of ever-stabilized accounts that left "
@@ -1943,9 +2004,10 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
         # What a snapshot CAN show: stability among accounts that stayed in the spine.
         prev = f[f.dpd_string.str.len() > 1].dpd_string.str[1:]
         prev = prev[prev.str[0].astype(int).isin(spine)]
+        prev_tr = f.loc[prev.index, "history_truncated"]
         surv = {"note": "survivor-only: accounts in the spine both last month and today"}
         if len(prev):
-            pf = build_features(prev.to_frame("dpd_string"))
+            pf = build_features(prev.to_frame("dpd_string").assign(history_truncated=prev_tr))
             st_prev = assign_states(pf, **OPTIONS[RECOMMENDED])
             now = f.loc[pf.index, "state"]
             same = pd.DataFrame({
@@ -1954,7 +2016,8 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
                 "n": st_prev.value_counts()})
             same = same.loc[order(same.index)]
             surv["same_state_next_month"] = _records(same.rename_axis("state"))
-        surv["stabilized_flips"] = stabilized_flips(f.dpd_string, k, spine, seed=seed)
+        surv["stabilized_flips"] = stabilized_flips(f.dpd_string, k, spine, seed=seed,
+                                                    truncated=f.history_truncated)
         R["survivor_checks"] = surv
         M.append("## 5. Backtest\n\n_Skipped — outcomes (roll rates, exits) need strings for accounts that "
                  "have since left the spine; a snapshot of today's segment only has the survivors._\n\n"
@@ -2093,7 +2156,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
 `````
 
 ### FILE: `dpd_states/expectations.py`
-sha256 `01ca019f4ea6bb1dbd9ef3a41e2b4d526369d193686b2394c63c374b7088c682` · 349 lines · trailing newline: yes
+sha256 `c961ab8a1e3c18eecec8a46345c5fc045c38b5af8750330bf9137690191b3159` · 349 lines · trailing newline: yes
 
 `````python
 """What we expect to see on real data, as checkable rules.
@@ -2415,7 +2478,7 @@ EXPECTATIONS = [
      "Synthetic ~5–7% with the long-run clause vs ~8% on the bank's rule alone; oscillating payers "
      "bounce 41% less. Remaining bounces are mostly staircases (hold, step, hold).",
      "Too many bounce: look at shapes; +2 tolerance or a sticky rule widen the definition — escalate."),
-    ("E27", "String lengths vary (p95 minus p05 of history length, months)",
+    ("E27", "Uncropped string lengths vary (p95 minus p05 of history length, months)",
      lambda R: R["data_quality"]["string_length_spread"], lambda v: v >= 6, ">= 6", "WARN", "data",
      "Full history from the first billed month gives very different lengths across accounts.",
      "Strings look fixed-length (padded or truncated): EPD and early-life cannot be judged from the "
@@ -3299,7 +3362,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/selftest.py`
-sha256 `0a9d05d1cdd138d3c29a48df573582a77c763374e5396ab07c9d23a5231613fc` · 153 lines · trailing newline: yes
+sha256 `e1fc37dfc16fa14e01764e022a347cda7a3be8016d32d96f3923aaafb3744272` · 178 lines · trailing newline: yes
 
 `````python
 """End-to-end self-test of the REAL-DATA path on synthetic data (no Spark needed).
@@ -3360,6 +3423,28 @@ CASES = [
     ("0000000000000000 2 3 4 4 0 4 5", "stabilized", "single 0 inside a spell at 4 is a glitch, not a cure"),
     ("0000 3 0000000000000 2 3 4", "straight_roller_seasoned", "single spike 0 3 0 is a glitch, not an earlier spell"),
 ]
+
+
+CROP_CASES = [   # (oldest -> newest, max months kept, expected option-B state, why)
+    ("0" * 10 + "234" + "45" * 18 + "4", 32, "stabilized",
+     "spell older than the window: not a data-quality case; long-run holder -> stabilized"),
+    ("0" * 40 + "234", 32, "straight_roller_seasoned", "long clean history cropped: still seasoned"),
+    ("0000000000234", 6, "straight_roller_early_life", "cropped to 0 0 0 2 3 4: looks like EPD but is not new"),
+    ("0 0 0 2 3 4", 32, "early_payment_default", "short history, not cropped: EPD"),
+]
+
+
+def check_crop() -> tuple[list[str], int]:
+    import pandas as pd
+    from .analysis import crop_history
+    lines, bad = [], 0
+    for chron, n, want, why in CROP_CASES:
+        s, tr = crop_history(pd.Series([chron.replace(" ", "")[::-1]]), n)
+        f = build_features(pd.DataFrame({"dpd_string": s, "history_truncated": tr}))
+        got = assign_states(f, **OPTIONS[RECOMMENDED]).iloc[0]
+        bad += got != want
+        lines.append(f"{'OK  ' if got == want else 'FAIL'} keep {n:>2}: {chron[-24:]:<25} -> {got:<27} {why}")
+    return lines, bad
 
 
 def check_file_mode() -> bool:
@@ -3441,6 +3526,9 @@ def main(n: int = 20_000) -> int:
 
     print(md(checks[["id", "status", "observed", "expected", "check"]], index=False))
     case_lines, bad = check_cases()
+    crop_lines, bad_crop = check_crop()
+    print("\nReliable-window cropping:\n" + "\n".join(crop_lines))
+    bad += bad_crop
     file_ok = check_file_mode()
     print("\nEdge cases (oldest -> newest, option B):\n" + "\n".join(case_lines))
     (OUT / f"selftest_report_{stamp}.md").write_text(

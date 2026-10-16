@@ -5,12 +5,15 @@ switched on per option (A / B / C) and never break MECE.
 
     Q0  History starts delinquent?  the string's oldest month is already at bucket 2+
                                 (restructured account opened at its old bucket, migrated
-                                or missing history) — data quality, not behaviour
+                                or missing history) — data quality, not behaviour. Not
+                                asked when the string was cropped to the reliable window
+                                (a spell older than the window is normal history)
                                                                -> history_starts_delinquent
     Q1  Early payment default?  <=3 months of history before this spell (at most one
                                 blip inside it, no earlier real spell) AND never paid
                                 since crossing bucket 2: every month of the spell a
-                                roll, still falling            -> early_payment_default
+                                roll, still falling; and the string was not cropped (it
+                                must start at the first billed month) -> early_payment_default
     Q2  Stabilized?             5 of the last 6 months within today's bucket ±1,
                                 OR (>= 6 months since first reaching 4 AND at most 1
                                 bucket higher than 6 months ago) -> stabilized
@@ -144,9 +147,11 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
         conds.append(cond)
         names.append(name)
 
-    add(f.left_censored, "history_starts_delinquent")
+    # cropped to the reliable window: the oldest digit is not the first billed month
+    cropped = f["history_truncated"].astype(bool) if "history_truncated" in f else False
+    add(f.left_censored & ~cropped, "history_starts_delinquent")
     add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])
-        & (f.n_prior_episodes == 0) & (f.spell_pay_events == 0), "early_payment_default")
+        & (f.n_prior_episodes == 0) & (f.spell_pay_events == 0) & ~cropped, "early_payment_default")
     stab = f.last6_in_band >= p["stabilized_min_in_band"]
     if p["stabilized_long_run_months"] is not None:
         stab |= ((f.months_since_4 >= p["stabilized_long_run_months"])

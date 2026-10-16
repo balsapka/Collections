@@ -43,6 +43,20 @@ Design rules agreed with the business owner:
   billed month**, so it is almost always 0 or 1. Exceptions: rare missing history, 180+
   accounts without history (start at 9, outside the spine), and restructured cards/loans
   re-opened as a new account at their previous bucket.
+- **Reliable window: January 2024 onwards.** Older DPD history is unreliable, so every
+  string is cropped to the newest months from `RELIABLE_FROM` (2024-01) to
+  `SNAPSHOT_MONTH` (2026-08) — **32 months** for the Aug 2026 sample (recomputed from the
+  two dates in `config.py`). Effects, all handled:
+  - EPD is unaffected: an EPD has at most 3 clean months plus a short straight roll, so its
+    string is under 12 digits and never cropped. As a safety net, a cropped string can
+    never be EPD (its oldest digit is no longer the first billed month).
+  - A spell that started before 2024 makes a cropped string start delinquent. That is
+    normal history, not a data issue, so Q0 skips cropped strings; these accounts (0.16%
+    of the synthetic spine) are classified normally — in practice mostly stabilized.
+  - Seasoned (≥ 12 months) and the 24-month repeat window fit inside 32 months; earlier
+    spells that ended before 2024 are invisible, which can slightly under-count repeat
+    delinquents whose spell began in early 2024.
+  *(Synthetic: 74% of strings cropped; option-B shares essentially unchanged.)*
 - **Read it as text.** A numeric column drops digits (Excel keeps 15 significant digits;
   leading zeros vanish). The file reader refuses number-like values.
 - **0 ≡ 1.** Bucket 1 (a few days late) is treated as normal.
@@ -396,7 +410,7 @@ Anchor: **bank** = the bank's figures or rules · **design** = follows from the 
 | E24 | "Paying since 4" stays rejected | persistence ≤ 75% | synthetic |
 | E25 | INFO: exit-within-3m spread across fixed states (bucket-std) | report | — |
 | E26 | Stabilized accounts that leave and come back | ≤ 10% | synthetic |
-| E27 | String lengths vary (not padded / fixed-length) | p95 − p05 ≥ 6 | data |
+| E27 | Uncropped string lengths vary (not padded / fixed-length) | p95 − p05 ≥ 6 | data |
 | E28 | Run-up holds: largest calendar month vs its neighbours | ≤ 2.5× | data |
 
 Every check carries an "if not met" action in the code and in the report; none of them

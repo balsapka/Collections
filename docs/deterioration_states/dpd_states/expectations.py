@@ -317,7 +317,7 @@ EXPECTATIONS = [
      "Synthetic ~5–7% with the long-run clause vs ~8% on the bank's rule alone; oscillating payers "
      "bounce 41% less. Remaining bounces are mostly staircases (hold, step, hold).",
      "Too many bounce: look at shapes; +2 tolerance or a sticky rule widen the definition — escalate."),
-    ("E27", "String lengths vary (p95 minus p05 of history length, months)",
+    ("E27", "Uncropped string lengths vary (p95 minus p05 of history length, months)",
      lambda R: R["data_quality"]["string_length_spread"], lambda v: v >= 6, ">= 6", "WARN", "data",
      "Full history from the first billed month gives very different lengths across accounts.",
      "Strings look fixed-length (padded or truncated): EPD and early-life cannot be judged from the "

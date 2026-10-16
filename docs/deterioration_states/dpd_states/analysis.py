@@ -90,6 +90,14 @@ def parse_flag(x: pd.Series) -> tuple[pd.Series, float]:
     return t.isin(_TRUE), float(1 - known[x.notna()].mean()) if x.notna().any() else 1.0
 
 
+def crop_history(s: pd.Series, max_len: int | None) -> tuple[pd.Series, pd.Series]:
+    """Keep the newest max_len months (leftmost digits) — history older than the reliable
+    window is dropped. Returns (cropped strings, truncated flag)."""
+    if not max_len:
+        return s, pd.Series(False, index=s.index)
+    return s.str[:max_len], s.str.len() > max_len
+
+
 def _spells(s: str, from_bucket: int, how: str) -> int:
     """'reached': runs at >=2 that reached the bucket; 'at': runs of months at >= the bucket."""
     b = encode(s)[0]
@@ -166,14 +174,16 @@ def backtest_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series,
     return out.loc[order(out.index)]
 
 
-def stabilized_flips(latest: pd.Series, k: int, spine, n: int = 10_000, seed: int = 7) -> dict:
+def stabilized_flips(latest: pd.Series, k: int, spine, n: int = 10_000, seed: int = 7,
+                     truncated: pd.Series | None = None) -> dict:
     """Month-by-month stabilized status over the k backtest months, for a sample of the
     backtest population. A 'bounce-back' is an account that LEFT stabilized and later came
     BACK while staying in the spine (S . S). Entering once and leaving once (. S S .) is a
     normal lifecycle and is not counted. Reported with and without the long-run clause."""
     latest = latest[latest.str.len() > k]
     latest = latest.sample(min(n, len(latest)), random_state=seed)
-    rows = [{"acct": i, "j": j, "dpd_string": s_[k - j:]}
+    tr = truncated if truncated is not None else pd.Series(False, index=latest.index)
+    rows = [{"acct": i, "j": j, "dpd_string": s_[k - j:], "history_truncated": bool(tr.get(i, False))}
             for i, s_ in latest.items() for j in range(k + 1)]
     panel = pd.DataFrame(rows)
     panel = panel[panel.dpd_string.str[0].astype(int).isin(spine)]
@@ -225,8 +235,10 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
     R, M = {}, []            # results (JSON) and markdown sections
 
     # ---- data quality + current spine --------------------------------------------
+    max_len = getattr(cfg, "MAX_HISTORY_MONTHS", None)
     s, ok = clean_strings(current.dpd_string, cfg.CHAR_MAP, cfg.STRIP_CHARS)
-    cur = current.assign(dpd_string=s)[ok]
+    s, trunc = crop_history(s, max_len)
+    cur = current.assign(dpd_string=s, history_truncated=trunc)[ok]
     cur = cur[cur.dpd_string.str[0].astype(int).isin(spine)]
     if not len(cur):
         raise ValueError("no account in today's spine after cleaning — check COL_DPD, "
@@ -242,9 +254,14 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
         "share_non_digit_strings_table": (float(spark_counts["non_digit_strings"] / max(spark_counts["rows"], 1))
                                           if spark_counts else None),
         "n_current_spine_analysed": int(len(f)),
+        "max_history_months": max_len,
+        "share_history_cropped_to_window": float(f.history_truncated.mean()),
+        "share_spell_started_before_window": float((f.left_censored & f.history_truncated).mean()),
         "string_length_p05_p50_p95": [int(x) for x in q],
-        "string_length_spread": int(q.iloc[2] - q.iloc[0]),
-        "share_history_starts_delinquent": float(f.left_censored.mean()),
+        "string_length_spread": (int(f.hist_len[~f.history_truncated].quantile(.95)
+                                     - f.hist_len[~f.history_truncated].quantile(.05))
+                                 if (~f.history_truncated).sum() >= 20 else None),
+        "share_history_starts_delinquent": float((f.left_censored & ~f.history_truncated).mean()),
         "share_glitch_fixed": float((f.n_glitches > 0).mean()),
         "share_jump_repaired": float((f.n_jumps_repaired > 0).mean()),
         "share_jump_left": float((f.n_jumps_left > 0).mean()),
@@ -346,12 +363,16 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
     if latest_bt is not None and len(latest_bt):
         s2, ok2 = clean_strings(latest_bt.dpd_string, cfg.CHAR_MAP, cfg.STRIP_CHARS)
         dq["share_invalid_strings_backtest"] = float(1 - ok2.mean())
-        btf = backtest_frame(s2[ok2], k, spine, cfg.EXIT_BUCKET)
+        s2, trunc2 = crop_history(s2[ok2], max_len)
+        btf = backtest_frame(s2, k, spine, cfg.EXIT_BUCKET)
+        btf["history_truncated"] = trunc2.loc[btf.index]
+        ok2 = pd.Series(True, index=s2.index)
     else:
         btf = None
     if btf is not None and len(btf):
         bt = build_features(btf)
-        nxt = btf[btf.next_bucket.isin(spine)][["next_string"]].rename(columns={"next_string": "dpd_string"})
+        nxt = (btf[btf.next_bucket.isin(spine)][["next_string", "history_truncated"]]
+               .rename(columns={"next_string": "dpd_string"}))
         nf = build_features(nxt) if len(nxt) else None
         roll = (bt.next_bucket >= bt.b_now + 1).groupby(bt.b_now).mean()
         R["backtest"] = {"k_months": k, "n_analysed": int(len(bt)),
@@ -381,7 +402,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
         R["backtest"]["one_hold_slow_rollers"] = _records(one_hold)
         parts.append("### Is one paid month enough to separate slow from straight rollers?\n\n"
                      + md(one_hold.rename_axis("group")))
-        flips = stabilized_flips(s2[ok2], k, spine, seed=seed)
+        flips = stabilized_flips(s2, k, spine, seed=seed, truncated=trunc2)
         R["backtest"]["stabilized_flips"] = flips
         parts.append(f"### Stabilized bounce-backs over the {k} backtest months "
                      f"({flips['n_accounts']:,} accounts)\n\nShare of ever-stabilized accounts that left "
@@ -395,9 +416,10 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
         # What a snapshot CAN show: stability among accounts that stayed in the spine.
         prev = f[f.dpd_string.str.len() > 1].dpd_string.str[1:]
         prev = prev[prev.str[0].astype(int).isin(spine)]
+        prev_tr = f.loc[prev.index, "history_truncated"]
         surv = {"note": "survivor-only: accounts in the spine both last month and today"}
         if len(prev):
-            pf = build_features(prev.to_frame("dpd_string"))
+            pf = build_features(prev.to_frame("dpd_string").assign(history_truncated=prev_tr))
             st_prev = assign_states(pf, **OPTIONS[RECOMMENDED])
             now = f.loc[pf.index, "state"]
             same = pd.DataFrame({
@@ -406,7 +428,8 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
                 "n": st_prev.value_counts()})
             same = same.loc[order(same.index)]
             surv["same_state_next_month"] = _records(same.rename_axis("state"))
-        surv["stabilized_flips"] = stabilized_flips(f.dpd_string, k, spine, seed=seed)
+        surv["stabilized_flips"] = stabilized_flips(f.dpd_string, k, spine, seed=seed,
+                                                    truncated=f.history_truncated)
         R["survivor_checks"] = surv
         M.append("## 5. Backtest\n\n_Skipped — outcomes (roll rates, exits) need strings for accounts that "
                  "have since left the spine; a snapshot of today's segment only has the survivors._\n\n"
