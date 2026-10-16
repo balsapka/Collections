@@ -169,43 +169,43 @@
   "overlap_other_axes": {
     "eta2_by_option": [
       {
-        "index": "credibility_score",
+        "axis": "credibility_score",
         "A_minimal_4": 0.116,
         "B_balanced_6": 0.1914,
         "C_detailed_7": 0.1933
       },
       {
-        "index": "cred_ptp_points",
+        "axis": "cred_ptp_points",
         "A_minimal_4": 0.0001,
         "B_balanced_6": 0.0001,
         "C_detailed_7": 0.0002
       },
       {
-        "index": "cred_money_in_points",
+        "axis": "cred_money_in_points",
         "A_minimal_4": 0.1738,
         "B_balanced_6": 0.1672,
         "C_detailed_7": 0.1702
       },
       {
-        "index": "cred_clean_point",
+        "axis": "cred_clean_point",
         "A_minimal_4": 0.0398,
         "B_balanced_6": 0.8444,
         "C_detailed_7": 0.8444
       },
       {
-        "index": "ability_score",
+        "axis": "ability_score",
         "A_minimal_4": 0.0002,
         "B_balanced_6": 0.0003,
         "C_detailed_7": 0.0003
       },
       {
-        "index": "reachable_flag",
+        "axis": "reachable_flag",
         "A_minimal_4": 0.0,
         "B_balanced_6": 0.0001,
         "C_detailed_7": 0.0001
       },
       {
-        "index": "in_country_flag",
+        "axis": "in_country_flag",
         "A_minimal_4": 0.0003,
         "B_balanced_6": 0.0003,
         "C_detailed_7": 0.0004

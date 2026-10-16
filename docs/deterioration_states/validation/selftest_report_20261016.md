@@ -25,6 +25,7 @@ Fake axis columns; real-data code path.
 | E17 | PASS | Option C: smaller of gradual_slide / gradual_fought_back | 0.064 | >= 4% | Synthetic 10% / 6%. | Too small to act on — use option B. |
 | E18 | PASS | Holding sits low in the spine: share at bucket 4 / share at bucket 7 | 19.157 | >= 2x | 90–95% roll rates at 6–7 leave little room to hold there. | Holders at 6–7 are unusual — check for frozen buckets (payment holidays). |
 | E19 | PASS | Orthogonality: credibility score explained by the states (eta²) | 0.191 | <= 0.25 | Known overlap via holding (money in) and relapse (clean point), but the states should not reproduce the score. | Use option A (drops relapse) or report holding under credibility instead. |
+| E19b | WARN | Orthogonality: credibility 'pre-delinquency clean' point explained by the states (eta²) | 0.844 | <= 0.50 | Relapse is defined from earlier spells — the same history the clean point scores. Synthetic (with a clean point = 'no earlier spell'): 0.84 → WARN. | Relapse duplicates the credibility clean point: use option A, or keep relapse and tell the persona grid it is the same signal (it is only 1 of credibility's 5 points). |
 | E20 | PASS | Orthogonality: ability score explained by the states (eta²) | 0.000 | <= 0.10 | DPD shape should carry little of salary/inflow/CASA. | Sudden vs gradual may be a proxy for income loss — fine, but say so in the persona grid. |
 | E21 | PASS | Holders with money coming in (credibility component or DPD proxy) | 1.000 | >= 90% | Holding = paid one month's due most months, so money must be coming in (synthetic 100%). | Holders without money in are frozen buckets (holiday/restructure) — exclude those months. |
 | E22 | PASS | Residual clusters agree more with option B than with A (ARI gain at k=6) | 0.388 | >= 0.15 | Synthetic: 0.55 (B) vs 0.16 (A) — the data has more than two residual groups. | The extra B splits are not natural groups in this book — prefer option A. |
@@ -34,7 +35,7 @@ Fake axis columns; real-data code path.
 
 ## 1. Data quality and population
 
-| index | value |
+| metric | value |
 |---|---|
 | n_current_rows | 20000 |
 | share_invalid_strings | 0.000 |
@@ -53,7 +54,7 @@ Fake axis columns; real-data code path.
 
 Share:
 
-| index | share |
+| state | share |
 |---|---|
 | bust_out | 0.058 |
 | holding | 0.066 |
@@ -62,7 +63,7 @@ Share:
 
 Mix by current bucket (column shares):
 
-| row_0 | 4 | 5 | 6 | 7 |
+| state | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|
 | bust_out | 0.051 | 0.059 | 0.056 | 0.067 |
 | holding | 0.134 | 0.070 | 0.030 | 0.007 |
@@ -73,7 +74,7 @@ Mix by current bucket (column shares):
 
 Share:
 
-| index | share |
+| state | share |
 |---|---|
 | bust_out | 0.058 |
 | holding | 0.066 |
@@ -84,7 +85,7 @@ Share:
 
 Mix by current bucket (column shares):
 
-| row_0 | 4 | 5 | 6 | 7 |
+| state | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|
 | bust_out | 0.051 | 0.059 | 0.056 | 0.067 |
 | holding | 0.134 | 0.070 | 0.030 | 0.007 |
@@ -97,7 +98,7 @@ Mix by current bucket (column shares):
 
 Share:
 
-| index | share |
+| state | share |
 |---|---|
 | bust_out | 0.058 |
 | holding | 0.066 |
@@ -109,7 +110,7 @@ Share:
 
 Mix by current bucket (column shares):
 
-| row_0 | 4 | 5 | 6 | 7 |
+| state | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|
 | bust_out | 0.051 | 0.059 | 0.056 | 0.067 |
 | holding | 0.134 | 0.070 | 0.030 | 0.007 |
@@ -144,7 +145,7 @@ Examples (B_balanced_6, no keys):
 
 ## 3. Agreement with the bank's existing bust-out / stabilized rules
 
-| index | their_share | our_share | recall_of_theirs | precision_vs_theirs |
+| state | their_share | our_share | recall_of_theirs | precision_vs_theirs |
 |---|---|---|---|---|
 | bust_out | 0.061 | 0.058 | 0.941 | 0.995 |
 | holding | 0.071 | 0.066 | 0.922 | 0.995 |
@@ -153,7 +154,7 @@ Examples (B_balanced_6, no keys):
 
 Variance of each axis explained by the states (eta², 0 = orthogonal):
 
-| index | A_minimal_4 | B_balanced_6 | C_detailed_7 |
+| axis | A_minimal_4 | B_balanced_6 | C_detailed_7 |
 |---|---|---|---|
 | credibility_score | 0.116 | 0.191 | 0.193 |
 | cred_ptp_points | 0.000 | 0.000 | 0.000 |
@@ -176,7 +177,7 @@ Mean of each axis by state (B_balanced_6):
 
 Holding vs money coming in:
 
-| index | value |
+| metric | value |
 |---|---|
 | source | cred_money_in_points |
 | holders_with_money_in | 1.000 |
@@ -186,7 +187,7 @@ Holding vs money coming in:
 
 20,000 accounts. Monthly roll rate by bucket (should match the bank's ~70/80/90/95%):
 
-| b_now | roll_rate |
+| bucket | roll_rate |
 |---|---|
 | 4 | 0.702 |
 | 5 | 0.808 |
