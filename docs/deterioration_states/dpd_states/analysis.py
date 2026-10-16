@@ -91,11 +91,12 @@ def parse_flag(x: pd.Series) -> tuple[pd.Series, float]:
 
 
 def crop_history(s: pd.Series, max_len: int | None) -> tuple[pd.Series, pd.Series]:
-    """Keep the newest max_len months (leftmost digits) — history older than the reliable
-    window is dropped. Returns (cropped strings, truncated flag)."""
+    """Keep the newest max_len months (leftmost digits) — history older than the window is
+    dropped. A string that fills the whole window may have older history, so it is flagged
+    as cropped too (>=). Returns (cropped strings, cropped flag)."""
     if not max_len:
         return s, pd.Series(False, index=s.index)
-    return s.str[:max_len], s.str.len() > max_len
+    return s.str[:max_len], s.str.len() >= max_len
 
 
 def _spells(s: str, from_bucket: int, how: str) -> int:

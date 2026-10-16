@@ -45,8 +45,10 @@ Design rules agreed with the business owner:
   re-opened as a new account at their previous bucket.
 - **Reliable window: January 2024 onwards.** Older DPD history is unreliable, so every
   string is cropped to the newest months from `RELIABLE_FROM` (2024-01) to
-  `SNAPSHOT_MONTH` (2026-08) — **32 months** for the Aug 2026 sample (recomputed from the
-  two dates in `config.py`). Effects, all handled:
+  `SNAPSHOT_MONTH` (2026-08) — 32 months — or to the source's own fixed window if shorter
+  (`SOURCE_WINDOW_MONTHS`: the sign-off file is a **24-month** extract, so 24 applies). A
+  string that fills the whole window may have older history and is treated as cropped.
+  Effects, all handled:
   - EPD is unaffected: an EPD has at most 3 clean months plus a short straight roll, so its
     string is under 12 digits and never cropped. As a safety net, a cropped string can
     never be EPD (its oldest digit is no longer the first billed month).

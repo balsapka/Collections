@@ -56,7 +56,13 @@ def _months_between(first: str, last: str) -> int:
     return (y1 - y0) * 12 + (m1 - m0) + 1
 
 
-MAX_HISTORY_MONTHS = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
+# The source may itself be a fixed-length extract (the sign-off file pivots every account
+# onto a 24-month grid). A string that fills the whole window may have older history, so
+# it is treated as cropped (never EPD, never "history starts delinquent"). None = full history.
+SOURCE_WINDOW_MONTHS = 24
+
+_reliable = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
+MAX_HISTORY_MONTHS = min(x for x in (_reliable, SOURCE_WINDOW_MONTHS) if x) if (_reliable or SOURCE_WINDOW_MONTHS) else None   # 24
 
 # --- string conventions ------------------------------------------------------------------
 LEFTMOST_IS_CURRENT = True    # '54320002000': leftmost digit = current month's bucket

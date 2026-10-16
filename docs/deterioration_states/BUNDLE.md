@@ -14,7 +14,7 @@ python docs/deterioration_states/run.py selftest
 
 # 4. validate on the real file                      -> checks + state shares
 #    reads data/input/dpd_synthetic_data.xlsx, column dpd_history_str (config.py),
-#    crops to the reliable window (2024-01 .. 2026-08 = 32 months), keeps buckets 4-7
+#    crops to the history window (reliable from 2024-01; 24-month extract -> 24), keeps buckets 4-7
 python docs/deterioration_states/run.py validate
 #    another file and/or sample size:
 #    python docs/deterioration_states/run.py validate data/input/other_file.xlsx 50000
@@ -46,7 +46,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-16 by `dpd_states/bundle.py`. 18 files, 3,796 lines.
+Generated 2026-10-16 by `dpd_states/bundle.py`. 18 files, 3,806 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -177,7 +177,7 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `521f28f20b40038c3cabb9dd2f3703830472f143ff00baeccb05acf8d7845f60` · 115 lines · trailing newline: yes
+sha256 `fb8e5fdf89d34bc63895a0c938816fe539684baf719f03e3d101a3eb0b458866` · 115 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
@@ -200,8 +200,8 @@ python docs/deterioration_states/run.py validate    # REAL data: INPUT_FILE / CO
 ```
 
 `validate` reads `data/input/dpd_synthetic_data.xlsx`, column `dpd_history_str` (leftmost =
-current month), crops it to the reliable window (2024-01 → 2026-08 = 32 months, set in
-`config.py`), keeps today's spine (current bucket 4–7) and writes
+current month), crops it to the history window (reliable from 2024-01, and the file is a 24-month
+extract, so 24 months; set in `config.py`), keeps today's spine (current bucket 4–7) and writes
 `results/dpd_states_file_<file>_<date>.json` + `.md` (aggregates only). Another file:
 `run.py validate path/to/file.xlsx`. Needs pandas, numpy, scikit-learn, and openpyxl for
 `.xlsx`. A snapshot file has no outcomes, so roll-rate / exit checks are SKIPPED; the Spark
@@ -350,7 +350,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `METHODOLOGY.md`
-sha256 `0fec7f3f70043efa4f79ecd65510f2e71497cd3ec6f7a5e71286378d9fe5fc75` · 476 lines · trailing newline: yes
+sha256 `fc088fb13d907bc226146164e6f2ef86ba44ec607ece488ed887bb00d8a94f57` · 478 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — methodology
@@ -400,8 +400,10 @@ Design rules agreed with the business owner:
   re-opened as a new account at their previous bucket.
 - **Reliable window: January 2024 onwards.** Older DPD history is unreliable, so every
   string is cropped to the newest months from `RELIABLE_FROM` (2024-01) to
-  `SNAPSHOT_MONTH` (2026-08) — **32 months** for the Aug 2026 sample (recomputed from the
-  two dates in `config.py`). Effects, all handled:
+  `SNAPSHOT_MONTH` (2026-08) — 32 months — or to the source's own fixed window if shorter
+  (`SOURCE_WINDOW_MONTHS`: the sign-off file is a **24-month** extract, so 24 applies). A
+  string that fills the whole window may have older history and is treated as cropped.
+  Effects, all handled:
   - EPD is unaffected: an EPD has at most 3 clean months plus a short straight roll, so its
     string is under 12 digits and never cropped. As a safety net, a cropped string can
     never be EPD (its oldest digit is no longer the first billed month).
@@ -886,7 +888,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `17aca49e87dd81a3f4b9f5549a299d18fb5f62d88ded84245db9b10255a5818e` · 240 lines · trailing newline: yes
+sha256 `b30091ce5c8868460f906b8141df62ca2a259bb44298f67fc2cf4f5086b5af3f` · 241 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -953,7 +955,8 @@ Task: run the package on our DPD-history file, without Spark.
    - the share of strings whose LEFTMOST digit is 4–7 (today's spine) and the
      distribution of the RIGHTMOST digit (should be mostly 0/1 = first billed month);
    - min / median / max string length (strings are cropped to the reliable window,
-     RELIABLE_FROM = 2024-01 to SNAPSHOT_MONTH = 2026-08 = 32 months, inside the package —
+     RELIABLE_FROM = 2024-01 to SNAPSHOT_MONTH = 2026-08, capped by SOURCE_WINDOW_MONTHS = 24
+     for the 24-month extract, inside the package —
      do not crop them yourself; if the snapshot month differs, update SNAPSHOT_MONTH);
    - any characters other than 0–9 (if so, list them with counts; do not guess a mapping).
 3. Optional columns: if the file (or another file I point you to) has any of the persona
@@ -1139,7 +1142,7 @@ sha256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` · 0 l
 `````
 
 ### FILE: `dpd_states/config.py`
-sha256 `d0dc44974896f1cda6baec3b3d944b8e5a432831370486d7468966b62d5e79ac` · 93 lines · trailing newline: yes
+sha256 `fe8b26df72b4c69fceab5f4533b749ae025369eec547f73c04f2f91595d87ed8` · 99 lines · trailing newline: yes
 
 `````python
 """Workplace configuration — the ONLY file that needs editing to run on real data.
@@ -1200,7 +1203,13 @@ def _months_between(first: str, last: str) -> int:
     return (y1 - y0) * 12 + (m1 - m0) + 1
 
 
-MAX_HISTORY_MONTHS = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
+# The source may itself be a fixed-length extract (the sign-off file pivots every account
+# onto a 24-month grid). A string that fills the whole window may have older history, so
+# it is treated as cropped (never EPD, never "history starts delinquent"). None = full history.
+SOURCE_WINDOW_MONTHS = 24
+
+_reliable = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
+MAX_HISTORY_MONTHS = min(x for x in (_reliable, SOURCE_WINDOW_MONTHS) if x) if (_reliable or SOURCE_WINDOW_MONTHS) else None   # 24
 
 # --- string conventions ------------------------------------------------------------------
 LEFTMOST_IS_CURRENT = True    # '54320002000': leftmost digit = current month's bucket
@@ -1623,7 +1632,7 @@ def state_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series | N
 `````
 
 ### FILE: `dpd_states/analysis.py`
-sha256 `c157a3300df8b897e6e50fb915b646b74b82e956f455a1d6cb182d05e4623955` · 567 lines · trailing newline: yes
+sha256 `dc3253e4579c594ce9c82fa60548f9934a7a2fec4946593d28f7ea890ac942ce` · 568 lines · trailing newline: yes
 
 `````python
 """Real-data analysis of deterioration states — pure pandas, no Spark.
@@ -1719,11 +1728,12 @@ def parse_flag(x: pd.Series) -> tuple[pd.Series, float]:
 
 
 def crop_history(s: pd.Series, max_len: int | None) -> tuple[pd.Series, pd.Series]:
-    """Keep the newest max_len months (leftmost digits) — history older than the reliable
-    window is dropped. Returns (cropped strings, truncated flag)."""
+    """Keep the newest max_len months (leftmost digits) — history older than the window is
+    dropped. A string that fills the whole window may have older history, so it is flagged
+    as cropped too (>=). Returns (cropped strings, cropped flag)."""
     if not max_len:
         return s, pd.Series(False, index=s.index)
-    return s.str[:max_len], s.str.len() > max_len
+    return s.str[:max_len], s.str.len() >= max_len
 
 
 def _spells(s: str, from_bucket: int, how: str) -> int:
@@ -3586,7 +3596,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `3ba4e16696e6222abfa841597279edede5dcd4dcce344839cacb9aae16e85450` · 237 lines · trailing newline: yes
+sha256 `306ae394f71b8449818740ac4a5328bb01274decb5c4603593cb9db7cd47d9ff` · 237 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -3736,7 +3746,7 @@ python docs/deterioration_states/run.py selftest
 
 # 4. validate on the real file                      -> checks + state shares
 #    reads data/input/dpd_synthetic_data.xlsx, column dpd_history_str (config.py),
-#    crops to the reliable window (2024-01 .. 2026-08 = 32 months), keeps buckets 4-7
+#    crops to the history window (reliable from 2024-01; 24-month extract -> 24), keeps buckets 4-7
 python docs/deterioration_states/run.py validate
 #    another file and/or sample size:
 #    python docs/deterioration_states/run.py validate data/input/other_file.xlsx 50000

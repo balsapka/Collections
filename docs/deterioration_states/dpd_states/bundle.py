@@ -145,7 +145,7 @@ python docs/deterioration_states/run.py selftest
 
 # 4. validate on the real file                      -> checks + state shares
 #    reads data/input/dpd_synthetic_data.xlsx, column dpd_history_str (config.py),
-#    crops to the reliable window (2024-01 .. 2026-08 = 32 months), keeps buckets 4-7
+#    crops to the history window (reliable from 2024-01; 24-month extract -> 24), keeps buckets 4-7
 python docs/deterioration_states/run.py validate
 #    another file and/or sample size:
 #    python docs/deterioration_states/run.py validate data/input/other_file.xlsx 50000
