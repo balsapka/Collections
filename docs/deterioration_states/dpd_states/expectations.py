@@ -213,6 +213,14 @@ EXPECTATIONS = [
      lambda R: (_partial(R) or {}).get("still_partial"), lambda v: v <= 0.75, "<= 75%", "WARN",
      "Synthetic 63%: unstable current-behaviour state.",
      "If it is stable on real data, reconsider Q3 — but it remains credibility's 'money in'."),
+    ("E26", "Stabilized bounce-backs: ever-stabilized accounts that left and came back within k months",
+     lambda R: R["backtest"]["stabilized_flips"]["with_long_run_clause"]["bounce_back_share_of_ever_stabilized"],
+     lambda v: v <= 0.10, "<= 10%", "WARN",
+     "Synthetic ~5–7% with the long-run clause vs ~8% on the bank's rule alone; oscillating "
+     "payers bounce 41% less. Remaining bounces are mostly staircases (hold, step, hold) "
+     "and swingers in their first 6 months at 4 (both rules are reported).",
+     "Too many accounts bounce: look at examples; consider stabilized_long_run_max_rise = 2 "
+     "or a sticky rule — but both widen the definition, so agree it with the business."),
     ("E25", "INFO — spread of exit-within-k across fixed states (option B)",
      _spread, None, "report", "INFO",
      "Synthetic data cannot show this (same post-4 dynamics by construction).",

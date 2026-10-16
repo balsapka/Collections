@@ -112,6 +112,7 @@ def journey_features(dpd: str) -> dict:
         # current spell
         "spell_len": int(sp_end - sp_start),
         "max_hold_run": int(max(hold_runs, default=0)),
+        "months_since_4": int(months_since_4),          # months in buckets 4+ this spell
         "post4_paid_rate": float(paid[first4:].mean()) if months_since_4 > 0 else 0.0,
         # recent behaviour (rates within the current spell, last 6 months)
         "rec_roll_rate": float((w_c == R).mean()) if len(w_c) else 1.0,

@@ -43,13 +43,15 @@ def realism(f: pd.DataFrame, st: pd.Series) -> str:
     one3 = (f.dpd_string.map(lambda s: _spells(s, 3)) == 1).mean()
     one4 = (f.dpd_string.map(lambda s: _spells(s, 4)) == 1).mean()
     bust = (st == "early_payment_default").mean()
-    stab = (st == "stabilized").mean()
+    stab = ((f.last6_in_band >= 5) & (st != "early_payment_default")).mean()
+    stab_clause = (st == "stabilized").mean()
     rows = [(f"Monthly roll rate at {b}", f"{synth.ROLL_TARGET[b]:.0%}", f"{rr[b]:.0%}") for b in synth.SPINE]
     rows += [
         ("One spell only (spell from bucket 3)", "~85%", f"{one3:.0%}"),
         ("One spell only (spell from bucket 4)", "~85%", f"{one4:.0%}"),
         ("EPD ('bust-out') share", "6%", f"{bust:.1%}"),
         ("Stabilized share (your 5/6 rule, after EPD)", "6%", f"{stab:.1%}"),
+        ("Stabilized share incl. long-run clause", "—", f"{stab_clause:.1%}"),
         ("Never paid since reaching 4", "majority (90% 'overkill')", f"{1 - f.paid_after_4_so_far.mean():.0%}"),
     ]
     t = pd.DataFrame(rows, columns=["check", "your book", "synthetic"])

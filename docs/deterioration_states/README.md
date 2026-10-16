@@ -24,7 +24,7 @@ deterioration_states/
 │   ├── discover.py           shapes, n-gram motifs, clustering helpers
 │   ├── synth.py              calibrated synthetic generator (method validation only)
 │   ├── run_synthetic.py      method validation report  → validation/
-│   └── selftest.py           real-data code path on synthetic data → validation/
+│   └── selftest.py           real-data code path on synthetic data + 14 edge-case regressions → validation/
 ├── snippets/
 │   └── dpd_states_validate.py   PROD entry point: main(catalog, model_id=None, ...)
 ├── validation/               evidence from synthetic runs (committed)

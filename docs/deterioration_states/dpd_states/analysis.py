@@ -117,6 +117,36 @@ def backtest_scorecard(f: pd.DataFrame, state: pd.Series, state_next: pd.Series)
     return out.loc[order(out.index)]
 
 
+def stabilized_flips(latest: pd.Series, k: int, spine, n: int = 10_000, seed: int = 7) -> dict:
+    """Month-by-month stabilized status over the k backtest months, for a sample of the
+    backtest population. A 'bounce-back' is an account that LEFT stabilized and later came
+    BACK while staying in the spine (S . S). Entering once and leaving once (. S S .) is a
+    normal lifecycle and is not counted. Reported with and without the long-run clause."""
+    latest = latest[latest.str.len() > k]
+    latest = latest.sample(min(n, len(latest)), random_state=seed)
+    rows = [{"acct": i, "j": j, "dpd_string": s_[k - j:]}
+            for i, s_ in latest.items() for j in range(k + 1)]
+    panel = pd.DataFrame(rows)
+    panel = panel[panel.dpd_string.str[0].astype(int).isin(spine)]
+    pf = build_features(panel)
+    out = {"n_accounts": int(latest.size)}
+    for name, kw in (("with_long_run_clause", {}), ("bank_rule_only", {"stabilized_long_run_months": None})):
+        st = (assign_states(pf, **OPTIONS[RECOMMENDED], **kw) == "stabilized")
+        g = pf.assign(stab=st).sort_values(["acct", "j"])
+        cons = g.groupby("acct").j.diff() == 1
+        prev = g.groupby("acct").stab.shift(1, fill_value=False).astype(bool)
+        left = cons & prev & ~g.stab
+        left_before = left.groupby(g.acct).cumsum() - left
+        back = cons & ~prev & g.stab & (left_before > 0)
+        bounced = back.groupby(g.acct).any()
+        changes = (cons & (prev != g.stab)).groupby(g.acct).sum()
+        ever = g.groupby("acct").stab.any()
+        out[name] = {"ever_stabilized": float(ever.mean()),
+                     "bounce_back_share_of_ever_stabilized": float(bounced[ever].mean()) if ever.any() else None,
+                     "mean_status_changes_per_account": float(changes.mean())}
+    return out
+
+
 # --- main ----------------------------------------------------------------------------
 
 def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 7):
@@ -235,6 +265,13 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
             card = backtest_scorecard(bt, assign_states(bt, **kw), assign_states(nf, **kw))
             R["backtest"]["scorecards"][o] = _records(card)
             parts.append(f"### {o}\n\n" + md(card))
+        flips = stabilized_flips(s2[ok2], k, spine, seed=seed)
+        R["backtest"]["stabilized_flips"] = flips
+        parts.append(f"### Stabilized bounce-backs over the {k} backtest months "
+                     f"({flips['n_accounts']:,} accounts)\n\nShare of ever-stabilized accounts that left "
+                     "stabilized and came back while staying in the spine (S . S):\n\n"
+                     + md(pd.DataFrame({kk: v for kk, v in flips.items() if isinstance(v, dict)}).T
+                          .rename_axis("stabilized rule")))
         M.append("\n\n".join(parts))
     else:
         R["backtest"] = "SKIPPED (no latest-month strings for the backtest population)"

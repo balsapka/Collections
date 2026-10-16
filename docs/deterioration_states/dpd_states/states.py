@@ -6,8 +6,9 @@ switched on per option (A / B / C) and never break MECE.
     Q1  Early payment default?  <=3 months of history before this spell (at most one
                                 blip inside it, no earlier real spell), run-up to 4
                                 took <=3 months                -> early_payment_default
-    Q2  Stabilized?             5 of the last 6 months within today's
-                                bucket ±1                      -> stabilized
+    Q2  Stabilized?             5 of the last 6 months within today's bucket ±1,
+                                OR (>= 6 months in buckets 4+ AND at most 1 bucket
+                                higher than 6 months ago)      -> stabilized
     Q3  Paying since 4?         [tested, NOT recommended] paid >= half a month's
                                 due per month since first reaching 4 -> paying_since_4
     Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3 and cured
@@ -36,6 +37,12 @@ DEFAULTS = {
     "epd_max_blips": 1,             # at most one blip (1–2 months at 2, paid off) in that history
     "straight_max_runup": 3,        # months from last clean month to first month at 4
     "stabilized_min_in_band": 5,    # of the last 6 months within today's bucket ±1
+    # Long-run clause: an account that has stayed in buckets 4+ for 6 months while rising
+    # at most one bucket has paid roughly what was due, even if unevenly (oscillating
+    # payers, accounts that just paid down). Straight rollers cannot meet it: they leave
+    # the spine within ~4 months. None disables it.
+    "stabilized_long_run_months": 6,
+    "stabilized_long_run_max_rise": 1,
     # Q3 tested and NOT recommended: unstable (~37% leave it each month), drags the
     # stability of other states to ~90%, barely separates risk, and is mostly the
     # credibility axis's 'money coming in'. Kept only so the test can be repeated.
@@ -76,7 +83,9 @@ REMARKS = {
                              "'bust-out' internally — but classic bust-out fraud (good history, limit "
                              "build-up, then max-out) shows as a seasoned straight roller and needs a "
                              "fraud overlay on spend data.",
-    "stabilized": "The bank's existing stabilized rule; roll-rate 'stay' behaviour.",
+    "stabilized": "The bank's 5-of-6 stabilized rule, plus a long-run clause (6+ months in "
+                  "buckets 4+, at most one bucket higher than 6 months ago) so oscillating "
+                  "payers and accounts that just paid down are not mislabelled.",
     "paying_since_4": "Rejected — current-behaviour state that belongs to credibility (money coming in).",
     "repeat_delinquent": "Re-default after a cured spell; collections 'recidivism'.",
     "straight_roller": "Rolled through every bucket without paying.",
@@ -100,7 +109,11 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
 
     add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])
         & (f.n_prior_episodes == 0) & fast, "early_payment_default")
-    add(f.last6_in_band >= p["stabilized_min_in_band"], "stabilized")
+    stab = f.last6_in_band >= p["stabilized_min_in_band"]
+    if p["stabilized_long_run_months"] is not None:
+        stab |= ((f.months_since_4 >= p["stabilized_long_run_months"])
+                 & (f.chg_6m <= p["stabilized_long_run_max_rise"]))
+    add(stab, "stabilized")
     if p["paying_since_4_min_rate"] is not None:
         add(f.post4_paid_rate >= p["paying_since_4_min_rate"], "paying_since_4")
     if p["repeat_min_prior_peak"] is not None:

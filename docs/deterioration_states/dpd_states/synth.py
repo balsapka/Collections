@@ -202,14 +202,34 @@ def stabilized(rng) -> list[int]:
     return path
 
 
+def oscillating_payer(rng) -> list[int]:
+    """0 0 … 2 3 4 4 4 3 3 4 5 4 3 3 4 5 6 5 5 4 — reaches 4, then swings between 3 and 6
+    for a year or more: misses a few months, catches up 2 months at once, misses again.
+    Pays roughly what is due on average, just unevenly. Uncommon (the bank's edge cases)."""
+    path = _normal(rng, _tenure(rng, lo=6))
+    _roll_to(path, 4)
+    for _ in range(int(rng.integers(10, 30))):
+        b, u = path[-1], rng.random()
+        if u < 0.40 and b < 6:
+            path.append(b + 1)                    # missed a month
+        elif u < 0.70 and b > 3:
+            path.append(b - 1)                    # caught up two months
+        else:
+            path.append(b)                        # paid one month
+    _roll_to(path, 4)
+    _post4(path, rng)
+    return path
+
+
 # Inflow weights tuned so the spine shows bust-out ~6% and stabilized ~6% (the bank's
 # actual shares under its own rules) while roll rates still hit ROLL_TARGET.
 ARCHETYPES = {                      # name: (share of INFLOW into bucket 4, generator)
     "bust_out": (0.055, bust_out),
-    "stabilized": (0.008, stabilized),
+    "stabilized": (0.006, stabilized),
     "clean_abrupt_shock": (0.42, clean_abrupt_shock),
     "slow_slide": (0.08, slow_slide),
     "staircase": (0.008, staircase),
+    "oscillating_payer": (0.004, oscillating_payer),
     "repeat_episodes": (0.16, repeat_episodes),
     "dip_and_roll": (0.10, dip_and_roll),
     "volatile": (0.10, volatile),

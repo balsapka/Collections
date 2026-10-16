@@ -89,7 +89,8 @@ Q1  Early payment default?  <= 3 months of history before this spell
                             earlier real spell) AND run-up to 4 took <= 3 months
                                                            -> early_payment_default
 Q2  Stabilized?             >= 5 of the last 6 months within today's bucket ±1
-                                                           -> stabilized
+                            OR (>= 6 months in buckets 4+ AND at most 1 bucket
+                                higher than 6 months ago)  -> stabilized
 Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3 and cured
                                                            -> repeat_delinquent
 Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
@@ -114,7 +115,7 @@ Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 m
 | State (display name · `code`) | Reads as | Action flavour | Share *(synthetic)* |
 |---|---|---|---|
 | **Early payment default (EPD)** · `early_payment_default` | At most 3 months of history (one blip allowed), rolled straight in, never really paid | Early-risk / first-party-fraud review, early legal; no restructuring | 6% (bank: 6%) |
-| **Stabilized** · `stabilized` | Paying about one month's due each month for 5 of 6 months | **Offer restructuring to break the hardship** | 7% (bank: 6%) |
+| **Stabilized** · `stabilized` | Paying about one month's due each month for 5 of 6 months — or, after 6+ months in buckets 4+, still within one bucket of where it was 6 months ago (pays what is due on average, unevenly) | **Offer restructuring to break the hardship** | 8% (bank's rule alone: 7%; bank: 6%) |
 | **Repeat delinquent (re-default)** · `repeat_delinquent` | Has been here before and cured from bucket 3 | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 16% |
 | **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book (≥ 12 months clean), then rolled every month without paying | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 52% |
 | **Early-life straight roller** · `straight_roller_early_life` | 4–11 months on book, then rolled every month without paying | Same triage; also an underwriting signal for acquisition | 3% — below the 5% floor in synthetic data; the real share decides (E16) |
@@ -162,6 +163,7 @@ The names use established card-risk and collections terms, and follow two rules:
 | EPD earlier spells | **none; one blip allowed** | An early defaulter may pay off once, but only from bucket 2 (a blip) | `0 2 3 4 0 0 2 3 4 5 6` is therefore repeat delinquent, not EPD; two blips (`0 2 0 2 0 2 3 4`) is not EPD |
 | Straight-roller run-up (`straight_max_runup`) | **≤ 3 months** | The one sharp threshold: any single paid month on the way down makes it a slow roller | ≤ 4 moves ~70% of genuine slow rollers into straight roller |
 | Stabilized band (`stabilized_min_in_band`) | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%, persistence ~63%. 6 of 6: ~5%, ~32%, ~80% |
+| Stabilized long-run clause (`stabilized_long_run_months`, `stabilized_long_run_max_rise`) | **≥ 6 months in 4+, at most +1 bucket over 6 months** | Fixes the two edge cases in §6.15: oscillating payers and accounts that just paid down. Straight rollers cannot meet it (they leave the spine within ~4 months) | Adds ~1% of the spine to stabilized, which still rolls far less than the rest (~44% vs ~85% next month). +2 would take in slow drifters paying ~4 of 6 dues; `None` switches the clause off |
 | Repeat-delinquent depth (`repeat_min_prior_peak`) | **earlier spell reached 3** | The bank counts ~85% single-spell; spells from 3 give 83% *(synthetic)* | From 2: 19%. From 4: 5% (cures from 4+ are rare) |
 | Seasoned (`seasoned_min_months`) | **≥ 12 months** | Business definition (agreed): the first year on book is the standard early-life window. EPD already takes ≤ 3 months, so early life = 4–11 months | *Synthetic:* 12 m gives early life only 3.4% (below the 5% floor), 18 m 7%, 24 m 11%, 36 m 20% — but these shares come from the generator's assumed tenure distribution, so the real share decides (E16) |
 
@@ -271,7 +273,36 @@ business definition: **≤ 3 months, at most one blip**. Under it the generator 
 5.8% EPD; every planted early defaulter is caught, and 93% of the state is a planted
 early defaulter (79% under the old 6-month rule).
 
-### 6.15 Seasoned / early-life split in option A
+### 6.15 Stabilized measured only around today's bucket (edge cases)
+The bank's rule — 5 of the last 6 months within ±1 of **today's** bucket — misreads two
+uncommon but real histories (oldest → newest, today is the last digit):
+
+- **Oscillating payer** `0000 0000 2344 4334 5433 4565 54` — swings between 3 and 6 for over
+  a year, paying roughly what is due on average. The rule flipped it between stabilized and
+  "straight roller" **5 times in 16 months**; every time it left the band it was called a
+  straight roller, which it is not.
+- **Just paid down** `… 3 4 5 6 6 5 4` — paid two months twice (6 → 5 → 4). The band around
+  today's 4 excludes the two 6s, so the rule called it a straight roller *because* it paid.
+
+Fix adopted: the **long-run clause** (§5). Both cases are now stabilized from their sixth
+month at 4+ onwards; the only remaining dip is the single month at the top of a
+3-month roll (3 → 4 → 5 → 6), which is a fair description of that month. Rejected
+alternatives: allowing +2 over 6 months (takes in slow drifters), and a "sticky" rule
+that remembers last month's state (harder to explain and audit).
+
+Measured on synthetic data with oscillating payers added (1.2% of the spine): of the
+accounts ever stabilized during the 6 backtest months, the share that **left and came
+back** fell from ~8% (bank's rule) to ~5–7%, and oscillating payers bounced 41% less.
+The rest are staircases (hold, step up, hold) and swingers in their first 6 months at 4.
+Expectation E26 tracks this on real data. Both examples are permanent regression cases
+in the self-test.
+
+**Known limitation.** After an oscillating or stabilized account breaks out and rolls,
+its fixed state comes from the original run-up (often "straight roller"). That is by
+design — post-4 payment history belongs to credibility — but read "straight roller" as
+*how they fell in*, not *never paid since*.
+
+### 6.16 Seasoned / early-life split in option A
 Not in A because, in synthetic data, it adds no risk separation (both ~94–95% exit within
 6 months, by construction). It is in B/C for its action difference (life event vs
 underwriting signal). Real outcomes decide whether it earns its place.
@@ -325,8 +356,12 @@ outcomes (the snippet detects and warns).
 | E23 | One paid month matters (slow roller at run-up ≤ 4 / ≤ 3) | ≤ 0.70 | Most slow rollers held once |
 | E24 | "Paying since 4" stays rejected | persistence ≤ 75% | *Synthetic:* 63% |
 | E25 | INFO: exit spread across fixed states | report | Unknowable from synthetic |
+| E26 | Stabilized accounts that leave and come back within k months | ≤ 10% | *Synthetic:* ~5–7% (§6.15) |
 
-Every check carries an "if not met" action in the code and in the report.
+Every check carries an "if not met" action in the code and in the report. The self-test
+also runs 14 **edge cases** from the design discussion (EPD with a blip, six clean months,
+two blips, payoff from 4, staircase, both oscillating payers, …) and fails if any changes
+state.
 
 ### Choosing the option on real data
 1. Any **FAIL** → fix config/data first; read nothing else.
@@ -341,7 +376,7 @@ Every check carries an "if not met" action in the code and in the report.
 
 - **Calibrated generator** (`dpd_states/synth.py`): eight planted journey patterns
   (bust-out, clean abrupt shock, slow slide, staircase, stabilized, repeat episodes,
-  dip-and-roll, volatile); full lifecycles to exit; length-biased snapshot like a real
+  dip-and-roll, volatile) plus a rare oscillating payer (1.2% of the spine); full lifecycles to exit; length-biased snapshot like a real
   spine; payment holidays (frozen buckets) and billing-cycle +2 jumps; one continuous
   tenure distribution. Matches the bank's figures: roll rates 70/80/89/95% (target
   70/80/90/95%), EPD 5.8% (6%), stabilized 6.5% (6%), single spell 83% from bucket 3 (85%).
@@ -365,6 +400,8 @@ all three.
 2. Spell definition (from bucket 3 or 4) — E07 shows which matches the bank's 85%.
 3. EPD history threshold — confirm 3 months (one blip) against the bank's existing bust-out rule (E10).
 4. Payment holidays / restructurings — if flags exist, exclude frozen months before Q2.
+5. The long-run clause widens the bank's stabilized definition (+~1% of the spine) —
+   confirm it with the owners of the existing rule (E11 will show the agreement drop).
 
 ## Glossary
 

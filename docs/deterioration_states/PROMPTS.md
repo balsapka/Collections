@@ -114,7 +114,8 @@ Allowed without asking me:
 
 Allowed only after I approve, one at a time, each justified by a sweep table in the
 report (section 6) and the check's "if_not_met" text:
-- epd_max_history (sweep: epd_max_history), stabilized_min_in_band, repeat_min_prior_peak
+- epd_max_history (sweep: epd_max_history), stabilized_min_in_band,
+  stabilized_long_run_months / stabilized_long_run_max_rise (see E26), repeat_min_prior_peak
   (spell from 3 vs 4, see E07), seasoned_min_months.
 
 Not allowed: changing the tree structure, adding or removing states, editing
