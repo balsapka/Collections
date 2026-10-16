@@ -2,7 +2,9 @@
 
 One state per account, from the DPD bucket history alone, assigned by a short decision
 tree (MECE, no residual bucket). Three options: **A** (4 states), **B** (6, recommended),
-**C** (7). The design, thresholds, evidence and everything that was tried and dropped
+**C** (7). States use common card-risk names — early payment default (formerly
+"bust-out"), stabilized, repeat delinquent, seasoned / early-life straight roller, slow
+roller (partial payer); code names and display names are kept separate. The design, thresholds, evidence and everything that was tried and dropped
 are in **[METHODOLOGY.md](METHODOLOGY.md)**. Copy-paste prompts for running this at the
 workplace with Sonnet are in **[PROMPTS.md](PROMPTS.md)**.
 
@@ -16,7 +18,7 @@ deterioration_states/
 ├── dpd_states/               the package (pandas + numpy + scikit-learn; no Spark)
 │   ├── config.py             ← the ONLY file to edit: dataset + column names (<<FILL-IN>>)
 │   ├── features.py           string → encoding → journey features (clock-safe)
-│   ├── states.py             the state tree, options A/B/C, thresholds (DEFAULTS)
+│   ├── states.py             the state tree, options A/B/C, thresholds, DISPLAY_NAMES / REMARKS
 │   ├── analysis.py           real-data analysis: states, backtest, overlap, sweeps, clusters
 │   ├── expectations.py       E01–E25: expected values, PASS/WARN/FAIL, "if not met" actions
 │   ├── discover.py           shapes, n-gram motifs, clustering helpers
@@ -33,10 +35,11 @@ deterioration_states/
 
 ```python
 from dpd_states.features import build_features
-from dpd_states.states import assign_states, OPTIONS
+from dpd_states.states import assign_states, OPTIONS, DISPLAY_NAMES
 
 f = build_features(df)                                   # df has a 'dpd_string' column
 f["state"] = assign_states(f, **OPTIONS["B_balanced_6"])  # or A_minimal_4 / C_detailed_7
+f["state_label"] = f.state.map(DISPLAY_NAMES)             # business label for reports
 ```
 
 `dpd_string` must be digits only, **leftmost = current month**, 0 and 1 both mean normal.

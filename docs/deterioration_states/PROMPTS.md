@@ -64,8 +64,8 @@ Task: make docs/deterioration_states runnable in this repo, then run the dry run
    - DS_STRINGS_HAS_EXITED: False if the dataset only has today's spine
    - Optional columns, ONLY if they exist on the same dataset (or tell me they live
      elsewhere — do not build joins yet): credibility score and its three components,
-     ability score, reachability and in-country flags, the bank's existing bust-out and
-     stabilized flags, payment-holiday / restructuring flags. Flags must be 1/0.
+     ability score, reachability and in-country flags, the bank's existing bust-out
+     (= our early payment default) and stabilized flags, payment-holiday / restructuring flags. Flags must be 1/0.
 3. Fill in _resolve_model_id in snippets/dpd_states_validate.py with the real
    globals_dev accessor from this repo.
 4. Show me the diff of config.py and the snippet, then give me the notebook cell for
@@ -94,9 +94,9 @@ Task: run the full validation and interpret it against the written expectations.
       me, or nothing.
    c. The recommended option (B_balanced_6) scorecard from the backtest: share,
       roll_next_month, exit_8plus_within_k, same_state_next_month per state.
-   d. Orthogonality: the eta² table and holding-vs-money-in. Name the largest overlap.
+   d. Orthogonality: the eta² table and stabilized-vs-money-in. Name the largest overlap.
    e. Which option the data supports, using METHODOLOGY.md §8 "Choosing the option":
-      E19b (relapse vs credibility clean point), E17 (gradual split size), E22 (residual
+      E19b (repeat delinquent vs credibility clean point), E17 (slow-roller split size), E22 (residual
       clusters), E25 (outcome spread across the fixed states).
 4. Keep it factual: every number you quote must come from the output. Mark anything
    you infer as an inference.
@@ -114,8 +114,8 @@ Allowed without asking me:
 
 Allowed only after I approve, one at a time, each justified by a sweep table in the
 report (section 6) and the check's "if_not_met" text:
-- bust_max_history (sweep: bust_max_history), hold_min_in_band, relapse_min_prior_peak
-  (spell from 3 vs 4, see E07), established_min.
+- epd_max_history (sweep: epd_max_history), stabilized_min_in_band, repeat_min_prior_peak
+  (spell from 3 vs 4, see E07), seasoned_min_months.
 
 Not allowed: changing the tree structure, adding or removing states, editing
 expectations to make a check pass, using payment-promise / inflow / ability columns
@@ -131,8 +131,8 @@ re-run and compare old vs new check tables.
 ## P4 — Compare with the bank's existing bust-out and stabilized rules
 
 ```
-Task: compare this package's bust_out and holding with the bank's existing
-implementations.
+Task: compare this package's early_payment_default (the bank calls it bust-out) and
+stabilized with the bank's existing implementations.
 
 1. Find the existing bust-out and stabilized logic in this repo (search for
    "bust", "stabil", "dpd", pipeline nodes, SQL). List the files and quote the rules.
@@ -155,12 +155,14 @@ results/dpd_states_validation_<model_id>_<date>.json (and .md).
 
 Audience: risk managers, not data scientists. No code, no eta², no ARI.
 Structure:
-1. What the states are (one line each) and the action each points to — use the table
-   in METHODOLOGY.md §4, with the REAL shares from the results.
-2. What the backtest shows: which states roll, which hold, how stable they are month to
+1. What the states are (one line each) and the action each points to — use the display
+   names and the table in METHODOLOGY.md §4 (and §4.1 for the names: EPD was formerly
+   called bust-out; slow roller is also called partial payer), with the REAL shares from
+   the results.
+2. What the backtest shows: which states roll, which stay stabilized, how stable they are month to
    month — real numbers only.
 3. How this fits with locatability, ability and credibility: where it adds information
-   and where it overlaps (holding ↔ money coming in; relapse ↔ clean history).
+   and where it overlaps (stabilized ↔ money coming in; repeat delinquent ↔ clean history).
 4. The option we recommend (A/B/C) and why, in two sentences.
 5. Open decisions for the risk team (METHODOLOGY.md §10), as questions.
 Every number must come from the results file. Write it to
@@ -178,8 +180,9 @@ Task: add the deterioration state as a pipeline output, using the option I name:
 1. Follow this repo's existing pipeline patterns (find a comparable node and copy its
    structure, naming, catalog entries and tests). Do not invent conventions.
 2. The node takes the spine's DPD strings and returns: account key, snapshot date,
-   state, option name, and the five assignment features (months_before_spell,
-   max_prior_bucket, runup_len, runup_pays, last6_in_band) for auditability.
+   state code, display name (dpd_states.states.DISPLAY_NAMES), option name, and the
+   assignment features (months_before_spell, n_blips,
+   n_prior_episodes, max_prior_bucket, runup_len, runup_pays, last6_in_band) for auditability.
    Call dpd_states.features.build_features and dpd_states.states.assign_states — do not
    re-implement the logic. If the data is large, apply them per partition
    (mapInPandas / applyInPandas).

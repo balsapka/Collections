@@ -42,14 +42,14 @@ def realism(f: pd.DataFrame, st: pd.Series) -> str:
     rr = synth.roll_rates(f)
     one3 = (f.dpd_string.map(lambda s: _spells(s, 3)) == 1).mean()
     one4 = (f.dpd_string.map(lambda s: _spells(s, 4)) == 1).mean()
-    bust = (st == "bust_out").mean()
-    stab = (st == "holding").mean()
+    bust = (st == "early_payment_default").mean()
+    stab = (st == "stabilized").mean()
     rows = [(f"Monthly roll rate at {b}", f"{synth.ROLL_TARGET[b]:.0%}", f"{rr[b]:.0%}") for b in synth.SPINE]
     rows += [
         ("One spell only (spell from bucket 3)", "~85%", f"{one3:.0%}"),
         ("One spell only (spell from bucket 4)", "~85%", f"{one4:.0%}"),
-        ("Bust-out share", "6%", f"{bust:.1%}"),
-        ("Stabilized share (your 5/6 rule, after bust-out)", "6%", f"{stab:.1%}"),
+        ("EPD ('bust-out') share", "6%", f"{bust:.1%}"),
+        ("Stabilized share (your 5/6 rule, after EPD)", "6%", f"{stab:.1%}"),
         ("Never paid since reaching 4", "majority (90% 'overkill')", f"{1 - f.paid_after_4_so_far.mean():.0%}"),
     ]
     t = pd.DataFrame(rows, columns=["check", "your book", "synthetic"])
@@ -74,65 +74,65 @@ def sweep(f: pd.DataFrame, nx: pd.DataFrame) -> str:
 
     rows = []
     for v in (2, 3, 4, 6, 9, 12):
-        s = assign_states(f, bust_max_history=v)
-        b = s == "bust_out"
-        rows.append({"bust_max_history": v, "bust_share": b.mean(), "exit_6m": f.exit_6m[b].mean(),
+        s = assign_states(f, epd_max_history=v)
+        b = s == "early_payment_default"
+        rows.append({"epd_max_history": v, "epd_share": b.mean(), "exit_6m": f.exit_6m[b].mean(),
                      "planted_bustouts_caught": b[planted == "bust_out"].mean(),
                      "share_of_state_planted_bustout": (planted[b] == "bust_out").mean()})
-    out.append("### Q1 bust-out — months of history before the spell\n\n" + md(pd.DataFrame(rows)))
+    out.append("### Q1 early payment default (EPD) — months of history before the spell\n\n" + md(pd.DataFrame(rows)))
 
     rows = []
     for band in (4, 5, 6):
-        s = assign_states(f, hold_min_in_band=band)
-        h = s == "holding"
-        s2 = assign_states(nx, hold_min_in_band=band)
+        s = assign_states(f, stabilized_min_in_band=band)
+        h = s == "stabilized"
+        s2 = assign_states(nx, stabilized_min_in_band=band)
         held = h.loc[nx.index]
-        rows.append({"min_in_band (of 6)": band, "holding_share": h.mean(),
+        rows.append({"min_in_band (of 6)": band, "stabilized_share": h.mean(),
                      "roll_next_month": (f.next_bucket[h] >= f.b_now[h] + 1).mean(),
                      "exit_6m": f.exit_6m[h].mean(),
-                     "still_holding_next_month": (s2[held[held].index] == "holding").mean(),
+                     "still_stabilized_next_month": (s2[held[held].index] == "stabilized").mean(),
                      "payment_holiday_share": f.had_holiday[h].mean(),
                      "planted_stabilizers_caught": h[planted == "stabilized"].mean()})
-    out.append("### Q2 holding — months within today's bucket ±1 (of the last 6)\n\n" + md(pd.DataFrame(rows)))
+    out.append("### Q2 stabilized — months within today's bucket ±1 (of the last 6)\n\n" + md(pd.DataFrame(rows)))
 
     rows = []
     for v in (0.34, 0.5, 0.67):
-        kw = {**OPTIONS["C_detailed_7"], "partial_min_paid_rate": v}
+        kw = {**OPTIONS["C_detailed_7"], "paying_since_4_min_rate": v}
         s, s2 = assign_states(f, **kw), assign_states(nx, **kw)
-        m = s == "partial_payer"
+        m = s == "paying_since_4"
         mm = m.loc[nx.index]
-        others = ~s.isin(["holding", "partial_payer"])
-        rows.append({"partial_min_paid_rate": v, "share": m.mean(),
+        others = ~s.isin(["stabilized", "paying_since_4"])
+        rows.append({"paying_since_4_min_rate": v, "share": m.mean(),
                      "roll_next_month": (f.next_bucket[m] >= f.b_now[m] + 1).mean(),
-                     "still_partial_next_month": (s2[mm[mm].index] == "partial_payer").mean(),
+                     "still_paying_since_4_next_month": (s2[mm[mm].index] == "paying_since_4").mean(),
                      "paid_in_last_3m": f.paid_any_3m[m].mean(),
                      "stability_of_other_states": (s.loc[nx.index][others.loc[nx.index]]
                                                    == s2[others.loc[nx.index]]).mean()})
-    out.append("### Q3 partial payer (tested, not recommended) — months paid per month since 4\n\n"
+    out.append("### Q3 paying since 4 (tested, not recommended) — months paid per month since 4\n\n"
                + md(pd.DataFrame(rows)))
 
     rows = []
     for v in (2, 3, 4):
-        s = assign_states(f, **{**OPTIONS[RECOMMENDED], "relapse_min_prior_peak": v})
-        rows.append({"earlier spell reached bucket": v, "relapse_share": (s == "relapse").mean()})
-    out.append("### Q4 relapse — how deep the earlier spell must have gone\n\n" + md(pd.DataFrame(rows)))
+        s = assign_states(f, **{**OPTIONS[RECOMMENDED], "repeat_min_prior_peak": v})
+        rows.append({"earlier spell reached bucket": v, "repeat_share": (s == "repeat_delinquent").mean()})
+    out.append("### Q4 repeat delinquent — how deep the earlier spell must have gone\n\n" + md(pd.DataFrame(rows)))
 
     rows = []
     for v in (3, 4, 5):
-        s = assign_states(f, sudden_max_runup=v)
-        g = s == "gradual_decline"
-        rows.append({"sudden_max_runup": v, "sudden_share": (s == "sudden_decline").mean(),
-                     "gradual_share": g.mean(),
-                     "slow_slides_in_gradual": g[planted == "slow_slide"].mean(),
-                     "abrupt_in_sudden": (s[planted == "clean_abrupt_shock"] == "sudden_decline").mean()})
-    out.append("### Q5 sudden vs gradual — max run-up months\n\n" + md(pd.DataFrame(rows)))
+        s = assign_states(f, straight_max_runup=v)
+        g = s == "slow_roller"
+        rows.append({"straight_max_runup": v, "straight_share": (s == "straight_roller").mean(),
+                     "slow_share": g.mean(),
+                     "slow_slides_in_slow_roller": g[planted == "slow_slide"].mean(),
+                     "abrupt_in_straight": (s[planted == "clean_abrupt_shock"] == "straight_roller").mean()})
+    out.append("### Q5 straight vs slow roller — max run-up months\n\n" + md(pd.DataFrame(rows)))
 
     rows = []
     for v in (12, 18, 24, 36):
-        s = assign_states(f, **{**OPTIONS[RECOMMENDED], "established_min": v})
-        rows.append({"established_min": v, "established": (s == "sudden_established").mean(),
-                     "early_life": (s == "sudden_early_life").mean()})
-    out.append("### Q5 split — months of history before the spell (established vs early-life)\n\n"
+        s = assign_states(f, **{**OPTIONS[RECOMMENDED], "seasoned_min_months": v})
+        rows.append({"seasoned_min_months": v, "seasoned": (s == "straight_roller_seasoned").mean(),
+                     "early_life": (s == "straight_roller_early_life").mean()})
+    out.append("### Q5 split — months of history before the spell (seasoned vs early-life straight roller)\n\n"
                + md(pd.DataFrame(rows)))
     return "\n\n".join(out)
 
@@ -143,10 +143,10 @@ RESIDUAL_FEATURES = ["months_before_spell", "n_blips", "n_prior_episodes", "max_
 
 
 def residual_clusters(f: pd.DataFrame, options: dict[str, pd.Series]) -> str:
-    """Cluster only what is left after bust-out and holding, and see which option's
+    """Cluster only what is left after EPD and stabilized, and see which option's
     residual states the natural groups agree with."""
     base = assign_states(f)
-    res = ~base.isin(["bust_out", "holding"])
+    res = ~base.isin(["early_payment_default", "stabilized"])
     r = f[res]
     X = r[RESIDUAL_FEATURES].astype(float).copy()
     for c in ("months_before_spell", "clean_gap_before_current", "runup_len"):
@@ -172,7 +172,7 @@ def residual_clusters(f: pd.DataFrame, options: dict[str, pd.Series]) -> str:
         "median_paid_rate_since_4": g.post4_paid_rate.median(),
         "top_state_option_C": g.apply(lambda x: options["C_detailed_7"][x.index].value_counts().index[0]),
     }).sort_values("share_of_spine", ascending=False)
-    return ("## C. Clustering the residual (after bust-out and holding)\n\n"
+    return ("## C. Clustering the residual (after EPD and stabilized)\n\n"
             f"Residual = {res.mean():.0%} of the spine. Agreement (ARI) between k-means clusters and each "
             "option's residual states:\n\n" + md(pd.DataFrame(rows), floatfmt="{:.2f}")
             + "\n\nk = 6 cluster profiles:\n\n" + md(prof, index=True))

@@ -24,7 +24,8 @@ import pandas as pd
 
 from . import discover as dv
 from .features import build_features, encode, _runs
-from .states import OPTIONS, RECOMMENDED, FIXED_STATES, assign_states, order
+from .states import (DISPLAY_NAMES, FIXED_STATES, OPTIONS, RECOMMENDED, REMARKS,
+                     assign_states, order)
 
 
 # --- helpers ---------------------------------------------------------------------
@@ -147,6 +148,10 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
         "bucket_mix": {int(b): float(v) for b, v in f.b_now.value_counts(normalize=True).sort_index().items()},
     }
     R["data_quality"] = dq
+    R["state_names"] = {s: {"display": DISPLAY_NAMES[s], "remark": REMARKS[s]} for s in DISPLAY_NAMES}
+    M.append("## State names\n\n" + md(pd.DataFrame(
+        [{"code": s, "display name": DISPLAY_NAMES[s], "remark": REMARKS[s]} for s in DISPLAY_NAMES]),
+        index=False))
     M.append("## 1. Data quality and population\n\n" + md(pd.Series(dq, name="value").rename_axis("metric").to_frame()))
 
     # ---- states today, all options ----------------------------------------------
@@ -171,7 +176,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
 
     # ---- agreement with the bank's existing rules -------------------------------
     agree = {}
-    for col, ours in (("existing_bust_out", "bust_out"), ("existing_stabilized", "holding")):
+    for col, ours in (("existing_bust_out", "early_payment_default"), ("existing_stabilized", "stabilized")):
         if col in f and f[col].notna().any():
             theirs = pd.to_numeric(f[col], errors="coerce").fillna(0).astype(bool)
             mine = f.state == ours
@@ -179,7 +184,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
                            "recall_of_theirs": float((mine & theirs).sum() / max(theirs.sum(), 1)),
                            "precision_vs_theirs": float((mine & theirs).sum() / max(mine.sum(), 1))}
     R["existing_rule_agreement"] = agree or "SKIPPED (no existing rule columns configured)"
-    M.append("## 3. Agreement with the bank's existing bust-out / stabilized rules\n\n"
+    M.append("## 3. Agreement with the bank's existing EPD ('bust-out') / stabilized rules\n\n"
              + (md(pd.DataFrame(agree).T.rename_axis("state")) if agree else "_Skipped — no existing rule columns configured._"))
 
     # ---- overlap with the other persona axes ------------------------------------
@@ -197,17 +202,17 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
         txt = "_No axis columns configured — using the DPD proxy for 'money coming in' only._"
     money = "cred_money_in_points" if "cred_money_in_points" in axes else None
     paid_now = (pd.to_numeric(f[money], errors="coerce") > 0) if money else f.paid_any_3m
-    hold = f.state == "holding"
-    ov["holding_vs_money_in"] = {"source": money or "DPD proxy (paid >= 1 month in last 3)",
-                                 "holders_with_money_in": float(paid_now[hold].mean()) if hold.any() else None,
-                                 "non_holders_with_money_in": float(paid_now[~hold].mean())}
+    hold = f.state == "stabilized"
+    ov["stabilized_vs_money_in"] = {"source": money or "DPD proxy (paid >= 1 month in last 3)",
+                                    "stabilized_with_money_in": float(paid_now[hold].mean()) if hold.any() else None,
+                                    "others_with_money_in": float(paid_now[~hold].mean())}
     flags = {c: float(pd.to_numeric(f.loc[hold, c], errors="coerce").fillna(0).astype(bool).mean())
              for c in cfg.FLAG_COLS if c in f and f[c].notna().any()}
-    ov["holding_flagged"] = flags
+    ov["stabilized_flagged"] = flags
     R["overlap_other_axes"] = ov
-    M.append("## 4. Overlap with the other persona axes\n\n" + txt + "\n\nHolding vs money coming in:\n\n"
-             + md(pd.Series(ov["holding_vs_money_in"], name="value").rename_axis("metric").to_frame())
-             + ("\n\nShare of holders carrying a data flag (frozen bucket, not a payment):\n\n"
+    M.append("## 4. Overlap with the other persona axes\n\n" + txt + "\n\nStabilized vs money coming in:\n\n"
+             + md(pd.Series(ov["stabilized_vs_money_in"], name="value").rename_axis("metric").to_frame())
+             + ("\n\nShare of stabilized accounts carrying a data flag (frozen bucket, not a payment):\n\n"
                 + md(pd.Series(flags, name="share").to_frame()) if flags else ""))
 
     # ---- backtest: outcomes and stability ----------------------------------------
@@ -248,42 +253,42 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
 
     rows = []
     for v in (2, 3, 4, 6, 9, 12):
-        st = assign_states(base, bust_max_history=v)
-        b_ = st == "bust_out"
-        rows.append({"bust_max_history": v, "share": b_.mean(),
+        st = assign_states(base, epd_max_history=v)
+        b_ = st == "early_payment_default"
+        rows.append({"epd_max_history": v, "share": b_.mean(),
                      "exit_within_k": base.exit_k[b_].mean() if bt is not None else None})
-    sw["bust_max_history"] = rows
+    sw["epd_max_history"] = rows
     rows = []
     for v in (4, 5, 6):
-        st = assign_states(base, hold_min_in_band=v)
-        h = st == "holding"
-        rows.append({"hold_min_in_band": v, "share": h.mean(),
+        st = assign_states(base, stabilized_min_in_band=v)
+        h = st == "stabilized"
+        rows.append({"stabilized_min_in_band": v, "share": h.mean(),
                      "roll_next_month": (base.next_bucket[h] >= base.b_now[h] + 1).mean() if bt is not None else None,
-                     "still_holding_next_month": _stay({"hold_min_in_band": v}, "holding")})
-    sw["hold_min_in_band"] = rows
+                     "still_stabilized_next_month": _stay({"stabilized_min_in_band": v}, "stabilized")})
+    sw["stabilized_min_in_band"] = rows
     rows = []
     for v in (2, 3, 4):
-        st = assign_states(base, **{**OPTIONS[RECOMMENDED], "relapse_min_prior_peak": v})
-        rows.append({"relapse_min_prior_peak": v, "share": (st == "relapse").mean()})
-    sw["relapse_min_prior_peak"] = rows
+        st = assign_states(base, **{**OPTIONS[RECOMMENDED], "repeat_min_prior_peak": v})
+        rows.append({"repeat_min_prior_peak": v, "share": (st == "repeat_delinquent").mean()})
+    sw["repeat_min_prior_peak"] = rows
     rows = []
     for v in (3, 4, 5):
-        st = assign_states(base, sudden_max_runup=v)
-        rows.append({"sudden_max_runup": v, "sudden_share": (st == "sudden_decline").mean(),
-                     "gradual_share": (st == "gradual_decline").mean()})
-    sw["sudden_max_runup"] = rows
+        st = assign_states(base, straight_max_runup=v)
+        rows.append({"straight_max_runup": v, "straight_share": (st == "straight_roller").mean(),
+                     "slow_share": (st == "slow_roller").mean()})
+    sw["straight_max_runup"] = rows
     rows = []
     for v in (12, 18, 24, 36):
-        st = assign_states(base, **{**OPTIONS[RECOMMENDED], "established_min": v})
-        rows.append({"established_min": v, "established": (st == "sudden_established").mean(),
-                     "early_life": (st == "sudden_early_life").mean()})
-    sw["established_min"] = rows
+        st = assign_states(base, **{**OPTIONS[RECOMMENDED], "seasoned_min_months": v})
+        rows.append({"seasoned_min_months": v, "seasoned": (st == "straight_roller_seasoned").mean(),
+                     "early_life": (st == "straight_roller_early_life").mean()})
+    sw["seasoned_min_months"] = rows
     rows = []
     for v in (0.34, 0.5, 0.67):
-        kw = {**OPTIONS["C_detailed_7"], "partial_min_paid_rate": v}
+        kw = {**OPTIONS["C_detailed_7"], "paying_since_4_min_rate": v}
         st = assign_states(base, **kw)
-        row = {"partial_min_paid_rate": v, "share": (st == "partial_payer").mean(),
-               "still_partial_next_month": _stay(kw, "partial_payer")}
+        row = {"paying_since_4_min_rate": v, "share": (st == "paying_since_4").mean(),
+               "still_paying_since_4_next_month": _stay(kw, "paying_since_4")}
         if nb is not None:
             st2 = assign_states(nb, **kw)
             fixed = st.loc[nb.index].isin(FIXED_STATES)
@@ -293,7 +298,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
             fx0 = a0.isin(FIXED_STATES)
             row["stability_of_fixed_states_without_q3"] = float((a0[fx0] == b0[fx0]).mean())
         rows.append(row)
-    sw["partial_payer_test"] = rows
+    sw["paying_since_4_test"] = rows
     R["sweeps"] = {kk: [{a: (round(b, 4) if isinstance(b, float) else b) for a, b in r.items()} for r in v]
                    for kk, v in sw.items()}
     M.append("## 6. Threshold sweeps (" + ("backtest population" if bt is not None else "current spine")
@@ -303,7 +308,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
     from sklearn.cluster import KMeans
     from sklearn.preprocessing import StandardScaler
     a_states = opts["A_minimal_4"]
-    res = ~a_states.isin(["bust_out", "holding"])
+    res = ~a_states.isin(["early_payment_default", "stabilized"])
     r = f[res]
     if len(r) > 30_000:
         r = r.sample(30_000, random_state=seed)
@@ -319,7 +324,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, seed: int = 
         lab = KMeans(kk, n_init=10, random_state=seed).fit_predict(X)
         rows.append({"k": kk, **{f"agree_{o}": _ari(lab, st.loc[r.index]) for o, st in opts.items()}})
     R["residual_cluster_agreement"] = rows
-    M.append("## 7. Clustering the residual (after bust-out and holding) — agreement (ARI) with "
+    M.append("## 7. Clustering the residual (after EPD and stabilized) — agreement (ARI) with "
              "each option\n\n" + md(pd.DataFrame(rows), index=False))
 
     # ---- shapes and motifs ---------------------------------------------------------

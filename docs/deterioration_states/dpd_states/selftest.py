@@ -44,7 +44,7 @@ def _fake_axes(cur, rng):
     out["reachable_flag"] = rng.choice([0, 1], len(f), p=[0.3, 0.7])
     out["in_country_flag"] = rng.choice([0, 1], len(f), p=[0.15, 0.85])
     # the bank's own rules: ours, with a little disagreement
-    out["existing_bust_out"] = ((st == "bust_out") ^ (rng.random(len(f)) < 0.005)).astype(int)
+    out["existing_bust_out"] = ((st == "early_payment_default") ^ (rng.random(len(f)) < 0.005)).astype(int)
     out["existing_stabilized"] = ((f.last6_in_band >= 5) ^ (rng.random(len(f)) < 0.005)).astype(int)
     return out
 

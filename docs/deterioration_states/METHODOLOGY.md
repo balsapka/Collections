@@ -19,7 +19,7 @@ slide, and designed to stay out of the way of the other persona axes.
 | Locatability | Can we reach them? | Reachability flag, in-country flag |
 | Ability | Can they pay? | Score: salary, inflow, CASA balance |
 | Payment credibility | Do they pay and keep their word? | Score: promises kept (0–2), money coming in last 3 months (0–2), pre-delinquency history clean (0–1) |
-| **Deterioration (this)** | **How did they fall in, and are they holding now?** | **DPD bucket history only** |
+| **Deterioration (this)** | **How did they fall in, and are they stabilized now?** | **DPD bucket history only** |
 
 Design rules agreed with the business owner:
 
@@ -67,12 +67,14 @@ rather than with behaviour.
 | Feature | Definition | Fixed once past 4? |
 |---|---|---|
 | `months_before_spell` | months of history before the current spell started | yes |
-| `max_prior_bucket` | deepest bucket reached in any earlier (non-blip) spell; 0 if none | yes |
+| `n_blips` | earlier excursions of 1–2 months that never passed bucket 2 (EPD allows one) | yes |
+| `n_prior_episodes` | earlier real (non-blip) spells (EPD requires none) | yes |
+| `max_prior_bucket` | deepest bucket reached in any earlier (non-blip) spell; 0 if none (repeat delinquent) | yes |
 | `runup_len` | months from the last clean month to the first month at bucket 4 (3 = straight 2→3→4) | yes |
 | `runup_pays` | months on the way to 4 in which 2+ months were paid (moved back) | yes |
 | `last6_in_band` | of the last 6 months (incl. today), how many were within today's bucket ±1 | no — current behaviour, by design |
 
-Other features (`n_blips`, `runup_holds`, `post4_paid_rate`, `max_hold_run`, …) are
+Other features (`runup_holds`, `post4_paid_rate`, `max_hold_run`, …) are
 computed for diagnostics and discovery only.
 
 ---
@@ -82,60 +84,89 @@ computed for diagnostics and discovery only.
 Questions are asked **in order**; the first "yes" assigns the state.
 
 ```
-Q1  Bust-out?   <= 3 months of history before this spell
-                (at most one blip inside it — a payoff from 2 — and no earlier real spell)
-                AND run-up to 4 took <= 3 months                     -> bust_out
-Q2  Holding?    >= 5 of the last 6 months within today's bucket ±1   -> holding
-Q4  Relapse?    [B, C] an earlier spell reached bucket 3 and cured   -> relapse
-Q5  Fell fast?  run-up (last clean month -> first month at 4) <= 3 months
-      yes -> sudden    [B, C: >= 12 months of history before the spell
-                        -> sudden_established, else sudden_early_life]
-      no  -> gradual   [C: paid 2+ months at once on the way down
-                        -> gradual_fought_back, else gradual_slide]
+Q1  Early payment default?  <= 3 months of history before this spell
+                            (at most one blip inside it — a payoff from 2 — and no
+                            earlier real spell) AND run-up to 4 took <= 3 months
+                                                           -> early_payment_default
+Q2  Stabilized?             >= 5 of the last 6 months within today's bucket ±1
+                                                           -> stabilized
+Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3 and cured
+                                                           -> repeat_delinquent
+Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
+      yes -> straight_roller  [B, C: >= 12 months of history before the spell
+                               -> straight_roller_seasoned, else straight_roller_early_life]
+      no  -> slow_roller      [C: paid 2+ months at once on the way down
+                               -> slow_roller_erratic, else slow_roller_intermittent]
 ```
 
-(Q3 "partial payer" was tested and rejected — §6.)
+(Q3 "paying since bucket 4" was tested and rejected — §6.4.)
 
 ### Three options
 
 | Option | States | Use when |
 |---|---|---|
-| **A — minimal (4)** | bust_out, holding, sudden_decline, gradual_decline | Strict orthogonality: prior-spell history is left entirely to credibility |
-| **B — balanced (6), recommended** | bust_out, holding, relapse, sudden_established, sudden_early_life, gradual_decline | Default. Matches the natural groups in the data (§6.1) and the 5–6 target |
-| **C — detailed (7)** | B with gradual split into gradual_slide / gradual_fought_back | The risk team has a different action for "slid" vs "fought back" and both are ≥ 4% |
+| **A — minimal (4)** | EPD, stabilized, straight roller, slow roller | Strict orthogonality: prior-spell history is left entirely to credibility |
+| **B — balanced (6), recommended** | EPD, stabilized, repeat delinquent, seasoned straight roller, early-life straight roller, slow roller | Default. Matches the natural groups in the data (§6.1) and the 5–6 target |
+| **C — detailed (7)** | B with slow roller split into intermittent payer / erratic payer | The risk team has a different action for each and both are ≥ 4% |
 
 ### What each state means and the action it points to
 
-| State | Reads as | Action flavour | Share *(synthetic)* |
+| State (display name · `code`) | Reads as | Action flavour | Share *(synthetic)* |
 |---|---|---|---|
-| **bust_out** | At most 3 months of history (one blip allowed), rolled straight in, never really paid | Fraud / first-party review, early legal; no restructuring | 6% (bank: 6%) |
-| **holding** | Paying about one month's due each month for 5 of 6 months | **Offer restructuring to break the hardship** | 7% (bank's stabilized: 6%) |
-| **relapse** | Has been here before and cured from bucket 3 | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 16% |
-| **sudden_established** | At least a year of clean history (≥ 12 months), then a straight roll | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 52% |
-| **sudden_early_life** | 4–11 months of clean history (first year on book), then a straight roll | Same triage; also an underwriting signal for acquisition | 3% — below the 5% floor in synthetic data; the real share decides (E16) |
-| **gradual_decline** | Paid something on the way down but kept slipping | Over-indebted: longer-tenor restructure or settlement | 16% |
-| ↳ gradual_slide *(C)* | Paid one month here and there, never caught up | Chronic insufficiency: restructure to what they actually pay | 10% |
-| ↳ gradual_fought_back *(C)* | Paid 2+ months at once, then rolled anyway | Lumpy / irregular income: plan aligned to inflow timing | 6% |
+| **Early payment default (EPD)** · `early_payment_default` | At most 3 months of history (one blip allowed), rolled straight in, never really paid | Early-risk / first-party-fraud review, early legal; no restructuring | 6% (bank: 6%) |
+| **Stabilized** · `stabilized` | Paying about one month's due each month for 5 of 6 months | **Offer restructuring to break the hardship** | 7% (bank: 6%) |
+| **Repeat delinquent (re-default)** · `repeat_delinquent` | Has been here before and cured from bucket 3 | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 16% |
+| **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book (≥ 12 months clean), then rolled every month without paying | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 52% |
+| **Early-life straight roller** · `straight_roller_early_life` | 4–11 months on book, then rolled every month without paying | Same triage; also an underwriting signal for acquisition | 3% — below the 5% floor in synthetic data; the real share decides (E16) |
+| **Slow roller (partial payer)** · `slow_roller` | Paid something on the way down but kept rolling | Over-indebted: longer-tenor restructure or settlement | 16% |
+| ↳ **Intermittent payer** *(C)* · `slow_roller_intermittent` | Paid one month here and there, never caught up | Chronic insufficiency: restructure to what they actually pay | 10% |
+| ↳ **Erratic payer** *(C)* · `slow_roller_erratic` | Caught up 2+ months at once, then rolled again | Lumpy / irregular income: plan aligned to inflow timing | 6% |
 
-**Holding is the only state that moves month to month** — it describes what the customer
-is doing now (*synthetic:* 62% are still holding next month). Every other state is fixed
-once the account is past bucket 4 (*synthetic:* 97–100% keep their state next month).
+In option A the two straight-roller states are one: **Straight roller** · `straight_roller`.
+
+**Stabilized is the only state that moves month to month** — it describes what the
+customer is doing now (*synthetic:* 62% are still stabilized next month). Every other
+state is fixed once the account is past bucket 4 (*synthetic:* 97–100% keep their state
+next month).
+
+### 4.1 Names
+
+The names use established card-risk and collections terms, and follow two rules:
+
+1. **Describe behaviour, not intent.** These labels reach collector screens, audit trails
+   and possibly complaint files. They say what the DPD history shows ("never really
+   paid", "rolled every month", "paid one month at a time"), never why ("fraud",
+   "won't pay"), which the history cannot prove.
+2. **Code names are stable; display names are free.** Code uses short identifiers
+   (`early_payment_default`, `straight_roller_seasoned`, …). `DISPLAY_NAMES` and `REMARKS`
+   in `dpd_states/states.py` carry the business labels, so renaming for the risk team never
+   breaks the pipeline or old results. Every report starts with the names table.
+
+| Term | Where it comes from | Note |
+|---|---|---|
+| **Early payment default (EPD)** | Early-risk monitoring (FPD / SPD / TPD = first / second / third payment default; EPD = default early in the life of the account) | **Formerly "bust-out"** — the bank's internal name, kept in remarks. Classic *bust-out* fraud is different: a customer builds a good record and limit, maxes out (often with cash advances) and disappears. Its DPD history is clean-then-straight-roll, so it lands in **seasoned straight roller**; spotting it needs spend / utilisation spikes before delinquency — a fraud overlay, not this axis |
+| **Stabilized** | The bank's own term; roll-rate "stay" behaviour | Industry has no single standard label for "pays enough to stay in the bucket" |
+| **Repeat delinquent / re-default** | Collections recidivism; re-default rates after cure or restructure | |
+| **Straight roller** | Core card-collections term: rolls through every bucket without a payment | |
+| **Seasoned / early-life** | Seasoning and months on book (MOB); the first 12 months is the standard early-life window | |
+| **Slow roller (partial payer)** | Roll-rate language: the counterpart of the straight roller | **Also called partial payer** — the more common collections term. The rejected Q3 state was renamed `paying_since_4` so "partial payer" means only this state |
+| **Intermittent / erratic payer** | Collections payment-pattern labels | |
 
 ---
 
 ## 5. Thresholds and the evidence behind them *(synthetic sweeps)*
 
-| Threshold | Value | Why this value | What moving it does |
+| Threshold (`parameter`) | Value | Why this value | What moving it does |
 |---|---|---|---|
-| Bust-out history | **≤ 3 months, at most one blip** | Business definition (agreed): a customer who never pays misses the first or second bill, so 2–3 clean months at most (`0 0 2 3 4`, `0 0 0 2 3 4`, `0 2 0 2 3 4`). No natural knee in the data | *Synthetic:* at 3 months 93% of the state is a planted bust-out; at 6 months 79%, at 12 months 55% — longer histories are early-life defaults and land in sudden_early_life. Sweep reported in every run (2–12 months) |
-| Bust-out earlier spells | **none; one blip allowed** | A bust-out may pay off once, but only from bucket 2 (a blip) | `0 2 3 4 0 0 2 3 4 5 6` is therefore relapse, not bust-out; two blips (`0 2 0 2 0 2 3 4`) is not a bust-out |
-| Run-up for "sudden" | **≤ 3 months** | The one sharp threshold: any single paid month on the way down makes it gradual | ≤ 4 moves ~70% of genuine slow slides into sudden (slides in gradual: 98% → ~30%) |
-| Holding band | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%, persistence ~63%. 6 of 6: ~5%, ~32%, ~80% |
-| Relapse depth | **earlier spell reached 3** | The bank counts ~85% single-spell; spells from 3 give 83% *(synthetic)* | From 2: 19%. From 4: 5% (cures from 4+ are rare) |
-| Established | **≥ 12 months** | Business definition (agreed): the first year on book is the standard early-life default window. Bust-out already takes ≤ 3 months, so early life = 4–11 months | *Synthetic:* 12 m gives early life only 3.4% (below the 5% floor), 18 m 7%, 24 m 11%, 36 m 20% — but these shares come from the generator's assumed tenure distribution, so the real share decides (E16) |
+| EPD history (`epd_max_history`, `epd_max_blips`) | **≤ 3 months, at most one blip** | Business definition (agreed): a customer who never pays misses the first or second bill, so 2–3 clean months at most (`0 0 2 3 4`, `0 0 0 2 3 4`, `0 2 0 2 3 4`). No natural knee in the data | *Synthetic:* at 3 months 93% of the state is a planted early defaulter; at 6 months 79%, at 12 months 55% — longer histories are early-life defaults and land in early-life straight roller. Sweep reported in every run (2–12 months) |
+| EPD earlier spells | **none; one blip allowed** | An early defaulter may pay off once, but only from bucket 2 (a blip) | `0 2 3 4 0 0 2 3 4 5 6` is therefore repeat delinquent, not EPD; two blips (`0 2 0 2 0 2 3 4`) is not EPD |
+| Straight-roller run-up (`straight_max_runup`) | **≤ 3 months** | The one sharp threshold: any single paid month on the way down makes it a slow roller | ≤ 4 moves ~70% of genuine slow rollers into straight roller |
+| Stabilized band (`stabilized_min_in_band`) | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%, persistence ~63%. 6 of 6: ~5%, ~32%, ~80% |
+| Repeat-delinquent depth (`repeat_min_prior_peak`) | **earlier spell reached 3** | The bank counts ~85% single-spell; spells from 3 give 83% *(synthetic)* | From 2: 19%. From 4: 5% (cures from 4+ are rare) |
+| Seasoned (`seasoned_min_months`) | **≥ 12 months** | Business definition (agreed): the first year on book is the standard early-life window. EPD already takes ≤ 3 months, so early life = 4–11 months | *Synthetic:* 12 m gives early life only 3.4% (below the 5% floor), 18 m 7%, 24 m 11%, 36 m 20% — but these shares come from the generator's assumed tenure distribution, so the real share decides (E16) |
 
-**Rule order.** Bust-out is asked before holding (the bank's order). Only ~0.2% of the
-spine is a bust-out that is also holding today, so the order barely matters.
+**Rule order.** EPD is asked before stabilized (the bank's order). Only ~0.2% of the spine
+is an early defaulter that is also stabilized today, so the order barely matters.
 
 ---
 
@@ -153,7 +184,7 @@ spine is a bust-out that is also holding today, so the order barely matters.
   ambiguous, so the soft-assignment advantage disappears. Best ARI vs planted 0.48 but
   stability fell to 0.67–0.93. Not used. GMM fits continuous inputs (ability scores,
   balances) far better than DPD-derived counts.
-- **Residual clustering (after bust-out and holding) — kept as a diagnostic.** k-means at
+- **Residual clustering (after EPD and stabilized) — kept as a diagnostic.** k-means at
   k = 6 on the remaining ~88% found six clean, nameable groups: long-clean straight roll,
   short-clean straight roll, earlier spell to 3+, paying after 4 but still rolling, held on
   the way, paid 2+ on the way. With the final thresholds, agreement at k = 6 is A 0.11,
@@ -161,19 +192,19 @@ spine is a bust-out that is also holding today, so the order barely matters.
   states were too few. Every B/C split maps to one of these clusters with a one-line
   rule; the clusters themselves are not the states. The clusters split clean history
   near 36 months, but that reflects the generator's assumed tenure distribution; the
-  established cut is a business definition (12 months, §5).
+  seasoned cut is a business definition (12 months, §5).
 
 ### 6.2 A "mixed" / residual state
 Dropped. An ordered tree with a default branch is MECE without one, and a residual
 bucket invites "everything we don't understand" to grow.
 
 ### 6.3 Staircase (holds for months at each level, then steps up)
-Merged. While it is holding it *is* holding (that is the actionable fact); just after a
-step it reads as gradual. Telling a genuine holder from a staircase mid-hold needs more
+Merged. While it is holding a bucket it *is* stabilized (that is the actionable fact);
+just after a step it reads as a slow roller. Telling a genuine holder from a staircase mid-hold needs more
 than 6 months of history and an extra rule, and the next-month risk was the same
 (*synthetic:* 0.28 vs 0.29). It separates only over 6 months (exit 33% vs 50%).
 
-### 6.4 Partial payer — "pays after reaching 4 but still rolling" (Q3)
+### 6.4 "Paying since bucket 4" — pays after reaching 4 but still rolling (Q3)
 Tested at 0.34 / 0.5 / 0.67 months paid per month since 4. Rejected:
 - barely separates risk (next-month roll ~80% vs ~86%);
 - unstable — ~37% leave it every month — and it **drags the stability of the fixed
@@ -181,24 +212,25 @@ Tested at 0.34 / 0.5 / 0.67 months paid per month since 4. Rejected:
 - 79% of it is "paid in the last 3 months" — the credibility axis's 2-point component.
 
 It is one of the six natural residual clusters, so it is real behaviour — but it belongs
-to credibility, not here. The switch is kept in code (`partial_min_paid_rate`) so the
+to credibility, not here. The switch is kept in code (`paying_since_4_min_rate`, state `paying_since_4` — renamed
+from "partial payer" so that term means only the slow roller) so the
 test can be repeated (expectation E24).
 
 ### 6.5 Separate states for slow slide, dip-and-roll, volatile
-Merged into gradual (A, B) or split once by "paid 2+ months on the way" (C). The three
+Merged into slow roller (A, B) or split once by "paid 2+ months on the way" (C). The three
 confuse each other in every view (shapes, clusters, trees), and the risk actions are close.
-Much of "volatile" (cure then relapse) is a relapse by definition.
+Much of "volatile" (cure then relapse) is a repeat delinquent by definition.
 
-### 6.6 Relapse in option A
-Left out of A on purpose. Relapse is built from earlier spells — the same history
+### 6.6 Repeat delinquent in option A
+Left out of A on purpose. Repeat delinquent is built from earlier spells — the same history
 credibility's 1-point "pre-delinquency clean" flag scores. In the self-test (with a clean
 point defined as "no earlier spell") the states explained **84%** of that point's
 variance. It is included in B/C because it is only 1 of credibility's 5 points and it
 carries more than a yes/no: *cured from bucket 3 before* is evidence of catch-up capacity.
 Expectation E19b measures the real overlap and decides A vs B.
 
-### 6.7 "Holding or improving" clause (today's bucket ≤ 6 months ago)
-Dropped. It changed **0.0%** of assignments. Sudden/gradual describe how the account fell
+### 6.7 "Stabilized or improving" clause (today's bucket ≤ 6 months ago)
+Dropped. It changed **0.0%** of assignments. Straight / slow roller describe how the account fell
 in, so an improving account carries no misleading label without it.
 
 ### 6.8 Payment-based refinement of stabilized
@@ -229,17 +261,17 @@ has billing-cycle effects (example: `…3 4 3 5 4…`).
 ### 6.13 Payment-promise or inflow inputs in any state
 Never used — credibility and ability own them. Their overlap is *measured* (§7).
 
-### 6.14 Bust-out with up to 6 months of history
+### 6.14 EPD ("bust-out") with up to 6 months of history
 The first version allowed ≤ 6 months before the spell, chosen to match "a few months".
-It made `0 0 0 0 0 0 2 3 4` a bust-out — but six clean months means about four bills were
+It made `0 0 0 0 0 0 2 3 4` a bust-out (now EPD) — but six clean months means about four bills were
 paid (or nothing was due): an **early-life default**, not a customer who never paid. The
 synthetic 6% match did not support 6 months either: the generator's bust-out volume had
 been tuned to hit 6% *under that rule*, so the match was circular. Replaced by the agreed
 business definition: **≤ 3 months, at most one blip**. Under it the generator still gives
-5.8% bust-out; every planted bust-out is caught, and 93% of the state is a planted
-bust-out (79% under the old 6-month rule).
+5.8% EPD; every planted early defaulter is caught, and 93% of the state is a planted
+early defaulter (79% under the old 6-month rule).
 
-### 6.15 Established / early-life split in option A
+### 6.15 Seasoned / early-life split in option A
 Not in A because, in synthetic data, it adds no risk separation (both ~94–95% exit within
 6 months, by construction). It is in B/C for its action difference (life event vs
 underwriting signal). Real outcomes decide whether it earns its place.
@@ -250,9 +282,9 @@ underwriting signal). Real outcomes decide whether it earns its place.
 
 | Overlap | Size *(synthetic)* | Treatment |
 |---|---|---|
-| holding ↔ credibility "money coming in" (2 pts) | 100% of holders have money in; 44% of non-holders do too | One-directional: holding is stricter (enough to hold the bucket, 6 months). Accept and state it. E21 |
-| relapse ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.84 of the clean point explained by B states | Decides A vs B. E19b |
-| sudden/gradual ↔ ability | none in synthetic (by construction) | Sudden may proxy income loss on real data — fine, but say so. E20 |
+| stabilized ↔ credibility "money coming in" (2 pts) | 100% of stabilized have money in; 44% of the rest do too | One-directional: stabilized is stricter (enough to hold the bucket, 6 months). Accept and state it. E21 |
+| repeat delinquent ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.84 of the clean point explained by B states | Decides A vs B. E19b |
+| straight / slow roller ↔ ability | none in synthetic (by construction) | Straight rolling may proxy income loss on real data — fine, but say so. E20 |
 | any state ↔ locatability | none expected | E19/E20 report it |
 
 ---
@@ -278,29 +310,29 @@ outcomes (the snippet detects and warns).
 | E05 | Unrepaired +2 jumps | ≤ 2% | Most jumps sit next to a hold |
 | E06 | Bucket mix declines 4 → 7 | yes | Rising roll rates |
 | E07 | One spell only (from bucket 3) | 78–92% | Bank ~85% |
-| E08 / E09 | Bust-out / holding share | 4–8% / 4–9% | Bank 6% / 6% |
+| E08 / E09 | EPD / stabilized share | 4–8% / 4–9% | Bank 6% / 6% |
 | E10 / E11 | Recall of the bank's existing flags | ≥ 80% / ≥ 90% | Same definitions |
-| E12 | Holding next-month roll below the fixed states | ≥ 20pp gap | *Synthetic:* 40% vs ~85% |
+| E12 | Stabilized next-month roll below the fixed states | ≥ 20pp gap | *Synthetic:* 40% vs ~85% |
 | E13 | Fixed states keep their state next month | ≥ 95% | Run-up fixed once past 4 |
-| E14 | Holding persistence next month | 45–85% | Current behaviour |
-| E15 | Option A sudden share | 55–80% | Most roll straight |
+| E14 | Stabilized persistence next month | 45–85% | Current behaviour |
+| E15 | Option A straight-roller share | 55–80% | Most roll straight |
 | E16 | Smallest option-B state | ≥ 5% | Actionable size |
-| E17 | Smaller gradual split (C) | ≥ 4% | Actionable size |
-| E18 | Holding at bucket 4 vs 7 | ≥ 2× | 90–95% roll at 6–7 |
+| E17 | Smaller slow-roller split (C) | ≥ 4% | Actionable size |
+| E18 | Stabilized at bucket 4 vs 7 | ≥ 2× | 90–95% roll at 6–7 |
 | E19 / E19b / E20 | eta² of credibility / clean point / ability by state | ≤ 0.25 / ≤ 0.50 / ≤ 0.10 | Orthogonality |
-| E21 | Holders with money coming in | ≥ 90% | Holding = paying |
+| E21 | Stabilized with money coming in | ≥ 90% | Stabilized = paying |
 | E22 | Residual clusters favour B over A | ARI gain ≥ 0.15 | *Synthetic:* 0.20 |
-| E23 | One paid month matters (gradual at run-up ≤ 4 / ≤ 3) | ≤ 0.70 | Most gradual held once |
-| E24 | Partial payer stays rejected | persistence ≤ 75% | *Synthetic:* 63% |
+| E23 | One paid month matters (slow roller at run-up ≤ 4 / ≤ 3) | ≤ 0.70 | Most slow rollers held once |
+| E24 | "Paying since 4" stays rejected | persistence ≤ 75% | *Synthetic:* 63% |
 | E25 | INFO: exit spread across fixed states | report | Unknowable from synthetic |
 
 Every check carries an "if not met" action in the code and in the report.
 
 ### Choosing the option on real data
 1. Any **FAIL** → fix config/data first; read nothing else.
-2. **E19b high** (relapse ≈ credibility clean point) **and** the risk team does not want the
+2. **E19b high** (repeat delinquent ≈ credibility clean point) **and** the risk team does not want the
    cured-before nuance → **A**. Otherwise **B**.
-3. **E17 passes and** the risk team has distinct actions for slide vs fought-back → **C**.
+3. **E17 passes and** the risk team has distinct actions for intermittent vs erratic payers → **C**.
 4. **E25 ≥ 5pp** → the mechanism carries risk on its own; report it to the risk team as a bonus.
 
 ---
@@ -312,17 +344,17 @@ Every check carries an "if not met" action in the code and in the report.
   dip-and-roll, volatile); full lifecycles to exit; length-biased snapshot like a real
   spine; payment holidays (frozen buckets) and billing-cycle +2 jumps; one continuous
   tenure distribution. Matches the bank's figures: roll rates 70/80/89/95% (target
-  70/80/90/95%), bust-out 5.8% (6%), stabilized 6.5% (6%), single spell 83% from bucket 3 (85%).
+  70/80/90/95%), EPD 5.8% (6%), stabilized 6.5% (6%), single spell 83% from bucket 3 (85%).
 - **Method report:** `validation/dpd_states_validation_*.md` (`python -m dpd_states.run_synthetic`).
 - **Real-data path self-test:** `validation/selftest_report_*.md` (`python -m dpd_states.selftest`)
   runs the exact analysis and expectations the workplace run uses, on synthetic data with
-  fake axis columns. All checks pass except two expected WARNs: E19b (relapse ≈
-  credibility clean point, §6.6) and E16 (sudden_early_life 3.4% under the 12-month
-  established cut — a property of the synthetic tenure distribution, §5).
+  fake axis columns. All checks pass except two expected WARNs: E19b (repeat delinquent ≈
+  credibility clean point, §6.6) and E16 (early-life straight roller 3.4% under the 12-month
+  seasoned cut — a property of the synthetic tenure distribution, §5).
 
 **What synthetic data cannot tell you:** whether the rolling states differ in outcome (they
 share post-4 dynamics by construction), how big the real overlaps with credibility and
-ability are, and how much payment holidays contaminate holding. The real-data run answers
+ability are, and how much payment holidays contaminate stabilized. The real-data run answers
 all three.
 
 ---
@@ -331,7 +363,7 @@ all three.
 
 1. Option A, B or C — decide from E19b, E17 and the risk team's actions (§8).
 2. Spell definition (from bucket 3 or 4) — E07 shows which matches the bank's 85%.
-3. Bust-out history threshold — confirm 6 months against the bank's existing rule (E10).
+3. EPD history threshold — confirm 3 months (one blip) against the bank's existing bust-out rule (E10).
 4. Payment holidays / restructurings — if flags exist, exclude frozen months before Q2.
 
 ## Glossary

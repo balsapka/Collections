@@ -67,7 +67,7 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
     from dpd_states import config as cfg
     from dpd_states.analysis import md, run
     from dpd_states.expectations import evaluate
-    from dpd_states.states import OPTIONS, RECOMMENDED
+    from dpd_states.states import DISPLAY_NAMES, OPTIONS, RECOMMENDED
 
     model_id = _resolve_model_id(model_id)
     out_dir = pathlib.Path(out_dir) if out_dir else _pkg_root() / "results"
@@ -194,7 +194,7 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
     print(f"expectations: {n_status}")
     for r in checks.itertuples():
         print(f"  {r.id:<4} {r.status:<7} observed={r.observed!s:<8} expected={r.expected:<8} {r.check[:70]}")
-    print(f"{RECOMMENDED} shares today: " + ", ".join(f"{s}={v:.1%}" for s, v in rec.items()))
+    print(f"{RECOMMENDED} shares today: " + ", ".join(f"{DISPLAY_NAMES[s]}={v:.1%}" for s, v in rec.items()))
     print(f"wrote: {out} and {rep.name} -> commit & push from PROD, pull in UAT")
     print("=== DPD_STATES OUTPUT END ===")
     return payload
