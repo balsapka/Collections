@@ -49,12 +49,13 @@ Run from the repo root, in this order:
 
     1. python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md
          -> must end with "N files OK, 0 mismatched"
-    2. python docs/deterioration_states/run.py selftest
-         -> must end with "SELFTEST PASSED" (~1 minute; needs pandas, numpy, scikit-learn)
-    3. Fill in docs/deterioration_states/dpd_states/config.py and the <<FILL-IN>> in
-       snippets/dpd_states_validate.py (PROMPTS.md P1), then in a Kedro notebook:
-         main(catalog, check_only=True)   # dry run
-         main(catalog)                    # full validation
+    2. python -m pip install pandas numpy scikit-learn openpyxl      (once)
+    3. python docs/deterioration_states/run.py selftest
+         -> must end with "SELFTEST PASSED" (~1 minute)
+    4. python docs/deterioration_states/run.py validate
+         -> checks + state shares on data/input/dpd_synthetic_data.xlsx (config.py)
+    5. optional: python docs/deterioration_states/run.py synthetic
+    Spark mode later: snippets/dpd_states_validate.py, main(catalog) (PROMPTS.md P6)
 
 Optional second argument writes somewhere else: extract_bundle.py BUNDLE.md <folder>
 """
@@ -100,7 +101,8 @@ for d in re.findall(r"^- empty folder: `([^`]+)`", "\\n".join(lines), flags=re.M
     (root / d / ".gitkeep").touch()
 print(f"\\n{ok} files OK, {bad} mismatched -> {root}")
 if not bad:
-    print("Next: python docs/deterioration_states/run.py selftest   (from the repo root)")
+    print("Next, from the repo root: python docs/deterioration_states/run.py selftest")
+    print("then:                     python docs/deterioration_states/run.py validate")
 sys.exit(1 if bad else 0)
 '''
 
@@ -132,19 +134,36 @@ def build() -> Path:
 ## Run this (from the repo root)
 
 ```bash
-# 1. recreate every file and verify checksums  -> "N files OK, 0 mismatched"
+# 1. recreate every file and verify checksums      -> "N files OK, 0 mismatched"
 python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md
 
-# 2. self-test on synthetic data              -> "SELFTEST PASSED"  (~1 min)
+# 2. dependencies (once)
+python -m pip install pandas numpy scikit-learn openpyxl
+
+# 3. self-test on synthetic data                    -> "SELFTEST PASSED"  (~1 min)
 python docs/deterioration_states/run.py selftest
 
-# 3. optional: rebuild the synthetic method-validation report
+# 4. validate on the real file                      -> checks + state shares
+#    reads data/input/dpd_synthetic_data.xlsx, column dpd_history_str (config.py),
+#    crops to the reliable window (2024-01 .. 2026-08 = 32 months), keeps buckets 4-7
+python docs/deterioration_states/run.py validate
+#    another file and/or sample size:
+#    python docs/deterioration_states/run.py validate data/input/other_file.xlsx 50000
+
+# 5. optional: synthetic method-validation report
 python docs/deterioration_states/run.py synthetic
 ```
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
-time. Then fill in `dpd_states/config.py` and the `<<FILL-IN>>` in
-`snippets/dpd_states_validate.py` (PROMPTS.md P1) and, in a Kedro notebook:
+time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
+`docs/deterioration_states/results/dpd_states_file_<file>_<date>.json` + `.md` (aggregates
+only) — paste the printed block back, or follow PROMPTS.md P0 -> P2 with Sonnet.
+
+If it fails: "column ... not in" -> check COL_DPD in `dpd_states/config.py`; "look like
+numbers" -> the Excel column is stored as numbers (digits lost), re-save it as text;
+"No module named openpyxl" -> step 2; snapshot not Aug 2026 -> set SNAPSHOT_MONTH in config.
+
+Spark mode (later, for outcomes / production), in a Kedro notebook — PROMPTS.md P6:
 
 ```python
 import sys, pathlib
@@ -152,8 +171,8 @@ _c = pathlib.Path.cwd()
 ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
 sys.path.insert(0, str(ROOT / "docs" / "deterioration_states" / "snippets"))
 from dpd_states_validate import main
-main(catalog, check_only=True)   # dry run: schema, counts, example strings
-result = main(catalog)           # full validation -> results/ (aggregates only)
+main(catalog, check_only=True)   # dry run: schema, counts, orientation (aggregates)
+result = main(catalog)           # full validation incl. backtest -> results/
 ```
 
 ---
