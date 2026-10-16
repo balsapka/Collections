@@ -20,7 +20,7 @@ switched on per option (A / B / C) and never break MECE.
     Q3  Paying since 4?         [tested, NOT recommended] paid >= half a month's
                                 due per month since first reaching 4 -> paying_since_4
     Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and
-                                ended within 24 months before this spell started
+                                ended within 12 months before this spell started
                                                                -> repeat_delinquent
     Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
           yes -> straight_roller   [B, C split: >=12 months of history before the spell
@@ -61,7 +61,7 @@ DEFAULTS = {
     # credibility axis's 'money coming in'. Kept only so the test can be repeated.
     "paying_since_4_min_rate": None,  # e.g. 0.5 -> Q3 on
     "repeat_min_prior_peak": None,  # [business] e.g. 3 -> Q4 on (earlier spell reached 3)
-    "repeat_window_months": 24,     # [business] earlier spell ended <= 24 months before this one
+    "repeat_window_months": 12,     # [business] earlier spell ended <= 12 months before this one
     "seasoned_min_months": None,    # [business] e.g. 12 -> split straight roller (first year = early life)
     "split_slow_roller": False,     # True -> split slow roller by 2+ month payments in run-up
 }
@@ -112,7 +112,7 @@ REMARKS = {
                   "first reaching 4, at most one bucket higher than 6 months ago) so oscillating "
                   "payers and accounts that just paid down are not mislabelled.",
     "paying_since_4": "Rejected — current-behaviour state that belongs to credibility (money coming in).",
-    "repeat_delinquent": "Re-default within 24 months of curing a spell that reached bucket 3; "
+    "repeat_delinquent": "Re-default within 12 months of curing a spell that reached bucket 3; "
                          "collections 'recidivism'.",
     "straight_roller": "Rolled straight to bucket 4 (no payment on the way down). Describes how "
                        "they fell in — some have paid since.",

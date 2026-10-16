@@ -14,7 +14,7 @@ python docs/deterioration_states/run.py selftest
 
 # 4. validate on the real file                      -> checks + state shares
 #    reads data/input/dpd_synthetic_data.xlsx, column dpd_history_str (config.py),
-#    crops to the history window (reliable from 2024-01; 24-month extract -> 24), keeps buckets 4-7
+#    crops to the reliable history window (2024-01 .. 2026-08 = 32 months), keeps buckets 4-7
 python docs/deterioration_states/run.py validate
 #    another file and/or sample size:
 #    python docs/deterioration_states/run.py validate data/input/other_file.xlsx 50000
@@ -178,7 +178,7 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `fb8e5fdf89d34bc63895a0c938816fe539684baf719f03e3d101a3eb0b458866` · 115 lines · trailing newline: yes
+sha256 `f7b35586c388b6841f086e7ec46a3fa3ed8c827821bd97dddce94731bd740ffe` · 115 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
@@ -201,8 +201,8 @@ python docs/deterioration_states/run.py validate    # REAL data: INPUT_FILE / CO
 ```
 
 `validate` reads `data/input/dpd_synthetic_data.xlsx`, column `dpd_history_str` (leftmost =
-current month), crops it to the history window (reliable from 2024-01, and the file is a 24-month
-extract, so 24 months; set in `config.py`), keeps today's spine (current bucket 4–7) and writes
+current month), crops it to the reliable history window (2024-01 → 2026-08 = 32 months, set in
+`config.py`), keeps today's spine (current bucket 4–7) and writes
 `results/dpd_states_file_<file>_<date>.json` + `.md` (aggregates only). Another file:
 `run.py validate path/to/file.xlsx`. Needs pandas, numpy, scikit-learn, and openpyxl for
 `.xlsx`. A snapshot file has no outcomes, so roll-rate / exit checks are SKIPPED; the Spark
@@ -355,7 +355,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `METHODOLOGY.md`
-sha256 `fc088fb13d907bc226146164e6f2ef86ba44ec607ece488ed887bb00d8a94f57` · 478 lines · trailing newline: yes
+sha256 `55e92102b3d570d38ce95fadea80b3f5c16a5d95a8a483f0c81723ba1f1c4522` · 479 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — methodology
@@ -405,9 +405,10 @@ Design rules agreed with the business owner:
   re-opened as a new account at their previous bucket.
 - **Reliable window: January 2024 onwards.** Older DPD history is unreliable, so every
   string is cropped to the newest months from `RELIABLE_FROM` (2024-01) to
-  `SNAPSHOT_MONTH` (2026-08) — 32 months — or to the source's own fixed window if shorter
-  (`SOURCE_WINDOW_MONTHS`: the sign-off file is a **24-month** extract, so 24 applies). A
-  string that fills the whole window may have older history and is treated as cropped.
+  `SNAPSHOT_MONTH` (2026-08) — **32 months** — or to the source's own fixed window if shorter
+  (`SOURCE_WINDOW_MONTHS`; the sign-off file now carries full history, so 32 applies). A
+  string that fills the whole window may have older history and is treated as cropped —
+  never EPD, never "history starts delinquent", and a straight roller is seasoned.
   Effects, all handled:
   - EPD is unaffected: an EPD has at most 3 clean months plus a short straight roll, so its
     string is under 12 digits and never cropped. As a safety net, a cropped string can
@@ -415,7 +416,7 @@ Design rules agreed with the business owner:
   - A spell that started before 2024 makes a cropped string start delinquent. That is
     normal history, not a data issue, so Q0 skips cropped strings; these accounts (0.16%
     of the synthetic spine) are classified normally — in practice mostly stabilized.
-  - Seasoned (≥ 12 months) and the 24-month repeat window fit inside 32 months; earlier
+  - Seasoned (≥ 12 months) and the 12-month repeat window fit inside 32 months; earlier
     spells that ended before 2024 are invisible, which can slightly under-count repeat
     delinquents whose spell began in early 2024.
   *(Synthetic: 74% of strings cropped; option-B shares essentially unchanged.)*
@@ -456,7 +457,7 @@ Design rules agreed with the business owner:
 | `months_before_spell` | months of history before the current spell started (blip months included) | yes |
 | `n_blips` | earlier 1–2 month excursions that never passed bucket 2 (EPD allows one) | yes |
 | `n_prior_episodes` | earlier real (non-blip) spells (EPD requires none) | yes |
-| `gap_prior_peak3` | clean months between the end of the most recent earlier spell that reached bucket 3 and the start of this one (repeat delinquent: ≤ 24) | yes |
+| `gap_prior_peak3` | clean months between the end of the most recent earlier spell that reached bucket 3 and the start of this one (repeat delinquent: ≤ 12) | yes |
 | `spell_pay_events` | months in the current spell with any payment (hold or move back); EPD requires 0 | **no** — EPD ends when they pay, by design |
 | `runup_len` | months from the last clean month to the first month at bucket 4 (3 = straight 2→3→4) | yes |
 | `runup_pays` | months on the way to 4 in which 2+ months were paid (moved back) | yes |
@@ -484,7 +485,7 @@ Q2  Stabilized?             >= 5 of the last 6 months within today's bucket ±1
                             OR (>= 6 months since first reaching 4 AND at most 1 bucket
                                 higher than 6 months ago)      -> stabilized
 Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and ended
-                            <= 24 months before this spell started
+                            <= 12 months before this spell started
                                                                -> repeat_delinquent
 Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
       yes -> straight_roller  [B, C: >= 12 months of history before the spell
@@ -514,8 +515,8 @@ Early-life straight roller stays a state in B and C, but if real data puts it un
 |---|---|---|---|
 | **Early payment default (EPD)** · `early_payment_default` | At most 3 months of history (one blip allowed), rolled straight in and has **never paid since crossing bucket 2** — still falling, so short-tenure by nature | Early-risk / first-party-fraud review, early legal; no restructuring | 4.3% (bank's broader rule: 6%) |
 | **Stabilized** · `stabilized` | Paying about one month's due each month for 5 of 6 months — or, 6+ months after first reaching 4, still within one bucket of where it was 6 months ago (pays what is due on average, unevenly) | **Offer restructuring to break the hardship** | 7.8% (bank's rule alone: 6.9%; bank: 6%) |
-| **Repeat delinquent (re-default)** · `repeat_delinquent` | Cured a spell that reached bucket 3 and fell back in within 24 months | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 14.8% |
-| **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book, then rolled straight to bucket 4 with no payment on the way down (some have paid since) | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 53.4% |
+| **Repeat delinquent (re-default)** · `repeat_delinquent` | Cured a spell that reached bucket 3 and fell back in within 12 months | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 10.8% |
+| **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book, then rolled straight to bucket 4 with no payment on the way down (some have paid since) | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 57.4% |
 | **Early-life straight roller** · `straight_roller_early_life` | 4–11 months on book, then rolled straight to bucket 4 | Same triage; also an underwriting signal for acquisition | 4.7% — under the 5% floor in synthetic data; the real share decides (E16) |
 | **Slow roller (partial payer)** · `slow_roller` | Paid something on the way down to bucket 4 but kept rolling | Over-indebted: longer-tenor restructure or settlement | 15.1% |
 | ↳ **Intermittent payer** *(C)* · `slow_roller_intermittent` | Paid one month here and there on the way down, never caught up | Chronic insufficiency: restructure to what they actually pay | 9.3% |
@@ -572,7 +573,7 @@ sensitivity, not as a menu.
 | Stabilized band (`stabilized_min_in_band`) [business] | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%. 6 of 6: ~5%, ~32% |
 | Stabilized long-run clause (`stabilized_long_run_months`, `_max_rise`) [business] | **≥ 6 months since first reaching 4, at most +1 bucket over 6 months** | Fixes oscillating payers and accounts that just paid down (§6.15). Straight rollers cannot meet it (they leave the spine within ~4 months) | Adds ~1% of the spine to stabilized. +2 would take in slow drifters paying ~4 of 6 dues; `None` switches it off |
 | Repeat-delinquent depth (`repeat_min_prior_peak`) [business] | **earlier spell reached 3** | Cures from 4+ are rare; spells reaching 3 give 83% one-spell vs the bank's ~85% | From 2: more; from 4: ~5% |
-| Repeat-delinquent window (`repeat_window_months`) [business] | **ended ≤ 24 months before this spell** | Owner decision; the common re-default window. Measured to the start of this spell, so the state stays fixed | Lowers the overlap with credibility's lifetime clean point (eta² 0.81 → 0.72) |
+| Repeat-delinquent window (`repeat_window_months`) [business] | **ended ≤ 12 months before this spell** | Owner decision (changed from 24); the common re-default window. Measured to the start of this spell, so the state stays fixed | Lowers the overlap with credibility's lifetime clean point (eta² 0.81 with no window → 0.52 at 12 months) |
 | Seasoned (`seasoned_min_months`) [business] | **≥ 12 months** | The first year on book is the standard early-life window; EPD already takes ≤ 3 months, so early life = 4–11 months | Early life 4.7% at 12 m; it depends on the book's tenure mix, so the real share decides (E16) |
 
 **Rule order.** Q0 and EPD come before stabilized; since an EPD has never paid in its
@@ -630,7 +631,7 @@ confuse each other in every view, and the risk actions are close. Much of "volat
 ### 6.6 Repeat delinquent in option A
 Left out of A on purpose. Repeat delinquent is built from earlier spells — the history
 credibility's 1-point "pre-delinquency clean" flag scores. In the self-test the states
-explain **72%** of that point's variance (81% before the 24-month window). It is in B/C
+explain **52%** of that point's variance under the 12-month window (81% with no window). It is in B/C
 because it is only 1 of credibility's 5 points and *cured from bucket 3 recently* is
 evidence of catch-up capacity. E19b measures the real overlap and decides A vs B.
 
@@ -709,7 +710,7 @@ to stabilized.
 | stabilized ↔ credibility "money coming in" (2 pts) | 98% of stabilized have money in; ~44% of the rest do too | One-directional: stabilized is stricter (enough to hold the bucket, 6 months). Accept and state it. E21 |
 | slow roller ↔ credibility "money coming in" | near bucket 4 almost all slow rollers paid in the last 3 months (they paid on the way down); by bucket 7 far fewer | A clock effect of the run-up, not a separate signal. Reported by state × bucket in every run |
 | stabilized ↔ credibility "promises kept" (2 pts) | likely (paying monthly) — not testable without the score | E19 measures the total |
-| repeat delinquent ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.72 of the clean point explained by B states | Decides A vs B. E19b |
+| repeat delinquent ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.52 of the clean point explained by B states (12-month window) | Decides A vs B. E19b |
 | straight / slow roller ↔ ability | none in synthetic (by construction) | Straight rolling may proxy income loss on real data — fine, but say so. E20 |
 | any state ↔ locatability | none expected | E20b |
 
@@ -893,7 +894,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `b30091ce5c8868460f906b8141df62ca2a259bb44298f67fc2cf4f5086b5af3f` · 241 lines · trailing newline: yes
+sha256 `e04fb130e4f442b3060c817761d351cda99d9574ddd46342b2cc288570f94642` · 240 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -960,8 +961,7 @@ Task: run the package on our DPD-history file, without Spark.
    - the share of strings whose LEFTMOST digit is 4–7 (today's spine) and the
      distribution of the RIGHTMOST digit (should be mostly 0/1 = first billed month);
    - min / median / max string length (strings are cropped to the reliable window,
-     RELIABLE_FROM = 2024-01 to SNAPSHOT_MONTH = 2026-08, capped by SOURCE_WINDOW_MONTHS = 24
-     for the 24-month extract, inside the package —
+     RELIABLE_FROM = 2024-01 to SNAPSHOT_MONTH = 2026-08 = 32 months, inside the package —
      do not crop them yourself; if the snapshot month differs, update SNAPSHOT_MONTH);
    - any characters other than 0–9 (if so, list them with counts; do not guess a mapping).
 3. Optional columns: if the file (or another file I point you to) has any of the persona
@@ -1066,7 +1066,7 @@ Write exactly these sections:
    - Stabilized: paying about one month's due each month — 5 of the last 6 months within
      one bucket of today's, or 6+ months past bucket 4 and at most one bucket higher than
      6 months ago.
-   - Repeat delinquent: cured a spell that reached 60+ DPD and fell back in within 24 months.
+   - Repeat delinquent: cured a spell that reached 60+ DPD and fell back in within 12 months.
    - Seasoned straight roller: 12+ months on book, then rolled straight to bucket 4 with no
      payment on the way down.
    - Early-life straight roller: same, within the first 12 months on book.
@@ -1147,7 +1147,7 @@ sha256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` · 0 l
 `````
 
 ### FILE: `dpd_states/config.py`
-sha256 `fe8b26df72b4c69fceab5f4533b749ae025369eec547f73c04f2f91595d87ed8` · 99 lines · trailing newline: yes
+sha256 `a35ec3ac537f61917e811a330c810f28994972bbddb762844b0bd3676df7004e` · 99 lines · trailing newline: yes
 
 `````python
 """Workplace configuration — the ONLY file that needs editing to run on real data.
@@ -1209,9 +1209,9 @@ def _months_between(first: str, last: str) -> int:
 
 
 # The source may itself be a fixed-length extract (the sign-off file pivots every account
-# onto a 24-month grid). A string that fills the whole window may have older history, so
+# onto a fixed grid). A string that fills the whole window may have older history, so
 # it is treated as cropped (never EPD, never "history starts delinquent"). None = full history.
-SOURCE_WINDOW_MONTHS = 24
+SOURCE_WINDOW_MONTHS = None          # the sign-off file now carries full history
 
 _reliable = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
 MAX_HISTORY_MONTHS = min(x for x in (_reliable, SOURCE_WINDOW_MONTHS) if x) if (_reliable or SOURCE_WINDOW_MONTHS) else None   # 24
@@ -1435,7 +1435,7 @@ def build_features(df: pd.DataFrame, col: str = "dpd_string") -> pd.DataFrame:
 `````
 
 ### FILE: `dpd_states/states.py`
-sha256 `231181a2fe7e41d49f072f1aaa0a0449c000d2017bbf241e4602e6338e4b840f` · 197 lines · trailing newline: yes
+sha256 `e94d2b72245e6f9cc4b86f4fa7d0631784c5aefe403fa72b8f3b47c50c4acaea` · 197 lines · trailing newline: yes
 
 `````python
 """Deterioration states for the bucket 4–7 spine: a small decision tree, MECE by construction.
@@ -1460,7 +1460,7 @@ switched on per option (A / B / C) and never break MECE.
     Q3  Paying since 4?         [tested, NOT recommended] paid >= half a month's
                                 due per month since first reaching 4 -> paying_since_4
     Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and
-                                ended within 24 months before this spell started
+                                ended within 12 months before this spell started
                                                                -> repeat_delinquent
     Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
           yes -> straight_roller   [B, C split: >=12 months of history before the spell
@@ -1501,7 +1501,7 @@ DEFAULTS = {
     # credibility axis's 'money coming in'. Kept only so the test can be repeated.
     "paying_since_4_min_rate": None,  # e.g. 0.5 -> Q3 on
     "repeat_min_prior_peak": None,  # [business] e.g. 3 -> Q4 on (earlier spell reached 3)
-    "repeat_window_months": 24,     # [business] earlier spell ended <= 24 months before this one
+    "repeat_window_months": 12,     # [business] earlier spell ended <= 12 months before this one
     "seasoned_min_months": None,    # [business] e.g. 12 -> split straight roller (first year = early life)
     "split_slow_roller": False,     # True -> split slow roller by 2+ month payments in run-up
 }
@@ -1552,7 +1552,7 @@ REMARKS = {
                   "first reaching 4, at most one bucket higher than 6 months ago) so oscillating "
                   "payers and accounts that just paid down are not mislabelled.",
     "paying_since_4": "Rejected — current-behaviour state that belongs to credibility (money coming in).",
-    "repeat_delinquent": "Re-default within 24 months of curing a spell that reached bucket 3; "
+    "repeat_delinquent": "Re-default within 12 months of curing a spell that reached bucket 3; "
                          "collections 'recidivism'.",
     "straight_roller": "Rolled straight to bucket 4 (no payment on the way down). Describes how "
                        "they fell in — some have paid since.",
@@ -2212,7 +2212,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
 `````
 
 ### FILE: `dpd_states/expectations.py`
-sha256 `c961ab8a1e3c18eecec8a46345c5fc045c38b5af8750330bf9137690191b3159` · 349 lines · trailing newline: yes
+sha256 `8ec6a0af8bd534a6904c745098226c19c3bf3a2166f4702e55b7b48b2ab8f606` · 349 lines · trailing newline: yes
 
 `````python
 """What we expect to see on real data, as checkable rules.
@@ -2494,7 +2494,7 @@ EXPECTATIONS = [
     ("E19b", "Orthogonality: credibility 'pre-delinquency clean' point explained by the states (eta²)",
      lambda R: _eta(R, "cred_clean_point"), lambda v: v <= 0.50, "<= 0.50", "WARN", "design",
      "Repeat delinquent uses earlier spells — the history the clean point scores (now limited to the "
-     "last 24 months, which lowers the overlap).",
+     "last 12 months, which lowers the overlap).",
      "Repeat delinquent duplicates the clean point: use option A, or keep it and tell the persona grid "
      "it is the same signal (only 1 of credibility's 5 points)."),
     ("E20", "Orthogonality: ability score explained by the states (eta²)",
@@ -2690,7 +2690,7 @@ def main(path: str | None = None, sample_n: int = 100_000, out_dir: str | None =
 `````
 
 ### FILE: `dpd_states/segment_180.py`
-sha256 `500fecf08fe430f526fbeb2c6b4e4a22e7cd0f508861e890df9c0d8dde2d168f` · 179 lines · trailing newline: yes
+sha256 `757f70d7de64f116a99618f336517a104f84673eb9c20994ae578de554c77f87` · 179 lines · trailing newline: yes
 
 `````python
 """PROTOTYPE — deterioration states for the 180+ segment (current bucket 8 or 9; 9 is the cap).
@@ -2709,7 +2709,7 @@ that only exist at 180+, plus an honest state when the path in is outside the wi
     Q3  Early payment default? <=3 months on book before the spell (<=1 blip), no earlier
                                spell, no payment between bucket 2 and reaching 9
                                                                   -> early_payment_default
-    Q4  Repeat delinquent?     earlier spell reached 3, cured, ended <=24 months before
+    Q4  Repeat delinquent?     earlier spell reached 3, cured, ended <=12 months before
                                                                   -> repeat_delinquent
     Q5  Straight roller?       run-up to 4 took <=3 months: seasoned (>=12 months on book,
                                or history cropped by the window = older than it) /
@@ -2729,7 +2729,7 @@ from .analysis import crop_history, md
 from .features import _runs, build_features, encode
 
 DEFAULT_TOP = 9
-WINDOW = 24                         # the bank's 24-month extract
+from .config import MAX_HISTORY_MONTHS as WINDOW   # reliable history window (32 months)
 
 
 # --- synthetic 180+ lifecycles -----------------------------------------------------------
@@ -2766,7 +2766,7 @@ def _broken_payer(rng) -> list[int]:
 def generate_180(n: int = 20_000, median_months_at_9: float = 12, seed: int = 7,
                  share_no_history: float = 0.03) -> pd.DataFrame:
     """Snapshot of the 180+ segment: accounts whose current bucket is 8 or 9, sampled in
-    proportion to the months they spend there, history cropped to the 24-month window."""
+    proportion to the months they spend there, history cropped to the reliable window."""
     rng = np.random.default_rng(seed)
     names = list(synth.ARCHETYPES) + ["broken_payer"]
     w = np.array([synth.ARCHETYPES[k][0] for k in synth.ARCHETYPES] + [0.03])
@@ -2826,7 +2826,7 @@ def features_180(df: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
     return pd.concat([f, pd.DataFrame(extra, index=f.index)], axis=1)
 
 
-def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 24) -> pd.Series:
+def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 12) -> pd.Series:
     fast = f.runup_len <= 3
     conds = [
         f.paid_in_default,
@@ -3603,7 +3603,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/selftest.py`
-sha256 `e1fc37dfc16fa14e01764e022a347cda7a3be8016d32d96f3923aaafb3744272` · 178 lines · trailing newline: yes
+sha256 `aa69ee6ab4297a5abd084cd45300517632bc22a92eedf68991c8d666239e3076` · 178 lines · trailing newline: yes
 
 `````python
 """End-to-end self-test of the REAL-DATA path on synthetic data (no Spark needed).
@@ -3659,8 +3659,8 @@ CASES = [
     ("0000000000000000224", "straight_roller_seasoned", "+2 jump after a hold at 2: repaired to 2 3 4"),
     ("00000000000000002244", "straight_roller_seasoned", "same account a month later: fixed state must not change"),
     ("000034", "straight_roller_early_life", "jump from clean to 3: no clean month is borrowed"),
-    ("0 2 3 4" + " 0" * 30 + " 2 3 4", "straight_roller_seasoned", "cured 30 months earlier: outside 24-month window"),
-    ("0 2 3 4" + " 0" * 20 + " 2 3 4 5", "repeat_delinquent", "cured 20 months earlier: repeat delinquent"),
+    ("0 2 3 4" + " 0" * 20 + " 2 3 4", "straight_roller_seasoned", "cured 20 months earlier: outside 12-month window"),
+    ("0 2 3 4" + " 0" * 8 + " 2 3 4 5", "repeat_delinquent", "cured 8 months earlier: repeat delinquent"),
     ("0000000000000000 2 3 4 4 0 4 5", "stabilized", "single 0 inside a spell at 4 is a glitch, not a cure"),
     ("0000 3 0000000000000 2 3 4", "straight_roller_seasoned", "single spike 0 3 0 is a glitch, not an earlier spell"),
 ]
@@ -3670,7 +3670,7 @@ CROP_CASES = [   # (oldest -> newest, max months kept, expected option-B state, 
     ("0" * 10 + "234" + "45" * 18 + "4", 32, "stabilized",
      "spell older than the window: not a data-quality case; long-run holder -> stabilized"),
     ("0" * 40 + "234", 32, "straight_roller_seasoned", "long clean history cropped: still seasoned"),
-    ("0000000000234", 6, "straight_roller_early_life", "cropped to 0 0 0 2 3 4: looks like EPD but is not new"),
+    ("0000000000234", 6, "straight_roller_seasoned", "cropped to 0 0 0 2 3 4: looks like EPD, but older than the window"),
     ("0 0 0 2 3 4", 32, "early_payment_default", "short history, not cropped: EPD"),
 ]
 
@@ -3787,7 +3787,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `20f1c946e3d465ae00772de37292fa9b342222deb623eb09d865a02af558c670` · 238 lines · trailing newline: yes
+sha256 `954061fd32988571b2a9ab572360477d45cba70ea49c335f03da6610dee142c0` · 238 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -3938,7 +3938,7 @@ python docs/deterioration_states/run.py selftest
 
 # 4. validate on the real file                      -> checks + state shares
 #    reads data/input/dpd_synthetic_data.xlsx, column dpd_history_str (config.py),
-#    crops to the history window (reliable from 2024-01; 24-month extract -> 24), keeps buckets 4-7
+#    crops to the reliable history window (2024-01 .. 2026-08 = 32 months), keeps buckets 4-7
 python docs/deterioration_states/run.py validate
 #    another file and/or sample size:
 #    python docs/deterioration_states/run.py validate data/input/other_file.xlsx 50000

@@ -45,9 +45,10 @@ Design rules agreed with the business owner:
   re-opened as a new account at their previous bucket.
 - **Reliable window: January 2024 onwards.** Older DPD history is unreliable, so every
   string is cropped to the newest months from `RELIABLE_FROM` (2024-01) to
-  `SNAPSHOT_MONTH` (2026-08) — 32 months — or to the source's own fixed window if shorter
-  (`SOURCE_WINDOW_MONTHS`: the sign-off file is a **24-month** extract, so 24 applies). A
-  string that fills the whole window may have older history and is treated as cropped.
+  `SNAPSHOT_MONTH` (2026-08) — **32 months** — or to the source's own fixed window if shorter
+  (`SOURCE_WINDOW_MONTHS`; the sign-off file now carries full history, so 32 applies). A
+  string that fills the whole window may have older history and is treated as cropped —
+  never EPD, never "history starts delinquent", and a straight roller is seasoned.
   Effects, all handled:
   - EPD is unaffected: an EPD has at most 3 clean months plus a short straight roll, so its
     string is under 12 digits and never cropped. As a safety net, a cropped string can
@@ -55,7 +56,7 @@ Design rules agreed with the business owner:
   - A spell that started before 2024 makes a cropped string start delinquent. That is
     normal history, not a data issue, so Q0 skips cropped strings; these accounts (0.16%
     of the synthetic spine) are classified normally — in practice mostly stabilized.
-  - Seasoned (≥ 12 months) and the 24-month repeat window fit inside 32 months; earlier
+  - Seasoned (≥ 12 months) and the 12-month repeat window fit inside 32 months; earlier
     spells that ended before 2024 are invisible, which can slightly under-count repeat
     delinquents whose spell began in early 2024.
   *(Synthetic: 74% of strings cropped; option-B shares essentially unchanged.)*
@@ -96,7 +97,7 @@ Design rules agreed with the business owner:
 | `months_before_spell` | months of history before the current spell started (blip months included) | yes |
 | `n_blips` | earlier 1–2 month excursions that never passed bucket 2 (EPD allows one) | yes |
 | `n_prior_episodes` | earlier real (non-blip) spells (EPD requires none) | yes |
-| `gap_prior_peak3` | clean months between the end of the most recent earlier spell that reached bucket 3 and the start of this one (repeat delinquent: ≤ 24) | yes |
+| `gap_prior_peak3` | clean months between the end of the most recent earlier spell that reached bucket 3 and the start of this one (repeat delinquent: ≤ 12) | yes |
 | `spell_pay_events` | months in the current spell with any payment (hold or move back); EPD requires 0 | **no** — EPD ends when they pay, by design |
 | `runup_len` | months from the last clean month to the first month at bucket 4 (3 = straight 2→3→4) | yes |
 | `runup_pays` | months on the way to 4 in which 2+ months were paid (moved back) | yes |
@@ -124,7 +125,7 @@ Q2  Stabilized?             >= 5 of the last 6 months within today's bucket ±1
                             OR (>= 6 months since first reaching 4 AND at most 1 bucket
                                 higher than 6 months ago)      -> stabilized
 Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and ended
-                            <= 24 months before this spell started
+                            <= 12 months before this spell started
                                                                -> repeat_delinquent
 Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 months
       yes -> straight_roller  [B, C: >= 12 months of history before the spell
@@ -154,8 +155,8 @@ Early-life straight roller stays a state in B and C, but if real data puts it un
 |---|---|---|---|
 | **Early payment default (EPD)** · `early_payment_default` | At most 3 months of history (one blip allowed), rolled straight in and has **never paid since crossing bucket 2** — still falling, so short-tenure by nature | Early-risk / first-party-fraud review, early legal; no restructuring | 4.3% (bank's broader rule: 6%) |
 | **Stabilized** · `stabilized` | Paying about one month's due each month for 5 of 6 months — or, 6+ months after first reaching 4, still within one bucket of where it was 6 months ago (pays what is due on average, unevenly) | **Offer restructuring to break the hardship** | 7.8% (bank's rule alone: 6.9%; bank: 6%) |
-| **Repeat delinquent (re-default)** · `repeat_delinquent` | Cured a spell that reached bucket 3 and fell back in within 24 months | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 14.8% |
-| **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book, then rolled straight to bucket 4 with no payment on the way down (some have paid since) | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 53.4% |
+| **Repeat delinquent (re-default)** · `repeat_delinquent` | Cured a spell that reached bucket 3 and fell back in within 12 months | Has shown they can catch up: firm promise-based plan; credibility decides the pressure | 10.8% |
+| **Seasoned straight roller** · `straight_roller_seasoned` | At least a year on book, then rolled straight to bucket 4 with no payment on the way down (some have paid since) | Life event. Read with the other axes: not in country → departed; no salary → income shock; salary still in → won't pay. Most likely to respond to a hardship route | 57.4% |
 | **Early-life straight roller** · `straight_roller_early_life` | 4–11 months on book, then rolled straight to bucket 4 | Same triage; also an underwriting signal for acquisition | 4.7% — under the 5% floor in synthetic data; the real share decides (E16) |
 | **Slow roller (partial payer)** · `slow_roller` | Paid something on the way down to bucket 4 but kept rolling | Over-indebted: longer-tenor restructure or settlement | 15.1% |
 | ↳ **Intermittent payer** *(C)* · `slow_roller_intermittent` | Paid one month here and there on the way down, never caught up | Chronic insufficiency: restructure to what they actually pay | 9.3% |
@@ -212,7 +213,7 @@ sensitivity, not as a menu.
 | Stabilized band (`stabilized_min_in_band`) [business] | **5 of last 6 months within ±1** | The bank's existing stabilized rule, unchanged | 4 of 6: share ~14%, next-month roll ~46%. 6 of 6: ~5%, ~32% |
 | Stabilized long-run clause (`stabilized_long_run_months`, `_max_rise`) [business] | **≥ 6 months since first reaching 4, at most +1 bucket over 6 months** | Fixes oscillating payers and accounts that just paid down (§6.15). Straight rollers cannot meet it (they leave the spine within ~4 months) | Adds ~1% of the spine to stabilized. +2 would take in slow drifters paying ~4 of 6 dues; `None` switches it off |
 | Repeat-delinquent depth (`repeat_min_prior_peak`) [business] | **earlier spell reached 3** | Cures from 4+ are rare; spells reaching 3 give 83% one-spell vs the bank's ~85% | From 2: more; from 4: ~5% |
-| Repeat-delinquent window (`repeat_window_months`) [business] | **ended ≤ 24 months before this spell** | Owner decision; the common re-default window. Measured to the start of this spell, so the state stays fixed | Lowers the overlap with credibility's lifetime clean point (eta² 0.81 → 0.72) |
+| Repeat-delinquent window (`repeat_window_months`) [business] | **ended ≤ 12 months before this spell** | Owner decision (changed from 24); the common re-default window. Measured to the start of this spell, so the state stays fixed | Lowers the overlap with credibility's lifetime clean point (eta² 0.81 with no window → 0.52 at 12 months) |
 | Seasoned (`seasoned_min_months`) [business] | **≥ 12 months** | The first year on book is the standard early-life window; EPD already takes ≤ 3 months, so early life = 4–11 months | Early life 4.7% at 12 m; it depends on the book's tenure mix, so the real share decides (E16) |
 
 **Rule order.** Q0 and EPD come before stabilized; since an EPD has never paid in its
@@ -270,7 +271,7 @@ confuse each other in every view, and the risk actions are close. Much of "volat
 ### 6.6 Repeat delinquent in option A
 Left out of A on purpose. Repeat delinquent is built from earlier spells — the history
 credibility's 1-point "pre-delinquency clean" flag scores. In the self-test the states
-explain **72%** of that point's variance (81% before the 24-month window). It is in B/C
+explain **52%** of that point's variance under the 12-month window (81% with no window). It is in B/C
 because it is only 1 of credibility's 5 points and *cured from bucket 3 recently* is
 evidence of catch-up capacity. E19b measures the real overlap and decides A vs B.
 
@@ -349,7 +350,7 @@ to stabilized.
 | stabilized ↔ credibility "money coming in" (2 pts) | 98% of stabilized have money in; ~44% of the rest do too | One-directional: stabilized is stricter (enough to hold the bucket, 6 months). Accept and state it. E21 |
 | slow roller ↔ credibility "money coming in" | near bucket 4 almost all slow rollers paid in the last 3 months (they paid on the way down); by bucket 7 far fewer | A clock effect of the run-up, not a separate signal. Reported by state × bucket in every run |
 | stabilized ↔ credibility "promises kept" (2 pts) | likely (paying monthly) — not testable without the score | E19 measures the total |
-| repeat delinquent ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.72 of the clean point explained by B states | Decides A vs B. E19b |
+| repeat delinquent ↔ credibility "pre-delinquency clean" (1 pt) | eta² 0.52 of the clean point explained by B states (12-month window) | Decides A vs B. E19b |
 | straight / slow roller ↔ ability | none in synthetic (by construction) | Straight rolling may proxy income loss on real data — fine, but say so. E20 |
 | any state ↔ locatability | none expected | E20b |
 

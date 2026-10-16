@@ -14,7 +14,7 @@ that only exist at 180+, plus an honest state when the path in is outside the wi
     Q3  Early payment default? <=3 months on book before the spell (<=1 blip), no earlier
                                spell, no payment between bucket 2 and reaching 9
                                                                   -> early_payment_default
-    Q4  Repeat delinquent?     earlier spell reached 3, cured, ended <=24 months before
+    Q4  Repeat delinquent?     earlier spell reached 3, cured, ended <=12 months before
                                                                   -> repeat_delinquent
     Q5  Straight roller?       run-up to 4 took <=3 months: seasoned (>=12 months on book,
                                or history cropped by the window = older than it) /
@@ -34,7 +34,7 @@ from .analysis import crop_history, md
 from .features import _runs, build_features, encode
 
 DEFAULT_TOP = 9
-WINDOW = 24                         # the bank's 24-month extract
+from .config import MAX_HISTORY_MONTHS as WINDOW   # reliable history window (32 months)
 
 
 # --- synthetic 180+ lifecycles -----------------------------------------------------------
@@ -71,7 +71,7 @@ def _broken_payer(rng) -> list[int]:
 def generate_180(n: int = 20_000, median_months_at_9: float = 12, seed: int = 7,
                  share_no_history: float = 0.03) -> pd.DataFrame:
     """Snapshot of the 180+ segment: accounts whose current bucket is 8 or 9, sampled in
-    proportion to the months they spend there, history cropped to the 24-month window."""
+    proportion to the months they spend there, history cropped to the reliable window."""
     rng = np.random.default_rng(seed)
     names = list(synth.ARCHETYPES) + ["broken_payer"]
     w = np.array([synth.ARCHETYPES[k][0] for k in synth.ARCHETYPES] + [0.03])
@@ -131,7 +131,7 @@ def features_180(df: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
     return pd.concat([f, pd.DataFrame(extra, index=f.index)], axis=1)
 
 
-def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 24) -> pd.Series:
+def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 12) -> pd.Series:
     fast = f.runup_len <= 3
     conds = [
         f.paid_in_default,

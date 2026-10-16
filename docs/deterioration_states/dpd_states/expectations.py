@@ -277,7 +277,7 @@ EXPECTATIONS = [
     ("E19b", "Orthogonality: credibility 'pre-delinquency clean' point explained by the states (eta²)",
      lambda R: _eta(R, "cred_clean_point"), lambda v: v <= 0.50, "<= 0.50", "WARN", "design",
      "Repeat delinquent uses earlier spells — the history the clean point scores (now limited to the "
-     "last 24 months, which lowers the overlap).",
+     "last 12 months, which lowers the overlap).",
      "Repeat delinquent duplicates the clean point: use option A, or keep it and tell the persona grid "
      "it is the same signal (only 1 of credibility's 5 points)."),
     ("E20", "Orthogonality: ability score explained by the states (eta²)",

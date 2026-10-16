@@ -51,8 +51,8 @@ CASES = [
     ("0000000000000000224", "straight_roller_seasoned", "+2 jump after a hold at 2: repaired to 2 3 4"),
     ("00000000000000002244", "straight_roller_seasoned", "same account a month later: fixed state must not change"),
     ("000034", "straight_roller_early_life", "jump from clean to 3: no clean month is borrowed"),
-    ("0 2 3 4" + " 0" * 30 + " 2 3 4", "straight_roller_seasoned", "cured 30 months earlier: outside 24-month window"),
-    ("0 2 3 4" + " 0" * 20 + " 2 3 4 5", "repeat_delinquent", "cured 20 months earlier: repeat delinquent"),
+    ("0 2 3 4" + " 0" * 20 + " 2 3 4", "straight_roller_seasoned", "cured 20 months earlier: outside 12-month window"),
+    ("0 2 3 4" + " 0" * 8 + " 2 3 4 5", "repeat_delinquent", "cured 8 months earlier: repeat delinquent"),
     ("0000000000000000 2 3 4 4 0 4 5", "stabilized", "single 0 inside a spell at 4 is a glitch, not a cure"),
     ("0000 3 0000000000000 2 3 4", "straight_roller_seasoned", "single spike 0 3 0 is a glitch, not an earlier spell"),
 ]
@@ -62,7 +62,7 @@ CROP_CASES = [   # (oldest -> newest, max months kept, expected option-B state, 
     ("0" * 10 + "234" + "45" * 18 + "4", 32, "stabilized",
      "spell older than the window: not a data-quality case; long-run holder -> stabilized"),
     ("0" * 40 + "234", 32, "straight_roller_seasoned", "long clean history cropped: still seasoned"),
-    ("0000000000234", 6, "straight_roller_early_life", "cropped to 0 0 0 2 3 4: looks like EPD but is not new"),
+    ("0000000000234", 6, "straight_roller_seasoned", "cropped to 0 0 0 2 3 4: looks like EPD, but older than the window"),
     ("0 0 0 2 3 4", 32, "early_payment_default", "short history, not cropped: EPD"),
 ]
 

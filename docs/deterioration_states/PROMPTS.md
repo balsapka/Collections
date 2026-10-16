@@ -62,8 +62,7 @@ Task: run the package on our DPD-history file, without Spark.
    - the share of strings whose LEFTMOST digit is 4–7 (today's spine) and the
      distribution of the RIGHTMOST digit (should be mostly 0/1 = first billed month);
    - min / median / max string length (strings are cropped to the reliable window,
-     RELIABLE_FROM = 2024-01 to SNAPSHOT_MONTH = 2026-08, capped by SOURCE_WINDOW_MONTHS = 24
-     for the 24-month extract, inside the package —
+     RELIABLE_FROM = 2024-01 to SNAPSHOT_MONTH = 2026-08 = 32 months, inside the package —
      do not crop them yourself; if the snapshot month differs, update SNAPSHOT_MONTH);
    - any characters other than 0–9 (if so, list them with counts; do not guess a mapping).
 3. Optional columns: if the file (or another file I point you to) has any of the persona
@@ -168,7 +167,7 @@ Write exactly these sections:
    - Stabilized: paying about one month's due each month — 5 of the last 6 months within
      one bucket of today's, or 6+ months past bucket 4 and at most one bucket higher than
      6 months ago.
-   - Repeat delinquent: cured a spell that reached 60+ DPD and fell back in within 24 months.
+   - Repeat delinquent: cured a spell that reached 60+ DPD and fell back in within 12 months.
    - Seasoned straight roller: 12+ months on book, then rolled straight to bucket 4 with no
      payment on the way down.
    - Early-life straight roller: same, within the first 12 months on book.

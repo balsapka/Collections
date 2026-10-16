@@ -57,9 +57,9 @@ def _months_between(first: str, last: str) -> int:
 
 
 # The source may itself be a fixed-length extract (the sign-off file pivots every account
-# onto a 24-month grid). A string that fills the whole window may have older history, so
+# onto a fixed grid). A string that fills the whole window may have older history, so
 # it is treated as cropped (never EPD, never "history starts delinquent"). None = full history.
-SOURCE_WINDOW_MONTHS = 24
+SOURCE_WINDOW_MONTHS = None          # the sign-off file now carries full history
 
 _reliable = _months_between(RELIABLE_FROM, SNAPSHOT_MONTH) if RELIABLE_FROM else None   # 32
 MAX_HISTORY_MONTHS = min(x for x in (_reliable, SOURCE_WINDOW_MONTHS) if x) if (_reliable or SOURCE_WINDOW_MONTHS) else None   # 24

@@ -1,4 +1,4 @@
-# DPD deterioration states — synthetic validation 20261016_163019
+# DPD deterioration states — synthetic validation 20261016_163440
 
 20,000 calibrated synthetic spine accounts (current bucket 4–7). Strings: leftmost = current bucket. 0 ≡ 1.
 
@@ -47,7 +47,7 @@ Months of history before the current spell (continuous — no planted gaps):
 
 ## B. State options — each a MECE tree (first 'yes' wins)
 
-Shared thresholds: `{'epd_max_history': 3, 'epd_max_blips': 1, 'straight_max_runup': 3, 'stabilized_min_in_band': 5, 'stabilized_long_run_months': 6, 'stabilized_long_run_max_rise': 1, 'paying_since_4_min_rate': None, 'repeat_min_prior_peak': None, 'repeat_window_months': 24, 'seasoned_min_months': None, 'split_slow_roller': False}`
+Shared thresholds: `{'epd_max_history': 3, 'epd_max_blips': 1, 'straight_max_runup': 3, 'stabilized_min_in_band': 5, 'stabilized_long_run_months': 6, 'stabilized_long_run_max_rise': 1, 'paying_since_4_min_rate': None, 'repeat_min_prior_peak': None, 'repeat_window_months': 12, 'seasoned_min_months': None, 'split_slow_roller': False}`
 
 ### A_minimal_4 — 4 states (extra switches: `{}`)
 
@@ -64,10 +64,10 @@ Shared thresholds: `{'epd_max_history': 3, 'epd_max_blips': 1, 'straight_max_run
 |---|---|---|---|---|---|---|
 | early_payment_default | 0.04 | 0.87 | 0.99 | 0.84 | 0.00 | 0.00 |
 | stabilized | 0.08 | 0.49 | 0.57 | 0.61 | 0.98 | 0.14 |
-| repeat_delinquent | 0.15 | 0.85 | 0.93 | 0.99 | 0.27 | 1.00 |
-| straight_roller_seasoned | 0.53 | 0.85 | 0.94 | 0.98 | 0.26 | 0.07 |
+| repeat_delinquent | 0.11 | 0.83 | 0.91 | 0.99 | 0.29 | 1.00 |
+| straight_roller_seasoned | 0.57 | 0.85 | 0.94 | 0.98 | 0.26 | 0.13 |
 | straight_roller_early_life | 0.05 | 0.85 | 0.95 | 0.97 | 0.48 | 0.01 |
-| slow_roller | 0.15 | 0.85 | 0.94 | 0.98 | 0.56 | 0.00 |
+| slow_roller | 0.15 | 0.85 | 0.94 | 0.98 | 0.56 | 0.01 |
 
 ### C_detailed_7 — 7 states (extra switches: `{'repeat_min_prior_peak': 3, 'seasoned_min_months': 12, 'split_slow_roller': True}`)
 
@@ -75,10 +75,10 @@ Shared thresholds: `{'epd_max_history': 3, 'epd_max_blips': 1, 'straight_max_run
 |---|---|---|---|---|---|---|
 | early_payment_default | 0.04 | 0.87 | 0.99 | 0.84 | 0.00 | 0.00 |
 | stabilized | 0.08 | 0.49 | 0.57 | 0.61 | 0.98 | 0.14 |
-| repeat_delinquent | 0.15 | 0.85 | 0.93 | 0.99 | 0.27 | 1.00 |
-| straight_roller_seasoned | 0.53 | 0.85 | 0.94 | 0.98 | 0.26 | 0.07 |
+| repeat_delinquent | 0.11 | 0.83 | 0.91 | 0.99 | 0.29 | 1.00 |
+| straight_roller_seasoned | 0.57 | 0.85 | 0.94 | 0.98 | 0.26 | 0.13 |
 | straight_roller_early_life | 0.05 | 0.85 | 0.95 | 0.97 | 0.48 | 0.01 |
-| slow_roller_intermittent | 0.09 | 0.84 | 0.94 | 0.97 | 0.62 | 0.01 |
+| slow_roller_intermittent | 0.09 | 0.84 | 0.93 | 0.97 | 0.62 | 0.01 |
 | slow_roller_erratic | 0.06 | 0.85 | 0.95 | 0.99 | 0.47 | 0.00 |
 
 Option C — state mix by current bucket:
@@ -86,12 +86,12 @@ Option C — state mix by current bucket:
 | row_0 | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|
 | early_payment_default | 0.04 | 0.04 | 0.04 | 0.04 |
-| repeat_delinquent | 0.14 | 0.14 | 0.16 | 0.16 |
+| repeat_delinquent | 0.10 | 0.10 | 0.12 | 0.11 |
 | slow_roller_erratic | 0.05 | 0.06 | 0.06 | 0.06 |
 | slow_roller_intermittent | 0.08 | 0.09 | 0.09 | 0.11 |
 | stabilized | 0.15 | 0.09 | 0.04 | 0.01 |
 | straight_roller_early_life | 0.04 | 0.05 | 0.06 | 0.05 |
-| straight_roller_seasoned | 0.50 | 0.53 | 0.55 | 0.57 |
+| straight_roller_seasoned | 0.53 | 0.57 | 0.59 | 0.61 |
 
 Option C — planted pattern → state (row share):
 
@@ -101,7 +101,7 @@ Option C — planted pattern → state (row share):
 | clean_abrupt_shock | 0.01 | 0.00 | 0.00 | 0.00 | 0.02 | 0.06 | 0.91 |
 | dip_and_roll | 0.00 | 0.00 | 0.43 | 0.00 | 0.06 | 0.03 | 0.47 |
 | oscillating_payer | 0.00 | 0.00 | 0.00 | 0.00 | 0.64 | 0.03 | 0.34 |
-| repeat_episodes | 0.00 | 0.59 | 0.00 | 0.02 | 0.02 | 0.01 | 0.36 |
+| repeat_episodes | 0.00 | 0.35 | 0.00 | 0.02 | 0.02 | 0.01 | 0.61 |
 | slow_slide | 0.00 | 0.00 | 0.00 | 0.98 | 0.02 | 0.00 | 0.00 |
 | stabilized | 0.00 | 0.00 | 0.00 | 0.00 | 0.68 | 0.03 | 0.29 |
 | staircase | 0.00 | 0.00 | 0.00 | 0.28 | 0.72 | 0.00 | 0.00 |
@@ -114,24 +114,24 @@ Option C — examples (last 30 months, oldest → newest):
 | early_payment_default | 023456 |
 | early_payment_default | 020234567 |
 | early_payment_default | 00234 |
-| repeat_delinquent | 000122320000023301000001234567 |
-| repeat_delinquent | 000000001000002220023200023445 |
-| repeat_delinquent | 000000010022334430010000000234 |
-| slow_roller_erratic | 010000000000000000233234234567 |
-| slow_roller_erratic | 000000000000100000000232234556 |
-| slow_roller_erratic | 000232334222222343434342323455 |
-| slow_roller_intermittent | 000000000000000120000002233456 |
-| slow_roller_intermittent | 000000000000000010100000023345 |
-| slow_roller_intermittent | 000000001000000000000022334566 |
-| stabilized | 000000101000000000023234334234 |
-| stabilized | 000000000000000012334233234234 |
-| stabilized | 000000000000000000000234456544 |
-| straight_roller_early_life | 010000002345677 |
-| straight_roller_early_life | 020234555 |
-| straight_roller_early_life | 00000000010234566 |
-| straight_roller_seasoned | 120000000002000020000002345567 |
-| straight_roller_seasoned | 000000000000000000000000100234 |
-| straight_roller_seasoned | 000000000000000010000002344567 |
+| repeat_delinquent | 000000100010232311112323123445 |
+| repeat_delinquent | 000000000000023423123423342345 |
+| repeat_delinquent | 010001023423232343112342345567 |
+| slow_roller_erratic | 000000000000000000000023232346 |
+| slow_roller_erratic | 00000001000000000000000232345 |
+| slow_roller_erratic | 000001000000010000000232234555 |
+| slow_roller_intermittent | 000000010000233434234233433456 |
+| slow_roller_intermittent | 0000000000102000000020002334 |
+| slow_roller_intermittent | 000100000000000000000022345556 |
+| stabilized | 0000000000000000002000233334 |
+| stabilized | 000000100023454455654344456554 |
+| stabilized | 002000000000000000002344444345 |
+| straight_roller_early_life | 000010002345 |
+| straight_roller_early_life | 0023445 |
+| straight_roller_early_life | 000000000023456 |
+| straight_roller_seasoned | 000000000000000000000102345567 |
+| straight_roller_seasoned | 000000000000000022011000234567 |
+| straight_roller_seasoned | 000000000000000000000000234566 |
 
 ## C. Clustering the residual (after EPD and stabilized)
 
@@ -139,13 +139,13 @@ Residual = 88% of the spine. Agreement (ARI) between k-means clusters and each o
 
 | k | silhouette | bootstrap_ARI | agree_A_minimal_4 | agree_B_balanced_6 | agree_C_detailed_7 |
 |---|---|---|---|---|---|
-| 2 | 0.34 | 1.00 | -0.06 | 0.37 | 0.35 |
-| 3 | 0.38 | 1.00 | 0.30 | 0.56 | 0.57 |
-| 4 | 0.34 | 1.00 | 0.17 | 0.40 | 0.40 |
-| 5 | 0.29 | 0.66 | 0.11 | 0.31 | 0.31 |
-| 6 | 0.32 | 1.00 | 0.11 | 0.30 | 0.31 |
-| 7 | 0.34 | 0.87 | 0.10 | 0.28 | 0.30 |
-| 8 | 0.36 | 0.98 | 0.17 | 0.36 | 0.38 |
+| 2 | 0.34 | 1.00 | -0.06 | 0.23 | 0.21 |
+| 3 | 0.38 | 1.00 | 0.30 | 0.44 | 0.45 |
+| 4 | 0.34 | 1.00 | 0.17 | 0.30 | 0.31 |
+| 5 | 0.29 | 0.66 | 0.11 | 0.22 | 0.22 |
+| 6 | 0.32 | 1.00 | 0.11 | 0.22 | 0.23 |
+| 7 | 0.34 | 0.87 | 0.10 | 0.20 | 0.22 |
+| 8 | 0.36 | 0.98 | 0.17 | 0.28 | 0.30 |
 
 k = 6 cluster profiles:
 
@@ -191,8 +191,8 @@ k = 6 cluster profiles:
 
 | earlier spell reached bucket | repeat_share |
 |---|---|
-| 2 | 0.17 |
-| 3 | 0.15 |
+| 2 | 0.13 |
+| 3 | 0.11 |
 | 4 | 0.04 |
 
 ### Q5 straight vs slow roller — max run-up months
@@ -207,10 +207,10 @@ k = 6 cluster profiles:
 
 | seasoned_min_months | seasoned | early_life |
 |---|---|---|
-| 12 | 0.53 | 0.05 |
-| 18 | 0.50 | 0.08 |
-| 24 | 0.46 | 0.13 |
-| 36 | 0.37 | 0.21 |
+| 12 | 0.57 | 0.05 |
+| 18 | 0.54 | 0.08 |
+| 24 | 0.49 | 0.13 |
+| 36 | 0.40 | 0.22 |
 
 ## E. Discovery views (states = B_balanced_6)
 
@@ -238,24 +238,24 @@ k = 6 cluster profiles:
 
 | gram | support | lift | top_label | purity |
 |---|---|---|---|---|
-| HHPP | 0.02 | 92.80 | repeat_delinquent | 0.81 |
-| RHHP | 0.09 | 71.15 | repeat_delinquent | 0.59 |
-| HRHP | 0.03 | 38.87 | repeat_delinquent | 0.76 |
-| RHPP | 0.02 | 32.29 | repeat_delinquent | 0.81 |
-| HHPN | 0.07 | 27.11 | repeat_delinquent | 0.56 |
-| RHRH | 0.10 | 26.03 | repeat_delinquent | 0.44 |
-| RRHH | 0.07 | 22.36 | repeat_delinquent | 0.40 |
-| RPRP | 0.10 | 20.84 | repeat_delinquent | 0.34 |
-| RRRH | 0.19 | 20.37 | straight_roller_seasoned | 0.55 |
-| RRHP | 0.04 | 19.68 | repeat_delinquent | 0.69 |
-| HPPN | 0.04 | 19.45 | repeat_delinquent | 0.86 |
-| RHRP | 0.05 | 18.00 | repeat_delinquent | 0.60 |
+| HHPP | 0.02 | 92.80 | repeat_delinquent | 0.49 |
+| RHHP | 0.09 | 71.15 | straight_roller_seasoned | 0.58 |
+| HRHP | 0.03 | 38.87 | repeat_delinquent | 0.46 |
+| RHPP | 0.02 | 32.29 | repeat_delinquent | 0.50 |
+| HHPN | 0.07 | 27.11 | straight_roller_seasoned | 0.65 |
+| RHRH | 0.10 | 26.03 | straight_roller_seasoned | 0.32 |
+| RRHH | 0.07 | 22.36 | straight_roller_seasoned | 0.37 |
+| RPRP | 0.10 | 20.84 | straight_roller_seasoned | 0.36 |
+| RRRH | 0.19 | 20.37 | straight_roller_seasoned | 0.59 |
+| RRHP | 0.04 | 19.68 | repeat_delinquent | 0.47 |
+| HPPN | 0.04 | 19.45 | repeat_delinquent | 0.53 |
+| RHRP | 0.05 | 18.00 | repeat_delinquent | 0.44 |
 | RRPH | 0.05 | 17.11 | slow_roller | 0.30 |
-| PRHP | 0.01 | 16.64 | repeat_delinquent | 0.54 |
+| PRHP | 0.01 | 16.64 | repeat_delinquent | 0.53 |
 | RPHR | 0.04 | 16.60 | slow_roller | 0.36 |
-| RRHR | 0.15 | 16.36 | straight_roller_seasoned | 0.38 |
-| HRPP | 0.02 | 15.52 | repeat_delinquent | 0.71 |
-| HRHH | 0.05 | 14.32 | repeat_delinquent | 0.43 |
+| RRHR | 0.15 | 16.36 | straight_roller_seasoned | 0.42 |
+| HRPP | 0.02 | 15.52 | repeat_delinquent | 0.53 |
+| HRHH | 0.05 | 14.32 | stabilized | 0.39 |
 | RHHH | 0.04 | 13.66 | stabilized | 0.68 |
 | HRHR | 0.05 | 13.33 | slow_roller | 0.64 |
 
@@ -263,8 +263,8 @@ k = 6 cluster profiles:
 
 | k | silhouette | bootstrap_ARI | ARI_vs_planted | ARI_vs_states |
 |---|---|---|---|---|
-| 4 | 0.328 | 0.988 | 0.381 | 0.413 |
-| 5 | 0.338 | 0.985 | 0.383 | 0.384 |
-| 6 | 0.283 | 0.979 | 0.373 | 0.453 |
-| 7 | 0.278 | 0.607 | 0.387 | 0.432 |
-| 8 | 0.291 | 0.989 | 0.363 | 0.400 |
+| 4 | 0.328 | 0.988 | 0.381 | 0.328 |
+| 5 | 0.338 | 0.985 | 0.383 | 0.300 |
+| 6 | 0.283 | 0.979 | 0.373 | 0.373 |
+| 7 | 0.278 | 0.607 | 0.387 | 0.356 |
+| 8 | 0.291 | 0.989 | 0.363 | 0.327 |
