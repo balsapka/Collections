@@ -1,27 +1,12 @@
-"""PROTOTYPE — deterioration states for the 180+ segment (current bucket 8 or 9; 9 is the cap).
+"""180+ segment (current bucket 8 or 9; 9 is the cap) — synthetic generator and run.
 
-At 9 the string cannot show payments (paying one month or nothing both read 9 9 9), so
-there is no 'stabilized'. The states describe how the account fell in, plus two signals
-that only exist at 180+, plus an honest state when the path in is outside the window:
-
-    Q1  Paying in default?     dropped below 9 after first reaching it (paid several
-                               months at once)                    -> paying_in_default
-    Q1b Stabilized?            below the cap (CC 8 only; never at 9, never RL 7) and the
-                               spine's stabilized rule holds      -> stabilized
-    Q2  Broken payer?          was stabilized (bank's 5-of-6 rule) for 6+ months while in
-                               buckets 4–7, then rolled on to 9 (visible even when the
-                               run-up is not)                     -> broken_payer
-    Q0  Journey start observed? the oldest observed month is already delinquent (incl.
-                               every month at 8 or 9): how it fell in is not visible
-                                                                  -> unknown
-    Q3  Early payment default? <=3 months on book before the spell (<=1 blip), no earlier
-                               spell, no payment between bucket 2 and reaching 9
-                                                                  -> early_payment_default
-    Q4  Repeat delinquent?     earlier spell reached 3, cured, ended <=12 months before
-                                                                  -> repeat_delinquent
-    Q5  Straight roller?       run-up to 4 took <=3 months: seasoned (>=12 months on book,
-                               or history cropped by the window = older than it) /
-                               early-life; otherwise              -> slow_roller
+The 180+ segment uses the SAME state tree and vocabulary as the 60-180 spine (states.py,
+option B): unknown, early_payment_default, stabilized, repeat_delinquent,
+straight_roller_seasoned / _early_life, slow_roller. Two rules make it valid at 180+:
+  * stabilized only up to bucket 7 (151-180 DPD) — never at 180+;
+  * a hold AT the ceiling (9 -> 9) is not a payment (features.py, cap=9), so EPD still
+    means "never paid since crossing bucket 2".
+Accounts whose window is all 8/9 start delinquent -> unknown.
 
 Plus an attribute, not a state: time in default (months since first reaching 8), banded.
 
@@ -35,6 +20,7 @@ import pandas as pd
 from . import synth
 from .analysis import crop_history, md
 from .features import _runs, build_features, encode
+from .states import OPTIONS, RECOMMENDED, assign_states, option_states
 
 DEFAULT_TOP = 9
 from .config import MAX_HISTORY_MONTHS as WINDOW   # reliable history window (32 months)
@@ -135,25 +121,10 @@ def features_180(df: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
     return pd.concat([f, pd.DataFrame(extra, index=f.index)], axis=1)
 
 
-def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 12,
-               cap_bucket: int = DEFAULT_TOP) -> pd.Series:
-    fast = f.runup_len <= 3
-    stab = ((f.last6_in_band >= 5) | ((f.months_since_4 >= 6) & (f.chg_6m <= 1))) & (f.b_now < cap_bucket)
-    conds = [
-        f.paid_in_default,
-        stab,                                       # CC 8 only: 9 is the cap
-        f.stabilized_months_in_4_7 >= 6,            # visible even when the run-up is not
-        f.starts_delinquent,                        # includes all_default
-        (f.months_before_spell <= 3) & (f.n_blips <= 1) & (f.n_prior_episodes == 0)
-        & (f.pay_events_before_9 == 0) & ~f.history_truncated,
-        f.gap_prior_peak3 <= repeat_window,
-        # cropped = older than the window, so on book well over a year: seasoned
-        fast & ((f.months_before_spell >= seasoned_min_months) | f.history_truncated),
-        fast,
-    ]
-    names = ["paying_in_default", "stabilized", "broken_payer", "unknown", "early_payment_default",
-             "repeat_delinquent", "straight_roller_seasoned", "straight_roller_early_life"]
-    return pd.Series(np.select(conds, names, "slow_roller"), index=f.index)
+def assign_180(f: pd.DataFrame) -> pd.Series:
+    """The SAME tree and vocabulary as the 60-180 spine (option B). Stabilized cannot occur
+    (bucket <= 7 only) and holds at the ceiling are not payments (features, cap=9)."""
+    return assign_states(f, **OPTIONS[RECOMMENDED])
 
 
 def default_band(f: pd.DataFrame) -> pd.Series:
@@ -163,8 +134,7 @@ def default_band(f: pd.DataFrame) -> pd.Series:
                      index=f.index)
 
 
-ORDER = ["paying_in_default", "stabilized", "broken_payer", "unknown", "early_payment_default",
-         "repeat_delinquent", "straight_roller_seasoned", "straight_roller_early_life", "slow_roller"]
+ORDER = option_states(RECOMMENDED)
 
 
 def main(n: int = 20_000) -> None:

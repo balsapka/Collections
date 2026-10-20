@@ -90,7 +90,9 @@ def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
     return list(zip(np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)))
 
 
-def journey_features(dpd: str) -> dict:
+def journey_features(dpd: str, cap: int = 9) -> dict:
+    """cap: the ceiling bucket (CC 9). A hold at the ceiling is not a payment (the bucket
+    cannot rise), so it does not count in spell_pay_events."""
     g, n_glitches = _glitches(_digits(dpd))
     _, n_repaired, n_jumps_left = _repair(g)
     b, d, c = encode(dpd)
@@ -151,7 +153,7 @@ def journey_features(dpd: str) -> dict:
         "runup_pays": int((ru_c == P).sum()),
         # current spell
         "spell_len": int(sp_end - sp_start),
-        "spell_pay_events": int((sp_c != R).sum()),     # months in this spell with a payment
+        "spell_pay_events": int(((sp_c != R) & ~((sp_c == H) & (b[t0 + 1:sp_end] >= cap))).sum()),
         "max_hold_run": int(max(hold_runs, default=0)),
         "months_since_4": int(months_since_4),          # months since first reaching 4 this spell
         "post4_paid_rate": float(paid[first4:].mean()) if months_since_4 > 0 else 0.0,
@@ -171,8 +173,8 @@ def journey_features(dpd: str) -> dict:
     }
 
 
-def build_features(df: pd.DataFrame, col: str = "dpd_string") -> pd.DataFrame:
+def build_features(df: pd.DataFrame, col: str = "dpd_string", cap: int = 9) -> pd.DataFrame:
     if len(df) == 0:
         raise ValueError("build_features got an empty frame — check the spine filter / sample")
-    feats = pd.DataFrame([journey_features(s) for s in df[col]], index=df.index)
+    feats = pd.DataFrame([journey_features(s, cap) for s in df[col]], index=df.index)
     return pd.concat([df, feats], axis=1)

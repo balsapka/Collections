@@ -11,6 +11,8 @@ tests only; the user runs the pipelines and `spark/prod_check.py` in PROD.
 **P9 runs after P8**: adds the regression tests under `src/tests/{nodes,pipelines}/crx_persona/`
 and removes everything unpacked from the bundle (recoverable from BUNDLE.md), plus any dead
 code the rewrite left in `src/`.
+**P10 fixes the state vocabulary** (after P9): one tree and the same 7 states for 60–180
+and 180+ (option B only), no stabilized at 180+, holds at the ceiling are not payments.
 
 ---
 
@@ -424,4 +426,97 @@ Step 5 — verify (offline) and report verbatim
    -> nothing (or only what I approved to keep).
 5. git status --short and git diff --stat.
 ```
+
+---
+
+## P10 — One state vocabulary for both segments; no stabilized at 180+ (after P9)
+
+Why: the previous engine had a separate 180+ tree that allowed `stabilized` at CC 8 and
+added 180+-only states (`paying_in_default`, `broken_payer`), and it kept the A / C option
+states that production never uses (`straight_roller`, `slow_roller_intermittent`,
+`slow_roller_erratic`) plus a dead one (`paying_since_4`). Both came from the bundle, not
+from Sonnet. Fixed: ONE tree and the same 7 states in both segments — `unknown`,
+`early_payment_default`, `stabilized`, `repeat_delinquent`, `straight_roller_seasoned`,
+`straight_roller_early_life`, `slow_roller`. Stabilized only up to CC 7 / RL 6 (151–180
+DPD), never at 180+. Holds at the ceiling (CC 9, RL 7) are not payments, so EPD still works
+at 180+. `det_option` and the `det_state_option` column are removed.
+
+Before pasting: replace `docs/deterioration_states/BUNDLE.md` with the **latest raw**
+BUNDLE.md. Changed for the repo: `_dpd_journey.py`, the `dpd_journey` params (no
+`det_option`), and the three tests in `src/tests/{nodes,pipelines}/crx_persona/`. The node
+and pipeline files are unchanged.
+
+```
+Context: src/enbd_collections/pipelines/crx_persona/ holds the DPD-journey deterioration
+pipelines (CC + RL) from an earlier bundle, with tests in src/tests/nodes/crx_persona/ and
+src/tests/pipelines/crx_persona/. docs/deterioration_states/ holds only BUNDLE.md, which I
+have just replaced with a newer version. The new engine has ONE state tree for both
+segments (60_180 and 180_plus) with 7 states: unknown, early_payment_default, stabilized,
+repeat_delinquent, straight_roller_seasoned, straight_roller_early_life, slow_roller.
+No stabilized at 180+, no 180+-only states, no A/C options. Bring src/ and the tests in
+line, and remove everything the old vocabulary left behind.
+
+Hard rules:
+- No PROD data access: never call catalog.load, never run kedro run, never query a table.
+- Extract the bundle OUTSIDE the repo (a temp folder) so nothing is unpacked into
+  docs/ again; delete the temp folder at the end.
+- STOP where marked. Do not commit or push.
+- Never adapt the engine to make a test pass; adapt only repo-specific names in tests.
+
+Step 1 — extract to a temp folder and verify (report only)
+1. mkdir a temp folder outside the repo, e.g. T=$(mktemp -d). Create $T/extract_bundle.py
+   from the "Extractor" section of docs/deterioration_states/BUNDLE.md, then:
+   python $T/extract_bundle.py docs/deterioration_states/BUNDLE.md $T
+   -> must end with "0 mismatched".
+2. python $T/spark/tests/test_parity.py -> must print "PARITY PASSED" (needs pandas,
+   numpy, pyspark importable; no Spark session).
+
+Step 2 — compare (report only)
+Diff, ignoring import lines and formatting:
+  $T/spark/crx_persona/_dpd_journey.py vs src/enbd_collections/pipelines/crx_persona/_dpd_journey.py
+  $T/spark/tests/nodes/crx_persona/*.py vs src/tests/nodes/crx_persona/*.py
+  $T/spark/tests/pipelines/crx_persona/*.py vs src/tests/pipelines/crx_persona/*.py
+  $T/spark/crx_persona/{cc,rl}_{full_history,a4_deterioration}/*.py vs src/... (expected: no logic change)
+Expected engine differences: one assign_state(f, cropped) for both segments;
+classify(buckets, cropped, offset, canon_top) without segment/option; STATE_RULES/STATES
+replace STATE_DEFAULTS/OPTIONS; features_180 / assign_state_180 / _FEATURES_180 removed;
+journey_features(..., canon_top) does not count holds at the ceiling as payments; no
+det_option param (an unknown dpd_journey key now raises); no det_state_option column.
+List any OTHER difference in src/ — e.g. adaptations made in P8/P9 (logging, import
+style, _DPD_BUCKET_REGEX, fixture names, EXPECTED table names) — those must be kept.
+Then find every remaining use of the old vocabulary and options:
+  grep -rn "det_option\|det_state_option\|segment_180_prototype\|assign_state_180\|features_180\|_FEATURES_180\|STATE_DEFAULTS\|OPTIONS\|paying_in_default\|broken_payer\|history_not_available\|history_starts_delinquent\|paying_since_4\|slow_roller_intermittent\|slow_roller_erratic\|\"straight_roller\"\|A_minimal_4\|C_detailed_7\|B_balanced_6" src/ conf/ notebooks/ 2>/dev/null
+including catalog schemas / column lists that name det_state_option or the 180+ extra
+columns (all_default, months_in_default, default_left_censored, pay_events_before_top,
+paid_in_default, stabilized_months_in_4_7).
+STOP — show me the diff summary and the grep results with a proposed action for each.
+
+Step 3 — apply (only after my OK)
+- Replace src/enbd_collections/pipelines/crx_persona/_dpd_journey.py with
+  $T/spark/crx_persona/_dpd_journey.py, re-applying only the repo adaptations listed in
+  step 2 (imports, logging, lint style).
+- Remove `det_option` from the crx_persona.dpd_journey params (conf/**/parameters*.yml).
+- Replace the three test files with the $T versions, re-applying only the repo
+  adaptations from P9 (fixture choice, names in the EXPECTED table).
+- Fix or remove every grep hit approved in step 2 (catalog column lists, notebooks, docs).
+- Leave the node and pipeline files alone unless step 2 found a logic difference I
+  approved.
+
+Step 4 — verify (offline) and report verbatim
+1. The repo's lint command on the changed files.
+2. python -m pytest src/tests/nodes/crx_persona src/tests/pipelines/crx_persona
+   -> 96 passed (89 if Java is missing: report it).
+3. kedro registry list   (imports every pipeline; no data needed).
+4. The step-2 grep again -> no hits (or only ones I approved to keep).
+5. python -c "from enbd_collections.pipelines.crx_persona import _dpd_journey as J; print(J.STATES)"
+   -> the 7 states.
+6. Delete $T. Show git status --short and git diff --stat.
+Then tell me what to re-run in PROD: Node 2 of both products for segment 60_180 and
+180_plus (Node 1 is unchanged and need not be re-run), using this repo's real pipeline
+and node names.
+```
+
+For the PROD check afterwards: `prod_check.py` is no longer in the repo. Extract the bundle
+to a temp folder as in step 1, then in the Kedro session
+`sys.path.insert(0, "<temp>/spark"); from prod_check import report; report(catalog)`.
 

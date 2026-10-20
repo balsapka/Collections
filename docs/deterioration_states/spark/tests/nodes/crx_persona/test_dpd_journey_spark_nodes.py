@@ -126,13 +126,16 @@ def test_cc_end_to_end(cc, segment):
     params = {"persona_end_date": str(SNAP), "dpd_journey": {"segment": segment}}
     seq = build_cc_dpd_sequences(build_cc_full_history(raw, spine), spells, params)
     got = {r.account_id: r for r in build_cc_a4_deterioration(seq, params).collect()}
-    want = {a: J.classify(k, c, 0, 9, segment, "B_balanced_6")
+    want = {a: J.classify(k, c, 0, 9)
             for a, (k, c) in expected.items() if max(k[-1], 1) in J.SEGMENTS[segment]}
     assert set(got) == set(want), "every account in the segment is classified, no others"
     for a, w in want.items():
         assert got[a].det_state == w["det_state"], (a, expected[a])
         assert got[a].history_cropped == expected[a][1], a
         assert got[a].det_state_label == J.DISPLAY_NAMES[w["det_state"]]
+    assert {r.det_state for r in got.values()} <= set(J.STATES)
+    if segment == "180_plus":
+        assert "stabilized" not in {r.det_state for r in got.values()}
     statuses = {r.build_status for r in seq.select("build_status").distinct().collect()}
     assert statuses == {"ok"}, "no account dropped"
 
@@ -170,7 +173,7 @@ def test_rl_end_to_end(spark, journeys, segment):
         start = SNAP_IDX - len(b) + 1
         rows += [(acc, _month(start + t, 28).date(), v, 1.0, 100.0, 0, "PL") for t, v in enumerate(b)]
         if max(b[-1] + 1, 1) in J.SEGMENTS[segment]:
-            want[acc] = J.classify(b, start <= global_min, 1, 8, segment, "B_balanced_6")["det_state"]
+            want[acc] = J.classify(b, start <= global_min, 1, 8)["det_state"]
     master = spark.createDataFrame(rows, "account_id string, observation_date date, dpd_bucket int, "
                                          "emi_coverage_ratio double, outstanding_balance double, "
                                          "is_restructured int, loan_type string")
@@ -181,6 +184,8 @@ def test_rl_end_to_end(spark, journeys, segment):
     assert {a: r.det_state for a, r in got.items()} == want
     allowed = set(J.RL.native_buckets(J.SEGMENTS[segment]))
     assert {r.current_bucket for r in got.values()} <= allowed
+    if segment == "180_plus":
+        assert "stabilized" not in set(want.values())
 
 
 def test_rl_double_spine_key_matches_string_master(spark):

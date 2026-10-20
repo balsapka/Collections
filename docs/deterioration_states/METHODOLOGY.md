@@ -122,7 +122,7 @@ Q1  Early payment default?  <= 3 months of history before this spell (at most on
                             no earlier real spell) AND never paid since crossing bucket 2
                             (every month of the spell a roll — still falling)
                                                                -> early_payment_default
-Q2  Stabilized?             today's bucket below the cap (CC < 9, RL < 7) AND
+Q2  Stabilized?             today's bucket <= 7 (151-180 DPD; never at 180+) AND
                             >= 5 of the last 6 months within today's bucket ±1
                             OR (>= 6 months since first reaching 4 AND at most 1 bucket
                                 higher than 6 months ago)      -> stabilized
@@ -140,8 +140,11 @@ Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 m
 not a behaviour state: when the history starts at 0 DPD the whole journey is observed and
 the fall-in states are confident; when it starts delinquent they would be guesses, so the
 account is `unknown` (stabilized needs only the last 6 months and is still assigned). At
-the ceiling bucket (CC 9, RL 7) the bucket cannot rise, so a run of 9s is not a hold and
-never counts as stabilized. Uncropped starts-delinquent histories should stay rare (E04).
+the ceiling bucket (CC 9, RL 7) the bucket cannot rise, so a run of 9s is not a payment:
+stabilized is assigned only up to bucket 7 (151-180 DPD, never at 180+), and holds at the
+ceiling do not count as payments (EPD). The 180+ segment uses this same tree and the same
+states — production uses option B only. Uncropped starts-delinquent histories should stay
+rare (E04).
 
 ### Three options
 

@@ -31,7 +31,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards.
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+).
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-20 by `dpd_states/bundle.py`. 41 files, 6,557 lines.
+Generated 2026-10-20 by `dpd_states/bundle.py`. 41 files, 6,560 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -395,7 +395,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `METHODOLOGY.md`
-sha256 `67cc4555c86f309962045d1e9f6337ef572773726a809c8c999d8e37f669c891` · 484 lines · trailing newline: yes
+sha256 `c1cfdcb731453183676a0d8af865e4e8f91c7d06734ffff2cbc54aaf24565a27` · 487 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — methodology
@@ -522,7 +522,7 @@ Q1  Early payment default?  <= 3 months of history before this spell (at most on
                             no earlier real spell) AND never paid since crossing bucket 2
                             (every month of the spell a roll — still falling)
                                                                -> early_payment_default
-Q2  Stabilized?             today's bucket below the cap (CC < 9, RL < 7) AND
+Q2  Stabilized?             today's bucket <= 7 (151-180 DPD; never at 180+) AND
                             >= 5 of the last 6 months within today's bucket ±1
                             OR (>= 6 months since first reaching 4 AND at most 1 bucket
                                 higher than 6 months ago)      -> stabilized
@@ -540,8 +540,11 @@ Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 m
 not a behaviour state: when the history starts at 0 DPD the whole journey is observed and
 the fall-in states are confident; when it starts delinquent they would be guesses, so the
 account is `unknown` (stabilized needs only the last 6 months and is still assigned). At
-the ceiling bucket (CC 9, RL 7) the bucket cannot rise, so a run of 9s is not a hold and
-never counts as stabilized. Uncropped starts-delinquent histories should stay rare (E04).
+the ceiling bucket (CC 9, RL 7) the bucket cannot rise, so a run of 9s is not a payment:
+stabilized is assigned only up to bucket 7 (151-180 DPD, never at 180+), and holds at the
+ceiling do not count as payments (EPD). The 180+ segment uses this same tree and the same
+states — production uses option B only. Uncropped starts-delinquent histories should stay
+rare (E04).
 
 ### Three options
 
@@ -939,7 +942,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `20f207e74d363862e497eb488271bb829c407d6a03197a26b060af1de67496a5` · 427 lines · trailing newline: yes
+sha256 `fe30fbe0d4ca3acdca57adb6df7a14fbbb6f9c59f0d3c8651d41424423d0398b` · 522 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -955,6 +958,8 @@ tests only; the user runs the pipelines and `spark/prod_check.py` in PROD.
 **P9 runs after P8**: adds the regression tests under `src/tests/{nodes,pipelines}/crx_persona/`
 and removes everything unpacked from the bundle (recoverable from BUNDLE.md), plus any dead
 code the rewrite left in `src/`.
+**P10 fixes the state vocabulary** (after P9): one tree and the same 7 states for 60–180
+and 180+ (option B only), no stabilized at 180+, holds at the ceiling are not payments.
 
 ---
 
@@ -1369,6 +1374,99 @@ Step 5 — verify (offline) and report verbatim
 5. git status --short and git diff --stat.
 ```
 
+---
+
+## P10 — One state vocabulary for both segments; no stabilized at 180+ (after P9)
+
+Why: the previous engine had a separate 180+ tree that allowed `stabilized` at CC 8 and
+added 180+-only states (`paying_in_default`, `broken_payer`), and it kept the A / C option
+states that production never uses (`straight_roller`, `slow_roller_intermittent`,
+`slow_roller_erratic`) plus a dead one (`paying_since_4`). Both came from the bundle, not
+from Sonnet. Fixed: ONE tree and the same 7 states in both segments — `unknown`,
+`early_payment_default`, `stabilized`, `repeat_delinquent`, `straight_roller_seasoned`,
+`straight_roller_early_life`, `slow_roller`. Stabilized only up to CC 7 / RL 6 (151–180
+DPD), never at 180+. Holds at the ceiling (CC 9, RL 7) are not payments, so EPD still works
+at 180+. `det_option` and the `det_state_option` column are removed.
+
+Before pasting: replace `docs/deterioration_states/BUNDLE.md` with the **latest raw**
+BUNDLE.md. Changed for the repo: `_dpd_journey.py`, the `dpd_journey` params (no
+`det_option`), and the three tests in `src/tests/{nodes,pipelines}/crx_persona/`. The node
+and pipeline files are unchanged.
+
+```
+Context: src/enbd_collections/pipelines/crx_persona/ holds the DPD-journey deterioration
+pipelines (CC + RL) from an earlier bundle, with tests in src/tests/nodes/crx_persona/ and
+src/tests/pipelines/crx_persona/. docs/deterioration_states/ holds only BUNDLE.md, which I
+have just replaced with a newer version. The new engine has ONE state tree for both
+segments (60_180 and 180_plus) with 7 states: unknown, early_payment_default, stabilized,
+repeat_delinquent, straight_roller_seasoned, straight_roller_early_life, slow_roller.
+No stabilized at 180+, no 180+-only states, no A/C options. Bring src/ and the tests in
+line, and remove everything the old vocabulary left behind.
+
+Hard rules:
+- No PROD data access: never call catalog.load, never run kedro run, never query a table.
+- Extract the bundle OUTSIDE the repo (a temp folder) so nothing is unpacked into
+  docs/ again; delete the temp folder at the end.
+- STOP where marked. Do not commit or push.
+- Never adapt the engine to make a test pass; adapt only repo-specific names in tests.
+
+Step 1 — extract to a temp folder and verify (report only)
+1. mkdir a temp folder outside the repo, e.g. T=$(mktemp -d). Create $T/extract_bundle.py
+   from the "Extractor" section of docs/deterioration_states/BUNDLE.md, then:
+   python $T/extract_bundle.py docs/deterioration_states/BUNDLE.md $T
+   -> must end with "0 mismatched".
+2. python $T/spark/tests/test_parity.py -> must print "PARITY PASSED" (needs pandas,
+   numpy, pyspark importable; no Spark session).
+
+Step 2 — compare (report only)
+Diff, ignoring import lines and formatting:
+  $T/spark/crx_persona/_dpd_journey.py vs src/enbd_collections/pipelines/crx_persona/_dpd_journey.py
+  $T/spark/tests/nodes/crx_persona/*.py vs src/tests/nodes/crx_persona/*.py
+  $T/spark/tests/pipelines/crx_persona/*.py vs src/tests/pipelines/crx_persona/*.py
+  $T/spark/crx_persona/{cc,rl}_{full_history,a4_deterioration}/*.py vs src/... (expected: no logic change)
+Expected engine differences: one assign_state(f, cropped) for both segments;
+classify(buckets, cropped, offset, canon_top) without segment/option; STATE_RULES/STATES
+replace STATE_DEFAULTS/OPTIONS; features_180 / assign_state_180 / _FEATURES_180 removed;
+journey_features(..., canon_top) does not count holds at the ceiling as payments; no
+det_option param (an unknown dpd_journey key now raises); no det_state_option column.
+List any OTHER difference in src/ — e.g. adaptations made in P8/P9 (logging, import
+style, _DPD_BUCKET_REGEX, fixture names, EXPECTED table names) — those must be kept.
+Then find every remaining use of the old vocabulary and options:
+  grep -rn "det_option\|det_state_option\|segment_180_prototype\|assign_state_180\|features_180\|_FEATURES_180\|STATE_DEFAULTS\|OPTIONS\|paying_in_default\|broken_payer\|history_not_available\|history_starts_delinquent\|paying_since_4\|slow_roller_intermittent\|slow_roller_erratic\|\"straight_roller\"\|A_minimal_4\|C_detailed_7\|B_balanced_6" src/ conf/ notebooks/ 2>/dev/null
+including catalog schemas / column lists that name det_state_option or the 180+ extra
+columns (all_default, months_in_default, default_left_censored, pay_events_before_top,
+paid_in_default, stabilized_months_in_4_7).
+STOP — show me the diff summary and the grep results with a proposed action for each.
+
+Step 3 — apply (only after my OK)
+- Replace src/enbd_collections/pipelines/crx_persona/_dpd_journey.py with
+  $T/spark/crx_persona/_dpd_journey.py, re-applying only the repo adaptations listed in
+  step 2 (imports, logging, lint style).
+- Remove `det_option` from the crx_persona.dpd_journey params (conf/**/parameters*.yml).
+- Replace the three test files with the $T versions, re-applying only the repo
+  adaptations from P9 (fixture choice, names in the EXPECTED table).
+- Fix or remove every grep hit approved in step 2 (catalog column lists, notebooks, docs).
+- Leave the node and pipeline files alone unless step 2 found a logic difference I
+  approved.
+
+Step 4 — verify (offline) and report verbatim
+1. The repo's lint command on the changed files.
+2. python -m pytest src/tests/nodes/crx_persona src/tests/pipelines/crx_persona
+   -> 96 passed (89 if Java is missing: report it).
+3. kedro registry list   (imports every pipeline; no data needed).
+4. The step-2 grep again -> no hits (or only ones I approved to keep).
+5. python -c "from enbd_collections.pipelines.crx_persona import _dpd_journey as J; print(J.STATES)"
+   -> the 7 states.
+6. Delete $T. Show git status --short and git diff --stat.
+Then tell me what to re-run in PROD: Node 2 of both products for segment 60_180 and
+180_plus (Node 1 is unchanged and need not be re-run), using this repo's real pipeline
+and node names.
+```
+
+For the PROD check afterwards: `prod_check.py` is no longer in the repo. Extract the bundle
+to a temp folder as in step 1, then in the Kedro session
+`sys.path.insert(0, "<temp>/spark"); from prod_check import report; report(catalog)`.
+
 `````
 
 ### FILE: `dpd_states/__init__.py`
@@ -1484,7 +1582,7 @@ FLAG_COLS = {
 `````
 
 ### FILE: `dpd_states/features.py`
-sha256 `9d8beba12ad7effa85f557508314c52293821fdad7f725072a90ce112de8cb8e` · 178 lines · trailing newline: yes
+sha256 `5cf855512d12b36c7b7028a8e4a14e03305a0e951d5f1181cdcd1196bfc937c3` · 180 lines · trailing newline: yes
 
 `````python
 """Encode DPD strings and derive per-account journey features.
@@ -1579,7 +1677,9 @@ def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
     return list(zip(np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)))
 
 
-def journey_features(dpd: str) -> dict:
+def journey_features(dpd: str, cap: int = 9) -> dict:
+    """cap: the ceiling bucket (CC 9). A hold at the ceiling is not a payment (the bucket
+    cannot rise), so it does not count in spell_pay_events."""
     g, n_glitches = _glitches(_digits(dpd))
     _, n_repaired, n_jumps_left = _repair(g)
     b, d, c = encode(dpd)
@@ -1640,7 +1740,7 @@ def journey_features(dpd: str) -> dict:
         "runup_pays": int((ru_c == P).sum()),
         # current spell
         "spell_len": int(sp_end - sp_start),
-        "spell_pay_events": int((sp_c != R).sum()),     # months in this spell with a payment
+        "spell_pay_events": int(((sp_c != R) & ~((sp_c == H) & (b[t0 + 1:sp_end] >= cap))).sum()),
         "max_hold_run": int(max(hold_runs, default=0)),
         "months_since_4": int(months_since_4),          # months since first reaching 4 this spell
         "post4_paid_rate": float(paid[first4:].mean()) if months_since_4 > 0 else 0.0,
@@ -1660,15 +1760,15 @@ def journey_features(dpd: str) -> dict:
     }
 
 
-def build_features(df: pd.DataFrame, col: str = "dpd_string") -> pd.DataFrame:
+def build_features(df: pd.DataFrame, col: str = "dpd_string", cap: int = 9) -> pd.DataFrame:
     if len(df) == 0:
         raise ValueError("build_features got an empty frame — check the spine filter / sample")
-    feats = pd.DataFrame([journey_features(s) for s in df[col]], index=df.index)
+    feats = pd.DataFrame([journey_features(s, cap) for s in df[col]], index=df.index)
     return pd.concat([df, feats], axis=1)
 `````
 
 ### FILE: `dpd_states/states.py`
-sha256 `9a3b5bd98f181aeefdb5f0953c0ed1742d6e8407c7ea74d481055ac0457bf09a` · 204 lines · trailing newline: yes
+sha256 `35c8cf04760bff030a95a9671663801e95cace608d0de87c046ecd7efceb5eb9` · 204 lines · trailing newline: yes
 
 `````python
 """Deterioration states for the bucket 4–7 spine: a small decision tree, MECE by construction.
@@ -1688,8 +1788,8 @@ switched on per option (A / B / C) and never break MECE.
                                 since crossing bucket 2: every month of the spell a
                                 roll, still falling; and the string was not cropped (it
                                 must start at the first billed month) -> early_payment_default
-    Q2  Stabilized?             today's bucket below the cap (CC < 9, RL < 7: at the cap a
-                                hold is not a payment) AND 5 of the last 6 months within
+    Q2  Stabilized?             today's bucket <= 7 (151-180 DPD; RL <= 6) — never at 180+ —
+                                AND 5 of the last 6 months within
                                 today's bucket ±1, OR (>= 6 months since first reaching 4
                                 AND at most 1 bucket higher than 6 months ago) -> stabilized
     Q3  Paying since 4?         [tested, NOT recommended] paid >= half a month's
@@ -1739,9 +1839,9 @@ DEFAULTS = {
     "repeat_window_months": 12,     # [business] earlier spell ended <= 12 months before this one
     "seasoned_min_months": None,    # [business] e.g. 12 -> split straight roller (first year = early life)
     "split_slow_roller": False,     # True -> split slow roller by 2+ month payments in run-up
-    # Ceiling bucket on the CC scale (CC 9 = 210+; RL 7 = 180+ maps to 8). At the cap the
-    # bucket cannot rise, so 9 9 9 reads as a hold: never stabilized there.
-    "cap_bucket": 9,
+    # [business] Stabilized only up to bucket 7 (151-180 DPD; RL 6): never in the 180+
+    # segment, where a hold at the ceiling is not a payment.
+    "stabilized_max_bucket": 7,
 }
 
 OPTIONS = {
@@ -1831,7 +1931,7 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
     if p["stabilized_long_run_months"] is not None:
         stab |= ((f.months_since_4 >= p["stabilized_long_run_months"])
                  & (f.chg_6m <= p["stabilized_long_run_max_rise"]))
-    stab &= f.b_now < p["cap_bucket"]
+    stab &= f.b_now <= p["stabilized_max_bucket"]
     add(f.starts_delinquent & stab, "stabilized")
     add(f.starts_delinquent, "unknown")
     add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])
@@ -2930,33 +3030,18 @@ def main(path: str | None = None, sample_n: int = 100_000, out_dir: str | None =
 `````
 
 ### FILE: `dpd_states/segment_180.py`
-sha256 `cb3b45e55e2959e7b3b02b59fa0bf90dc2c3cfcb3451a9f7003351fc00a0e8be` · 186 lines · trailing newline: yes
+sha256 `c4e75922ac7cf72143fd49a315606822b46762b105238902b2dab49279c138f2` · 156 lines · trailing newline: yes
 
 `````python
-"""PROTOTYPE — deterioration states for the 180+ segment (current bucket 8 or 9; 9 is the cap).
+"""180+ segment (current bucket 8 or 9; 9 is the cap) — synthetic generator and run.
 
-At 9 the string cannot show payments (paying one month or nothing both read 9 9 9), so
-there is no 'stabilized'. The states describe how the account fell in, plus two signals
-that only exist at 180+, plus an honest state when the path in is outside the window:
-
-    Q1  Paying in default?     dropped below 9 after first reaching it (paid several
-                               months at once)                    -> paying_in_default
-    Q1b Stabilized?            below the cap (CC 8 only; never at 9, never RL 7) and the
-                               spine's stabilized rule holds      -> stabilized
-    Q2  Broken payer?          was stabilized (bank's 5-of-6 rule) for 6+ months while in
-                               buckets 4–7, then rolled on to 9 (visible even when the
-                               run-up is not)                     -> broken_payer
-    Q0  Journey start observed? the oldest observed month is already delinquent (incl.
-                               every month at 8 or 9): how it fell in is not visible
-                                                                  -> unknown
-    Q3  Early payment default? <=3 months on book before the spell (<=1 blip), no earlier
-                               spell, no payment between bucket 2 and reaching 9
-                                                                  -> early_payment_default
-    Q4  Repeat delinquent?     earlier spell reached 3, cured, ended <=12 months before
-                                                                  -> repeat_delinquent
-    Q5  Straight roller?       run-up to 4 took <=3 months: seasoned (>=12 months on book,
-                               or history cropped by the window = older than it) /
-                               early-life; otherwise              -> slow_roller
+The 180+ segment uses the SAME state tree and vocabulary as the 60-180 spine (states.py,
+option B): unknown, early_payment_default, stabilized, repeat_delinquent,
+straight_roller_seasoned / _early_life, slow_roller. Two rules make it valid at 180+:
+  * stabilized only up to bucket 7 (151-180 DPD) — never at 180+;
+  * a hold AT the ceiling (9 -> 9) is not a payment (features.py, cap=9), so EPD still
+    means "never paid since crossing bucket 2".
+Accounts whose window is all 8/9 start delinquent -> unknown.
 
 Plus an attribute, not a state: time in default (months since first reaching 8), banded.
 
@@ -2970,6 +3055,7 @@ import pandas as pd
 from . import synth
 from .analysis import crop_history, md
 from .features import _runs, build_features, encode
+from .states import OPTIONS, RECOMMENDED, assign_states, option_states
 
 DEFAULT_TOP = 9
 from .config import MAX_HISTORY_MONTHS as WINDOW   # reliable history window (32 months)
@@ -3070,25 +3156,10 @@ def features_180(df: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
     return pd.concat([f, pd.DataFrame(extra, index=f.index)], axis=1)
 
 
-def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 12,
-               cap_bucket: int = DEFAULT_TOP) -> pd.Series:
-    fast = f.runup_len <= 3
-    stab = ((f.last6_in_band >= 5) | ((f.months_since_4 >= 6) & (f.chg_6m <= 1))) & (f.b_now < cap_bucket)
-    conds = [
-        f.paid_in_default,
-        stab,                                       # CC 8 only: 9 is the cap
-        f.stabilized_months_in_4_7 >= 6,            # visible even when the run-up is not
-        f.starts_delinquent,                        # includes all_default
-        (f.months_before_spell <= 3) & (f.n_blips <= 1) & (f.n_prior_episodes == 0)
-        & (f.pay_events_before_9 == 0) & ~f.history_truncated,
-        f.gap_prior_peak3 <= repeat_window,
-        # cropped = older than the window, so on book well over a year: seasoned
-        fast & ((f.months_before_spell >= seasoned_min_months) | f.history_truncated),
-        fast,
-    ]
-    names = ["paying_in_default", "stabilized", "broken_payer", "unknown", "early_payment_default",
-             "repeat_delinquent", "straight_roller_seasoned", "straight_roller_early_life"]
-    return pd.Series(np.select(conds, names, "slow_roller"), index=f.index)
+def assign_180(f: pd.DataFrame) -> pd.Series:
+    """The SAME tree and vocabulary as the 60-180 spine (option B). Stabilized cannot occur
+    (bucket <= 7 only) and holds at the ceiling are not payments (features, cap=9)."""
+    return assign_states(f, **OPTIONS[RECOMMENDED])
 
 
 def default_band(f: pd.DataFrame) -> pd.Series:
@@ -3098,8 +3169,7 @@ def default_band(f: pd.DataFrame) -> pd.Series:
                      index=f.index)
 
 
-ORDER = ["paying_in_default", "stabilized", "broken_payer", "unknown", "early_payment_default",
-         "repeat_delinquent", "straight_roller_seasoned", "straight_roller_early_life", "slow_roller"]
+ORDER = option_states(RECOMMENDED)
 
 
 def main(n: int = 20_000) -> None:
@@ -4036,7 +4106,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `ec0b73498bce96c5aaa7c9efb967cce8525f5a58a36914e6a05d6a551828264a` · 273 lines · trailing newline: yes
+sha256 `f6be4075b065883e4ac911cb7980cc92ed2077db2a75b5f836109f4dbe39949a` · 273 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -4229,7 +4299,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards.
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+).
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -4568,7 +4638,7 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
 `````
 
 ### FILE: `spark/REVIEW_SPARK.md`
-sha256 `d1995e34ec86c442f170bbe369f17449379ca2d43d3430db4614599389e91e2f` · 278 lines · trailing newline: yes
+sha256 `34bb4033f53c46047fc7353afc634899abb710dd0289a43573825a6f513f1e6c` · 283 lines · trailing newline: yes
 
 `````markdown
 # PySpark deterioration pipeline — review and rewrite (CC + RL)
@@ -4609,10 +4679,13 @@ with the reference is tested (0 mismatches), and so is the Spark pipeline end to
 
 | Rule | Why | Effect (synthetic) |
 |---|---|---|
-| **Stabilized never at the ceiling bucket** (CC 9, RL 7; canonical cap 9 / 8) | At the cap the bucket cannot rise, so `9 9 9` looks like a hold although nothing was paid — every long-default account would be "stabilized". CC 8 (181–210) can still be stabilized in the 180+ tree. | 180+ stabilized 0% at the cap; 60–180 unchanged (never at the cap) |
-| **Unknown** replaces `history_starts_delinquent` and `history_not_available` | If the oldest OBSERVED month is clean (0 DPD), the whole current journey is seen and the fall-in states are confident. If it is already delinquent (spell older than the window / CC floor, restructured, migrated, missing), they would be guesses. Observed-evidence states still win: stabilized (60–180 and CC 8), paying_in_default and broken_payer (180+). | 60–180: 3.3% unknown with the 32-month window; 180+: 17–32% unknown depending on time at 9 |
+| **One tree, one vocabulary for both segments** (option B only) | The 180+ prototype had its own tree (`paying_in_default`, `broken_payer`), and options A / C added states production never uses (`straight_roller`, `slow_roller_intermittent` / `_erratic`) plus a dead one (`paying_since_4`). Now 60–180 and 180+ share the same 7 states: `unknown`, `early_payment_default`, `stabilized`, `repeat_delinquent`, `straight_roller_seasoned`, `straight_roller_early_life`, `slow_roller`. The segment only decides which accounts are classified. `det_option` / `det_state_option` are gone. | — |
+| **Stabilized never at 180+** (only up to CC 7 / RL 6 = 151–180 DPD) | At the ceiling (CC 9, RL 7) the bucket cannot rise, so `9 9 9` looks like a hold although nothing was paid; at 180+ a hold is not a meaningful "stabilized" signal. | 180+: 0% stabilized; 60–180 unchanged |
+| **Holds at the ceiling are not payments** | Same reason. Without it, EPD would fail for every account that has sat at the cap for a month. A move down from the cap (9 → 8) is still a payment. | — |
+| **Unknown** replaces `history_starts_delinquent` and `history_not_available` | If the oldest OBSERVED month is clean (0 DPD), the whole current journey is seen and the fall-in states are confident. If it is already delinquent (spell older than the window / CC floor, restructured, migrated, missing), they would be guesses. Stabilized (60–180 only) still wins: it needs only the last 6 months. | 60–180: 3.3% unknown with the 32-month window; 180+: 17–32% unknown depending on time at 9 |
 
-New output column `starts_delinquent` (oldest observed month at canonical 2+).
+New output column `starts_delinquent` (oldest observed month at canonical 2+). A stale
+`dpd_journey` parameter (e.g. `det_option`) now raises an error instead of being ignored.
 
 ### Efficiency
 
@@ -4651,8 +4724,8 @@ canonical = max(native + offset, 1), with CC offset 0 and RL offset 1.
 | canonical | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 
 Segments: `60_180` = canonical 4–7 (CC native 4–7, RL native 3–6). `180_plus` = canonical
-8+ (CC 8–9, RL 7). For RL 180+ the cap is RL 7, so "paying in default" means dropping
-below RL 7. Outputs carry native buckets (`dlq_buckets`, `current_bucket`). Feature names
+8+ (CC 8–9, RL 7). Both segments use the same state tree; the ceiling is CC 9 / RL 7.
+Outputs carry native buckets (`dlq_buckets`, `current_bucket`). Feature names
 keep the reference's names: `months_since_4` means months since first reaching canonical 4
 (CC 4, RL 3, i.e. 61–90 DPD).
 
@@ -4686,13 +4759,15 @@ Gap rules, in order (all in `build_history`, all counted):
 
 **Node 2 — `build_deterioration`**: filters `build_status = 'ok'` and today's segment.
 Features and the state come from the reference port. Output columns: `account_id,
-det_state, det_state_label, det_state_option, det_segment, current_bucket,
+det_state, det_state_label, det_segment, current_bucket,
 n_gap_months_filled, left_censored, months_before_spell, n_blips, n_prior_episodes,
 gap_prior_peak3, spell_pay_events, runup_len, runup_pays, last6_in_band, months_since_4,
-chg_6m, n_glitches, n_jumps_repaired, n_jumps_left, [180+ extras], history_months,
+chg_6m, n_glitches, n_jumps_repaired, n_jumps_left, starts_delinquent, history_months,
 history_cropped, n_months_truncated, history_stale_months, restructure_blind_spot_flag,
-computed_at`. This is the old schema plus `det_segment`, `current_bucket`, `n_jumps_left`,
-`history_months`, `history_cropped`, `n_months_truncated` and `history_stale_months`.
+computed_at` — identical for both segments. Compared with the old schema: no
+`det_state_option`; new `det_segment`, `current_bucket`, `n_jumps_left`,
+`starts_delinquent`, `history_months`, `history_cropped`, `n_months_truncated` and
+`history_stale_months`.
 
 **Schema change:** `crx_*_dpd_sequences` changes from grain (account, month) to grain
 (account) with an array. Its only consumer is Node 2. If anything else needs the long grid:
@@ -4852,7 +4927,7 @@ bundle except BUNDLE.md, plus dead code the rewrite left in `src/`.
 `````
 
 ### FILE: `spark/conf/parameters_crx_persona_dpd_journey.yml`
-sha256 `f7543a69f193230eb5a1774c71b1b085e5869c27f0c92e4bc96aa038e291ea57` · 16 lines · trailing newline: yes
+sha256 `fc610b3b42a383d72f0bd6542b11c44ef2633d0ae4ab75bce6cbf81414dc5484` · 15 lines · trailing newline: yes
 
 `````yaml
 # Merge under the existing `crx_persona:` block (persona_start_date / persona_end_date stay
@@ -4865,7 +4940,6 @@ crx_persona:
     cc_history_floor_date: "2024-01-01"
     rl_history_floor_date: null          # RL history is trusted in full
     segment: "60_180"                    # "180_plus" for the cc_180_plus / RL 180+ run
-    det_option: "B_balanced_6"           # A_minimal_4 | B_balanced_6 | C_detailed_7 (60_180 only)
     on_unresolvable_gap: "truncate"      # truncate = keep months after the gap (flag cropped); drop = old behaviour
     fill_straight_roll_gaps: true        # 3 _ 5 -> 3 4 5 (the only path without a +2 jump)
     repair_cycle_shift: true             # 2 bills in one month next to an empty month: one belongs there
@@ -4881,7 +4955,7 @@ sha256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` · 0 l
 `````
 
 ### FILE: `spark/crx_persona/_dpd_journey.py`
-sha256 `b294bc74fb28d2e3233ae65d783014b9154de339f870d4b140baaa9e74d219e9` · 746 lines · trailing newline: yes
+sha256 `64757dd76c8923a0b88def3fd19563d98861a3dc90d42d6fa30649dc77af1de5` · 674 lines · trailing newline: yes
 
 `````python
 """DPD-journey deterioration states — one engine for credit cards (CC) and retail loans (RL).
@@ -4890,7 +4964,7 @@ Replaces the window-function port (resolve_gaps / encode_transitions / classify_
 Spark does what Spark is good at — scoping, the history floor, and ONE shuffle that gathers
 each account's monthly buckets into an array. The journey logic then runs per account as a
 plain-Python port of the signed-off numpy reference (docs/deterioration_states/dpd_states:
-features.py, states.py, segment_180.py). Sequential rules (glitch fix, +2 jump repair, runs
+features.py, states.py option B). Sequential rules (glitch fix, +2 jump repair, runs
 of months) are loops, exactly as in the reference — no lag/lead approximation, no cascade
 divergence. Parity with the reference is a test (tests/test_parity.py), not a hope.
 
@@ -4903,6 +4977,11 @@ Every rule is written once, on the CC scale ("canonical"):
 canonical = max(native + offset, 1): CC offset 0, RL offset 1 (0 and 1 are both "clean").
 So the 60-180 DPD spine is canonical 4-7 for both (CC native 4-7, RL native 3-6), and the
 180+ segment is canonical 8+ (CC native 8-9, RL native 7). Outputs carry NATIVE buckets.
+
+One state tree and one vocabulary for both segments (7 states): unknown, early_payment_default,
+stabilized, repeat_delinquent, straight_roller_seasoned, straight_roller_early_life,
+slow_roller. Stabilized only up to 151-180 DPD (never at 180+); holds at the ceiling bucket
+are not payments. The segment only decides which accounts are classified.
 
 Two stages (two Kedro nodes per product)
 ----------------------------------------
@@ -4963,7 +5042,6 @@ PARAM_DEFAULTS = {
     "cc_history_floor_date": "2024-01-01",
     "rl_history_floor_date": None,
     "segment": "60_180",                  # "60_180" or "180_plus" (the run's spine)
-    "det_option": "B_balanced_6",         # A_minimal_4 / B_balanced_6 / C_detailed_7 (60_180 only)
     "on_unresolvable_gap": "truncate",    # "truncate" (keep months after the gap) or "drop"
     "fill_straight_roll_gaps": True,      # 3 _ 5 -> 3 4 5: the only path without a +2 jump
     "repair_cycle_shift": True,           # two bills in one month + empty neighbour month
@@ -4977,7 +5055,6 @@ class JourneyParams:
     end_date: str
     floor_date: str | None
     segment: str
-    det_option: str
     on_unresolvable_gap: str
     fill_straight_roll_gaps: bool
     repair_cycle_shift: bool
@@ -4986,18 +5063,19 @@ class JourneyParams:
 
 
 def journey_params(crx_persona: dict, scheme: BucketScheme) -> JourneyParams:
-    p = {**PARAM_DEFAULTS, **(crx_persona.get("dpd_journey") or {})}
+    given = crx_persona.get("dpd_journey") or {}
+    unknown = sorted(set(given) - set(PARAM_DEFAULTS))
+    if unknown:          # a stale key (e.g. the removed det_option) must not be silently ignored
+        raise ValueError(f"dpd_journey: unknown parameter(s) {unknown}; allowed {sorted(PARAM_DEFAULTS)}")
+    p = {**PARAM_DEFAULTS, **given}
     if p["segment"] not in SEGMENTS:
         raise ValueError(f"dpd_journey.segment must be one of {list(SEGMENTS)}, got {p['segment']!r}")
-    if p["det_option"] not in OPTIONS:
-        raise ValueError(f"dpd_journey.det_option must be one of {list(OPTIONS)}, got {p['det_option']!r}")
     if p["on_unresolvable_gap"] not in ("truncate", "drop"):
         raise ValueError("dpd_journey.on_unresolvable_gap must be 'truncate' or 'drop'")
     return JourneyParams(
         end_date=str(crx_persona["persona_end_date"]),
         floor_date=p[f"{scheme.name}_history_floor_date"],
         segment=p["segment"],
-        det_option=p["det_option"],
         on_unresolvable_gap=p["on_unresolvable_gap"],
         fill_straight_roll_gaps=bool(p["fill_straight_roll_gaps"]),
         repair_cycle_shift=bool(p["repair_cycle_shift"]),
@@ -5088,8 +5166,10 @@ def _mean(xs) -> float:
     return sum(xs) / len(xs) if xs else 0.0
 
 
-def journey_features(b_canon: list[int]) -> dict:
-    """features.py::journey_features on a canonical bucket list (oldest -> newest)."""
+def journey_features(b_canon: list[int], canon_top: int = 9) -> dict:
+    """features.py::journey_features on a canonical bucket list (oldest -> newest).
+    canon_top: the ceiling bucket (CC 9, RL 7 -> 8). A hold AT the ceiling is not a payment
+    (the bucket cannot rise), so it is not counted in spell_pay_events."""
     raw = [max(x, 1) for x in b_canon]
     g, n_glitches = _glitches(raw)
     _, n_repaired, n_jumps_left = _repair(g)
@@ -5138,7 +5218,8 @@ def journey_features(b_canon: list[int]) -> dict:
         "runup_holds": sum(1 for x in ru_c if x == H),
         "runup_pays": sum(1 for x in ru_c if x == P),
         "spell_len": sp_end - sp_start,
-        "spell_pay_events": sum(1 for x in sp_c if x != R),
+        "spell_pay_events": sum(1 for t in range(t0, sp_end - 1)
+                                if c[t] != R and not (c[t] == H and b[t + 1] >= canon_top)),
         "max_hold_run": max(hold_runs, default=0),
         "months_since_4": months_since_4,
         "post4_paid_rate": _mean(paid[first4:]) if months_since_4 > 0 else 0.0,
@@ -5156,131 +5237,68 @@ def journey_features(b_canon: list[int]) -> dict:
     }
 
 
-# --- 60-180 DPD states (states.py) -------------------------------------------------------
+# --- the state tree (states.py, option B) — ONE tree for 60-180 and 180+ -------------------
 
-STATE_DEFAULTS = {
-    "epd_max_history": 3,           # [business]
-    "epd_max_blips": 1,             # [business]
-    "straight_max_runup": 3,
-    "stabilized_min_in_band": 5,    # [business]
+STATE_RULES = {
+    "epd_max_history": 3,                # [business] months of history before the spell (blip incl.)
+    "epd_max_blips": 1,                  # [business]
+    "straight_max_runup": 3,             # last clean month -> first month at 4
+    "stabilized_min_in_band": 5,         # [business] of the last 6 months within today's bucket ±1
     "stabilized_long_run_months": 6,     # [business]
     "stabilized_long_run_max_rise": 1,   # [business]
-    "paying_since_4_min_rate": None,     # tested, NOT recommended
-    "repeat_min_prior_peak": None,  # [business]
-    "repeat_window_months": 12,     # [business]
-    "seasoned_min_months": None,    # [business]
-    "split_slow_roller": False,
-}
-OPTIONS = {
-    "A_minimal_4": {},
-    "B_balanced_6": {"repeat_min_prior_peak": 3, "seasoned_min_months": 12},
-    "C_detailed_7": {"repeat_min_prior_peak": 3, "seasoned_min_months": 12, "split_slow_roller": True},
+    "stabilized_max_bucket": 7,          # [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
+    "repeat_min_prior_peak": 3,          # [business] earlier spell reached bucket 3 ...
+    "repeat_window_months": 12,          # [business] ... and ended <= 12 months before this one
+    "seasoned_min_months": 12,           # [business] months on book before the spell
 }
 
+STATES = ["unknown", "early_payment_default", "stabilized", "repeat_delinquent",
+          "straight_roller_seasoned", "straight_roller_early_life", "slow_roller"]
 
-def _stabilized(f: dict, p: dict, canon_top: int) -> bool:
-    """Bank's 5-of-6 rule + long-run clause, never at the ceiling bucket (CC 9, RL 7):
-    at the cap the bucket cannot rise, so 9 9 9 reads as a hold without any payment."""
-    stab = f["last6_in_band"] >= p["stabilized_min_in_band"]
-    if p["stabilized_long_run_months"] is not None:
-        stab = stab or (f["months_since_4"] >= p["stabilized_long_run_months"]
-                        and f["chg_6m"] <= p["stabilized_long_run_max_rise"])
-    return stab and f["b_now"] < canon_top
+DISPLAY_NAMES = {
+    "unknown": "Unknown — start of the delinquency journey not observed",
+    "early_payment_default": "Early payment default (EPD)",
+    "stabilized": "Stabilized",
+    "repeat_delinquent": "Repeat delinquent (re-default)",
+    "straight_roller_seasoned": "Seasoned straight roller",
+    "straight_roller_early_life": "Early-life straight roller",
+    "slow_roller": "Slow roller (partial payer)",
+}
 
 
-def assign_state(f: dict, cropped: bool, option: str = "B_balanced_6", canon_top: int = 9) -> str:
-    """states.py::assign_states for one account. First 'yes' wins."""
-    p = {**STATE_DEFAULTS, **OPTIONS[option]}
-    fast = f["runup_len"] <= p["straight_max_runup"]
-    stab = _stabilized(f, p, canon_top)
-    if f["starts_delinquent"]:              # journey start not observed: only stabilized is safe
+def assign_state(f: dict, cropped: bool) -> str:
+    """One state per account, same tree and vocabulary in both segments. First 'yes' wins.
+
+    Q0 journey start not observed (oldest observed month delinquent) -> stabilized if Q2, else unknown
+    Q1 early payment default   <=3 months before the spell, <=1 blip, no earlier spell, no payment
+                               in the spell (holds at the ceiling are not payments), not cropped
+    Q2 stabilized              60-180 only (today <= CC 7 / RL 6): 5 of the last 6 months within
+                               today's bucket ±1, or >=6 months since first reaching 4 and at most
+                               1 bucket higher than 6 months ago
+    Q3 repeat delinquent       an earlier spell reached 3, cured, ended <=12 months before this one
+    Q4 straight roller         run-up to 4 took <=3 months: seasoned (>=12 months on book, or
+                               cropped = older than the window) / early life
+    else slow roller
+    """
+    p = STATE_RULES
+    stab = (f["b_now"] <= p["stabilized_max_bucket"]
+            and (f["last6_in_band"] >= p["stabilized_min_in_band"]
+                 or (f["months_since_4"] >= p["stabilized_long_run_months"]
+                     and f["chg_6m"] <= p["stabilized_long_run_max_rise"])))
+    if f["starts_delinquent"]:
         return "stabilized" if stab else "unknown"
     if (f["months_before_spell"] <= p["epd_max_history"] and f["n_blips"] <= p["epd_max_blips"]
             and f["n_prior_episodes"] == 0 and f["spell_pay_events"] == 0 and not cropped):
         return "early_payment_default"
     if stab:
         return "stabilized"
-    if p["paying_since_4_min_rate"] is not None and f["post4_paid_rate"] >= p["paying_since_4_min_rate"]:
-        return "paying_since_4"
-    if p["repeat_min_prior_peak"] is not None:
-        peak = min(max(int(p["repeat_min_prior_peak"]), 2), 4)
-        if f[f"gap_prior_peak{peak}"] <= p["repeat_window_months"]:
-            return "repeat_delinquent"
-    if p["seasoned_min_months"] is not None:
-        if fast and (f["months_before_spell"] >= p["seasoned_min_months"] or cropped):
-            return "straight_roller_seasoned"
-        if fast:
-            return "straight_roller_early_life"
-    elif fast:
-        return "straight_roller"
-    if p["split_slow_roller"]:
-        return "slow_roller_erratic" if f["runup_pays"] >= 1 else "slow_roller_intermittent"
-    return "slow_roller"
-
-
-# --- 180+ states (segment_180.py, PROTOTYPE) ------------------------------------------------
-
-def features_180(b_canon: list[int], canon_top: int) -> dict:
-    """segment_180.py::features_180 extras. canon_top: 9 for CC, 8 for RL (its 180+ cap)."""
-    b, d, c = encode(b_canon)
-    sp0 = _runs([x >= 2 for x in b])[-1][0]
-    first8 = next((i for i, x in enumerate(b) if x >= 8), 0)
-    first_top = next((i for i, x in enumerate(b) if x >= canon_top), None)
-    upto = first_top if first_top is not None else len(b) - 1
-    pre_top = c[max(sp0 - 1, 0):upto]
-    after_top = d[first_top:] if first_top is not None else []
-    stab_months = 0
-    for t in range(sp0, first8):
-        if 4 <= b[t] <= 7 and t >= 5 and sum(1 for x in b[t - 5:t + 1] if abs(x - b[t]) <= 1) >= 5:
-            stab_months += 1
-    return {
-        "all_default": all(x >= 8 for x in b_canon),
-        "months_in_default": len(b) - 1 - first8,
-        "default_left_censored": first8 == 0,
-        "pay_events_before_top": sum(1 for x in pre_top if x != R),
-        "paid_in_default": any(x < 0 for x in after_top),
-        "stabilized_months_in_4_7": stab_months,
-    }
-
-
-def assign_state_180(f: dict, cropped: bool, canon_top: int = 9, seasoned_min_months: int = 12,
-                     repeat_window: int = 12) -> str:
-    fast = f["runup_len"] <= 3
-    if f["paid_in_default"]:
-        return "paying_in_default"
-    if _stabilized(f, STATE_DEFAULTS, canon_top):         # CC 8 only: never at the cap
-        return "stabilized"
-    if f["stabilized_months_in_4_7"] >= 6:
-        return "broken_payer"
-    if f["starts_delinquent"]:                            # includes all_default
-        return "unknown"
-    if (f["months_before_spell"] <= 3 and f["n_blips"] <= 1 and f["n_prior_episodes"] == 0
-            and f["pay_events_before_top"] == 0 and not cropped):
-        return "early_payment_default"
-    if f["gap_prior_peak3"] <= repeat_window:
+    if f["gap_prior_peak3"] <= p["repeat_window_months"]:
         return "repeat_delinquent"
-    if fast and (f["months_before_spell"] >= seasoned_min_months or cropped):
-        return "straight_roller_seasoned"
-    if fast:
+    if f["runup_len"] <= p["straight_max_runup"]:
+        if f["months_before_spell"] >= p["seasoned_min_months"] or cropped:
+            return "straight_roller_seasoned"
         return "straight_roller_early_life"
     return "slow_roller"
-
-
-DISPLAY_NAMES = {
-    "unknown": "Unknown — start of the delinquency journey not observed",
-    "early_payment_default": "Early payment default (EPD)",
-    "stabilized": "Stabilized",
-    "paying_since_4": "Paying since bucket 4 (tested, not used)",
-    "repeat_delinquent": "Repeat delinquent (re-default)",
-    "straight_roller": "Straight roller",
-    "straight_roller_seasoned": "Seasoned straight roller",
-    "straight_roller_early_life": "Early-life straight roller",
-    "slow_roller": "Slow roller (partial payer)",
-    "slow_roller_intermittent": "Intermittent payer",
-    "slow_roller_erratic": "Erratic payer",
-    "paying_in_default": "Paying in default",
-    "broken_payer": "Broken payer (stabilized, then rolled to 180+)",
-}
 
 
 # --- Stage 1 core: monthly grid from raw rows ----------------------------------------------
@@ -5386,15 +5404,10 @@ def build_history(rows, first_raw_idx: int, global_min_idx: int, offset: int,
 
 # --- Stage 2 core: classify one account -------------------------------------------------
 
-def classify(buckets_native: list[int], cropped: bool, offset: int, canon_top: int,
-             segment: str, option: str) -> dict:
-    b = [max(x + offset, 1) for x in buckets_native]
-    f = journey_features(b)
-    if segment == "180_plus":
-        f.update(features_180(b, canon_top))
-        f["det_state"] = assign_state_180(f, cropped, canon_top)
-    else:
-        f["det_state"] = assign_state(f, cropped, option, canon_top)
+def classify(buckets_native: list[int], cropped: bool, offset: int, canon_top: int) -> dict:
+    """Features + state for one account (native buckets, oldest -> newest)."""
+    f = journey_features([max(x + offset, 1) for x in buckets_native], canon_top)
+    f["det_state"] = assign_state(f, cropped)
     return f
 
 
@@ -5443,18 +5456,8 @@ _FEATURES = [
     ("n_glitches", T.IntegerType()), ("n_jumps_repaired", T.IntegerType()),
     ("n_jumps_left", T.IntegerType()),
 ]
-_FEATURES_180 = [
-    ("all_default", T.BooleanType()), ("months_in_default", T.IntegerType()),
-    ("default_left_censored", T.BooleanType()), ("pay_events_before_top", T.IntegerType()),
-    ("paid_in_default", T.BooleanType()), ("stabilized_months_in_4_7", T.IntegerType()),
-]
-
-
-def _classify_schema(segment: str) -> T.StructType:
-    cols = [(n, t) for n, t in _FEATURES if t is not None]
-    cols += _FEATURES_180 if segment == "180_plus" else []
-    return T.StructType([T.StructField("det_state", T.StringType())]
-                        + [T.StructField(n, t) for n, t in cols])
+_CLASSIFY_SCHEMA = T.StructType([T.StructField("det_state", T.StringType())]
+                                + [T.StructField(n, t) for n, t in _FEATURES if t is not None])
 
 
 def _month_col(c) -> F.Column:
@@ -5556,7 +5559,7 @@ def build_deterioration(sequences: DataFrame, scheme: BucketScheme, params: Jour
     LATEST month is in the segment (native buckets), and assigns one state per account.
 
     Returns one row per account:
-        account_id, det_state, det_state_label, det_state_option, det_segment, current_bucket
+        account_id, det_state, det_state_label, det_segment, current_bucket
         (native), <features>, history_months, history_cropped, n_months_truncated,
         history_stale_months (snapshot month - last observed month), restructure_blind_spot_flag,
         computed_at
@@ -5567,12 +5570,12 @@ def build_deterioration(sequences: DataFrame, scheme: BucketScheme, params: Jour
     cur = F.element_at("dlq_buckets", -1)
     seg = sequences.where((F.col("build_status") == "ok") & cur.isin(native))
 
-    offset, top, option = scheme.offset, scheme.canon_top, params.det_option
+    offset, top = scheme.offset, scheme.canon_top
 
     def _udf(buckets, cropped):
-        return classify(list(buckets), bool(cropped), offset, top, segment, option)
+        return classify(list(buckets), bool(cropped), offset, top)
 
-    schema = _classify_schema(segment)
+    schema = _CLASSIFY_SCHEMA
     res = seg.withColumn("_s", F.udf(_udf, schema)("dlq_buckets", "history_cropped"))
 
     labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
@@ -5582,7 +5585,6 @@ def build_deterioration(sequences: DataFrame, scheme: BucketScheme, params: Jour
         F.col("account_id"),
         F.col("_s.det_state").alias("det_state"),
         labels[F.col("_s.det_state")].alias("det_state_label"),
-        F.lit(option if segment == "60_180" else "segment_180_prototype").alias("det_state_option"),
         F.lit(segment).alias("det_segment"),
         cur.alias("current_bucket"),
         F.col("n_gap_months_filled"),
@@ -5627,8 +5629,8 @@ def _log_state_stats(seq: DataFrame, out: DataFrame, scheme: BucketScheme, param
     n_ok = seq.where(F.col("build_status") == "ok").count()
     rows = out.groupBy("det_state").count().orderBy(F.desc("count")).collect()
     n = sum(r["count"] for r in rows) or 1
-    LOG.info("build_%s_deterioration [%s, %s]: %d of %d ok accounts in segment; %s", scheme.name,
-             params.segment, params.det_option, n, n_ok,
+    LOG.info("build_%s_deterioration [%s]: %d of %d ok accounts in segment; %s", scheme.name,
+             params.segment, n, n_ok,
              ", ".join(f"{r['det_state']} {r['count']} ({r['count'] / n:.1%})" for r in rows))
 `````
 
@@ -5963,7 +5965,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 `````
 
 ### FILE: `spark/tests/test_parity.py`
-sha256 `db25c691b5a9825922b7b1bfcde1bceea7e82b4f1c52fee69b2e9925b514b979` · 209 lines · trailing newline: yes
+sha256 `d4c962371a858edeafa86a4a853bc890b7f0dbfbab71a16313d1a7e8faa4cf16` · 196 lines · trailing newline: yes
 
 `````python
 """Parity: the per-account core of crx_persona/_dpd_journey.py vs the signed-off numpy
@@ -5971,7 +5973,7 @@ reference (docs/deterioration_states/dpd_states). No Spark needed.
 
     python docs/deterioration_states/spark/tests/test_parity.py        # or: pytest <this file>
 
-Checks every feature and every state (options A/B/C, 180+ prototype) on the synthetic
+Checks every feature and the state (one tree, both segments) on the synthetic
 generators, the business edge cases (selftest CASES / CROP_CASES) on CC and RL numbering,
 and the Stage 1 gap rules.
 """
@@ -5990,7 +5992,7 @@ from dpd_states.analysis import crop_history                   # noqa: E402
 from dpd_states.config import MAX_HISTORY_MONTHS               # noqa: E402
 from dpd_states.features import build_features                 # noqa: E402
 from dpd_states.selftest import CASES, CROP_CASES              # noqa: E402
-from dpd_states.states import OPTIONS, assign_states           # noqa: E402
+from dpd_states.states import OPTIONS, RECOMMENDED, assign_states  # noqa: E402
 
 N = 20_000
 FEATURES = [k for k in J.journey_features([1, 2, 3, 4])]
@@ -6018,36 +6020,34 @@ def _compare(ref, mine, what: str) -> int:
     return bad
 
 
-def _reference(strings, cropped):
+def _reference(strings, cropped, cap=9):
     import pandas as pd
-    f = build_features(pd.DataFrame({"dpd_string": list(strings), "history_truncated": list(cropped)}))
-    return f, {o: assign_states(f, **OPTIONS[o]) for o in OPTIONS}
+    f = build_features(pd.DataFrame({"dpd_string": list(strings), "history_truncated": list(cropped)}), cap=cap)
+    return f, assign_states(f, **OPTIONS[RECOMMENDED])
 
 
 def test_spine_cc_and_rl():
     synth.calibrate(n=4000, iters=3)
     df = synth.generate(N)
     s, cropped = crop_history(df.dpd_string, MAX_HISTORY_MONTHS)
-    f, ref_states = _reference(s, cropped)
+    f, ref = _reference(s, cropped)
     bad = 0
     for i, (string, cr) in enumerate(zip(s, cropped)):
-        b = _chron(string)
-        for o in OPTIONS:
-            mine = J.classify(b, bool(cr), 0, 9, "60_180", o)
-            if mine["det_state"] != ref_states[o].iloc[i]:
-                bad += 1
-                print(f"  STATE {o} {string}: {ref_states[o].iloc[i]} vs {mine['det_state']}")
-        bad += _compare(f.iloc[i], mine, f"cc {string}")
-    # RL: the same journeys in RL numbering must give the same states / features
-    rl_ref_strings = ["".join(str(min(max(x, 1), 8)) for x in reversed(_chron(x))) for x in s]
-    f_rl, ref_rl = _reference(rl_ref_strings, cropped)
-    for i, (string, cr) in enumerate(zip(s, cropped)):
-        mine = J.classify(_to_rl(_chron(string)), bool(cr), 1, 8, "60_180", "B_balanced_6")
-        if mine["det_state"] != ref_rl["B_balanced_6"].iloc[i]:
+        mine = J.classify(_chron(string), bool(cr), 0, 9)
+        if mine["det_state"] != ref.iloc[i]:
             bad += 1
-            print(f"  RL STATE {string}: {ref_rl['B_balanced_6'].iloc[i]} vs {mine['det_state']}")
+            print(f"  STATE {string}: {ref.iloc[i]} vs {mine['det_state']}")
+        bad += _compare(f.iloc[i], mine, f"cc {string}")
+    # RL: the same journeys in RL numbering (cap RL 7 = canonical 8) give the same states
+    rl_ref_strings = ["".join(str(min(max(x, 1), 8)) for x in reversed(_chron(x))) for x in s]
+    f_rl, ref_rl = _reference(rl_ref_strings, cropped, cap=8)
+    for i, (string, cr) in enumerate(zip(s, cropped)):
+        mine = J.classify(_to_rl(_chron(string)), bool(cr), 1, 8)
+        if mine["det_state"] != ref_rl.iloc[i]:
+            bad += 1
+            print(f"  RL STATE {string}: {ref_rl.iloc[i]} vs {mine['det_state']}")
         bad += _compare(f_rl.iloc[i], mine, f"rl {string}")
-    print(f"spine: {len(s):,} accounts x {len(OPTIONS)} options + RL, {bad} mismatches")
+    print(f"spine: {len(s):,} accounts, CC + RL, {bad} mismatches")
     assert bad == 0
 
 
@@ -6057,18 +6057,14 @@ def test_segment_180_cc():
     ref = segment_180.assign_180(f)
     bad = 0
     for i, (string, cr) in enumerate(zip(f.dpd_string, f.history_truncated)):
-        mine = J.classify(_chron(string), bool(cr), 0, 9, "180_plus", "B_balanced_6")
+        mine = J.classify(_chron(string), bool(cr), 0, 9)
         if mine["det_state"] != ref.iloc[i]:
             bad += 1
             if bad <= 5:
                 print(f"  180 STATE {string}: {ref.iloc[i]} vs {mine['det_state']}")
-        for k in ("all_default", "months_in_default", "default_left_censored", "paid_in_default",
-                  "stabilized_months_in_4_7"):
-            if bool(f[k].iloc[i] == mine[k]) is False:
-                bad += 1
-        if int(f.pay_events_before_9.iloc[i]) != mine["pay_events_before_top"]:
-            bad += 1
-    print(f"180+: {len(f):,} accounts, {bad} mismatches")
+        bad += _compare(f.iloc[i], mine, f"180 {string}")
+    assert "stabilized" not in set(ref), "stabilized must never occur at 180+"
+    print(f"180+: {len(f):,} accounts, {bad} mismatches; states {sorted(set(ref))}")
     assert bad == 0
 
 
@@ -6077,42 +6073,35 @@ def test_business_cases():
     for chron, want, why in CASES:
         b = [int(ch) for ch in chron.replace(" ", "")]
         for name, buckets, off, top in (("cc", b, 0, 9), ("rl", _to_rl(b), 1, 8)):
-            got = J.classify(buckets, False, off, top, "60_180", "B_balanced_6")["det_state"]
+            got = J.classify(buckets, False, off, top)["det_state"]
             if got != want:
                 bad += 1
                 print(f"  CASE {name} {chron!r}: want {want}, got {got} — {why}")
     for chron, n, want, why in CROP_CASES:
         b = [int(ch) for ch in chron.replace(" ", "")]
-        kept, cropped = b[-n:], len(b) >= n
-        got = J.classify(kept, cropped, 0, 9, "60_180", "B_balanced_6")["det_state"]
+        got = J.classify(b[-n:], len(b) >= n, 0, 9)["det_state"]
         if got != want:
             bad += 1
             print(f"  CROP {chron!r}: want {want}, got {got} — {why}")
-    # RL 180+: cap is RL 7 (canonical 8)
-    rl180 = [
-        ([0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 7], "straight_roller_seasoned"),
-        ([0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 6, 7], "paying_in_default"),
-        ([7, 7, 7, 7], "unknown"),
-        ([0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "broken_payer"),
-        ([0] * 20 + [1, 2, 3, 4, 5, 6, 7] + [7] * 12, "straight_roller_seasoned"),   # 12 months at the cap: NOT stabilized
-        ([0, 0, 1, 2, 3, 4, 5, 6, 7], "early_payment_default"),
+    cases_180 = [   # (product, oldest -> newest native buckets, expected) — same tree as 60-180
+        ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),
+        ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "straight_roller_seasoned"),  # holding at 8: NOT stabilized
+        ("cc", [8, 9, 9, 9, 9, 9, 9], "unknown"),
+        ("cc", [0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9], "early_payment_default"),     # holds at the cap are not payments
+        ("cc", [0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 9], "straight_roller_early_life"),  # 9 -> 8 is a payment: not EPD
+        ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 7], "straight_roller_seasoned"),
+        ("rl", [7, 7, 7, 7], "unknown"),
+        ("rl", [0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7], "early_payment_default"),
+        ("rl", [0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "straight_roller_seasoned"),
+        ("rl", [0] * 20 + [1, 1, 2, 2, 3, 4, 5, 6, 7], "slow_roller"),
     ]
-    cc180 = [
-        ([0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),     # at the cap: NOT stabilized
-        ([0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "stabilized"),                  # holding at 8 (below the cap)
-        ([8, 9, 9, 9, 9, 9, 9], "unknown"),
-    ]
-    for buckets, want in cc180:
-        got = J.classify(buckets, False, 0, 9, "180_plus", "B_balanced_6")["det_state"]
+    for product, buckets, want in cases_180:
+        off, top = (0, 9) if product == "cc" else (1, 8)
+        got = J.classify(buckets, False, off, top)["det_state"]
         if got != want:
             bad += 1
-            print(f"  CC180 {buckets}: want {want}, got {got}")
-    for buckets, want in rl180:
-        got = J.classify(buckets, False, 1, 8, "180_plus", "B_balanced_6")["det_state"]
-        if got != want:
-            bad += 1
-            print(f"  RL180 {buckets}: want {want}, got {got}")
-    print(f"business cases: {len(CASES) * 2 + len(CROP_CASES) + len(rl180) + len(cc180)} checked, {bad} wrong")
+            print(f"  180 {product} {buckets}: want {want}, got {got}")
+    print(f"business cases: {len(CASES) * 2 + len(CROP_CASES) + len(cases_180)} checked, {bad} wrong")
     assert bad == 0
 
 
@@ -6178,7 +6167,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `spark/tests/test_spark_e2e.py`
-sha256 `ca1134a0065947c391cc5eb257feb6b45a23aca758df5a1631b4d8eae63696ea` · 200 lines · trailing newline: yes
+sha256 `8c964ebcfca4c55c36c8d3219d31333015455c717aec6f315853704ddc13a41e` · 200 lines · trailing newline: yes
 
 `````python
 """End to end on local Spark: synthetic raw tables -> the Kedro node functions -> states,
@@ -6302,7 +6291,7 @@ def main(n: int = 4000) -> int:
         cc_outs.append(out)
         got = {r.account_id: r for r in out.collect()}
         seg = J.SEGMENTS[segment]
-        want = {a: J.classify(k, c, 0, 9, segment, "B_balanced_6") for a, (k, c) in expected.items()
+        want = {a: J.classify(k, c, 0, 9) for a, (k, c) in expected.items()
                 if max(k[-1], 1) in seg}
         miss = set(want) ^ set(got)
         wrong = [a for a in want if a in got and (got[a].det_state != want[a]["det_state"]
@@ -6343,7 +6332,7 @@ def main(n: int = 4000) -> int:
     for a, rlb in rl_expected.items():
         if max(rlb[-1] + 1, 1) in J.SEGMENTS["60_180"]:
             cropped = SNAP_IDX - len(rlb) + 1 <= global_min
-            want[a] = J.classify(rlb, cropped, 1, 8, "60_180", "B_balanced_6")
+            want[a] = J.classify(rlb, cropped, 1, 8)
     miss = set(want) ^ set(got)
     wrong = [a for a in want if a in got and got[a].det_state != want[a]["det_state"]]
     bad += len(miss) + len(wrong)
@@ -6451,7 +6440,7 @@ def spark():
 `````
 
 ### FILE: `spark/tests/nodes/crx_persona/test_dpd_journey.py`
-sha256 `f28b985ea042fb45b521fb42673d603a18bc88162657be559fc9e58ec5259ef1` · 181 lines · trailing newline: yes
+sha256 `c261fdc59688991b41eba8708b888803816d3fdc159b55e9f2bb9ef4875b9239` · 188 lines · trailing newline: yes
 
 `````python
 """Unit tests for crx_persona/_dpd_journey.py — self-contained (no Spark session, no data).
@@ -6535,18 +6524,19 @@ CROP_CASES = [   (   '00000000002344545454545454545454545454545454545454',
         'cropped to 0 0 0 2 3 4: looks like EPD, but older than the window'),
     ('0 0 0 2 3 4', 32, 'early_payment_default', 'short history, not cropped: EPD')]
 
-# 180+ segment (canonical cap: CC 9, RL 7 -> 8) and the ceiling / unknown rules
+# 180+ segment: the SAME tree and vocabulary as 60-180; no stabilized at 180+; holds at the
+# ceiling (CC 9, RL 7) are not payments
 CASES_180 = [
-    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),  # at the cap: not stabilized
-    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "stabilized"),               # holding at 8, below the cap
-    ("cc", [8, 9, 9, 9, 9, 9, 9], "unknown"),                                            # journey start not observed
-    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 9], "paying_in_default"),
+    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),
+    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "straight_roller_seasoned"),   # holding at 8: NOT stabilized
+    ("cc", [8, 9, 9, 9, 9, 9, 9], "unknown"),                                             # journey start not observed
+    ("cc", [0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9], "early_payment_default"),                # cap holds are not payments
+    ("cc", [0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 9], "straight_roller_early_life"),        # 9 -> 8 is a payment
     ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 7], "straight_roller_seasoned"),
-    ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 6, 7], "paying_in_default"),
     ("rl", [7, 7, 7, 7], "unknown"),
-    ("rl", [0, 0, 1, 2, 3, 4, 5, 6, 7], "early_payment_default"),
-    ("rl", [0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "broken_payer"),
-    ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7] + [7] * 12, "straight_roller_seasoned"),     # 12 months at the cap
+    ("rl", [0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7], "early_payment_default"),
+    ("rl", [0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "straight_roller_seasoned"),
+    ("rl", [0] * 20 + [1, 1, 2, 2, 3, 4, 5, 6, 7], "slow_roller"),
 ]
 SCHEME = {"cc": (0, 9), "rl": (1, 8)}     # (offset, canonical cap)
 
@@ -6566,27 +6556,33 @@ def test_business_case(product, chron, want, why):
     b = _chron(chron)
     buckets = b if product == "cc" else _to_rl(b)
     off, top = SCHEME[product]
-    assert J.classify(buckets, False, off, top, "60_180", "B_balanced_6")["det_state"] == want, why
+    assert J.classify(buckets, False, off, top)["det_state"] == want, why
 
 
 @pytest.mark.parametrize("chron,n,want,why", CROP_CASES)
 def test_crop_case(chron, n, want, why):
     b = _chron(chron)
-    got = J.classify(b[-n:], len(b) >= n, 0, 9, "60_180", "B_balanced_6")["det_state"]
+    got = J.classify(b[-n:], len(b) >= n, 0, 9)["det_state"]
     assert got == want, why
 
 
 @pytest.mark.parametrize("product,buckets,want", CASES_180)
 def test_180_and_ceiling(product, buckets, want):
     off, top = SCHEME[product]
-    assert J.classify(buckets, False, off, top, "180_plus", "B_balanced_6")["det_state"] == want
+    assert J.classify(buckets, False, off, top)["det_state"] == want
 
 
-def test_every_option_is_mece():
-    """Each option returns exactly one known state for every case."""
-    for option in J.OPTIONS:
-        for chron, _, _ in CASES:
-            assert J.classify(_chron(chron), False, 0, 9, "60_180", option)["det_state"] in J.DISPLAY_NAMES
+def test_one_vocabulary_and_no_stabilized_at_180():
+    """Both segments use the same 7 states; stabilized never occurs at 180+ (CC 8-9, RL 7)."""
+    assert list(J.DISPLAY_NAMES) == J.STATES and len(J.STATES) == 7
+    holds = [[0] * 20 + [2, 3, 4, 5, 6, 7] + [top] * k for top in (8, 9) for k in range(1, 13)]
+    for b in holds + [c for _, c, _ in CASES_180 if _ == "cc"]:
+        st = J.classify(b, False, 0, 9)["det_state"]
+        assert st in J.STATES
+        if max(b[-1], 1) >= 8:
+            assert st != "stabilized", b
+    for b in [[0] * 20 + [1, 2, 3, 4, 5, 6] + [7] * k for k in range(1, 13)]:
+        assert J.classify(b, False, 1, 8)["det_state"] != "stabilized", b
 
 
 def _hist(rows, first_raw=None, gmin=0, offset=0, fill=True, how="truncate", max_inf=2):
@@ -6638,7 +6634,7 @@ def test_build_history_empty():
 `````
 
 ### FILE: `spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py`
-sha256 `9b53aa34ee505b041bfd2e508b70445d078ab90ce7a3f49c616df58e766ddf64` · 192 lines · trailing newline: yes
+sha256 `7b1502e612df6e6de2a2ef540d303e30b0a7df014f2a65096a7b1cd18c5be303` · 197 lines · trailing newline: yes
 
 `````python
 """Spark tests for the crx_persona deterioration nodes — synthetic data, no catalog, no PROD.
@@ -6769,13 +6765,16 @@ def test_cc_end_to_end(cc, segment):
     params = {"persona_end_date": str(SNAP), "dpd_journey": {"segment": segment}}
     seq = build_cc_dpd_sequences(build_cc_full_history(raw, spine), spells, params)
     got = {r.account_id: r for r in build_cc_a4_deterioration(seq, params).collect()}
-    want = {a: J.classify(k, c, 0, 9, segment, "B_balanced_6")
+    want = {a: J.classify(k, c, 0, 9)
             for a, (k, c) in expected.items() if max(k[-1], 1) in J.SEGMENTS[segment]}
     assert set(got) == set(want), "every account in the segment is classified, no others"
     for a, w in want.items():
         assert got[a].det_state == w["det_state"], (a, expected[a])
         assert got[a].history_cropped == expected[a][1], a
         assert got[a].det_state_label == J.DISPLAY_NAMES[w["det_state"]]
+    assert {r.det_state for r in got.values()} <= set(J.STATES)
+    if segment == "180_plus":
+        assert "stabilized" not in {r.det_state for r in got.values()}
     statuses = {r.build_status for r in seq.select("build_status").distinct().collect()}
     assert statuses == {"ok"}, "no account dropped"
 
@@ -6813,7 +6812,7 @@ def test_rl_end_to_end(spark, journeys, segment):
         start = SNAP_IDX - len(b) + 1
         rows += [(acc, _month(start + t, 28).date(), v, 1.0, 100.0, 0, "PL") for t, v in enumerate(b)]
         if max(b[-1] + 1, 1) in J.SEGMENTS[segment]:
-            want[acc] = J.classify(b, start <= global_min, 1, 8, segment, "B_balanced_6")["det_state"]
+            want[acc] = J.classify(b, start <= global_min, 1, 8)["det_state"]
     master = spark.createDataFrame(rows, "account_id string, observation_date date, dpd_bucket int, "
                                          "emi_coverage_ratio double, outstanding_balance double, "
                                          "is_restructured int, loan_type string")
@@ -6824,6 +6823,8 @@ def test_rl_end_to_end(spark, journeys, segment):
     assert {a: r.det_state for a, r in got.items()} == want
     allowed = set(J.RL.native_buckets(J.SEGMENTS[segment]))
     assert {r.current_bucket for r in got.values()} <= allowed
+    if segment == "180_plus":
+        assert "stabilized" not in set(want.values())
 
 
 def test_rl_double_spine_key_matches_string_master(spark):
@@ -6836,7 +6837,7 @@ def test_rl_double_spine_key_matches_string_master(spark):
 `````
 
 ### FILE: `spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py`
-sha256 `e8fbb8cf167cde3166b15e3ac35b17e30a22f87fc72a95238cb990ebafe8c724` · 59 lines · trailing newline: yes
+sha256 `24e6b6b0e9e2429f0d62a1157e0c17bf59763f3970bc425236884fb9209e9d9b` · 61 lines · trailing newline: yes
 
 `````python
 """Wiring of the CC / RL deterioration pipelines — no Spark, no data.
@@ -6894,10 +6895,12 @@ def test_sequences_run_before_classification(product):
 def test_params_defaults_are_valid():
     """The params the nodes read: defaults resolve, and a bad value fails loudly."""
     p = J.journey_params({"persona_end_date": "2026-08-31"}, J.CC)
-    assert p.floor_date == "2024-01-01" and p.segment == "60_180" and p.det_option == "B_balanced_6"
+    assert p.floor_date == "2024-01-01" and p.segment == "60_180"
     assert J.journey_params({"persona_end_date": "2026-08-31"}, J.RL).floor_date is None
     with pytest.raises(ValueError):
         J.journey_params({"persona_end_date": "2026-08-31", "dpd_journey": {"segment": "90_plus"}}, J.CC)
+    with pytest.raises(ValueError):    # stale key from the old A/B/C options must not pass silently
+        J.journey_params({"persona_end_date": "2026-08-31", "dpd_journey": {"det_option": "B_balanced_6"}}, J.CC)
 `````
 
 ### FILE: `spark/prod_check.py`

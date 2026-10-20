@@ -53,7 +53,9 @@ def test_sequences_run_before_classification(product):
 def test_params_defaults_are_valid():
     """The params the nodes read: defaults resolve, and a bad value fails loudly."""
     p = J.journey_params({"persona_end_date": "2026-08-31"}, J.CC)
-    assert p.floor_date == "2024-01-01" and p.segment == "60_180" and p.det_option == "B_balanced_6"
+    assert p.floor_date == "2024-01-01" and p.segment == "60_180"
     assert J.journey_params({"persona_end_date": "2026-08-31"}, J.RL).floor_date is None
     with pytest.raises(ValueError):
         J.journey_params({"persona_end_date": "2026-08-31", "dpd_journey": {"segment": "90_plus"}}, J.CC)
+    with pytest.raises(ValueError):    # stale key from the old A/B/C options must not pass silently
+        J.journey_params({"persona_end_date": "2026-08-31", "dpd_journey": {"det_option": "B_balanced_6"}}, J.CC)

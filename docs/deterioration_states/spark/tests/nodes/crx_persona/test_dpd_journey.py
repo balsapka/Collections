@@ -79,18 +79,19 @@ CROP_CASES = [   (   '00000000002344545454545454545454545454545454545454',
         'cropped to 0 0 0 2 3 4: looks like EPD, but older than the window'),
     ('0 0 0 2 3 4', 32, 'early_payment_default', 'short history, not cropped: EPD')]
 
-# 180+ segment (canonical cap: CC 9, RL 7 -> 8) and the ceiling / unknown rules
+# 180+ segment: the SAME tree and vocabulary as 60-180; no stabilized at 180+; holds at the
+# ceiling (CC 9, RL 7) are not payments
 CASES_180 = [
-    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),  # at the cap: not stabilized
-    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "stabilized"),               # holding at 8, below the cap
-    ("cc", [8, 9, 9, 9, 9, 9, 9], "unknown"),                                            # journey start not observed
-    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 9], "paying_in_default"),
+    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),
+    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "straight_roller_seasoned"),   # holding at 8: NOT stabilized
+    ("cc", [8, 9, 9, 9, 9, 9, 9], "unknown"),                                             # journey start not observed
+    ("cc", [0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9], "early_payment_default"),                # cap holds are not payments
+    ("cc", [0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 9], "straight_roller_early_life"),        # 9 -> 8 is a payment
     ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 7], "straight_roller_seasoned"),
-    ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 6, 7], "paying_in_default"),
     ("rl", [7, 7, 7, 7], "unknown"),
-    ("rl", [0, 0, 1, 2, 3, 4, 5, 6, 7], "early_payment_default"),
-    ("rl", [0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "broken_payer"),
-    ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7] + [7] * 12, "straight_roller_seasoned"),     # 12 months at the cap
+    ("rl", [0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7], "early_payment_default"),
+    ("rl", [0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "straight_roller_seasoned"),
+    ("rl", [0] * 20 + [1, 1, 2, 2, 3, 4, 5, 6, 7], "slow_roller"),
 ]
 SCHEME = {"cc": (0, 9), "rl": (1, 8)}     # (offset, canonical cap)
 
@@ -110,27 +111,33 @@ def test_business_case(product, chron, want, why):
     b = _chron(chron)
     buckets = b if product == "cc" else _to_rl(b)
     off, top = SCHEME[product]
-    assert J.classify(buckets, False, off, top, "60_180", "B_balanced_6")["det_state"] == want, why
+    assert J.classify(buckets, False, off, top)["det_state"] == want, why
 
 
 @pytest.mark.parametrize("chron,n,want,why", CROP_CASES)
 def test_crop_case(chron, n, want, why):
     b = _chron(chron)
-    got = J.classify(b[-n:], len(b) >= n, 0, 9, "60_180", "B_balanced_6")["det_state"]
+    got = J.classify(b[-n:], len(b) >= n, 0, 9)["det_state"]
     assert got == want, why
 
 
 @pytest.mark.parametrize("product,buckets,want", CASES_180)
 def test_180_and_ceiling(product, buckets, want):
     off, top = SCHEME[product]
-    assert J.classify(buckets, False, off, top, "180_plus", "B_balanced_6")["det_state"] == want
+    assert J.classify(buckets, False, off, top)["det_state"] == want
 
 
-def test_every_option_is_mece():
-    """Each option returns exactly one known state for every case."""
-    for option in J.OPTIONS:
-        for chron, _, _ in CASES:
-            assert J.classify(_chron(chron), False, 0, 9, "60_180", option)["det_state"] in J.DISPLAY_NAMES
+def test_one_vocabulary_and_no_stabilized_at_180():
+    """Both segments use the same 7 states; stabilized never occurs at 180+ (CC 8-9, RL 7)."""
+    assert list(J.DISPLAY_NAMES) == J.STATES and len(J.STATES) == 7
+    holds = [[0] * 20 + [2, 3, 4, 5, 6, 7] + [top] * k for top in (8, 9) for k in range(1, 13)]
+    for b in holds + [c for _, c, _ in CASES_180 if _ == "cc"]:
+        st = J.classify(b, False, 0, 9)["det_state"]
+        assert st in J.STATES
+        if max(b[-1], 1) >= 8:
+            assert st != "stabilized", b
+    for b in [[0] * 20 + [1, 2, 3, 4, 5, 6] + [7] * k for k in range(1, 13)]:
+        assert J.classify(b, False, 1, 8)["det_state"] != "stabilized", b
 
 
 def _hist(rows, first_raw=None, gmin=0, offset=0, fill=True, how="truncate", max_inf=2):

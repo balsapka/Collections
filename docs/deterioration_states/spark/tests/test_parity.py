@@ -3,7 +3,7 @@ reference (docs/deterioration_states/dpd_states). No Spark needed.
 
     python docs/deterioration_states/spark/tests/test_parity.py        # or: pytest <this file>
 
-Checks every feature and every state (options A/B/C, 180+ prototype) on the synthetic
+Checks every feature and the state (one tree, both segments) on the synthetic
 generators, the business edge cases (selftest CASES / CROP_CASES) on CC and RL numbering,
 and the Stage 1 gap rules.
 """
@@ -22,7 +22,7 @@ from dpd_states.analysis import crop_history                   # noqa: E402
 from dpd_states.config import MAX_HISTORY_MONTHS               # noqa: E402
 from dpd_states.features import build_features                 # noqa: E402
 from dpd_states.selftest import CASES, CROP_CASES              # noqa: E402
-from dpd_states.states import OPTIONS, assign_states           # noqa: E402
+from dpd_states.states import OPTIONS, RECOMMENDED, assign_states  # noqa: E402
 
 N = 20_000
 FEATURES = [k for k in J.journey_features([1, 2, 3, 4])]
@@ -50,36 +50,34 @@ def _compare(ref, mine, what: str) -> int:
     return bad
 
 
-def _reference(strings, cropped):
+def _reference(strings, cropped, cap=9):
     import pandas as pd
-    f = build_features(pd.DataFrame({"dpd_string": list(strings), "history_truncated": list(cropped)}))
-    return f, {o: assign_states(f, **OPTIONS[o]) for o in OPTIONS}
+    f = build_features(pd.DataFrame({"dpd_string": list(strings), "history_truncated": list(cropped)}), cap=cap)
+    return f, assign_states(f, **OPTIONS[RECOMMENDED])
 
 
 def test_spine_cc_and_rl():
     synth.calibrate(n=4000, iters=3)
     df = synth.generate(N)
     s, cropped = crop_history(df.dpd_string, MAX_HISTORY_MONTHS)
-    f, ref_states = _reference(s, cropped)
+    f, ref = _reference(s, cropped)
     bad = 0
     for i, (string, cr) in enumerate(zip(s, cropped)):
-        b = _chron(string)
-        for o in OPTIONS:
-            mine = J.classify(b, bool(cr), 0, 9, "60_180", o)
-            if mine["det_state"] != ref_states[o].iloc[i]:
-                bad += 1
-                print(f"  STATE {o} {string}: {ref_states[o].iloc[i]} vs {mine['det_state']}")
-        bad += _compare(f.iloc[i], mine, f"cc {string}")
-    # RL: the same journeys in RL numbering must give the same states / features
-    rl_ref_strings = ["".join(str(min(max(x, 1), 8)) for x in reversed(_chron(x))) for x in s]
-    f_rl, ref_rl = _reference(rl_ref_strings, cropped)
-    for i, (string, cr) in enumerate(zip(s, cropped)):
-        mine = J.classify(_to_rl(_chron(string)), bool(cr), 1, 8, "60_180", "B_balanced_6")
-        if mine["det_state"] != ref_rl["B_balanced_6"].iloc[i]:
+        mine = J.classify(_chron(string), bool(cr), 0, 9)
+        if mine["det_state"] != ref.iloc[i]:
             bad += 1
-            print(f"  RL STATE {string}: {ref_rl['B_balanced_6'].iloc[i]} vs {mine['det_state']}")
+            print(f"  STATE {string}: {ref.iloc[i]} vs {mine['det_state']}")
+        bad += _compare(f.iloc[i], mine, f"cc {string}")
+    # RL: the same journeys in RL numbering (cap RL 7 = canonical 8) give the same states
+    rl_ref_strings = ["".join(str(min(max(x, 1), 8)) for x in reversed(_chron(x))) for x in s]
+    f_rl, ref_rl = _reference(rl_ref_strings, cropped, cap=8)
+    for i, (string, cr) in enumerate(zip(s, cropped)):
+        mine = J.classify(_to_rl(_chron(string)), bool(cr), 1, 8)
+        if mine["det_state"] != ref_rl.iloc[i]:
+            bad += 1
+            print(f"  RL STATE {string}: {ref_rl.iloc[i]} vs {mine['det_state']}")
         bad += _compare(f_rl.iloc[i], mine, f"rl {string}")
-    print(f"spine: {len(s):,} accounts x {len(OPTIONS)} options + RL, {bad} mismatches")
+    print(f"spine: {len(s):,} accounts, CC + RL, {bad} mismatches")
     assert bad == 0
 
 
@@ -89,18 +87,14 @@ def test_segment_180_cc():
     ref = segment_180.assign_180(f)
     bad = 0
     for i, (string, cr) in enumerate(zip(f.dpd_string, f.history_truncated)):
-        mine = J.classify(_chron(string), bool(cr), 0, 9, "180_plus", "B_balanced_6")
+        mine = J.classify(_chron(string), bool(cr), 0, 9)
         if mine["det_state"] != ref.iloc[i]:
             bad += 1
             if bad <= 5:
                 print(f"  180 STATE {string}: {ref.iloc[i]} vs {mine['det_state']}")
-        for k in ("all_default", "months_in_default", "default_left_censored", "paid_in_default",
-                  "stabilized_months_in_4_7"):
-            if bool(f[k].iloc[i] == mine[k]) is False:
-                bad += 1
-        if int(f.pay_events_before_9.iloc[i]) != mine["pay_events_before_top"]:
-            bad += 1
-    print(f"180+: {len(f):,} accounts, {bad} mismatches")
+        bad += _compare(f.iloc[i], mine, f"180 {string}")
+    assert "stabilized" not in set(ref), "stabilized must never occur at 180+"
+    print(f"180+: {len(f):,} accounts, {bad} mismatches; states {sorted(set(ref))}")
     assert bad == 0
 
 
@@ -109,42 +103,35 @@ def test_business_cases():
     for chron, want, why in CASES:
         b = [int(ch) for ch in chron.replace(" ", "")]
         for name, buckets, off, top in (("cc", b, 0, 9), ("rl", _to_rl(b), 1, 8)):
-            got = J.classify(buckets, False, off, top, "60_180", "B_balanced_6")["det_state"]
+            got = J.classify(buckets, False, off, top)["det_state"]
             if got != want:
                 bad += 1
                 print(f"  CASE {name} {chron!r}: want {want}, got {got} — {why}")
     for chron, n, want, why in CROP_CASES:
         b = [int(ch) for ch in chron.replace(" ", "")]
-        kept, cropped = b[-n:], len(b) >= n
-        got = J.classify(kept, cropped, 0, 9, "60_180", "B_balanced_6")["det_state"]
+        got = J.classify(b[-n:], len(b) >= n, 0, 9)["det_state"]
         if got != want:
             bad += 1
             print(f"  CROP {chron!r}: want {want}, got {got} — {why}")
-    # RL 180+: cap is RL 7 (canonical 8)
-    rl180 = [
-        ([0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 7], "straight_roller_seasoned"),
-        ([0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 6, 7], "paying_in_default"),
-        ([7, 7, 7, 7], "unknown"),
-        ([0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "broken_payer"),
-        ([0] * 20 + [1, 2, 3, 4, 5, 6, 7] + [7] * 12, "straight_roller_seasoned"),   # 12 months at the cap: NOT stabilized
-        ([0, 0, 1, 2, 3, 4, 5, 6, 7], "early_payment_default"),
+    cases_180 = [   # (product, oldest -> newest native buckets, expected) — same tree as 60-180
+        ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),
+        ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "straight_roller_seasoned"),  # holding at 8: NOT stabilized
+        ("cc", [8, 9, 9, 9, 9, 9, 9], "unknown"),
+        ("cc", [0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 9], "early_payment_default"),     # holds at the cap are not payments
+        ("cc", [0, 0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 9], "straight_roller_early_life"),  # 9 -> 8 is a payment: not EPD
+        ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 7], "straight_roller_seasoned"),
+        ("rl", [7, 7, 7, 7], "unknown"),
+        ("rl", [0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7], "early_payment_default"),
+        ("rl", [0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "straight_roller_seasoned"),
+        ("rl", [0] * 20 + [1, 1, 2, 2, 3, 4, 5, 6, 7], "slow_roller"),
     ]
-    cc180 = [
-        ([0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),     # at the cap: NOT stabilized
-        ([0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "stabilized"),                  # holding at 8 (below the cap)
-        ([8, 9, 9, 9, 9, 9, 9], "unknown"),
-    ]
-    for buckets, want in cc180:
-        got = J.classify(buckets, False, 0, 9, "180_plus", "B_balanced_6")["det_state"]
+    for product, buckets, want in cases_180:
+        off, top = (0, 9) if product == "cc" else (1, 8)
+        got = J.classify(buckets, False, off, top)["det_state"]
         if got != want:
             bad += 1
-            print(f"  CC180 {buckets}: want {want}, got {got}")
-    for buckets, want in rl180:
-        got = J.classify(buckets, False, 1, 8, "180_plus", "B_balanced_6")["det_state"]
-        if got != want:
-            bad += 1
-            print(f"  RL180 {buckets}: want {want}, got {got}")
-    print(f"business cases: {len(CASES) * 2 + len(CROP_CASES) + len(rl180) + len(cc180)} checked, {bad} wrong")
+            print(f"  180 {product} {buckets}: want {want}, got {got}")
+    print(f"business cases: {len(CASES) * 2 + len(CROP_CASES) + len(cases_180)} checked, {bad} wrong")
     assert bad == 0
 
 

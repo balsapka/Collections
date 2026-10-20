@@ -4,7 +4,7 @@ Replaces the window-function port (resolve_gaps / encode_transitions / classify_
 Spark does what Spark is good at — scoping, the history floor, and ONE shuffle that gathers
 each account's monthly buckets into an array. The journey logic then runs per account as a
 plain-Python port of the signed-off numpy reference (docs/deterioration_states/dpd_states:
-features.py, states.py, segment_180.py). Sequential rules (glitch fix, +2 jump repair, runs
+features.py, states.py option B). Sequential rules (glitch fix, +2 jump repair, runs
 of months) are loops, exactly as in the reference — no lag/lead approximation, no cascade
 divergence. Parity with the reference is a test (tests/test_parity.py), not a hope.
 
@@ -17,6 +17,11 @@ Every rule is written once, on the CC scale ("canonical"):
 canonical = max(native + offset, 1): CC offset 0, RL offset 1 (0 and 1 are both "clean").
 So the 60-180 DPD spine is canonical 4-7 for both (CC native 4-7, RL native 3-6), and the
 180+ segment is canonical 8+ (CC native 8-9, RL native 7). Outputs carry NATIVE buckets.
+
+One state tree and one vocabulary for both segments (7 states): unknown, early_payment_default,
+stabilized, repeat_delinquent, straight_roller_seasoned, straight_roller_early_life,
+slow_roller. Stabilized only up to 151-180 DPD (never at 180+); holds at the ceiling bucket
+are not payments. The segment only decides which accounts are classified.
 
 Two stages (two Kedro nodes per product)
 ----------------------------------------
@@ -77,7 +82,6 @@ PARAM_DEFAULTS = {
     "cc_history_floor_date": "2024-01-01",
     "rl_history_floor_date": None,
     "segment": "60_180",                  # "60_180" or "180_plus" (the run's spine)
-    "det_option": "B_balanced_6",         # A_minimal_4 / B_balanced_6 / C_detailed_7 (60_180 only)
     "on_unresolvable_gap": "truncate",    # "truncate" (keep months after the gap) or "drop"
     "fill_straight_roll_gaps": True,      # 3 _ 5 -> 3 4 5: the only path without a +2 jump
     "repair_cycle_shift": True,           # two bills in one month + empty neighbour month
@@ -91,7 +95,6 @@ class JourneyParams:
     end_date: str
     floor_date: str | None
     segment: str
-    det_option: str
     on_unresolvable_gap: str
     fill_straight_roll_gaps: bool
     repair_cycle_shift: bool
@@ -100,18 +103,19 @@ class JourneyParams:
 
 
 def journey_params(crx_persona: dict, scheme: BucketScheme) -> JourneyParams:
-    p = {**PARAM_DEFAULTS, **(crx_persona.get("dpd_journey") or {})}
+    given = crx_persona.get("dpd_journey") or {}
+    unknown = sorted(set(given) - set(PARAM_DEFAULTS))
+    if unknown:          # a stale key (e.g. the removed det_option) must not be silently ignored
+        raise ValueError(f"dpd_journey: unknown parameter(s) {unknown}; allowed {sorted(PARAM_DEFAULTS)}")
+    p = {**PARAM_DEFAULTS, **given}
     if p["segment"] not in SEGMENTS:
         raise ValueError(f"dpd_journey.segment must be one of {list(SEGMENTS)}, got {p['segment']!r}")
-    if p["det_option"] not in OPTIONS:
-        raise ValueError(f"dpd_journey.det_option must be one of {list(OPTIONS)}, got {p['det_option']!r}")
     if p["on_unresolvable_gap"] not in ("truncate", "drop"):
         raise ValueError("dpd_journey.on_unresolvable_gap must be 'truncate' or 'drop'")
     return JourneyParams(
         end_date=str(crx_persona["persona_end_date"]),
         floor_date=p[f"{scheme.name}_history_floor_date"],
         segment=p["segment"],
-        det_option=p["det_option"],
         on_unresolvable_gap=p["on_unresolvable_gap"],
         fill_straight_roll_gaps=bool(p["fill_straight_roll_gaps"]),
         repair_cycle_shift=bool(p["repair_cycle_shift"]),
@@ -202,8 +206,10 @@ def _mean(xs) -> float:
     return sum(xs) / len(xs) if xs else 0.0
 
 
-def journey_features(b_canon: list[int]) -> dict:
-    """features.py::journey_features on a canonical bucket list (oldest -> newest)."""
+def journey_features(b_canon: list[int], canon_top: int = 9) -> dict:
+    """features.py::journey_features on a canonical bucket list (oldest -> newest).
+    canon_top: the ceiling bucket (CC 9, RL 7 -> 8). A hold AT the ceiling is not a payment
+    (the bucket cannot rise), so it is not counted in spell_pay_events."""
     raw = [max(x, 1) for x in b_canon]
     g, n_glitches = _glitches(raw)
     _, n_repaired, n_jumps_left = _repair(g)
@@ -252,7 +258,8 @@ def journey_features(b_canon: list[int]) -> dict:
         "runup_holds": sum(1 for x in ru_c if x == H),
         "runup_pays": sum(1 for x in ru_c if x == P),
         "spell_len": sp_end - sp_start,
-        "spell_pay_events": sum(1 for x in sp_c if x != R),
+        "spell_pay_events": sum(1 for t in range(t0, sp_end - 1)
+                                if c[t] != R and not (c[t] == H and b[t + 1] >= canon_top)),
         "max_hold_run": max(hold_runs, default=0),
         "months_since_4": months_since_4,
         "post4_paid_rate": _mean(paid[first4:]) if months_since_4 > 0 else 0.0,
@@ -270,131 +277,68 @@ def journey_features(b_canon: list[int]) -> dict:
     }
 
 
-# --- 60-180 DPD states (states.py) -------------------------------------------------------
+# --- the state tree (states.py, option B) — ONE tree for 60-180 and 180+ -------------------
 
-STATE_DEFAULTS = {
-    "epd_max_history": 3,           # [business]
-    "epd_max_blips": 1,             # [business]
-    "straight_max_runup": 3,
-    "stabilized_min_in_band": 5,    # [business]
+STATE_RULES = {
+    "epd_max_history": 3,                # [business] months of history before the spell (blip incl.)
+    "epd_max_blips": 1,                  # [business]
+    "straight_max_runup": 3,             # last clean month -> first month at 4
+    "stabilized_min_in_band": 5,         # [business] of the last 6 months within today's bucket ±1
     "stabilized_long_run_months": 6,     # [business]
     "stabilized_long_run_max_rise": 1,   # [business]
-    "paying_since_4_min_rate": None,     # tested, NOT recommended
-    "repeat_min_prior_peak": None,  # [business]
-    "repeat_window_months": 12,     # [business]
-    "seasoned_min_months": None,    # [business]
-    "split_slow_roller": False,
-}
-OPTIONS = {
-    "A_minimal_4": {},
-    "B_balanced_6": {"repeat_min_prior_peak": 3, "seasoned_min_months": 12},
-    "C_detailed_7": {"repeat_min_prior_peak": 3, "seasoned_min_months": 12, "split_slow_roller": True},
+    "stabilized_max_bucket": 7,          # [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
+    "repeat_min_prior_peak": 3,          # [business] earlier spell reached bucket 3 ...
+    "repeat_window_months": 12,          # [business] ... and ended <= 12 months before this one
+    "seasoned_min_months": 12,           # [business] months on book before the spell
 }
 
+STATES = ["unknown", "early_payment_default", "stabilized", "repeat_delinquent",
+          "straight_roller_seasoned", "straight_roller_early_life", "slow_roller"]
 
-def _stabilized(f: dict, p: dict, canon_top: int) -> bool:
-    """Bank's 5-of-6 rule + long-run clause, never at the ceiling bucket (CC 9, RL 7):
-    at the cap the bucket cannot rise, so 9 9 9 reads as a hold without any payment."""
-    stab = f["last6_in_band"] >= p["stabilized_min_in_band"]
-    if p["stabilized_long_run_months"] is not None:
-        stab = stab or (f["months_since_4"] >= p["stabilized_long_run_months"]
-                        and f["chg_6m"] <= p["stabilized_long_run_max_rise"])
-    return stab and f["b_now"] < canon_top
+DISPLAY_NAMES = {
+    "unknown": "Unknown — start of the delinquency journey not observed",
+    "early_payment_default": "Early payment default (EPD)",
+    "stabilized": "Stabilized",
+    "repeat_delinquent": "Repeat delinquent (re-default)",
+    "straight_roller_seasoned": "Seasoned straight roller",
+    "straight_roller_early_life": "Early-life straight roller",
+    "slow_roller": "Slow roller (partial payer)",
+}
 
 
-def assign_state(f: dict, cropped: bool, option: str = "B_balanced_6", canon_top: int = 9) -> str:
-    """states.py::assign_states for one account. First 'yes' wins."""
-    p = {**STATE_DEFAULTS, **OPTIONS[option]}
-    fast = f["runup_len"] <= p["straight_max_runup"]
-    stab = _stabilized(f, p, canon_top)
-    if f["starts_delinquent"]:              # journey start not observed: only stabilized is safe
+def assign_state(f: dict, cropped: bool) -> str:
+    """One state per account, same tree and vocabulary in both segments. First 'yes' wins.
+
+    Q0 journey start not observed (oldest observed month delinquent) -> stabilized if Q2, else unknown
+    Q1 early payment default   <=3 months before the spell, <=1 blip, no earlier spell, no payment
+                               in the spell (holds at the ceiling are not payments), not cropped
+    Q2 stabilized              60-180 only (today <= CC 7 / RL 6): 5 of the last 6 months within
+                               today's bucket ±1, or >=6 months since first reaching 4 and at most
+                               1 bucket higher than 6 months ago
+    Q3 repeat delinquent       an earlier spell reached 3, cured, ended <=12 months before this one
+    Q4 straight roller         run-up to 4 took <=3 months: seasoned (>=12 months on book, or
+                               cropped = older than the window) / early life
+    else slow roller
+    """
+    p = STATE_RULES
+    stab = (f["b_now"] <= p["stabilized_max_bucket"]
+            and (f["last6_in_band"] >= p["stabilized_min_in_band"]
+                 or (f["months_since_4"] >= p["stabilized_long_run_months"]
+                     and f["chg_6m"] <= p["stabilized_long_run_max_rise"])))
+    if f["starts_delinquent"]:
         return "stabilized" if stab else "unknown"
     if (f["months_before_spell"] <= p["epd_max_history"] and f["n_blips"] <= p["epd_max_blips"]
             and f["n_prior_episodes"] == 0 and f["spell_pay_events"] == 0 and not cropped):
         return "early_payment_default"
     if stab:
         return "stabilized"
-    if p["paying_since_4_min_rate"] is not None and f["post4_paid_rate"] >= p["paying_since_4_min_rate"]:
-        return "paying_since_4"
-    if p["repeat_min_prior_peak"] is not None:
-        peak = min(max(int(p["repeat_min_prior_peak"]), 2), 4)
-        if f[f"gap_prior_peak{peak}"] <= p["repeat_window_months"]:
-            return "repeat_delinquent"
-    if p["seasoned_min_months"] is not None:
-        if fast and (f["months_before_spell"] >= p["seasoned_min_months"] or cropped):
-            return "straight_roller_seasoned"
-        if fast:
-            return "straight_roller_early_life"
-    elif fast:
-        return "straight_roller"
-    if p["split_slow_roller"]:
-        return "slow_roller_erratic" if f["runup_pays"] >= 1 else "slow_roller_intermittent"
-    return "slow_roller"
-
-
-# --- 180+ states (segment_180.py, PROTOTYPE) ------------------------------------------------
-
-def features_180(b_canon: list[int], canon_top: int) -> dict:
-    """segment_180.py::features_180 extras. canon_top: 9 for CC, 8 for RL (its 180+ cap)."""
-    b, d, c = encode(b_canon)
-    sp0 = _runs([x >= 2 for x in b])[-1][0]
-    first8 = next((i for i, x in enumerate(b) if x >= 8), 0)
-    first_top = next((i for i, x in enumerate(b) if x >= canon_top), None)
-    upto = first_top if first_top is not None else len(b) - 1
-    pre_top = c[max(sp0 - 1, 0):upto]
-    after_top = d[first_top:] if first_top is not None else []
-    stab_months = 0
-    for t in range(sp0, first8):
-        if 4 <= b[t] <= 7 and t >= 5 and sum(1 for x in b[t - 5:t + 1] if abs(x - b[t]) <= 1) >= 5:
-            stab_months += 1
-    return {
-        "all_default": all(x >= 8 for x in b_canon),
-        "months_in_default": len(b) - 1 - first8,
-        "default_left_censored": first8 == 0,
-        "pay_events_before_top": sum(1 for x in pre_top if x != R),
-        "paid_in_default": any(x < 0 for x in after_top),
-        "stabilized_months_in_4_7": stab_months,
-    }
-
-
-def assign_state_180(f: dict, cropped: bool, canon_top: int = 9, seasoned_min_months: int = 12,
-                     repeat_window: int = 12) -> str:
-    fast = f["runup_len"] <= 3
-    if f["paid_in_default"]:
-        return "paying_in_default"
-    if _stabilized(f, STATE_DEFAULTS, canon_top):         # CC 8 only: never at the cap
-        return "stabilized"
-    if f["stabilized_months_in_4_7"] >= 6:
-        return "broken_payer"
-    if f["starts_delinquent"]:                            # includes all_default
-        return "unknown"
-    if (f["months_before_spell"] <= 3 and f["n_blips"] <= 1 and f["n_prior_episodes"] == 0
-            and f["pay_events_before_top"] == 0 and not cropped):
-        return "early_payment_default"
-    if f["gap_prior_peak3"] <= repeat_window:
+    if f["gap_prior_peak3"] <= p["repeat_window_months"]:
         return "repeat_delinquent"
-    if fast and (f["months_before_spell"] >= seasoned_min_months or cropped):
-        return "straight_roller_seasoned"
-    if fast:
+    if f["runup_len"] <= p["straight_max_runup"]:
+        if f["months_before_spell"] >= p["seasoned_min_months"] or cropped:
+            return "straight_roller_seasoned"
         return "straight_roller_early_life"
     return "slow_roller"
-
-
-DISPLAY_NAMES = {
-    "unknown": "Unknown — start of the delinquency journey not observed",
-    "early_payment_default": "Early payment default (EPD)",
-    "stabilized": "Stabilized",
-    "paying_since_4": "Paying since bucket 4 (tested, not used)",
-    "repeat_delinquent": "Repeat delinquent (re-default)",
-    "straight_roller": "Straight roller",
-    "straight_roller_seasoned": "Seasoned straight roller",
-    "straight_roller_early_life": "Early-life straight roller",
-    "slow_roller": "Slow roller (partial payer)",
-    "slow_roller_intermittent": "Intermittent payer",
-    "slow_roller_erratic": "Erratic payer",
-    "paying_in_default": "Paying in default",
-    "broken_payer": "Broken payer (stabilized, then rolled to 180+)",
-}
 
 
 # --- Stage 1 core: monthly grid from raw rows ----------------------------------------------
@@ -500,15 +444,10 @@ def build_history(rows, first_raw_idx: int, global_min_idx: int, offset: int,
 
 # --- Stage 2 core: classify one account -------------------------------------------------
 
-def classify(buckets_native: list[int], cropped: bool, offset: int, canon_top: int,
-             segment: str, option: str) -> dict:
-    b = [max(x + offset, 1) for x in buckets_native]
-    f = journey_features(b)
-    if segment == "180_plus":
-        f.update(features_180(b, canon_top))
-        f["det_state"] = assign_state_180(f, cropped, canon_top)
-    else:
-        f["det_state"] = assign_state(f, cropped, option, canon_top)
+def classify(buckets_native: list[int], cropped: bool, offset: int, canon_top: int) -> dict:
+    """Features + state for one account (native buckets, oldest -> newest)."""
+    f = journey_features([max(x + offset, 1) for x in buckets_native], canon_top)
+    f["det_state"] = assign_state(f, cropped)
     return f
 
 
@@ -557,18 +496,8 @@ _FEATURES = [
     ("n_glitches", T.IntegerType()), ("n_jumps_repaired", T.IntegerType()),
     ("n_jumps_left", T.IntegerType()),
 ]
-_FEATURES_180 = [
-    ("all_default", T.BooleanType()), ("months_in_default", T.IntegerType()),
-    ("default_left_censored", T.BooleanType()), ("pay_events_before_top", T.IntegerType()),
-    ("paid_in_default", T.BooleanType()), ("stabilized_months_in_4_7", T.IntegerType()),
-]
-
-
-def _classify_schema(segment: str) -> T.StructType:
-    cols = [(n, t) for n, t in _FEATURES if t is not None]
-    cols += _FEATURES_180 if segment == "180_plus" else []
-    return T.StructType([T.StructField("det_state", T.StringType())]
-                        + [T.StructField(n, t) for n, t in cols])
+_CLASSIFY_SCHEMA = T.StructType([T.StructField("det_state", T.StringType())]
+                                + [T.StructField(n, t) for n, t in _FEATURES if t is not None])
 
 
 def _month_col(c) -> F.Column:
@@ -670,7 +599,7 @@ def build_deterioration(sequences: DataFrame, scheme: BucketScheme, params: Jour
     LATEST month is in the segment (native buckets), and assigns one state per account.
 
     Returns one row per account:
-        account_id, det_state, det_state_label, det_state_option, det_segment, current_bucket
+        account_id, det_state, det_state_label, det_segment, current_bucket
         (native), <features>, history_months, history_cropped, n_months_truncated,
         history_stale_months (snapshot month - last observed month), restructure_blind_spot_flag,
         computed_at
@@ -681,12 +610,12 @@ def build_deterioration(sequences: DataFrame, scheme: BucketScheme, params: Jour
     cur = F.element_at("dlq_buckets", -1)
     seg = sequences.where((F.col("build_status") == "ok") & cur.isin(native))
 
-    offset, top, option = scheme.offset, scheme.canon_top, params.det_option
+    offset, top = scheme.offset, scheme.canon_top
 
     def _udf(buckets, cropped):
-        return classify(list(buckets), bool(cropped), offset, top, segment, option)
+        return classify(list(buckets), bool(cropped), offset, top)
 
-    schema = _classify_schema(segment)
+    schema = _CLASSIFY_SCHEMA
     res = seg.withColumn("_s", F.udf(_udf, schema)("dlq_buckets", "history_cropped"))
 
     labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
@@ -696,7 +625,6 @@ def build_deterioration(sequences: DataFrame, scheme: BucketScheme, params: Jour
         F.col("account_id"),
         F.col("_s.det_state").alias("det_state"),
         labels[F.col("_s.det_state")].alias("det_state_label"),
-        F.lit(option if segment == "60_180" else "segment_180_prototype").alias("det_state_option"),
         F.lit(segment).alias("det_segment"),
         cur.alias("current_bucket"),
         F.col("n_gap_months_filled"),
@@ -741,6 +669,6 @@ def _log_state_stats(seq: DataFrame, out: DataFrame, scheme: BucketScheme, param
     n_ok = seq.where(F.col("build_status") == "ok").count()
     rows = out.groupBy("det_state").count().orderBy(F.desc("count")).collect()
     n = sum(r["count"] for r in rows) or 1
-    LOG.info("build_%s_deterioration [%s, %s]: %d of %d ok accounts in segment; %s", scheme.name,
-             params.segment, params.det_option, n, n_ok,
+    LOG.info("build_%s_deterioration [%s]: %d of %d ok accounts in segment; %s", scheme.name,
+             params.segment, n, n_ok,
              ", ".join(f"{r['det_state']} {r['count']} ({r['count'] / n:.1%})" for r in rows))

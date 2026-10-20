@@ -15,8 +15,8 @@ switched on per option (A / B / C) and never break MECE.
                                 since crossing bucket 2: every month of the spell a
                                 roll, still falling; and the string was not cropped (it
                                 must start at the first billed month) -> early_payment_default
-    Q2  Stabilized?             today's bucket below the cap (CC < 9, RL < 7: at the cap a
-                                hold is not a payment) AND 5 of the last 6 months within
+    Q2  Stabilized?             today's bucket <= 7 (151-180 DPD; RL <= 6) — never at 180+ —
+                                AND 5 of the last 6 months within
                                 today's bucket ±1, OR (>= 6 months since first reaching 4
                                 AND at most 1 bucket higher than 6 months ago) -> stabilized
     Q3  Paying since 4?         [tested, NOT recommended] paid >= half a month's
@@ -66,9 +66,9 @@ DEFAULTS = {
     "repeat_window_months": 12,     # [business] earlier spell ended <= 12 months before this one
     "seasoned_min_months": None,    # [business] e.g. 12 -> split straight roller (first year = early life)
     "split_slow_roller": False,     # True -> split slow roller by 2+ month payments in run-up
-    # Ceiling bucket on the CC scale (CC 9 = 210+; RL 7 = 180+ maps to 8). At the cap the
-    # bucket cannot rise, so 9 9 9 reads as a hold: never stabilized there.
-    "cap_bucket": 9,
+    # [business] Stabilized only up to bucket 7 (151-180 DPD; RL 6): never in the 180+
+    # segment, where a hold at the ceiling is not a payment.
+    "stabilized_max_bucket": 7,
 }
 
 OPTIONS = {
@@ -158,7 +158,7 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
     if p["stabilized_long_run_months"] is not None:
         stab |= ((f.months_since_4 >= p["stabilized_long_run_months"])
                  & (f.chg_6m <= p["stabilized_long_run_max_rise"]))
-    stab &= f.b_now < p["cap_bucket"]
+    stab &= f.b_now <= p["stabilized_max_bucket"]
     add(f.starts_delinquent & stab, "stabilized")
     add(f.starts_delinquent, "unknown")
     add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])

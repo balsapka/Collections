@@ -36,10 +36,13 @@ with the reference is tested (0 mismatches), and so is the Spark pipeline end to
 
 | Rule | Why | Effect (synthetic) |
 |---|---|---|
-| **Stabilized never at the ceiling bucket** (CC 9, RL 7; canonical cap 9 / 8) | At the cap the bucket cannot rise, so `9 9 9` looks like a hold although nothing was paid — every long-default account would be "stabilized". CC 8 (181–210) can still be stabilized in the 180+ tree. | 180+ stabilized 0% at the cap; 60–180 unchanged (never at the cap) |
-| **Unknown** replaces `history_starts_delinquent` and `history_not_available` | If the oldest OBSERVED month is clean (0 DPD), the whole current journey is seen and the fall-in states are confident. If it is already delinquent (spell older than the window / CC floor, restructured, migrated, missing), they would be guesses. Observed-evidence states still win: stabilized (60–180 and CC 8), paying_in_default and broken_payer (180+). | 60–180: 3.3% unknown with the 32-month window; 180+: 17–32% unknown depending on time at 9 |
+| **One tree, one vocabulary for both segments** (option B only) | The 180+ prototype had its own tree (`paying_in_default`, `broken_payer`), and options A / C added states production never uses (`straight_roller`, `slow_roller_intermittent` / `_erratic`) plus a dead one (`paying_since_4`). Now 60–180 and 180+ share the same 7 states: `unknown`, `early_payment_default`, `stabilized`, `repeat_delinquent`, `straight_roller_seasoned`, `straight_roller_early_life`, `slow_roller`. The segment only decides which accounts are classified. `det_option` / `det_state_option` are gone. | — |
+| **Stabilized never at 180+** (only up to CC 7 / RL 6 = 151–180 DPD) | At the ceiling (CC 9, RL 7) the bucket cannot rise, so `9 9 9` looks like a hold although nothing was paid; at 180+ a hold is not a meaningful "stabilized" signal. | 180+: 0% stabilized; 60–180 unchanged |
+| **Holds at the ceiling are not payments** | Same reason. Without it, EPD would fail for every account that has sat at the cap for a month. A move down from the cap (9 → 8) is still a payment. | — |
+| **Unknown** replaces `history_starts_delinquent` and `history_not_available` | If the oldest OBSERVED month is clean (0 DPD), the whole current journey is seen and the fall-in states are confident. If it is already delinquent (spell older than the window / CC floor, restructured, migrated, missing), they would be guesses. Stabilized (60–180 only) still wins: it needs only the last 6 months. | 60–180: 3.3% unknown with the 32-month window; 180+: 17–32% unknown depending on time at 9 |
 
-New output column `starts_delinquent` (oldest observed month at canonical 2+).
+New output column `starts_delinquent` (oldest observed month at canonical 2+). A stale
+`dpd_journey` parameter (e.g. `det_option`) now raises an error instead of being ignored.
 
 ### Efficiency
 
@@ -78,8 +81,8 @@ canonical = max(native + offset, 1), with CC offset 0 and RL offset 1.
 | canonical | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 
 Segments: `60_180` = canonical 4–7 (CC native 4–7, RL native 3–6). `180_plus` = canonical
-8+ (CC 8–9, RL 7). For RL 180+ the cap is RL 7, so "paying in default" means dropping
-below RL 7. Outputs carry native buckets (`dlq_buckets`, `current_bucket`). Feature names
+8+ (CC 8–9, RL 7). Both segments use the same state tree; the ceiling is CC 9 / RL 7.
+Outputs carry native buckets (`dlq_buckets`, `current_bucket`). Feature names
 keep the reference's names: `months_since_4` means months since first reaching canonical 4
 (CC 4, RL 3, i.e. 61–90 DPD).
 
@@ -113,13 +116,15 @@ Gap rules, in order (all in `build_history`, all counted):
 
 **Node 2 — `build_deterioration`**: filters `build_status = 'ok'` and today's segment.
 Features and the state come from the reference port. Output columns: `account_id,
-det_state, det_state_label, det_state_option, det_segment, current_bucket,
+det_state, det_state_label, det_segment, current_bucket,
 n_gap_months_filled, left_censored, months_before_spell, n_blips, n_prior_episodes,
 gap_prior_peak3, spell_pay_events, runup_len, runup_pays, last6_in_band, months_since_4,
-chg_6m, n_glitches, n_jumps_repaired, n_jumps_left, [180+ extras], history_months,
+chg_6m, n_glitches, n_jumps_repaired, n_jumps_left, starts_delinquent, history_months,
 history_cropped, n_months_truncated, history_stale_months, restructure_blind_spot_flag,
-computed_at`. This is the old schema plus `det_segment`, `current_bucket`, `n_jumps_left`,
-`history_months`, `history_cropped`, `n_months_truncated` and `history_stale_months`.
+computed_at` — identical for both segments. Compared with the old schema: no
+`det_state_option`; new `det_segment`, `current_bucket`, `n_jumps_left`,
+`starts_delinquent`, `history_months`, `history_cropped`, `n_months_truncated` and
+`history_stale_months`.
 
 **Schema change:** `crx_*_dpd_sequences` changes from grain (account, month) to grain
 (account) with an array. Its only consumer is Node 2. If anything else needs the long grid:

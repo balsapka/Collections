@@ -119,7 +119,7 @@ def main(n: int = 4000) -> int:
         cc_outs.append(out)
         got = {r.account_id: r for r in out.collect()}
         seg = J.SEGMENTS[segment]
-        want = {a: J.classify(k, c, 0, 9, segment, "B_balanced_6") for a, (k, c) in expected.items()
+        want = {a: J.classify(k, c, 0, 9) for a, (k, c) in expected.items()
                 if max(k[-1], 1) in seg}
         miss = set(want) ^ set(got)
         wrong = [a for a in want if a in got and (got[a].det_state != want[a]["det_state"]
@@ -160,7 +160,7 @@ def main(n: int = 4000) -> int:
     for a, rlb in rl_expected.items():
         if max(rlb[-1] + 1, 1) in J.SEGMENTS["60_180"]:
             cropped = SNAP_IDX - len(rlb) + 1 <= global_min
-            want[a] = J.classify(rlb, cropped, 1, 8, "60_180", "B_balanced_6")
+            want[a] = J.classify(rlb, cropped, 1, 8)
     miss = set(want) ^ set(got)
     wrong = [a for a in want if a in got and got[a].det_state != want[a]["det_state"]]
     bad += len(miss) + len(wrong)
