@@ -10,11 +10,16 @@ Then, in a Kedro notebook / `kedro ipython` session where `catalog` exists:
     sys.path.insert(0, str(ROOT / "docs" / "deterioration_states" / "spark"))
     from prod_check import report
     report(catalog)                       # CC and RL; report(catalog, products=("cc",)) for one
+    report(catalog, save_json="dpd_journey_results.json")   # also save the counts for the
+                                                             # stakeholder workbook (aggregates only)
 
 READ-ONLY. Prints AGGREGATES ONLY (counts and shares — no account ids, no DPD strings)
 between === DPD_JOURNEY PROD CHECK START / END ===. Paste that block back for review.
 Datasets read: crx_<p>_dpd_sequences and crx_<p>_a4_deterioration (the pipeline outputs).
 """
+import datetime
+import json
+
 from pyspark.sql import functions as F
 
 TARGET_COVERAGE = 0.999
@@ -24,7 +29,7 @@ def _pct(x, n):
     return f"{x:,} ({x / n:.2%})" if n else f"{x:,}"
 
 
-def _product(catalog, p: str) -> list[str]:
+def _product(catalog, p: str, store: dict) -> list[str]:
     seq = catalog.load(f"crx_{p}_dpd_sequences")
     out = catalog.load(f"crx_{p}_a4_deterioration")
     lines = [f"## {p.upper()}"]
@@ -46,6 +51,8 @@ def _product(catalog, p: str) -> list[str]:
         F.expr("percentile_approx(history_months, array(0.05, 0.5, 0.95))").alias("history_months_p05_p50_p95"),
     ).first().asDict()
     n = s["accounts"]
+    store[p] = {"sequences": {k: (str(v) if k in ("first_month", "last_month") else v)
+                              for k, v in s.items()}, "segments": {}}
     lines.append(f"sequences: {n:,} accounts, months {s['first_month']} .. {s['last_month']}, "
                  f"history months p05/p50/p95 {s['history_months_p05_p50_p95']}")
     lines.append("build_status: " + ", ".join(
@@ -81,8 +88,11 @@ def _product(catalog, p: str) -> list[str]:
                      f"[{'OK' if cov >= TARGET_COVERAGE else 'BELOW 99.9%'}]")
         lines.append("| state | accounts | share |")
         lines.append("|---|---|---|")
-        for r in o.groupBy("det_state").count().orderBy(F.desc("count")).collect():
+        counts = o.groupBy("det_state").count().orderBy(F.desc("count")).collect()
+        for r in counts:
             lines.append(f"| {r['det_state']} | {r['count']:,} | {r['count'] / m:.1%} |")
+        store[p]["segments"][seg] = {"classified": m, "in_segment_not_classified": lost,
+                                     "state_counts": {r["det_state"]: r["count"] for r in counts}}
         q = o.agg(
             F.avg(F.col("starts_delinquent").cast("double")).alias("starts_delinquent"),
             F.avg(F.col("history_cropped").cast("double")).alias("cropped"),
@@ -101,14 +111,22 @@ def _product(catalog, p: str) -> list[str]:
     return lines
 
 
-def report(catalog, products=("cc", "rl")) -> str:
+def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
+    """Print the check; with save_json, also write the counts (aggregates only) to that path —
+    the input of the stakeholder workbook's Results sheet."""
     lines = ["=== DPD_JOURNEY PROD CHECK START ==="]
+    store: dict = {}
     for p in products:
         try:
-            lines += _product(catalog, p)
+            lines += _product(catalog, p, store)
         except Exception as exc:          # one product failing must not hide the other
             lines.append(f"## {p.upper()}: FAILED — {type(exc).__name__}: {str(exc)[:300]}")
     lines.append("=== DPD_JOURNEY PROD CHECK END ===")
     text = "\n".join(lines)
     print(text)
+    if save_json:
+        payload = {"generated": datetime.date.today().isoformat(), "products": store}
+        with open(save_json, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, default=str)
+        print(f"saved {save_json}")
     return text

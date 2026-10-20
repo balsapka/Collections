@@ -53,7 +53,9 @@ deterioration_states/
 │   ├── REVIEW_SPARK.md       review of the workplace code (F1–F12), rewrite design, coverage, prompts W1–W4
 │   ├── crx_persona/          drop-in: _dpd_journey.py engine + cc/rl full_history + a4_deterioration nodes
 │   ├── conf/                 parameters (dpd_journey: floor, segment, option, gap rules)
-│   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only)
+│   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only; save_json for the workbook)
+│   ├── stakeholder/          build_states_workbook.py: the stakeholder xlsx, rules + examples from the engine (PROMPTS P11);
+│   │                         dpd_deterioration_states_reference.xlsx = reference copy, Results empty (git only, not in the bundle)
 │   └── tests/                nodes/ + pipelines/crx_persona/ (96 tests, ship to src/tests/) · test_parity.py · test_spark_e2e.py (bundle-only)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)

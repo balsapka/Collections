@@ -186,7 +186,12 @@ def main(n: int = 4000) -> int:
     cat = _Catalog(crx_cc_dpd_sequences=cc_seq,
                    crx_cc_a4_deterioration=cc_outs[0].unionByName(cc_outs[1], allowMissingColumns=True),
                    crx_rl_dpd_sequences=seq, crx_rl_a4_deterioration=out)
-    text = report(cat)
+    import tempfile
+    out_json = pathlib.Path(tempfile.gettempdir()) / "dpd_journey_e2e_results.json"
+    text = report(cat, save_json=str(out_json))
+    import json
+    res = json.loads(out_json.read_text())
+    print("results json segments:", {p: sorted(v["segments"]) for p, v in res["products"].items()})
     ok = (text.count("coverage 100.000% [OK]") == 3 and "FAILED" not in text)
     print(f"prod_check report: {'OK' if ok else 'UNEXPECTED'}")
     bad += 0 if ok else 1

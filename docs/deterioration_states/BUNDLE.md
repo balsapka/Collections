@@ -31,7 +31,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+).
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+); **P11** rebuilds the stakeholder workbook.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-20 by `dpd_states/bundle.py`. 41 files, 6,560 lines.
+Generated 2026-10-20 by `dpd_states/bundle.py`. 42 files, 7,396 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -199,6 +199,7 @@ docs/deterioration_states/
 ├── spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py
 ├── spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py
 ├── spark/prod_check.py
+├── spark/stakeholder/build_states_workbook.py
 ├── results/
 ├── validation/
 ```
@@ -212,7 +213,7 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `37694cc63e0f164cdc238c505951cb5125f5b8aec1ff698ab904ec6246f4210a` · 121 lines · trailing newline: yes
+sha256 `dabd6c3fa3a1a93d53d74036f19310987551da39902751808ba9556223b4b239` · 123 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
@@ -270,7 +271,9 @@ deterioration_states/
 │   ├── REVIEW_SPARK.md       review of the workplace code (F1–F12), rewrite design, coverage, prompts W1–W4
 │   ├── crx_persona/          drop-in: _dpd_journey.py engine + cc/rl full_history + a4_deterioration nodes
 │   ├── conf/                 parameters (dpd_journey: floor, segment, option, gap rules)
-│   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only)
+│   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only; save_json for the workbook)
+│   ├── stakeholder/          build_states_workbook.py: the stakeholder xlsx, rules + examples from the engine (PROMPTS P11);
+│   │                         dpd_deterioration_states_reference.xlsx = reference copy, Results empty (git only, not in the bundle)
 │   └── tests/                nodes/ + pipelines/crx_persona/ (96 tests, ship to src/tests/) · test_parity.py · test_spark_e2e.py (bundle-only)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
@@ -942,7 +945,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `fe30fbe0d4ca3acdca57adb6df7a14fbbb6f9c59f0d3c8651d41424423d0398b` · 522 lines · trailing newline: yes
+sha256 `4e8aeeee2b1f9fff7889a99eb4250aa011fbea87279585dd72e36cdf6fa6f3ba` · 607 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -960,6 +963,8 @@ and removes everything unpacked from the bundle (recoverable from BUNDLE.md), pl
 code the rewrite left in `src/`.
 **P10 fixes the state vocabulary** (after P9): one tree and the same 7 states for 60–180
 and 180+ (option B only), no stabilized at 180+, holds at the ceiling are not payments.
+**P11 rebuilds the stakeholder workbook** (after P10) from the deployed engine plus the
+PROD counts — replaces `dpd_states_review_20261016.xlsx`.
 
 ---
 
@@ -1466,6 +1471,89 @@ and node names.
 For the PROD check afterwards: `prod_check.py` is no longer in the repo. Extract the bundle
 to a temp folder as in step 1, then in the Kedro session
 `sys.path.insert(0, "<temp>/spark"); from prod_check import report; report(catalog)`.
+
+---
+
+## P11 — Rebuild the stakeholder workbook (after P10)
+
+What it produces: `dpd_deterioration_states_<YYYYMMDD>.xlsx`, replacing
+`dpd_states_review_20261016.xlsx`. Eight sheets: **Overview** (the 7 states, one sentence,
+action, whether they change over time) · **How states are assigned** (a visual flow of the
+6 ordered questions + the exact tests + terms) · **Worked examples** (month-by-month
+coloured journeys, each run through the production rules at build time) · **Thresholds**
+(plain names; code names in a side column) · **Buckets & segments** (CC vs RL, the
+ceiling) · **Data handling** · **Results** (counts per product × segment × state; shares
+and coverage are formulas) · **What changed**. Rules, thresholds and examples are read
+from the deployed engine, so the workbook cannot drift from the pipeline; the build fails
+if an example no longer gets the state it illustrates. The old "Rule tester" sheet is gone
+(it was a second copy of the rules in Excel formulas and had drifted), and so is roll rate
+(circular: measured on the months that define the state).
+
+Reference copy (layout and content, Results left empty — the real counts come from your
+PROD JSONs): `docs/deterioration_states/spark/stakeholder/dpd_deterioration_states_reference.xlsx`
+on GitHub (branch `feat/dpd-deterioration-states`). It is not inside BUNDLE.md (binary).
+
+**You, in PROD first** (after P10 is deployed), once per segment run of Node 2:
+1. Extract the bundle to a temp folder (P10 step 1), then in the Kedro session:
+   `sys.path.insert(0, "<temp>/spark"); from prod_check import report`
+2. After the 60_180 run: `report(catalog, save_json="dpd_journey_results_60_180.json")`;
+   after the 180_plus run: `report(catalog, save_json="dpd_journey_results_180_plus.json")`.
+   The JSONs hold counts only (no account ids, no DPD histories).
+3. Put both JSONs where Sonnet can read them (e.g. next to the old workbook) and paste P11.
+
+```
+Context: the DPD-journey deterioration pipelines (CC + RL) in
+src/enbd_collections/pipelines/crx_persona/ are up to date with
+docs/deterioration_states/BUNDLE.md (P10 done). The stakeholder workbook
+<PATH>/dpd_states_review_20261016.xlsx is outdated. Rebuild it with the bundled generator.
+Results JSONs (aggregates from PROD): <PATH>/dpd_journey_results_60_180.json and
+<PATH>/dpd_journey_results_180_plus.json. Snapshot month: <Mon YYYY>.
+
+Hard rules:
+- No PROD data access: never call catalog.load, never run kedro run, never query a table.
+- Extract the bundle OUTSIDE the repo (a temp folder) and delete it at the end. Do not add
+  the generator script to the repo.
+- Never hand-edit rule text, thresholds or examples in the workbook: they come from the
+  engine. Never type numbers into Results: they come from the JSONs.
+- Do not delete the old workbook; do not commit or push.
+
+Step 1 — extract and check
+1. T=$(mktemp -d); create $T/extract_bundle.py from BUNDLE.md's "Extractor" section;
+   python $T/extract_bundle.py docs/deterioration_states/BUNDLE.md $T  -> "0 mismatched".
+2. From the repo root, confirm the generator will use the DEPLOYED engine:
+   python -c "from enbd_collections.pipelines.crx_persona import _dpd_journey as J; print(J.STATES)"
+   -> the 7 states. If the import fails, STOP and tell me (do not let it fall back to the
+   bundled copy).
+
+Step 2 — read the old workbook (report only)
+Open <PATH>/dpd_states_review_20261016.xlsx (openpyxl or markitdown) and list anything it
+holds that the new workbook does not cover — e.g. stakeholder names, owner decisions,
+comments, extra notes. Do NOT carry over: the 'Rule tester' sheet, roll rates, 'Not
+classified — history starts delinquent', option A/C states, or the 16-Oct shares (they
+predate the Unknown / 180+ rules). STOP — show me the list and wait.
+
+Step 3 — build
+From the repo root:
+python $T/spark/stakeholder/build_states_workbook.py \
+    --out <PATH>/dpd_deterioration_states_<YYYYMMDD>.xlsx \
+    --results <PATH>/dpd_journey_results_60_180.json \
+    --results <PATH>/dpd_journey_results_180_plus.json \
+    --snapshot "<Mon YYYY>"
+If it stops with "example ... now gives ...", STOP and report it verbatim — the deployed
+engine differs from the bundle; do not edit the examples.
+If I approved items in step 2, add them ONLY as a new last sheet "Notes" (plain text,
+Arial 10), never by editing the generated sheets.
+
+Step 4 — verify and report
+1. Sheet names: Overview, How states are assigned, Worked examples, Thresholds,
+   Buckets & segments, Data handling, Results, What changed (+ Notes if added).
+2. Results: for each product x segment, the account counts in the sheet equal the JSON
+   state_counts (print a small comparison table); every state present; RL/CC 180+ blocks
+   filled if their JSON had them, otherwise yellow and empty (say which).
+3. If LibreOffice is available: recalculate (soffice --headless --convert-to xlsx) and
+   confirm no #DIV/0!, #REF!, #NAME?. Otherwise say that Excel computes the shares on open.
+4. Delete $T. Report the output path, and git status --short (the xlsx may be untracked).
+```
 
 `````
 
@@ -4106,7 +4194,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `f6be4075b065883e4ac911cb7980cc92ed2077db2a75b5f836109f4dbe39949a` · 273 lines · trailing newline: yes
+sha256 `e53b3ecdfb16870b036b9b2e3365b285a77124881ebc61c8a0148abc67fdbeb3` · 274 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -4173,6 +4261,7 @@ FILES = [
     "spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py",
     "spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py",
     "spark/prod_check.py",
+    "spark/stakeholder/build_states_workbook.py",
 ]
 EMPTY_DIRS = ["results", "validation"]
 
@@ -4299,7 +4388,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+).
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+); **P11** rebuilds the stakeholder workbook.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -6167,7 +6256,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `spark/tests/test_spark_e2e.py`
-sha256 `8c964ebcfca4c55c36c8d3219d31333015455c717aec6f315853704ddc13a41e` · 200 lines · trailing newline: yes
+sha256 `d25b4fd07e617741dbf14beba6d81bb75726b66c0e8dddf1ea33cda983eb30bf` · 205 lines · trailing newline: yes
 
 `````python
 """End to end on local Spark: synthetic raw tables -> the Kedro node functions -> states,
@@ -6358,7 +6447,12 @@ def main(n: int = 4000) -> int:
     cat = _Catalog(crx_cc_dpd_sequences=cc_seq,
                    crx_cc_a4_deterioration=cc_outs[0].unionByName(cc_outs[1], allowMissingColumns=True),
                    crx_rl_dpd_sequences=seq, crx_rl_a4_deterioration=out)
-    text = report(cat)
+    import tempfile
+    out_json = pathlib.Path(tempfile.gettempdir()) / "dpd_journey_e2e_results.json"
+    text = report(cat, save_json=str(out_json))
+    import json
+    res = json.loads(out_json.read_text())
+    print("results json segments:", {p: sorted(v["segments"]) for p, v in res["products"].items()})
     ok = (text.count("coverage 100.000% [OK]") == 3 and "FAILED" not in text)
     print(f"prod_check report: {'OK' if ok else 'UNEXPECTED'}")
     bad += 0 if ok else 1
@@ -6904,7 +6998,7 @@ def test_params_defaults_are_valid():
 `````
 
 ### FILE: `spark/prod_check.py`
-sha256 `9dad42eb97fe2b940fb9adc630983b287438aa119247bd12e837df5e8102b90f` · 114 lines · trailing newline: yes
+sha256 `3d186a02806858ec3a665802b4d2d1e006e1dbbe3f79370841285e00530a3209` · 132 lines · trailing newline: yes
 
 `````python
 """PROD check — run by a person with PROD access, AFTER the pipelines have run.
@@ -6919,11 +7013,16 @@ Then, in a Kedro notebook / `kedro ipython` session where `catalog` exists:
     sys.path.insert(0, str(ROOT / "docs" / "deterioration_states" / "spark"))
     from prod_check import report
     report(catalog)                       # CC and RL; report(catalog, products=("cc",)) for one
+    report(catalog, save_json="dpd_journey_results.json")   # also save the counts for the
+                                                             # stakeholder workbook (aggregates only)
 
 READ-ONLY. Prints AGGREGATES ONLY (counts and shares — no account ids, no DPD strings)
 between === DPD_JOURNEY PROD CHECK START / END ===. Paste that block back for review.
 Datasets read: crx_<p>_dpd_sequences and crx_<p>_a4_deterioration (the pipeline outputs).
 """
+import datetime
+import json
+
 from pyspark.sql import functions as F
 
 TARGET_COVERAGE = 0.999
@@ -6933,7 +7032,7 @@ def _pct(x, n):
     return f"{x:,} ({x / n:.2%})" if n else f"{x:,}"
 
 
-def _product(catalog, p: str) -> list[str]:
+def _product(catalog, p: str, store: dict) -> list[str]:
     seq = catalog.load(f"crx_{p}_dpd_sequences")
     out = catalog.load(f"crx_{p}_a4_deterioration")
     lines = [f"## {p.upper()}"]
@@ -6955,6 +7054,8 @@ def _product(catalog, p: str) -> list[str]:
         F.expr("percentile_approx(history_months, array(0.05, 0.5, 0.95))").alias("history_months_p05_p50_p95"),
     ).first().asDict()
     n = s["accounts"]
+    store[p] = {"sequences": {k: (str(v) if k in ("first_month", "last_month") else v)
+                              for k, v in s.items()}, "segments": {}}
     lines.append(f"sequences: {n:,} accounts, months {s['first_month']} .. {s['last_month']}, "
                  f"history months p05/p50/p95 {s['history_months_p05_p50_p95']}")
     lines.append("build_status: " + ", ".join(
@@ -6990,8 +7091,11 @@ def _product(catalog, p: str) -> list[str]:
                      f"[{'OK' if cov >= TARGET_COVERAGE else 'BELOW 99.9%'}]")
         lines.append("| state | accounts | share |")
         lines.append("|---|---|---|")
-        for r in o.groupBy("det_state").count().orderBy(F.desc("count")).collect():
+        counts = o.groupBy("det_state").count().orderBy(F.desc("count")).collect()
+        for r in counts:
             lines.append(f"| {r['det_state']} | {r['count']:,} | {r['count'] / m:.1%} |")
+        store[p]["segments"][seg] = {"classified": m, "in_segment_not_classified": lost,
+                                     "state_counts": {r["det_state"]: r["count"] for r in counts}}
         q = o.agg(
             F.avg(F.col("starts_delinquent").cast("double")).alias("starts_delinquent"),
             F.avg(F.col("history_cropped").cast("double")).alias("cropped"),
@@ -7010,15 +7114,754 @@ def _product(catalog, p: str) -> list[str]:
     return lines
 
 
-def report(catalog, products=("cc", "rl")) -> str:
+def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
+    """Print the check; with save_json, also write the counts (aggregates only) to that path —
+    the input of the stakeholder workbook's Results sheet."""
     lines = ["=== DPD_JOURNEY PROD CHECK START ==="]
+    store: dict = {}
     for p in products:
         try:
-            lines += _product(catalog, p)
+            lines += _product(catalog, p, store)
         except Exception as exc:          # one product failing must not hide the other
             lines.append(f"## {p.upper()}: FAILED — {type(exc).__name__}: {str(exc)[:300]}")
     lines.append("=== DPD_JOURNEY PROD CHECK END ===")
     text = "\n".join(lines)
     print(text)
+    if save_json:
+        payload = {"generated": datetime.date.today().isoformat(), "products": store}
+        with open(save_json, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, default=str)
+        print(f"saved {save_json}")
     return text
+`````
+
+### FILE: `spark/stakeholder/build_states_workbook.py`
+sha256 `bd7f67b6b5781b82ac4f2deef2f9582df1a2c25702ef42f85d837bf9665de971` · 725 lines · trailing newline: yes
+
+`````python
+"""Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
+
+    python build_states_workbook.py --out dpd_deterioration_states_<date>.xlsx \
+        [--results results_60_180.json --results results_180_plus.json] [--snapshot "Aug 2026"]
+
+Everything rule-related is read from the deployed engine, so the workbook cannot drift from
+the pipeline: thresholds come from STATE_RULES / PARAM_DEFAULTS, and every worked example is
+run through classify() — the build FAILS if an example no longer gets the state it
+illustrates. Results (counts per product x segment x state) come from the JSON that
+prod_check.report(catalog, save_json=...) writes in PROD (aggregates only); without it the
+Results sheet is left for manual entry. Shares and coverage are Excel formulas.
+
+The engine is imported from the repo package (enbd_collections.pipelines.crx_persona) or,
+when run from the bundle, from ../crx_persona/_dpd_journey.py.
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import importlib.util
+import json
+import pathlib
+import sys
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+
+def _engine():
+    try:
+        from enbd_collections.pipelines.crx_persona import _dpd_journey as J  # noqa: N811
+        return J
+    except ImportError:
+        path = pathlib.Path(__file__).resolve().parents[1] / "crx_persona" / "_dpd_journey.py"
+        spec = importlib.util.spec_from_file_location("_dpd_journey", path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["_dpd_journey"] = mod          # dataclasses need the module registered
+        spec.loader.exec_module(mod)
+        return mod
+
+
+J = _engine()
+
+# --- look ----------------------------------------------------------------------------------
+FONT = "Arial"
+NAVY, GREY, LIGHT, RULE = "1F3864", "595959", "F2F2F2", "BFBFBF"
+STATE_COLOUR = {                      # one colour per state, used on every sheet
+    "unknown": "A6A6A6",
+    "early_payment_default": "C00000",
+    "stabilized": "548235",
+    "repeat_delinquent": "C55A11",
+    "straight_roller_seasoned": "2F5597",
+    "straight_roller_early_life": "8FAADC",
+    "slow_roller": "7030A0",
+}
+BUCKET_FILL = {0: "FFFFFF", 1: "FFFFFF", 2: "FFF2CC", 3: "FFE699", 4: "F8CBAD", 5: "F4B183",
+               6: "ED7D31", 7: "C55A11", 8: "843C0C", 9: "3B1A06"}
+THIN = Side(style="thin", color=RULE)
+BOX = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+WRAP = Alignment(wrap_text=True, vertical="top")
+CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+
+def _font(**kw) -> Font:
+    return Font(name=FONT, size=kw.pop("size", 10), **kw)
+
+
+def _fill(hex_: str) -> PatternFill:
+    return PatternFill("solid", start_color=hex_, end_color=hex_)
+
+
+def _text_on(hex_: str) -> str:
+    r, g, b = (int(hex_[i:i + 2], 16) for i in (0, 2, 4))
+    return "FFFFFF" if (0.299 * r + 0.587 * g + 0.114 * b) < 150 else "000000"
+
+
+def _title(ws: Worksheet, title: str, subtitle: str, width_cols: int) -> int:
+    ws["A1"] = title
+    ws["A1"].font = _font(size=16, bold=True, color=NAVY)
+    ws["A2"] = subtitle
+    ws["A2"].font = _font(size=10, italic=True, color=GREY)
+    ws["A2"].alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=width_cols)
+    ws.row_dimensions[2].height = 30
+    ws.sheet_view.showGridLines = False
+    return 4
+
+
+def _section(ws: Worksheet, row: int, text: str, width_cols: int) -> int:
+    c = ws.cell(row=row, column=1, value=text)
+    c.font = _font(size=12, bold=True, color=NAVY)
+    for col in range(1, width_cols + 1):
+        ws.cell(row=row, column=col).border = Border(bottom=Side(style="medium", color=NAVY))
+    return row + 1
+
+
+def _header(ws: Worksheet, row: int, labels: list[str]) -> int:
+    for i, lab in enumerate(labels, 1):
+        c = ws.cell(row=row, column=i, value=lab)
+        c.font = _font(bold=True, color="FFFFFF")
+        c.fill = _fill(NAVY)
+        c.alignment = CENTER
+        c.border = BOX
+    return row + 1
+
+
+def _row(ws: Worksheet, row: int, values: list, bold_first: bool = False, height: float | None = None) -> int:
+    for i, v in enumerate(values, 1):
+        c = ws.cell(row=row, column=i, value=v)
+        c.font = _font(bold=bold_first and i == 1)
+        c.alignment = WRAP
+        c.border = BOX
+    if height:
+        ws.row_dimensions[row].height = height
+    return row + 1
+
+
+def _chip(cell, state: str, label: str | None = None) -> None:
+    cell.value = label or J.DISPLAY_NAMES[state]
+    cell.fill = _fill(STATE_COLOUR[state])
+    cell.font = _font(bold=True, color=_text_on(STATE_COLOUR[state]))
+    cell.alignment = Alignment(wrap_text=True, vertical="center")
+    cell.border = BOX
+
+
+def _widths(ws: Worksheet, widths: list[float]) -> None:
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+
+def _print(ws: Worksheet) -> None:
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+
+# --- content -------------------------------------------------------------------------------
+R = J.STATE_RULES
+FLOOR = J.PARAM_DEFAULTS["cc_history_floor_date"]
+FLOOR_TXT = dt.date.fromisoformat(FLOOR).strftime("%b %Y") if FLOOR else "the start of the data"
+
+STATE_TEXT = {   # state: (one sentence, typical action, fixed or current)
+    "unknown": (
+        "We cannot see how the account fell into delinquency: the oldest month we hold is "
+        "already overdue.",
+        "Treat on current behaviour and the other persona axes only.",
+        "Fixed"),
+    "early_payment_default": (
+        f"Fell behind within its first {R['epd_max_history']} months on book and has never "
+        "paid since — still getting worse every month.",
+        "Early-risk / first-party fraud review, early legal; no restructuring.",
+        "Current — ends the month the customer pays"),
+    "stabilized": (
+        "Paying about one month's due each month: the DPD bucket has stopped climbing. "
+        "Only possible up to 151–180 DPD.",
+        "Offer restructuring to break the hardship.",
+        "Current — re-read every month"),
+    "repeat_delinquent": (
+        f"Was 31+ DPD before, caught up, and fell back in within {R['repeat_window_months']} "
+        "months.",
+        "Has shown they can catch up: firm promise-based plan; credibility decides the pressure.",
+        "Fixed"),
+    "straight_roller_seasoned": (
+        f"On book {R['seasoned_min_months']}+ months, then missed every payment straight from "
+        "current to 61+ DPD.",
+        "Life event: read with the other axes (departed / income shock / won't pay); most "
+        "likely to respond to a hardship route.",
+        "Fixed"),
+    "straight_roller_early_life": (
+        f"Same straight roll, but in the first {R['seasoned_min_months']} months on book "
+        "(after the EPD window).",
+        "Same triage as seasoned; also an underwriting signal for acquisition.",
+        "Fixed"),
+    "slow_roller": (
+        "Paid something on the way down to 61+ DPD but kept rolling.",
+        "Over-indebted: longer-tenor restructure or settlement.",
+        "Fixed"),
+}
+
+STEPS = [   # (step, short question, state on yes, exact test, why it sits here)
+    ("0", "Can we see how the account fell in?",
+     "unknown",
+     "If the OLDEST month we hold is already 1+ DPD, the start of this delinquency is not "
+     f"visible (CC history before {FLOOR_TXT} is not used; migrated, restructured or missing "
+     "history). Such an account is Stabilized if the Step 2 test passes, otherwise Unknown.",
+     "Every later step needs the start of the journey; Stabilized needs only the last 6 months."),
+    ("1", "Early payment default?",
+     "early_payment_default",
+     f"All of: at most {R['epd_max_history']} months on book before first falling 1+ DPD "
+     f"(one short slip that was paid off is allowed); no earlier delinquency; and NOT ONE "
+     "payment since — every month one bucket worse (months held at the ceiling bucket, "
+     "CC 210+ / RL 180+, do not count as payments).",
+     "Checked before Stabilized so a brand-new non-payer is never read as stable."),
+    ("2", "Stabilized?",
+     "stabilized",
+     f"Today at most 151–180 DPD (CC bucket ≤ {R['stabilized_max_bucket']}, RL ≤ "
+     f"{R['stabilized_max_bucket'] - 1}) — never in 180+ — AND either "
+     f"{R['stabilized_min_in_band']} of the last 6 months within one bucket of today's, or "
+     f"{R['stabilized_long_run_months']}+ months since first reaching 61+ DPD and at most "
+     f"{R['stabilized_long_run_max_rise']} bucket higher than 6 months ago.",
+     "Current behaviour wins over how the account fell in: it points to the action."),
+    ("3", "Repeat delinquent?",
+     "repeat_delinquent",
+     "An earlier delinquency reached 31+ DPD, was cured, and ended at most "
+     f"{R['repeat_window_months']} months before this one started.",
+     "Recent recovery is stronger evidence than the shape of the latest fall."),
+    ("4", "Straight roller?",
+     "straight_roller_seasoned",
+     "Went 1–30 → 31–60 → 61–90 DPD in consecutive months (no payment on the way). "
+     f"Seasoned if on book {R['seasoned_min_months']}+ months before the fall, or if its "
+     f"history starts before {FLOOR_TXT} (so it is older than that); otherwise Early-life.",
+     "Splits by tenure because the action differs (life event vs underwriting)."),
+    ("5", "Otherwise",
+     "slow_roller",
+     "Paid at least once on the way down to 61+ DPD but kept rolling.",
+     "Everything left: no account is unclassified."),
+]
+STEP_OF = {"unknown": "0", "early_payment_default": "1", "stabilized": "2", "repeat_delinquent": "3",
+           "straight_roller_seasoned": "4", "straight_roller_early_life": "4", "slow_roller": "5"}
+
+TERMS = [
+    ("DPD bucket", "The account's days-past-due band at month end (see 'Buckets & segments'). "
+                   "One value per month is all the states use."),
+    ("Delinquency (spell)", "A continuous run of months at 1+ DPD. The current spell is the one "
+                            "the account is in today."),
+    ("Short slip (blip)", "An earlier 1–2 month spell that never passed 1–30 DPD and was paid "
+                          "off. It is not counted as an earlier delinquency."),
+    ("Month-to-month reading", "One bucket worse = nothing paid (roll). Same bucket = one "
+                               "month's due paid (hold). Better = two or more months paid."),
+    ("Months on book before the spell", "Months of history before the current spell started."),
+    ("Ceiling bucket", "The highest bucket: CC 210+ DPD, RL 180+ DPD. It cannot rise, so staying "
+                       "there is not a payment."),
+    ("Cropped history", f"Older months exist but are not used (CC before {FLOOR_TXT}; a long gap "
+                        "in the data). A cropped account is never EPD and counts as seasoned."),
+]
+
+EXAMPLES = [   # (product, buckets oldest -> newest, cropped, expected state, why)
+    ("CC", [0, 0, 0, 2, 3, 4, 5], False, "early_payment_default",
+     "3 clean months, then one bucket worse every month: never paid."),
+    ("CC", [0, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9], False, "early_payment_default",
+     "Same story at 180+: the months held at the ceiling (9 9 9) are not payments."),
+    ("CC", [0] * 8 + [2, 3, 4, 4, 5, 5, 5, 5, 5], False, "stabilized",
+     "Holding at 91–120 DPD for 5 months: paying about one month's due."),
+    ("CC", [int(c) for c in "00000000234443345433456554"], False, "stabilized",
+     "Swings between 61–90 and 151–180 DPD but no worse than 6 months ago: pays on average."),
+    ("CC", [5, 5, 5, 5, 5, 5], True, "stabilized",
+     f"Journey start not visible (delinquent since before {FLOOR_TXT}), but clearly holding."),
+    ("CC", [0, 2, 3, 4] + [0] * 8 + [2, 3, 4, 5], False, "repeat_delinquent",
+     "Reached 61–90 DPD, caught up fully, fell back in 8 months later."),
+    ("CC", [0] * 14 + [2, 3, 4, 5], False, "straight_roller_seasoned",
+     "14 clean months, then missed every payment."),
+    ("CC", [0, 0, 0, 2, 3, 4], True, "straight_roller_seasoned",
+     f"Looks short, but its history starts before {FLOOR_TXT}: older than a year."),
+    ("CC", [0] * 6 + [2, 3, 4, 5], False, "straight_roller_early_life",
+     "6 clean months (past the EPD window), then a straight roll."),
+    ("CC", [0] * 10 + [2, 2, 3, 3, 4, 5], False, "slow_roller",
+     "Paid one month at 1–30 and at 31–60 DPD on the way down, still rolled."),
+    ("CC", [0] * 12 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], False, "straight_roller_seasoned",
+     "Holding at 181–210 DPD is NOT stabilized: Stabilized stops at 151–180 DPD."),
+    ("CC", [6, 6, 7, 7, 8, 9], True, "unknown",
+     "Already 121–150 DPD in the oldest month we hold: the fall is not visible."),
+    ("RL", [0] * 14 + [1, 2, 3, 4], False, "straight_roller_seasoned",
+     "Retail loan, RL numbering (1 = 1–30 DPD): reads exactly like the CC case above."),
+]
+TIMELINE = 18   # months shown per example
+
+
+def _overview(wb: Workbook, snapshot: str) -> None:
+    ws = wb.active
+    ws.title = "Overview"
+    r = _title(ws, "DPD deterioration states",
+               "One of the persona axes: how a delinquent account got where it is, read only from "
+               "its monthly DPD history. Every account in scope gets exactly one of seven states.", 5)
+    for k, v in [
+        ("Scope", "Credit cards (CC) and retail loans (RL) at 61–180 DPD and at 180+ DPD on the "
+                  f"snapshot date ({snapshot}). Both segments use the same seven states."),
+        ("Input", f"One DPD bucket per account per month. CC from {FLOOR_TXT} (older history has "
+                  "known data-quality issues); RL full history."),
+        ("How", "Six yes/no questions asked in a fixed order; the first 'yes' decides the state. "
+                "See 'How states are assigned'."),
+        ("Over time", "Stabilized and EPD describe current behaviour and can change month to "
+                      "month. The others describe how the account fell in and stay fixed — "
+                      "except that any account can move into Stabilized."),
+    ]:
+        lab = ws.cell(row=r, column=1, value=k)
+        lab.font = _font(bold=True, color=NAVY)
+        lab.alignment = WRAP
+        c = ws.cell(row=r, column=2, value=v)
+        c.font = _font()
+        c.alignment = WRAP
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
+        ws.row_dimensions[r].height = 30
+        r += 1
+    r = _section(ws, r + 1, "The seven states", 5)
+    r = _header(ws, r, ["State", "In one sentence", "Typical action", "Changes over time?",
+                        "Decided at step"])
+    for st in J.STATES:
+        sentence, action, moves = STATE_TEXT[st]
+        _chip(ws.cell(row=r, column=1), st)
+        _row(ws, r, [None, sentence, action, moves, STEP_OF[st]], height=42)
+        _chip(ws.cell(row=r, column=1), st)
+        ws.cell(row=r, column=5).alignment = CENTER
+        r += 1
+    ws.cell(row=r + 1, column=1, value="Shares by product and segment: see 'Results'. "
+            "Thresholds: see 'Thresholds'.").font = _font(italic=True, color=GREY)
+    _widths(ws, [30, 58, 52, 24, 12])
+    ws.freeze_panes = "A4"
+    _print(ws)
+
+
+def _assignment(wb: Workbook) -> None:
+    ws = wb.create_sheet("How states are assigned")
+    r = _title(ws, "How states are assigned",
+               "Questions are asked top to bottom. The first 'yes' decides the state, so every "
+               "account lands in exactly one state. Read the flow first, then the exact tests.", 6)
+    r = _section(ws, r, "The flow", 6)
+    for i, (step, q, st, _, _) in enumerate(STEPS):
+        c = ws.cell(row=r, column=1, value=f"Step {step}")
+        c.font = _font(bold=True, color="FFFFFF")
+        c.fill = _fill(NAVY)
+        c.alignment = CENTER
+        q_cell = ws.cell(row=r, column=2, value=q)
+        q_cell.font = _font(bold=True)
+        q_cell.fill = _fill(LIGHT)
+        q_cell.border = BOX
+        q_cell.alignment = Alignment(vertical="center", wrap_text=True)
+        arrow = ws.cell(row=r, column=3, value="yes  ▶" if step != "5" else "▶")
+        arrow.font = _font(bold=True, color=GREY)
+        arrow.alignment = CENTER
+        if step == "0":
+            _chip(ws.cell(row=r, column=4), "unknown",
+                  "Unknown  (or Stabilized, if the Step 2 test passes)")
+        elif step == "4":
+            _chip(ws.cell(row=r, column=4), "straight_roller_seasoned",
+                  f"Seasoned straight roller  ({R['seasoned_min_months']}+ months on book)")
+            _chip(ws.cell(row=r, column=5), "straight_roller_early_life",
+                  f"Early-life straight roller  (< {R['seasoned_min_months']} months)")
+        else:
+            _chip(ws.cell(row=r, column=4), st)
+        ws.row_dimensions[r].height = 30
+        r += 1
+        if step != "5":
+            down = ws.cell(row=r, column=2, value="no  ▼")
+            down.font = _font(color=GREY)
+            down.alignment = Alignment(horizontal="center")
+            r += 1
+    r = _section(ws, r + 1, "The exact tests", 6)
+    r = _header(ws, r, ["Step", "Question", "State if yes", "Exact test", "", "Why at this point"])
+    for step, q, st, test, why in STEPS:
+        _row(ws, r, [step, q, None, test, None, why], height=66)
+        ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=5)
+        _chip(ws.cell(row=r, column=3), st)
+        ws.cell(row=r, column=1).alignment = CENTER
+        r += 1
+    r = _section(ws, r + 1, "Terms used above", 6)
+    for term, meaning in TERMS:
+        lab = ws.cell(row=r, column=1, value=term)
+        lab.font = _font(bold=True)
+        lab.alignment = WRAP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+        c = ws.cell(row=r, column=3, value=meaning)
+        c.font = _font()
+        c.alignment = WRAP
+        ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=6)
+        ws.row_dimensions[r].height = 28
+        r += 1
+    _widths(ws, [9, 34, 26, 34, 34, 42])
+    _print(ws)
+
+
+def _examples(wb: Workbook) -> None:
+    ws = wb.create_sheet("Worked examples")
+    n_lead = 3
+    last_col = n_lead + TIMELINE + 2
+    r = _title(ws, "Worked examples",
+               "Each row is one account's monthly DPD bucket, oldest on the left, this month on "
+               "the right. Every example is run through the production rules when this workbook "
+               "is built.", last_col)
+    # legend
+    ws.cell(row=r, column=1, value="Bucket colours (CC numbering)").font = _font(bold=True)
+    labels = {0: "0", 1: "0", 2: "1–30", 3: "31–60", 4: "61–90", 5: "91–120", 6: "121–150",
+              7: "151–180", 8: "181–210", 9: "210+"}
+    for i, b in enumerate(range(1, 10)):
+        col = n_lead + 1 + 2 * i
+        c = ws.cell(row=r, column=col, value=f"{b}: {labels[b]}" if b > 1 else "0/1: 0 DPD")
+        c.fill = _fill(BUCKET_FILL[b])
+        c.font = _font(size=8, bold=True, color=_text_on(BUCKET_FILL[b]))
+        c.alignment = CENTER
+        c.border = BOX
+        ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col + 1)
+    r += 2
+    head = ["State", "Product", "Decided at step"] + \
+        [("Now" if k == TIMELINE - 1 else f"-{TIMELINE - 1 - k}") for k in range(TIMELINE)] + ["Why", ""]
+    r = _header(ws, r, head)
+    ws.merge_cells(start_row=r - 1, start_column=last_col - 1, end_row=r - 1, end_column=last_col)
+    for product, buckets, cropped, want, why in EXAMPLES:
+        offset, top = (0, 9) if product == "CC" else (1, 8)
+        got = J.classify(buckets, cropped, offset, top)
+        if got["det_state"] != want:
+            raise SystemExit(f"example {buckets} ({product}) now gives {got['det_state']}, "
+                             f"not {want}: update the example or its text")
+        step = STEP_OF[want] if not (want == "stabilized" and got["starts_delinquent"]) else "0 → 2"
+        _chip(ws.cell(row=r, column=1), want)
+        for col, v in ((2, product), (3, step)):
+            c = ws.cell(row=r, column=col, value=v)
+            c.font = _font()
+            c.alignment = CENTER
+            c.border = BOX
+        shown = buckets[-TIMELINE:]
+        pad = TIMELINE - len(shown)
+        for k in range(TIMELINE):
+            c = ws.cell(row=r, column=n_lead + 1 + k)
+            c.border = BOX
+            c.alignment = CENTER
+            if k < pad:
+                c.value = "·" if not cropped else ""
+                c.font = _font(color=RULE)
+                continue
+            b = shown[k - pad]
+            canon = max(b + offset, 1)
+            c.value = b
+            c.fill = _fill(BUCKET_FILL[canon])
+            c.font = _font(bold=k == TIMELINE - 1, color=_text_on(BUCKET_FILL[canon]))
+        note = why
+        if len(buckets) > TIMELINE:
+            note += f" ({len(buckets) - TIMELINE} earlier months not shown.)"
+        if cropped:
+            note += f" Older history exists but is not used."
+        c = ws.cell(row=r, column=last_col - 1, value=note)
+        c.font = _font()
+        c.alignment = WRAP
+        c.border = BOX
+        ws.merge_cells(start_row=r, start_column=last_col - 1, end_row=r, end_column=last_col)
+        ws.row_dimensions[r].height = 30
+        r += 1
+    ws.cell(row=r + 1, column=1, value="'·' = no history yet (account not open). RL buckets: 0 = "
+            "0 DPD, 1 = 1–30 … 6 = 151–180, 7 = 180+ — coloured like the CC bucket one higher."
+            ).font = _font(italic=True, color=GREY)
+    _widths(ws, [28, 9, 10] + [5.2] * TIMELINE + [48, 8])
+    ws.freeze_panes = ws.cell(row=8, column=4)
+    _print(ws)
+
+
+def _thresholds(wb: Workbook) -> None:
+    ws = wb.create_sheet("Thresholds")
+    r = _title(ws, "Thresholds",
+               "The numbers behind the rules, as used by the pipeline. Business thresholds change "
+               "only with the business owner. Editing a cell here does NOT change the pipeline.", 6)
+    rows = [
+        ("Early payment default", "Months on book allowed before the first missed payment",
+         R["epd_max_history"], "months", "A customer who never pays misses the 1st or 2nd bill: "
+         "2–3 clean months at most.", "epd_max_history"),
+        ("Early payment default", "Short paid-off slips allowed before the fall",
+         R["epd_max_blips"], "slips", "One brief slip that was paid off does not show good "
+         "behaviour was ever established.", "epd_max_blips"),
+        ("Straight roller", "Months from current to 61–90 DPD to count as a straight roll",
+         R["straight_max_runup"], "months", "1–30 → 31–60 → 61–90 in consecutive months = no "
+         "payment on the way.", "straight_max_runup"),
+        ("Stabilized", "Of the last 6 months, how many within one bucket of today's",
+         R["stabilized_min_in_band"], "of 6", "The bank's existing stabilized rule.",
+         "stabilized_min_in_band"),
+        ("Stabilized", "Long-run clause: months since first reaching 61+ DPD",
+         R["stabilized_long_run_months"], "months", "Gives an account two full up-down cycles "
+         "before a plateau counts as stable.", "stabilized_long_run_months"),
+        ("Stabilized", "Long-run clause: at most this many buckets higher than 6 months ago",
+         R["stabilized_long_run_max_rise"], "bucket", "One bucket of drift is normal; more is "
+         "still getting worse.", "stabilized_long_run_max_rise"),
+        ("Stabilized", "Highest bucket at which an account can be Stabilized",
+         f"CC {R['stabilized_max_bucket']} / RL {R['stabilized_max_bucket'] - 1}", "151–180 DPD",
+         "At 180+ staying in the same bucket is not evidence of payment.", "stabilized_max_bucket"),
+        ("Repeat delinquent", "Depth the earlier delinquency must have reached",
+         "31–60 DPD", "bucket", "Cures from 61+ DPD are rare; 31+ DPD matches the bank's own "
+         "re-default view.", "repeat_min_prior_peak"),
+        ("Repeat delinquent", "Months between the earlier cure and the new fall",
+         R["repeat_window_months"], "months", "The common re-default window.", "repeat_window_months"),
+        ("Seasoned vs early-life", "Months on book before the fall to count as seasoned",
+         R["seasoned_min_months"], "months", "Standard first-year early-life window; EPD already "
+         "takes the first 3 months.", "seasoned_min_months"),
+        ("Data (CC only)", "Billing history used from",
+         FLOOR_TXT, "date", "Older CC history has known data-quality issues (temporary).",
+         "cc_history_floor_date"),
+        ("Data", "Missing months filled by inference if the gap is at most",
+         J.PARAM_DEFAULTS["max_inferred_gap_months"], "months", "Longer gaps: history starts "
+         "after the gap (see 'Data handling').", "max_inferred_gap_months"),
+    ]
+    r = _header(ws, r, ["Applies to", "Threshold", "Value", "Unit", "Why this value", "Name in code"])
+    for row in rows:
+        _row(ws, r, list(row), height=32)
+        ws.cell(row=r, column=3).alignment = CENTER
+        ws.cell(row=r, column=3).font = _font(bold=True)
+        ws.cell(row=r, column=6).font = _font(size=8, color=GREY)
+        r += 1
+    _widths(ws, [22, 50, 12, 12, 52, 28])
+    ws.freeze_panes = "A5"
+    _print(ws)
+
+
+def _buckets(wb: Workbook) -> None:
+    ws = wb.create_sheet("Buckets & segments")
+    r = _title(ws, "Buckets & segments",
+               "CC and RL number their buckets differently; the rules are the same once both are "
+               "read as DPD bands.", 5)
+    r = _header(ws, r, ["DPD band", "CC bucket", "RL bucket", "Segment", "Note"])
+    rows = [
+        ("0 DPD", "0 (no due) / 1 (current)", "0", "—", "Clean."),
+        ("1–30 DPD", "2", "1", "—", "Delinquency starts here."),
+        ("31–60 DPD", "3", "2", "—", ""),
+        ("61–90 DPD", "4", "3", "61–180 DPD", "Spine starts here."),
+        ("91–120 DPD", "5", "4", "61–180 DPD", ""),
+        ("121–150 DPD", "6", "5", "61–180 DPD", ""),
+        ("151–180 DPD", "7", "6", "61–180 DPD", "Highest bucket at which Stabilized is possible."),
+        ("181–210 DPD", "8", "7 (ceiling)", "180+ DPD", "RL ceiling: RL 7 covers all of 180+."),
+        ("210+ DPD", "9 (ceiling)", "7 (ceiling)", "180+ DPD", "CC ceiling. Staying at the ceiling is not a payment."),
+    ]
+    for i, row in enumerate(rows):
+        _row(ws, r, list(row), height=20)
+        canon = max(i, 1) if i else 1
+        for col in (2, 3):
+            ws.cell(row=r, column=col).alignment = CENTER
+        ws.cell(row=r, column=1).fill = _fill(BUCKET_FILL[canon + (1 if i else 0) if i else 1])
+        ws.cell(row=r, column=1).font = _font(bold=True, color=_text_on(BUCKET_FILL[min(i + 1, 9) if i else 1]))
+        r += 1
+    r = _section(ws, r + 1, "Reading one month to the next", 5)
+    r = _header(ws, r, ["Bucket this month vs last", "Meaning", "Months' due paid"])
+    for row in [("One bucket worse", "Roll — nothing paid", "0"),
+                ("Same bucket (below the ceiling)", "Hold — one month's due paid", "1"),
+                ("k buckets better", "Paid k + 1 months at once", "k + 1"),
+                ("Back to 0 DPD", "Cure — rare from 61+ DPD", "all"),
+                ("Same bucket AT the ceiling", "Unknown — the bucket cannot rise; NOT a payment", "—")]:
+        _row(ws, r, list(row), height=30)
+        ws.cell(row=r, column=3).alignment = CENTER
+        r += 1
+    _widths(ws, [30, 34, 18, 16, 50])
+    _print(ws)
+
+
+def _data_handling(wb: Workbook) -> None:
+    ws = wb.create_sheet("Data handling")
+    r = _title(ws, "Data handling",
+               "How the monthly history is prepared before the questions are asked. Nothing is "
+               "dropped silently; every fix is counted per account.", 3)
+    r = _header(ws, r, ["Situation", "What we do", "Effect on the states"])
+    rows = [
+        (f"CC history before {FLOOR_TXT}", "Not used (known data-quality issue, temporary).",
+         "The account's history is 'cropped': never EPD; a straight roller counts as seasoned; "
+         "if the oldest month we hold is overdue → Unknown (unless Stabilized)."),
+        ("Two bills in one month, none in the next", "Billing-cycle shift: one bill is moved to "
+         "the empty month.", "None — restores the true monthly sequence."),
+        ("A missing month between two equal buckets", "Filled with that bucket.", "None."),
+        ("A missing month where only a straight roll fits (3 _ 5)", "Filled as the roll (3 4 5).",
+         "None."),
+        (f"Other gaps of up to {J.PARAM_DEFAULTS['max_inferred_gap_months']} months",
+         "Filled: last known bucket carried, rising as late as possible.",
+         "Can read as a payment (hold); counted per account."),
+        ("Longer gaps", "History starts after the gap.", "Treated like cropped history."),
+        ("Impossible one-month blips (4 0 4, 0 3 0)", "Corrected to the neighbours.",
+         "Prevents a false cure or a false earlier delinquency."),
+        ("Billing-cycle jumps (3 3 5 / 3 5 5 for 3 4 5)", "Corrected to the straight roll.",
+         "Prevents a false payment."),
+        ("No bucket on any row / no bill in the window", "Account kept with a status, not "
+         "classified.", "Reported as lost coverage (target: 99.9% classified)."),
+        ("Last month older than the snapshot", "Flagged (months stale).", "Classified on the "
+         "history we have."),
+    ]
+    for row in rows:
+        _row(ws, r, list(row), bold_first=True, height=44)
+        r += 1
+    _widths(ws, [38, 48, 62])
+    _print(ws)
+
+
+def _results(wb: Workbook, results: dict | None, snapshot: str) -> None:
+    ws = wb.create_sheet("Results")
+    blocks = [("cc", "60_180", "CC 61–180 DPD"), ("cc", "180_plus", "CC 180+ DPD"),
+              ("rl", "60_180", "RL 61–180 DPD"), ("rl", "180_plus", "RL 180+ DPD")]
+    last_col = 1 + 2 * len(blocks)
+    src = f"PROD run, snapshot {snapshot}" + (f", checked {results.get('generated')}" if results else "")
+    r = _title(ws, "Results",
+               f"Accounts per state ({src}). Blue numbers come from the PROD check "
+               "(prod_check.report(catalog, save_json=...)); shares and coverage are formulas. "
+               "Yellow = still to fill in.", last_col)
+    head = ["State"]
+    for _, _, label in blocks:
+        head += [f"{label}\naccounts", "share"]
+    r = _header(ws, r, head)
+    ws.row_dimensions[r - 1].height = 44
+    first = r
+    total_row = first + len(J.STATES)
+    for st in J.STATES:
+        _chip(ws.cell(row=r, column=1), st)
+        for b, (prod, seg, _) in enumerate(blocks):
+            col = 2 + 2 * b
+            seg_res = ((results or {}).get("products", {}).get(prod, {}).get("segments", {}).get(seg))
+            c = ws.cell(row=r, column=col)
+            if seg_res is not None:
+                c.value = int(seg_res["state_counts"].get(st, 0))
+            else:
+                c.fill = _fill("FFFF00")
+            c.font = _font(color="0000FF")
+            c.number_format = "#,##0"
+            c.border = BOX
+            L = get_column_letter(col)
+            s = ws.cell(row=r, column=col + 1,
+                        value=f'=IF(${L}${total_row}=0,"",{L}{r}/${L}${total_row})')
+            s.number_format = "0.0%"
+            s.font = _font()
+            s.border = BOX
+        r += 1
+    ws.cell(row=r, column=1, value="Classified accounts").font = _font(bold=True)
+    for b in range(len(blocks)):
+        L = get_column_letter(2 + 2 * b)
+        c = ws.cell(row=r, column=2 + 2 * b, value=f"=SUM({L}{first}:{L}{r - 1})")
+        c.number_format = "#,##0"
+        c.font = _font(bold=True)
+        c.border = Border(top=Side(style="medium", color=NAVY))
+    r += 1
+    lost_row = r
+    ws.cell(row=r, column=1, value="In segment, not classified").font = _font()
+    for b, (prod, seg, _) in enumerate(blocks):
+        seg_res = ((results or {}).get("products", {}).get(prod, {}).get("segments", {}).get(seg))
+        c = ws.cell(row=r, column=2 + 2 * b)
+        if seg_res is not None:
+            c.value = int(seg_res["in_segment_not_classified"])
+        else:
+            c.fill = _fill("FFFF00")
+        c.font = _font(color="0000FF")
+        c.number_format = "#,##0"
+    r += 1
+    ws.cell(row=r, column=1, value="Coverage (target 99.9%)").font = _font(bold=True)
+    for b in range(len(blocks)):
+        L = get_column_letter(2 + 2 * b)
+        c = ws.cell(row=r, column=2 + 2 * b,
+                    value=f'=IF(({L}{total_row}+{L}{lost_row})=0,"",{L}{total_row}/({L}{total_row}+{L}{lost_row}))')
+        c.number_format = "0.00%"
+        c.font = _font(bold=True)
+    r += 2
+    for note in [
+        "Stabilized cannot occur at 180+ by design (Stabilized stops at 151–180 DPD).",
+        "Roll rates are not shown: measured on the same months that define a state they are "
+        "circular (EPD rolls 100% by definition). Forward-looking outcomes come from the backtest.",
+        "Aggregates only: no account ids, no DPD histories.",
+    ]:
+        c = ws.cell(row=r, column=1, value=note)
+        c.font = _font(italic=True, color=GREY)
+        c.alignment = WRAP
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=last_col)
+        ws.row_dimensions[r].height = 26
+        r += 1
+    _widths(ws, [34] + [14, 9] * len(blocks))
+    ws.freeze_panes = ws.cell(row=first, column=2)
+    _print(ws)
+
+
+def _changes(wb: Workbook) -> None:
+    ws = wb.create_sheet("What changed")
+    r = _title(ws, "What changed since the 16 Oct 2026 version", "", 2)
+    r = _header(ws, r, ["Change", "Why"])
+    rows = [
+        ("Retail loans and the 180+ segment added, with the same seven states as CC 61–180.",
+         "One vocabulary for every product and segment."),
+        ("'Not classified — history starts delinquent' is now 'Unknown' and also covers accounts "
+         f"already overdue in the oldest month we hold (e.g. delinquent since before {FLOOR_TXT}).",
+         "When the start of the journey is not visible, how the account fell in would be a guess."),
+        ("Stabilized only up to 151–180 DPD; never at 180+.",
+         "At 180+ staying in the same bucket is not evidence of payment."),
+        ("Months held at the ceiling bucket (CC 210+, RL 180+) are not payments.",
+         "Keeps EPD meaningful at 180+."),
+        ("The live 'Rule tester' sheet is replaced by worked examples computed by the production "
+         "rules.", "The formulas were a second copy of the rules and had drifted (no Unknown, no "
+                   "180+ rule)."),
+        ("Roll rate removed from the results.",
+         "It was measured on the same months that define the states (EPD = 100% by definition)."),
+        ("Thresholds shown with plain names; parameter names kept in a side column.",
+         "Readable for the business; traceable to the code."),
+    ]
+    for row in rows:
+        _row(ws, r, list(row), height=44)
+        r += 1
+    _widths(ws, [80, 70])
+    _print(ws)
+
+
+def build(out: pathlib.Path, results: dict | None, snapshot: str) -> pathlib.Path:
+    wb = Workbook()
+    _overview(wb, snapshot)
+    _assignment(wb)
+    _examples(wb)
+    _thresholds(wb)
+    _buckets(wb)
+    _data_handling(wb)
+    _results(wb, results, snapshot)
+    _changes(wb)
+    wb.calculation.fullCalcOnLoad = True      # Excel computes the share / coverage formulas on open
+    wb.save(out)
+    return out
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--out", default=f"dpd_deterioration_states_{dt.date.today():%Y%m%d}.xlsx")
+    ap.add_argument("--results", action="append", default=[],
+                    help="JSON written by prod_check.report(..., save_json=...); repeat it for "
+                         "each run (one per segment) — they are merged")
+    ap.add_argument("--snapshot", default="(snapshot month)")
+    a = ap.parse_args()
+    res = None
+    for path in a.results:
+        part = json.loads(pathlib.Path(path).read_text())
+        if res is None:
+            res = {"generated": part.get("generated"), "products": {}}
+        res["generated"] = max(filter(None, [res["generated"], part.get("generated")]), default=None)
+        for prod, body in part.get("products", {}).items():
+            tgt = res["products"].setdefault(prod, {"segments": {}})
+            for seg, val in body.get("segments", {}).items():
+                if seg in tgt["segments"]:
+                    raise SystemExit(f"{prod} {seg} appears in more than one --results file")
+                tgt["segments"][seg] = val
+    print(build(pathlib.Path(a.out), res, a.snapshot))
+
+
+if __name__ == "__main__":
+    main()
 `````
