@@ -164,6 +164,7 @@ def journey_features(dpd: str) -> dict:
         "chg_6m": int(b_now - b[max(len(b) - 7, 0)]),
         # data quality
         "left_censored": bool(sp_start == 0),           # history starts inside the spell
+        "starts_delinquent": bool(b[0] >= 2),           # oldest observed month already delinquent
         "n_glitches": n_glitches,
         "n_jumps_repaired": n_repaired,
         "n_jumps_left": n_jumps_left,

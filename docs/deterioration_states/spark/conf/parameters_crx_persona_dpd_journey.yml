@@ -1,0 +1,16 @@
+# Merge under the existing `crx_persona:` block (persona_start_date / persona_end_date stay
+# as they are). Every key is optional; the values below are the code defaults.
+crx_persona:
+  dpd_journey:
+    # CC only, TEMPORARY: billing history before this date has known data-quality issues.
+    # Set to null once the source is fixed. Accounts with older history are flagged
+    # history_cropped (never EPD / never "history starts delinquent"; straight rollers seasoned).
+    cc_history_floor_date: "2024-01-01"
+    rl_history_floor_date: null          # RL history is trusted in full
+    segment: "60_180"                    # "180_plus" for the cc_180_plus / RL 180+ run
+    det_option: "B_balanced_6"           # A_minimal_4 | B_balanced_6 | C_detailed_7 (60_180 only)
+    on_unresolvable_gap: "truncate"      # truncate = keep months after the gap (flag cropped); drop = old behaviour
+    fill_straight_roll_gaps: true        # 3 _ 5 -> 3 4 5 (the only path without a +2 jump)
+    repair_cycle_shift: true             # 2 bills in one month next to an empty month: one belongs there
+    max_inferred_gap_months: 2           # ambiguous gaps up to this length are inferred (carry, roll late); 0 = never
+    log_stats: false                     # true: one extra aggregate job per node + persist

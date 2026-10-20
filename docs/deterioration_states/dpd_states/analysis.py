@@ -530,7 +530,7 @@ def run(current: pd.DataFrame, latest_bt: pd.DataFrame | None, cfg, spark_counts
 
     # ---- residual clustering agreement (diagnostic only) ---------------------------
     a_states = opts["A_minimal_4"]
-    r = f[~a_states.isin(["early_payment_default", "stabilized", "history_starts_delinquent"])]
+    r = f[~a_states.isin(["early_payment_default", "stabilized", "unknown"])]
     if len(r) > 30_000:
         r = r.sample(30_000, random_state=seed)
     if len(r) >= 50:

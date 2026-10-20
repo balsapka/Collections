@@ -49,6 +49,11 @@ deterioration_states/
 │   └── bundle.py             rebuilds BUNDLE.md
 ├── snippets/
 │   └── dpd_states_validate.py   Spark / Kedro entry point: main(catalog, model_id=None, ...)
+├── spark/                    PySpark / Kedro PIPELINE for the workplace (CC + RL)
+│   ├── REVIEW_SPARK.md       review of the workplace code (F1–F12), rewrite design, coverage, prompts W1–W4
+│   ├── crx_persona/          drop-in: _dpd_journey.py engine + cc/rl full_history + a4_deterioration nodes
+│   ├── conf/                 parameters (dpd_journey: floor, segment, option, gap rules)
+│   └── tests/                test_parity.py (vs this package) · test_spark_e2e.py (local Spark)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
 ```

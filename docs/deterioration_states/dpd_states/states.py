@@ -3,20 +3,22 @@
 Questions are asked in order; the first 'yes' assigns the state. Optional questions are
 switched on per option (A / B / C) and never break MECE.
 
-    Q0  History starts delinquent?  the string's oldest month is already at bucket 2+
-                                (restructured account opened at its old bucket, migrated
-                                or missing history) — data quality, not behaviour. Not
-                                asked when the string was cropped to the reliable window
-                                (a spell older than the window is normal history)
-                                                               -> history_starts_delinquent
+    Q0  Journey start observed?   the OLDEST OBSERVED month is already at bucket 2+ (a spell
+                                older than the window / floor, a restructured account
+                                re-opened at its old bucket, migrated or missing history):
+                                how the account fell in is not visible, so every
+                                fall-in state would be a guess. Stabilized needs only
+                                the last 6 months, so it is still assigned; otherwise
+                                                               -> unknown
     Q1  Early payment default?  <=3 months of history before this spell (at most one
                                 blip inside it, no earlier real spell) AND never paid
                                 since crossing bucket 2: every month of the spell a
                                 roll, still falling; and the string was not cropped (it
                                 must start at the first billed month) -> early_payment_default
-    Q2  Stabilized?             5 of the last 6 months within today's bucket ±1,
-                                OR (>= 6 months since first reaching 4 AND at most 1
-                                bucket higher than 6 months ago) -> stabilized
+    Q2  Stabilized?             today's bucket below the cap (CC < 9, RL < 7: at the cap a
+                                hold is not a payment) AND 5 of the last 6 months within
+                                today's bucket ±1, OR (>= 6 months since first reaching 4
+                                AND at most 1 bucket higher than 6 months ago) -> stabilized
     Q3  Paying since 4?         [tested, NOT recommended] paid >= half a month's
                                 due per month since first reaching 4 -> paying_since_4
     Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and
@@ -64,6 +66,9 @@ DEFAULTS = {
     "repeat_window_months": 12,     # [business] earlier spell ended <= 12 months before this one
     "seasoned_min_months": None,    # [business] e.g. 12 -> split straight roller (first year = early life)
     "split_slow_roller": False,     # True -> split slow roller by 2+ month payments in run-up
+    # Ceiling bucket on the CC scale (CC 9 = 210+; RL 7 = 180+ maps to 8). At the cap the
+    # bucket cannot rise, so 9 9 9 reads as a hold: never stabilized there.
+    "cap_bucket": 9,
 }
 
 OPTIONS = {
@@ -73,7 +78,7 @@ OPTIONS = {
 }
 RECOMMENDED = "B_balanced_6"
 
-STATE_ORDER = ["history_starts_delinquent", "early_payment_default", "stabilized", "paying_since_4",
+STATE_ORDER = ["unknown", "early_payment_default", "stabilized", "paying_since_4",
                "repeat_delinquent", "straight_roller", "straight_roller_seasoned",
                "straight_roller_early_life", "slow_roller", "slow_roller_intermittent",
                "slow_roller_erratic"]
@@ -81,13 +86,13 @@ STATE_ORDER = ["history_starts_delinquent", "early_payment_default", "stabilized
 # not one of them: it ends the month the account pays. Stabilized / paying_since_4 describe
 # current behaviour. A fixed state may legitimately move INTO stabilized.
 FIXED_STATES = [s for s in STATE_ORDER
-                if s not in ("early_payment_default", "stabilized", "paying_since_4")]
+                if s not in ("unknown", "early_payment_default", "stabilized", "paying_since_4")]
 CURRENT_STATES = ["stabilized", "paying_since_4"]
 
 # Business labels (common card-risk / collections terms). Change freely: code never
 # reads these, so renaming for the risk team cannot break the pipeline or old results.
 DISPLAY_NAMES = {
-    "history_starts_delinquent": "Not classified — history starts delinquent",
+    "unknown": "Unknown — start of the delinquency journey not observed",
     "early_payment_default": "Early payment default (EPD)",
     "stabilized": "Stabilized",
     "paying_since_4": "Paying since bucket 4 (tested, not used)",
@@ -100,10 +105,10 @@ DISPLAY_NAMES = {
     "slow_roller_erratic": "Erratic payer",
 }
 REMARKS = {
-    "history_starts_delinquent": "Data quality, not behaviour: the oldest month in the string is "
-                                 "already delinquent — typically a restructured card/loan re-opened at "
-                                 "its old bucket, a migrated account or missing history. Rare; treatment "
-                                 "of restructured accounts is deferred.",
+    "unknown": "The oldest observed month is already delinquent, so how the account fell in "
+               "is not visible: a spell older than the history window / floor (common at 180+), "
+               "a restructured card/loan re-opened at its old bucket, a migrated account or "
+               "missing history. Stabilized is still assigned (it needs only the last 6 months).",
     "early_payment_default": "Never paid since crossing bucket 2 and still falling, at most 3 months "
                              "after the first bill. Called 'bust-out' internally — but classic bust-out "
                              "fraud (good history, limit build-up, then max-out) shows as a seasoned "
@@ -127,7 +132,7 @@ REMARKS = {
 def option_states(option: str) -> list[str]:
     """Every state an option can produce (for share tables that must show empty states)."""
     p = {**DEFAULTS, **OPTIONS[option]}
-    out = ["history_starts_delinquent", "early_payment_default", "stabilized"]
+    out = ["unknown", "early_payment_default", "stabilized"]
     out += ["paying_since_4"] if p["paying_since_4_min_rate"] is not None else []
     out += ["repeat_delinquent"] if p["repeat_min_prior_peak"] is not None else []
     out += (["straight_roller_seasoned", "straight_roller_early_life"]
@@ -149,13 +154,15 @@ def assign_states(f: pd.DataFrame, **params) -> pd.Series:
 
     # cropped to the reliable window: the oldest digit is not the first billed month
     cropped = f["history_truncated"].astype(bool) if "history_truncated" in f else False
-    add(f.left_censored & ~cropped, "history_starts_delinquent")
-    add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])
-        & (f.n_prior_episodes == 0) & (f.spell_pay_events == 0) & ~cropped, "early_payment_default")
-    stab = f.last6_in_band >= p["stabilized_min_in_band"]
+    stab = (f.last6_in_band >= p["stabilized_min_in_band"])
     if p["stabilized_long_run_months"] is not None:
         stab |= ((f.months_since_4 >= p["stabilized_long_run_months"])
                  & (f.chg_6m <= p["stabilized_long_run_max_rise"]))
+    stab &= f.b_now < p["cap_bucket"]
+    add(f.starts_delinquent & stab, "stabilized")
+    add(f.starts_delinquent, "unknown")
+    add((f.months_before_spell <= p["epd_max_history"]) & (f.n_blips <= p["epd_max_blips"])
+        & (f.n_prior_episodes == 0) & (f.spell_pay_events == 0) & ~cropped, "early_payment_default")
     add(stab, "stabilized")
     if p["paying_since_4_min_rate"] is not None:
         add(f.post4_paid_rate >= p["paying_since_4_min_rate"], "paying_since_4")

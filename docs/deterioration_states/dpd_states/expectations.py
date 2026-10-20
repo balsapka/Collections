@@ -35,7 +35,7 @@ def _card(R, option):
 
 
 def _share(R, option):
-    allowed = [s for s in option_states(option) if s != "history_starts_delinquent"]
+    allowed = [s for s in option_states(option) if s != "unknown"]
     return pd.Series(R["states_today"][option]["share"]).reindex(allowed).fillna(0.0)
 
 
@@ -151,7 +151,7 @@ def _spread(R):
     c = _card(R, RECOMMENDED)
     if c is None:
         return None
-    x = c.loc[[s for s in c.index if s in FIXED_STATES and s != "history_starts_delinquent"],
+    x = c.loc[[s for s in c.index if s in FIXED_STATES and s != "unknown"],
               "exit_8plus_within_3m_bucket_std"].dropna()
     return float(x.max() - x.min()) if len(x) > 1 else None
 
@@ -192,7 +192,7 @@ EXPECTATIONS = [
      "charge-off/closure, or exited accounts dropped from the table, make roll rates too low — set "
      "COL_STRING_AS_OF); letter exit codes missing from CHAR_MAP; whether the bank's roll rates are "
      "count- or balance-weighted."),
-    ("E04", "Histories that start already delinquent (history_starts_delinquent)",
+    ("E04", "Uncropped histories that start already delinquent (part of unknown)",
      lambda R: R["data_quality"]["share_history_starts_delinquent"], lambda v: v <= 0.01,
      "<= 1%", "WARN", "bank",
      "The first digit is the first billed month (0/1); exceptions are rare data issues and restructured "

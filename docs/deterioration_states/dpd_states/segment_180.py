@@ -6,12 +6,14 @@ that only exist at 180+, plus an honest state when the path in is outside the wi
 
     Q1  Paying in default?     dropped below 9 after first reaching it (paid several
                                months at once)                    -> paying_in_default
+    Q1b Stabilized?            below the cap (CC 8 only; never at 9, never RL 7) and the
+                               spine's stabilized rule holds      -> stabilized
     Q2  Broken payer?          was stabilized (bank's 5-of-6 rule) for 6+ months while in
                                buckets 4–7, then rolled on to 9 (visible even when the
                                run-up is not)                     -> broken_payer
-    Q0  History not available? every month in the window is 8 or 9: nothing before 180+
-                               is visible (in default since before the window, or no
-                               history)                           -> history_not_available
+    Q0  Journey start observed? the oldest observed month is already delinquent (incl.
+                               every month at 8 or 9): how it fell in is not visible
+                                                                  -> unknown
     Q3  Early payment default? <=3 months on book before the spell (<=1 blip), no earlier
                                spell, no payment between bucket 2 and reaching 9
                                                                   -> early_payment_default
@@ -133,12 +135,15 @@ def features_180(df: pd.DataFrame, window: int = WINDOW) -> pd.DataFrame:
     return pd.concat([f, pd.DataFrame(extra, index=f.index)], axis=1)
 
 
-def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 12) -> pd.Series:
+def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: int = 12,
+               cap_bucket: int = DEFAULT_TOP) -> pd.Series:
     fast = f.runup_len <= 3
+    stab = ((f.last6_in_band >= 5) | ((f.months_since_4 >= 6) & (f.chg_6m <= 1))) & (f.b_now < cap_bucket)
     conds = [
         f.paid_in_default,
+        stab,                                       # CC 8 only: 9 is the cap
         f.stabilized_months_in_4_7 >= 6,            # visible even when the run-up is not
-        f.all_default,
+        f.starts_delinquent,                        # includes all_default
         (f.months_before_spell <= 3) & (f.n_blips <= 1) & (f.n_prior_episodes == 0)
         & (f.pay_events_before_9 == 0) & ~f.history_truncated,
         f.gap_prior_peak3 <= repeat_window,
@@ -146,7 +151,7 @@ def assign_180(f: pd.DataFrame, seasoned_min_months: int = 12, repeat_window: in
         fast & ((f.months_before_spell >= seasoned_min_months) | f.history_truncated),
         fast,
     ]
-    names = ["paying_in_default", "broken_payer", "history_not_available", "early_payment_default",
+    names = ["paying_in_default", "stabilized", "broken_payer", "unknown", "early_payment_default",
              "repeat_delinquent", "straight_roller_seasoned", "straight_roller_early_life"]
     return pd.Series(np.select(conds, names, "slow_roller"), index=f.index)
 
@@ -158,7 +163,7 @@ def default_band(f: pd.DataFrame) -> pd.Series:
                      index=f.index)
 
 
-ORDER = ["paying_in_default", "broken_payer", "history_not_available", "early_payment_default",
+ORDER = ["paying_in_default", "stabilized", "broken_payer", "unknown", "early_payment_default",
          "repeat_delinquent", "straight_roller_seasoned", "straight_roller_early_life", "slow_roller"]
 
 

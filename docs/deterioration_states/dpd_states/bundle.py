@@ -39,10 +39,27 @@ FILES = [
     "dpd_states/selftest.py",
     "dpd_states/bundle.py",
     "snippets/dpd_states_validate.py",
+    # PySpark / Kedro pipeline for the workplace (CC + RL) — review, engine, nodes, tests
+    "spark/REVIEW_SPARK.md",
+    "spark/conf/parameters_crx_persona_dpd_journey.yml",
+    "spark/crx_persona/__init__.py",
+    "spark/crx_persona/_dpd_journey.py",
+    "spark/crx_persona/cc_full_history/__init__.py",
+    "spark/crx_persona/cc_full_history/nodes.py",
+    "spark/crx_persona/rl_full_history/__init__.py",
+    "spark/crx_persona/rl_full_history/nodes.py",
+    "spark/crx_persona/cc_a4_deterioration/__init__.py",
+    "spark/crx_persona/cc_a4_deterioration/nodes.py",
+    "spark/crx_persona/cc_a4_deterioration/pipeline.py",
+    "spark/crx_persona/rl_a4_deterioration/__init__.py",
+    "spark/crx_persona/rl_a4_deterioration/nodes.py",
+    "spark/crx_persona/rl_a4_deterioration/pipeline.py",
+    "spark/tests/test_parity.py",
+    "spark/tests/test_spark_e2e.py",
 ]
 EMPTY_DIRS = ["results", "validation"]
 
-LANG = {".py": "python", ".md": "markdown"}
+LANG = {".py": "python", ".md": "markdown", ".yml": "yaml"}
 
 EXTRACTOR = '''"""Recreate docs/deterioration_states/ from BUNDLE.md and verify every file.
 
@@ -57,6 +74,8 @@ Run from the repo root, in this order:
          -> checks + state shares on data/input/dpd_synthetic_data.xlsx (config.py)
     5. optional: python docs/deterioration_states/run.py synthetic
     Spark mode later: snippets/dpd_states_validate.py, main(catalog) (PROMPTS.md P6)
+    PySpark pipeline (CC + RL): read spark/REVIEW_SPARK.md, then
+       python docs/deterioration_states/spark/tests/test_parity.py   -> "PARITY PASSED"
 
 Optional second argument writes somewhere else: extract_bundle.py BUNDLE.md <folder>
 """
@@ -153,7 +172,14 @@ python docs/deterioration_states/run.py validate
 
 # 5. optional: synthetic method-validation report
 python docs/deterioration_states/run.py synthetic
+
+# 6. PySpark pipeline (CC + RL) — review + rewrite: read spark/REVIEW_SPARK.md first
+python docs/deterioration_states/spark/tests/test_parity.py      # -> "PARITY PASSED" (no Spark, ~30 s)
+python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E PASSED" (local Spark + Java 17)
 ```
+
+**For the PySpark pipeline review, start at `spark/REVIEW_SPARK.md`** — findings on the
+workplace code (F1–F12), the rewrite design, the coverage plan (99.9%) and prompts W1–W4.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes

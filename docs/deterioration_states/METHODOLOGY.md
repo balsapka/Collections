@@ -53,9 +53,9 @@ Design rules agreed with the business owner:
   - EPD is unaffected: an EPD has at most 3 clean months plus a short straight roll, so its
     string is under 12 digits and never cropped. As a safety net, a cropped string can
     never be EPD (its oldest digit is no longer the first billed month).
-  - A spell that started before 2024 makes a cropped string start delinquent. That is
-    normal history, not a data issue, so Q0 skips cropped strings; these accounts (0.16%
-    of the synthetic spine) are classified normally — in practice mostly stabilized.
+  - A spell that started before 2024 makes a cropped string start delinquent: how the
+    account fell in is not visible, so it is **unknown** unless it is stabilized (Q0;
+    3.3% of the synthetic spine, 17–32% of the synthetic 180+ segment).
   - Seasoned (≥ 12 months) and the 12-month repeat window fit inside 32 months; earlier
     spells that ended before 2024 are invisible, which can slightly under-count repeat
     delinquents whose spell began in early 2024.
@@ -115,13 +115,15 @@ only. The current-behaviour inputs are confined to the stabilized question and t
 Questions are asked **in order**; the first "yes" assigns the state.
 
 ```
-Q0  History starts delinquent?  oldest month already at bucket 2+ (restructured re-open,
-                                migrated or missing history)  -> history_starts_delinquent
+Q0  Journey start observed?  the oldest OBSERVED month is already at bucket 2+ (spell
+                            older than the window / floor, restructured re-open, migrated
+                            or missing history): stabilized if Q2 holds, else -> unknown
 Q1  Early payment default?  <= 3 months of history before this spell (at most one blip,
                             no earlier real spell) AND never paid since crossing bucket 2
                             (every month of the spell a roll — still falling)
                                                                -> early_payment_default
-Q2  Stabilized?             >= 5 of the last 6 months within today's bucket ±1
+Q2  Stabilized?             today's bucket below the cap (CC < 9, RL < 7) AND
+                            >= 5 of the last 6 months within today's bucket ±1
                             OR (>= 6 months since first reaching 4 AND at most 1 bucket
                                 higher than 6 months ago)      -> stabilized
 Q4  Repeat delinquent?      [B, C] an earlier spell reached bucket 3, cured, and ended
@@ -134,9 +136,12 @@ Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 m
                                -> slow_roller_erratic, else slow_roller_intermittent]
 ```
 
-(Q3 "paying since bucket 4" was tested and rejected — §6.4.) Q0 is a data-quality guard,
-not a behaviour state: it stops truncated or restructured histories from being forced
-into EPD. It should be rare (E04); restructured accounts are a deferred decision.
+(Q3 "paying since bucket 4" was tested and rejected — §6.4.) Q0 is a confidence guard,
+not a behaviour state: when the history starts at 0 DPD the whole journey is observed and
+the fall-in states are confident; when it starts delinquent they would be guesses, so the
+account is `unknown` (stabilized needs only the last 6 months and is still assigned). At
+the ceiling bucket (CC 9, RL 7) the bucket cannot rise, so a run of 9s is not a hold and
+never counts as stabilized. Uncropped starts-delinquent histories should stay rare (E04).
 
 ### Three options
 
@@ -161,7 +166,7 @@ Early-life straight roller stays a state in B and C, but if real data puts it un
 | **Slow roller (partial payer)** · `slow_roller` | Paid something on the way down to bucket 4 but kept rolling | Over-indebted: longer-tenor restructure or settlement | 15.1% |
 | ↳ **Intermittent payer** *(C)* · `slow_roller_intermittent` | Paid one month here and there on the way down, never caught up | Chronic insufficiency: restructure to what they actually pay | 9.3% |
 | ↳ **Erratic payer** *(C)* · `slow_roller_erratic` | Caught up 2+ months at once on the way down, then rolled again | Lumpy / irregular income: plan aligned to inflow timing | 5.7% |
-| **Not classified — history starts delinquent** · `history_starts_delinquent` | Data quality: the string starts already delinquent | Fix the data / treat restructured accounts separately (deferred) | 0% *(synthetic has none)*; expect < 1% |
+| **Unknown** · `unknown` | The oldest observed month is already delinquent: how the account fell in is not visible (spell older than the window / floor, restructured, migrated or missing history) | Treat on current behaviour and other axes only | 3.3% with the 32-month window (synthetic); large at 180+ |
 
 In option A the two straight-roller states are one: **Straight roller** · `straight_roller`.
 
