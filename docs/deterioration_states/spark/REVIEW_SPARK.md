@@ -176,6 +176,8 @@ and paste the aggregate report back.
 
 ### Sonnet — code changes and offline tests (no catalog, no PROD data)
 
+The whole sequence as one copy-paste prompt: **PROMPTS.md P8**. The steps below are the same, one at a time.
+
 **S1 — unpack.** "Save BUNDLE.md raw at `docs/deterioration_states/BUNDLE.md`, create
 `docs/deterioration_states/extract_bundle.py` from its Extractor section, run
 `python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md`

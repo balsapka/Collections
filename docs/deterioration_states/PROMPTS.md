@@ -5,6 +5,9 @@ self-contained. **Paste P0 first in every new session**, then the prompt for the
 
 Order: **P0 → P1 (file mode) → P2**, then P3 / P4 as the results require, then P5.
 **P6 (Spark) and P7 (production)** only after the methodology and states are signed off.
+**P8 ships the reviewed PySpark pipeline (CC + RL)** into the existing Kedro code — it
+replaces P7 for that work. Sonnet has no PROD data access: P8 is code changes and offline
+tests only; the user runs the pipelines and `spark/prod_check.py` in PROD.
 
 ---
 
@@ -215,6 +218,8 @@ Task: run the Spark validation, which adds the outcome backtest.
 
 ## P7 — Productionise the chosen option (only after sign-off)
 
+*Superseded by **P8** for the CC / RL Kedro pipelines (`crx_persona`), which already exist.*
+
 ```
 Task: add the deterioration state as a pipeline output, using the option I name:
 <A_minimal_4 | B_balanced_6 | C_detailed_7>.
@@ -237,4 +242,79 @@ Task: add the deterioration state as a pipeline output, using the option I name:
    agreement with the last validation run's shares (within 1pp), and banded journey
    shapes (no raw strings, no keys).
 6. Show me the diff and the catalog entries before anything runs.
+```
+
+---
+
+## P8 — Ship the reviewed PySpark pipeline (CC + RL) into the Kedro repo
+
+Background: `spark/REVIEW_SPARK.md` (findings F1–F12, design, rule changes, §5 roles).
+Sonnet runs this prompt (code + offline tests). Afterwards **you** run REVIEW_SPARK.md §5
+P1–P2 in PROD and paste the `=== DPD_JOURNEY PROD CHECK START / END ===` block back.
+
+```
+Context: I am adding a reviewed PySpark/Kedro rewrite of the DPD-journey deterioration
+pipelines (CC + RL) to this repo. Everything is in docs/deterioration_states/BUNDLE.md,
+which I have saved raw at that path.
+
+Hard rules:
+- You have NO PROD data access. Never call catalog.load, never run kedro run, never
+  query any table. Only edit code and run offline tests (synthetic data).
+- Never guess a dataset, column or module name: find it in the repo or ask me.
+- Do not retype bundled code by hand: use the extractor, which checks SHA-256.
+- Stop and wait for my OK where marked STOP.
+
+Step 1 — unpack and verify
+1. Create docs/deterioration_states/extract_bundle.py from the "Extractor" section of
+   BUNDLE.md, then run:
+   python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md
+   It must end with "N files OK, 0 mismatched". If anything mismatches, stop and tell
+   me (the copy was altered); do not hand-fix code.
+2. Run: python docs/deterioration_states/spark/tests/test_parity.py
+   It must print "PARITY PASSED". If pyspark or another package is missing, tell me
+   which; do not change code to work around it.
+
+Step 2 — impact scan (report only, change nothing)
+Read docs/deterioration_states/spark/REVIEW_SPARK.md first (findings, design, §5).
+Then report:
+a) every importer of _dpd_journey under src/ and the names each one imports
+   (grep -rn "_dpd_journey" src/);
+b) the catalog entries (conf/**/catalog*.yml) for crx_cc_dpd_sequences,
+   crx_rl_dpd_sequences, crx_cc_a4_deterioration, crx_rl_a4_deterioration — format,
+   partitioning, schema settings;
+c) any consumer of those four datasets outside the cc/rl_a4_deterioration pipelines;
+d) the current value of _DPD_BUCKET_REGEX and where it is defined;
+e) the PySpark version the project pins (the new code needs >= 3.3);
+f) the current params:crx_persona block (file path + keys).
+STOP — show me the report.
+
+Step 3 — apply (only after my OK)
+Replace, keeping this repo's import style, logging and lint conventions:
+- src/enbd_collections/pipelines/crx_persona/_dpd_journey.py
+    <- docs/deterioration_states/spark/crx_persona/_dpd_journey.py
+- cc_full_history/nodes.py: build_cc_full_history
+    <- spark/crx_persona/cc_full_history/nodes.py (keep the repo's _DPD_BUCKET_REGEX)
+- rl_full_history/nodes.py: build_rl_full_history
+    <- spark/crx_persona/rl_full_history/nodes.py
+- cc_a4_deterioration/nodes.py and rl_a4_deterioration/nodes.py
+    <- the files under spark/crx_persona/
+- pipeline.py files: only if the node inputs differ from what is there now.
+- Merge spark/conf/parameters_crx_persona_dpd_journey.yml under the existing
+  crx_persona: block (do not touch persona_start_date / persona_end_date).
+- Catalog: crx_cc_dpd_sequences and crx_rl_dpd_sequences are now ONE ROW PER ACCOUNT
+  with an array<int> column dlq_buckets. Propose the catalog change (drop any
+  partitioning by month).
+If step 2a/2c found anything that still needs resolve_gaps, encode_transitions,
+classify_from_grid or old BucketScheme fields, do NOT delete it: STOP and show me.
+STOP — show me the full diff before writing files.
+
+Step 4 — offline verification (after the files are written)
+1. The repo's lint / test command on the changed files.
+2. python -c "from enbd_collections.pipelines.crx_persona.cc_a4_deterioration.pipeline import create_pipeline as c; from enbd_collections.pipelines.crx_persona.rl_a4_deterioration.pipeline import create_pipeline as r; print(c().describe()); print(r().describe())"
+3. python docs/deterioration_states/spark/tests/test_parity.py  -> PARITY PASSED
+4. If Java + local Spark work in the dev container:
+   python docs/deterioration_states/spark/tests/test_spark_e2e.py 2000  -> SPARK E2E PASSED
+   (synthetic data only; if Java is missing, say so and skip.)
+Report every result verbatim. Then list what I must run in PROD (REVIEW_SPARK.md §5
+P1-P2) using this repo's real pipeline names.
 ```
