@@ -109,12 +109,14 @@ def main(n: int = 4000) -> int:
     spine = spark.createDataFrame([(float(a),) for a in expected], "contract_id double")
     spells = spark.createDataFrame([(a, "restructured_entry" if a % 50 == 0 else "none") for a in expected],
                                    "account_id long, censored_subtype string")
+    cc_outs = []
     for segment in ("60_180", "180_plus"):
         params = {"persona_start_date": "2024-01-01", "persona_end_date": str(SNAP),
                   "dpd_journey": {"segment": segment, "log_stats": True}}
         full = build_cc_full_history(raw, spine)
-        seq = build_cc_dpd_sequences(full, spells, params)
+        seq = cc_seq = build_cc_dpd_sequences(full, spells, params)
         out = build_cc_a4_deterioration(seq, params)
+        cc_outs.append(out)
         got = {r.account_id: r for r in out.collect()}
         seg = J.SEGMENTS[segment]
         want = {a: J.classify(k, c, 0, 9, segment, "B_balanced_6") for a, (k, c) in expected.items()
@@ -173,6 +175,21 @@ def main(n: int = 4000) -> int:
     matched = build_rl_full_history(num_spine, num_master).select("account_id").distinct().count()
     print(f"RL double spine key -> string master key: {matched}/100 matched")
     bad += 100 - matched
+
+    # PROD check snippet on a fake catalog (CC with both segments, RL)
+    from prod_check import report
+
+    class _Catalog(dict):
+        def load(self, name):
+            return self[name]
+
+    cat = _Catalog(crx_cc_dpd_sequences=cc_seq,
+                   crx_cc_a4_deterioration=cc_outs[0].unionByName(cc_outs[1], allowMissingColumns=True),
+                   crx_rl_dpd_sequences=seq, crx_rl_a4_deterioration=out)
+    text = report(cat)
+    ok = (text.count("coverage 100.000% [OK]") == 3 and "FAILED" not in text)
+    print(f"prod_check report: {'OK' if ok else 'UNEXPECTED'}")
+    bad += 0 if ok else 1
 
     spark.stop()
     print(f"{'SPARK E2E PASSED' if not bad else f'SPARK E2E FAILED ({bad})'} in {time.time() - t0:.0f}s")

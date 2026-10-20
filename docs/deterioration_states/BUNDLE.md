@@ -27,8 +27,11 @@ python docs/deterioration_states/spark/tests/test_parity.py      # -> "PARITY PA
 python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E PASSED" (local Spark + Java 17)
 ```
 
-**For the PySpark pipeline review, start at `spark/REVIEW_SPARK.md`** — findings on the
-workplace code (F1–F12), the rewrite design, the coverage plan (99.9%) and prompts W1–W4.
+**For the PySpark pipeline, start at `spark/REVIEW_SPARK.md`** — findings on the workplace
+code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
+Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
+offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
+then `spark/prod_check.py` (P1–P2), which prints aggregates only.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -53,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-20 by `dpd_states/bundle.py`. 35 files, 5,692 lines.
+Generated 2026-10-20 by `dpd_states/bundle.py`. 36 files, 5,856 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -190,6 +193,7 @@ docs/deterioration_states/
 ├── spark/crx_persona/rl_a4_deterioration/pipeline.py
 ├── spark/tests/test_parity.py
 ├── spark/tests/test_spark_e2e.py
+├── spark/prod_check.py
 ├── results/
 ├── validation/
 ```
@@ -203,7 +207,7 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `fcaed1766dc80b4dad705cb86a05641e3dad8ac0a2838f4f40038fe699a83cdc` · 120 lines · trailing newline: yes
+sha256 `f76867bd2c8a87e028e6a372de8d37dae0f93fda9335e49bb28c7bf4b5122444` · 121 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
@@ -261,6 +265,7 @@ deterioration_states/
 │   ├── REVIEW_SPARK.md       review of the workplace code (F1–F12), rewrite design, coverage, prompts W1–W4
 │   ├── crx_persona/          drop-in: _dpd_journey.py engine + cc/rl full_history + a4_deterioration nodes
 │   ├── conf/                 parameters (dpd_journey: floor, segment, option, gap rules)
+│   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only)
 │   └── tests/                test_parity.py (vs this package) · test_spark_e2e.py (local Spark)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
@@ -3839,7 +3844,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `47d10cfe95901ba5e6a2fb68128d7f29b4afd86fa18ed039a2321e39df91d4f7` · 264 lines · trailing newline: yes
+sha256 `e405f6daad2162ddf0094e8860d869620129609598610e488d19e418928c5999` · 268 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -3900,6 +3905,7 @@ FILES = [
     "spark/crx_persona/rl_a4_deterioration/pipeline.py",
     "spark/tests/test_parity.py",
     "spark/tests/test_spark_e2e.py",
+    "spark/prod_check.py",
 ]
 EMPTY_DIRS = ["results", "validation"]
 
@@ -4022,8 +4028,11 @@ python docs/deterioration_states/spark/tests/test_parity.py      # -> "PARITY PA
 python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E PASSED" (local Spark + Java 17)
 ```
 
-**For the PySpark pipeline review, start at `spark/REVIEW_SPARK.md`** — findings on the
-workplace code (F1–F12), the rewrite design, the coverage plan (99.9%) and prompts W1–W4.
+**For the PySpark pipeline, start at `spark/REVIEW_SPARK.md`** — findings on the workplace
+code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
+Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
+offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
+then `spark/prod_check.py` (P1–P2), which prints aggregates only.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -4362,7 +4371,7 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
 `````
 
 ### FILE: `spark/REVIEW_SPARK.md`
-sha256 `61995d75b12b4ebf72b0020c8bd41f97d31ab919626954521a6558b68d33dd74` · 228 lines · trailing newline: yes
+sha256 `b85b1d9e933e5b35e166b6c4aff4eec83c5348224a32a5e08bce231e87f76e1f` · 256 lines · trailing newline: yes
 
 `````markdown
 # PySpark deterioration pipeline — review and rewrite (CC + RL)
@@ -4508,35 +4517,19 @@ code and apply F1–F8 and F10–F12 to it. F9 (exact parity) cannot be reached 
 
 ## 3. Coverage — reaching 99.9%
 
-Coverage = accounts classified ÷ spine accounts in the segment. With `truncate`, every
-spine account with at least one valid row in the window is classified. So only these lose
-coverage, and the log shows each one: `no_rows_in_window` (no bill since the floor),
-`no_valid_rows` (every bucket NULL), and spine accounts that are missing from the history
-altogether (a key mismatch — check `spine accounts found` in the RL log).
+Coverage = accounts classified ÷ accounts whose latest bucket is in the segment. With
+`truncate`, every account with at least one valid row in the window is classified. So only
+these lose coverage: `no_rows_in_window` (no bill since the floor), `no_valid_rows` (every
+bucket NULL), and spine accounts missing from the history altogether (a key mismatch —
+see `spine accounts found` in the RL log).
 
-**First run (dev):** set `log_stats: true`, run Node 1, then:
-
-```python
-seq = catalog.load("crx_cc_dpd_sequences")
-legacy = seq.where("legacy_drop")              # should be ~17,675: same rule as the old code
-legacy.agg(
-    F.count("*").alias("old_rule_dropped"),
-    F.sum((F.col("n_cycle_shift_moves") > 0).cast("int")).alias("had_cycle_shift"),
-    F.sum((F.col("n_gap_months_rolled") > 0).cast("int")).alias("had_straight_roll_fill"),
-    F.sum((F.col("n_gap_months_inferred") > 0).cast("int")).alias("had_inferred_fill"),
-    F.sum((F.col("n_months_truncated") > 0).cast("int")).alias("truncated"),
-    F.expr("percentile_approx(n_months_truncated, 0.5)").alias("median_months_truncated"),
-).show()
-seq.groupBy("build_status").count().show()
-```
-
-Read it like this: a `legacy_drop` count near 17,675 confirms the reconciliation. If
-`truncated` is large, the gaps are long and real (missing billing months) — then ask the
-data owner, before loosening `max_inferred_gap_months`. Compare the state shares of the
-truncated accounts with the rest. They should look similar, apart from fewer EPD /
-early-life, which is expected because they are cropped.
-
----
+`prod_check.py` (run by you in PROD, §5 step P2) prints coverage per segment against the
+99.9% target. It also reconciles with the old code: `old rule would have dropped` should
+be close to 17,675 (same rule as the old `resolve_gaps`), followed by which new rule
+rescued those accounts. If many are `truncated`, the gaps are long and real (missing
+billing months) — ask the data owner before raising `max_inferred_gap_months`. The
+truncated and cropped accounts should show state shares similar to the rest, apart from
+fewer EPD / early-life (expected: they are cropped).
 
 ## 4. Tests
 
@@ -4551,35 +4544,79 @@ equal neighbours, unresolvable 3-month gaps, history before the floor, and a dou
 key. It runs the actual node functions under ANSI mode and checks every account against
 the expected state and cropped flag (CC 60–180, CC 180+, RL 60–180).
 
-## 5. Integrating at the workplace (prompts for Sonnet)
+## 5. Shipping to the workplace repo
 
-**W1 — place the files.** "Copy `docs/deterioration_states/spark/crx_persona/_dpd_journey.py`
-over `src/enbd_collections/pipelines/crx_persona/_dpd_journey.py`. Before overwriting,
-list every import of the old module across the repo (`grep -rn "_dpd_journey"`): any
-importer other than the four node files below must be shown to me first. Then replace
+Two roles. **Sonnet** (workplace assistant): edits code and runs offline tests only — it
+has no PROD data and must not load catalog datasets. **You**: run the pipelines in PROD
+and paste the aggregate report back.
+
+### Sonnet — code changes and offline tests (no catalog, no PROD data)
+
+**S1 — unpack.** "Save BUNDLE.md raw at `docs/deterioration_states/BUNDLE.md`, create
+`docs/deterioration_states/extract_bundle.py` from its Extractor section, run
+`python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md`
+— it must end with `0 mismatched`. Then run
+`python docs/deterioration_states/spark/tests/test_parity.py` → must print `PARITY PASSED`.
+If `pyspark` is missing, report it; do not change any code to work around it."
+
+**S2 — impact scan, no edits yet.** "Read `docs/deterioration_states/spark/REVIEW_SPARK.md`.
+In `src/enbd_collections/pipelines/crx_persona/`, list (a) every importer of
+`_dpd_journey` and every name it imports (`grep -rn "_dpd_journey"`), (b) every dataset in
+`conf/**/catalog*.yml` named `crx_cc_dpd_sequences`, `crx_rl_dpd_sequences`,
+`crx_cc_a4_deterioration`, `crx_rl_a4_deterioration`, with format / partitioning / schema
+settings, (c) every consumer of those four datasets in other pipelines, (d) the current
+value of `_DPD_BUCKET_REGEX`. Report only — change nothing."
+
+**S3 — apply.** "Replace, keeping the repo's own imports and conventions:
+`crx_persona/_dpd_journey.py` ← `spark/crx_persona/_dpd_journey.py`;
 `cc_full_history/nodes.py::build_cc_full_history`,
-`rl_full_history/nodes.py::build_rl_full_history`, and `cc_a4_deterioration/nodes.py` /
-`rl_a4_deterioration/nodes.py` with the versions in this folder. Keep the repo's existing
-`_DPD_BUCKET_REGEX` value and any helpers the old files still need. Show me the diff; do
-not run anything yet."
+`rl_full_history/nodes.py::build_rl_full_history`, and `cc_a4_deterioration/nodes.py`,
+`rl_a4_deterioration/nodes.py` ← the files under `spark/crx_persona/`. Keep the repo's
+`_DPD_BUCKET_REGEX` value. If S2(a) found importers of names the new module no longer has
+(`resolve_gaps`, `encode_transitions`, `classify_from_grid`, `BucketScheme` fields), stop
+and show them to me. Merge `spark/conf/parameters_crx_persona_dpd_journey.yml` under the
+existing `crx_persona:` block. If `rl_full_history`'s pipeline should pass
+`params:crx_persona` (only needed for `log_stats`), add it. Update the catalog entries for
+the two `*_dpd_sequences` datasets: the grain is now one row per account with an array
+column `dlq_buckets` — drop any partitioning by month. Show me the full diff."
 
-**W2 — wire params and catalog.** "Merge `spark/conf/parameters_crx_persona_dpd_journey.yml`
-under the existing `crx_persona:` block. In the catalog, `crx_rl_full_history` now needs
-`params:crx_persona` as a third input (only if you want its log). `crx_cc_dpd_sequences` /
-`crx_rl_dpd_sequences` change grain to one row per account, with an array column: check
-their catalog entries (format, schema enforcement, partitioning by month) and propose the
-change. Never guess dataset names."
+**S4 — offline verification.** "Run `python -m pytest` (or the repo's lint/test command)
+on the changed files; run
+`python -c "from enbd_collections.pipelines.crx_persona.cc_a4_deterioration.pipeline import create_pipeline as c; from enbd_collections.pipelines.crx_persona.rl_a4_deterioration.pipeline import create_pipeline as r; print(c().describe()); print(r().describe())"`;
+and, if Java + local Spark work in the dev container,
+`python docs/deterioration_states/spark/tests/test_spark_e2e.py 2000` → `SPARK E2E PASSED`
+(synthetic data only). Report each result verbatim."
 
-**W3 — dry run.** "Run the parity test in the workplace env:
-`python docs/deterioration_states/spark/tests/test_parity.py` — it must print PARITY PASSED.
-Then run Node 1 for CC in a Kedro notebook with `log_stats: true`, and run the §3 snippet.
-Report aggregates only — no account ids."
+### You — in PROD, after Sonnet's changes are merged
 
-**W4 — review the numbers.** Paste the §3 output and the Node 2 state shares back here.
-The decisions for the business owner are: is a truncated account acceptable, and is a
-2-month inference acceptable for EPD?
+**P1 — run.** First run on dev settings: `log_stats: true` in the params.
 
----
+```bash
+kedro run --pipeline=crx_cc_full_history       # whatever the repo calls the CC full-history pipeline
+kedro run --pipeline=crx_cc_a4_deterioration
+kedro run --pipeline=crx_rl_a4_deterioration    # after crx_rl_full_history
+```
+
+For the 180+ run, set `dpd_journey.segment: "180_plus"` (CC 8–9, RL 7) and re-run Node 2.
+Node 1 does not depend on the segment.
+
+**P2 — check.** In `kedro ipython` / a Kedro notebook:
+
+```python
+import sys, pathlib
+_c = pathlib.Path.cwd()
+ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
+sys.path.insert(0, str(ROOT / "docs" / "deterioration_states" / "spark"))
+from prod_check import report
+report(catalog)                    # or report(catalog, products=("cc",))
+```
+
+It is read-only and prints aggregates only (counts and shares, no account ids or DPD
+strings). Paste the block between `=== DPD_JOURNEY PROD CHECK START / END ===` back for
+review.
+
+**P3 — decide** (business owner): are truncated / inferred-gap accounts acceptable as
+classified, and is the `unknown` share at 180+ acceptable as reported?
 
 ## 6. Open points
 
@@ -5922,7 +5959,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `spark/tests/test_spark_e2e.py`
-sha256 `5746e2fe92425da6fd1363b0c63314e57a949db4a459556cd831dacb85fa33b5` · 183 lines · trailing newline: yes
+sha256 `ca1134a0065947c391cc5eb257feb6b45a23aca758df5a1631b4d8eae63696ea` · 200 lines · trailing newline: yes
 
 `````python
 """End to end on local Spark: synthetic raw tables -> the Kedro node functions -> states,
@@ -6036,12 +6073,14 @@ def main(n: int = 4000) -> int:
     spine = spark.createDataFrame([(float(a),) for a in expected], "contract_id double")
     spells = spark.createDataFrame([(a, "restructured_entry" if a % 50 == 0 else "none") for a in expected],
                                    "account_id long, censored_subtype string")
+    cc_outs = []
     for segment in ("60_180", "180_plus"):
         params = {"persona_start_date": "2024-01-01", "persona_end_date": str(SNAP),
                   "dpd_journey": {"segment": segment, "log_stats": True}}
         full = build_cc_full_history(raw, spine)
-        seq = build_cc_dpd_sequences(full, spells, params)
+        seq = cc_seq = build_cc_dpd_sequences(full, spells, params)
         out = build_cc_a4_deterioration(seq, params)
+        cc_outs.append(out)
         got = {r.account_id: r for r in out.collect()}
         seg = J.SEGMENTS[segment]
         want = {a: J.classify(k, c, 0, 9, segment, "B_balanced_6") for a, (k, c) in expected.items()
@@ -6101,6 +6140,21 @@ def main(n: int = 4000) -> int:
     print(f"RL double spine key -> string master key: {matched}/100 matched")
     bad += 100 - matched
 
+    # PROD check snippet on a fake catalog (CC with both segments, RL)
+    from prod_check import report
+
+    class _Catalog(dict):
+        def load(self, name):
+            return self[name]
+
+    cat = _Catalog(crx_cc_dpd_sequences=cc_seq,
+                   crx_cc_a4_deterioration=cc_outs[0].unionByName(cc_outs[1], allowMissingColumns=True),
+                   crx_rl_dpd_sequences=seq, crx_rl_a4_deterioration=out)
+    text = report(cat)
+    ok = (text.count("coverage 100.000% [OK]") == 3 and "FAILED" not in text)
+    print(f"prod_check report: {'OK' if ok else 'UNEXPECTED'}")
+    bad += 0 if ok else 1
+
     spark.stop()
     print(f"{'SPARK E2E PASSED' if not bad else f'SPARK E2E FAILED ({bad})'} in {time.time() - t0:.0f}s")
     return 1 if bad else 0
@@ -6108,4 +6162,124 @@ def main(n: int = 4000) -> int:
 
 if __name__ == "__main__":
     sys.exit(main(int(sys.argv[1]) if len(sys.argv) > 1 else 4000))
+`````
+
+### FILE: `spark/prod_check.py`
+sha256 `9dad42eb97fe2b940fb9adc630983b287438aa119247bd12e837df5e8102b90f` · 114 lines · trailing newline: yes
+
+`````python
+"""PROD check — run by a person with PROD access, AFTER the pipelines have run.
+
+    kedro run --pipeline=crx_cc_a4_deterioration      # and/or crx_rl_a4_deterioration
+
+Then, in a Kedro notebook / `kedro ipython` session where `catalog` exists:
+
+    import sys, pathlib
+    _c = pathlib.Path.cwd()
+    ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
+    sys.path.insert(0, str(ROOT / "docs" / "deterioration_states" / "spark"))
+    from prod_check import report
+    report(catalog)                       # CC and RL; report(catalog, products=("cc",)) for one
+
+READ-ONLY. Prints AGGREGATES ONLY (counts and shares — no account ids, no DPD strings)
+between === DPD_JOURNEY PROD CHECK START / END ===. Paste that block back for review.
+Datasets read: crx_<p>_dpd_sequences and crx_<p>_a4_deterioration (the pipeline outputs).
+"""
+from pyspark.sql import functions as F
+
+TARGET_COVERAGE = 0.999
+
+
+def _pct(x, n):
+    return f"{x:,} ({x / n:.2%})" if n else f"{x:,}"
+
+
+def _product(catalog, p: str) -> list[str]:
+    seq = catalog.load(f"crx_{p}_dpd_sequences")
+    out = catalog.load(f"crx_{p}_a4_deterioration")
+    lines = [f"## {p.upper()}"]
+
+    # -- Node 1: every account in the history, with a build status ----------------------
+    s = seq.agg(
+        F.count("*").alias("accounts"),
+        F.sum((F.col("build_status") == "ok").cast("int")).alias("ok"),
+        F.sum(F.col("legacy_drop").cast("int")).alias("legacy_drop"),
+        F.sum(F.col("history_cropped").cast("int")).alias("cropped"),
+        F.sum((F.col("n_months_truncated") > 0).cast("int")).alias("truncated"),
+        F.sum((F.col("n_cycle_shift_moves") > 0).cast("int")).alias("acc_cycle_shift"),
+        F.sum((F.col("n_gap_months_filled") > 0).cast("int")).alias("acc_gap_filled"),
+        F.sum((F.col("n_gap_months_rolled") > 0).cast("int")).alias("acc_gap_rolled"),
+        F.sum((F.col("n_gap_months_inferred") > 0).cast("int")).alias("acc_gap_inferred"),
+        F.sum((F.col("n_invalid_rows") > 0).cast("int")).alias("acc_invalid_rows"),
+        F.min("first_month").alias("first_month"),
+        F.max("last_month").alias("last_month"),
+        F.expr("percentile_approx(history_months, array(0.05, 0.5, 0.95))").alias("history_months_p05_p50_p95"),
+    ).first().asDict()
+    n = s["accounts"]
+    lines.append(f"sequences: {n:,} accounts, months {s['first_month']} .. {s['last_month']}, "
+                 f"history months p05/p50/p95 {s['history_months_p05_p50_p95']}")
+    lines.append("build_status: " + ", ".join(
+        f"{r['build_status']} {_pct(r['count'], n)}"
+        for r in seq.groupBy("build_status").count().orderBy(F.desc("count")).collect()))
+    lines.append(f"old rule would have dropped: {_pct(s['legacy_drop'], n)}")
+    lg = seq.where("legacy_drop").agg(
+        F.count("*").alias("n"),
+        F.sum((F.col("n_cycle_shift_moves") > 0).cast("int")).alias("cycle_shift"),
+        F.sum((F.col("n_gap_months_rolled") > 0).cast("int")).alias("straight_roll"),
+        F.sum((F.col("n_gap_months_inferred") > 0).cast("int")).alias("inferred"),
+        F.sum((F.col("n_months_truncated") > 0).cast("int")).alias("truncated"),
+        F.expr("percentile_approx(n_months_truncated, 0.5)").alias("median_months_truncated"),
+    ).first().asDict()
+    lines.append(f"  of those, now resolved by (an account can have several): {lg}")
+    lines.append(f"cropped {_pct(s['cropped'], n)}; truncated at a gap {_pct(s['truncated'], n)}; "
+                 f"accounts with cycle-shift repair {_pct(s['acc_cycle_shift'], n)}, gap filled "
+                 f"{_pct(s['acc_gap_filled'], n)}, straight-roll fill {_pct(s['acc_gap_rolled'], n)}, "
+                 f"inferred fill {_pct(s['acc_gap_inferred'], n)}, invalid bucket rows {_pct(s['acc_invalid_rows'], n)}")
+
+    # -- Node 2: coverage and state shares ------------------------------------------------
+    segs = [r["det_segment"] for r in out.select("det_segment").distinct().collect()]
+    for seg in segs or ["(empty output)"]:
+        o = out.where(F.col("det_segment") == seg)
+        m = o.count()
+        cur = [r["current_bucket"] for r in o.select("current_bucket").distinct().collect()]
+        # accounts whose latest bucket is in this segment but that were NOT classified
+        in_seg = seq.where(F.element_at("dlq_buckets", -1).isin(cur)) if cur else seq.limit(0)
+        lost = in_seg.where(F.col("build_status") != "ok").count()
+        cov = m / (m + lost) if (m + lost) else 0.0
+        lines.append(f"### segment {seg} (current buckets {sorted(cur)}): {m:,} classified, "
+                     f"{lost:,} in segment but not classified -> coverage {cov:.3%} "
+                     f"[{'OK' if cov >= TARGET_COVERAGE else 'BELOW 99.9%'}]")
+        lines.append("| state | accounts | share |")
+        lines.append("|---|---|---|")
+        for r in o.groupBy("det_state").count().orderBy(F.desc("count")).collect():
+            lines.append(f"| {r['det_state']} | {r['count']:,} | {r['count'] / m:.1%} |")
+        q = o.agg(
+            F.avg(F.col("starts_delinquent").cast("double")).alias("starts_delinquent"),
+            F.avg(F.col("history_cropped").cast("double")).alias("cropped"),
+            F.avg((F.col("history_stale_months") > 1).cast("double")).alias("stale_over_1m"),
+            F.avg(F.col("restructure_blind_spot_flag").cast("double")).alias("restructured"),
+            F.avg((F.col("n_glitches") > 0).cast("double")).alias("glitch_fixed"),
+            F.avg((F.col("n_jumps_repaired") > 0).cast("double")).alias("jump_repaired"),
+        ).first().asDict()
+        lines.append("shares: " + ", ".join(f"{k} {v:.1%}" for k, v in q.items() if v is not None))
+        lines.append("state x starts_delinquent / cropped (shares within state):")
+        for r in (o.groupBy("det_state").agg(
+                F.avg(F.col("starts_delinquent").cast("double")).alias("sd"),
+                F.avg(F.col("history_cropped").cast("double")).alias("cr"))
+                .orderBy("det_state").collect()):
+            lines.append(f"  {r['det_state']}: starts_delinquent {r['sd']:.1%}, cropped {r['cr']:.1%}")
+    return lines
+
+
+def report(catalog, products=("cc", "rl")) -> str:
+    lines = ["=== DPD_JOURNEY PROD CHECK START ==="]
+    for p in products:
+        try:
+            lines += _product(catalog, p)
+        except Exception as exc:          # one product failing must not hide the other
+            lines.append(f"## {p.upper()}: FAILED — {type(exc).__name__}: {str(exc)[:300]}")
+    lines.append("=== DPD_JOURNEY PROD CHECK END ===")
+    text = "\n".join(lines)
+    print(text)
+    return text
 `````

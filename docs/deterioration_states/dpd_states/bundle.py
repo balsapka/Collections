@@ -56,6 +56,7 @@ FILES = [
     "spark/crx_persona/rl_a4_deterioration/pipeline.py",
     "spark/tests/test_parity.py",
     "spark/tests/test_spark_e2e.py",
+    "spark/prod_check.py",
 ]
 EMPTY_DIRS = ["results", "validation"]
 
@@ -178,8 +179,11 @@ python docs/deterioration_states/spark/tests/test_parity.py      # -> "PARITY PA
 python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E PASSED" (local Spark + Java 17)
 ```
 
-**For the PySpark pipeline review, start at `spark/REVIEW_SPARK.md`** — findings on the
-workplace code (F1–F12), the rewrite design, the coverage plan (99.9%) and prompts W1–W4.
+**For the PySpark pipeline, start at `spark/REVIEW_SPARK.md`** — findings on the workplace
+code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
+Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
+offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
+then `spark/prod_check.py` (P1–P2), which prints aggregates only.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
