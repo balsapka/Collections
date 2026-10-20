@@ -54,7 +54,7 @@ deterioration_states/
 │   ├── crx_persona/          drop-in: _dpd_journey.py engine + cc/rl full_history + a4_deterioration nodes
 │   ├── conf/                 parameters (dpd_journey: floor, segment, option, gap rules)
 │   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only)
-│   └── tests/                test_parity.py (vs this package) · test_spark_e2e.py (local Spark)
+│   └── tests/                nodes/ + pipelines/crx_persona/ (96 tests, ship to src/tests/) · test_parity.py · test_spark_e2e.py (bundle-only)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
 ```

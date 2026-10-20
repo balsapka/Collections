@@ -8,6 +8,9 @@ Order: **P0 → P1 (file mode) → P2**, then P3 / P4 as the results require, th
 **P8 ships the reviewed PySpark pipeline (CC + RL)** into the existing Kedro code — it
 replaces P7 for that work. Sonnet has no PROD data access: P8 is code changes and offline
 tests only; the user runs the pipelines and `spark/prod_check.py` in PROD.
+**P9 runs after P8**: adds the regression tests under `src/tests/{nodes,pipelines}/crx_persona/`
+and removes everything unpacked from the bundle (recoverable from BUNDLE.md), plus any dead
+code the rewrite left in `src/`.
 
 ---
 
@@ -318,3 +321,107 @@ Step 4 — offline verification (after the files are written)
 Report every result verbatim. Then list what I must run in PROD (REVIEW_SPARK.md §5
 P1-P2) using this repo's real pipeline names.
 ```
+
+---
+
+## P9 — Add the tests, then clean up (after P8)
+
+Before pasting: replace `docs/deterioration_states/BUNDLE.md` in the workplace repo with
+the **latest raw** BUNDLE.md (it now carries the tests). The pipeline code in it is the
+same as the bundle P8 used — step 1 checks that.
+
+```
+Context: P8 is done — the reviewed DPD-journey deterioration pipelines (CC + RL) are in
+src/enbd_collections/pipelines/crx_persona/. I have just replaced
+docs/deterioration_states/BUNDLE.md with a newer version that adds regression tests.
+Now: (1) check src/ matches the bundle, (2) add the tests under src/tests/, (3) remove
+everything else unpacked from the bundle and any dead code, so the repo holds only what
+the registered pipelines use, plus their tests. I will re-extract from BUNDLE.md if I
+ever need the rest.
+
+Hard rules:
+- No PROD data access: never call catalog.load, never run kedro run, never query a table.
+- Delete nothing before I approve the plan (STOP below). Use `git rm` / `git mv`.
+  Do not commit or push.
+- Never delete anything a registered pipeline imports, any test of it, or any file that
+  was not unpacked from the bundle without asking me.
+
+Step 1 — re-extract and check src/ is current (report only)
+1. python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md
+   -> must end with "0 mismatched" (if extract_bundle.py is gone, recreate it from the
+   bundle's "Extractor" section first).
+2. Compare the bundled engine and nodes with src/, ignoring import lines and formatting:
+     docs/deterioration_states/spark/crx_persona/_dpd_journey.py   vs src/.../crx_persona/_dpd_journey.py
+     .../spark/crx_persona/cc_full_history/nodes.py                vs src/.../cc_full_history/nodes.py
+     .../spark/crx_persona/rl_full_history/nodes.py                vs src/.../rl_full_history/nodes.py
+     .../spark/crx_persona/cc_a4_deterioration/nodes.py, pipeline.py vs src/...
+     .../spark/crx_persona/rl_a4_deterioration/nodes.py, pipeline.py vs src/...
+   Report every LOGIC difference (anything beyond imports, the repo's _DPD_BUCKET_REGEX,
+   logging and lint style). Quick check that the latest rules are in src/:
+   grep -n "starts_delinquent\|def _stabilized\|\"unknown\"" src/enbd_collections/pipelines/crx_persona/_dpd_journey.py
+   must show all three.
+If there is any logic difference, STOP and show me before going on.
+
+Step 2 — add the tests (only after step 1 is clean)
+Copy, keeping file names:
+  docs/deterioration_states/spark/tests/nodes/crx_persona/test_dpd_journey.py
+  docs/deterioration_states/spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py
+  docs/deterioration_states/spark/tests/nodes/crx_persona/conftest.py
+      -> src/tests/nodes/crx_persona/
+  docs/deterioration_states/spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py
+      -> src/tests/pipelines/crx_persona/
+Create the crx_persona folders; add __init__.py files only if the sibling test folders
+under src/tests/nodes and src/tests/pipelines have them. If src/tests (or a parent
+conftest) already defines a session-scoped `spark` fixture, do not copy conftest.py — the
+tests use the existing fixture. Do NOT copy docs/deterioration_states/spark/tests/conftest.py
+or test_parity.py / test_spark_e2e.py (bundle-only: an import shim and the one-time proof
+against the numpy reference). If step 1 found that the repo's pipeline uses different
+dataset or node names, adapt the EXPECTED table in test_a4_deterioration_pipelines.py to
+the repo — never the pipeline to the test.
+Run:
+  python -m pytest src/tests/nodes/crx_persona src/tests/pipelines/crx_persona
+  -> 96 passed (the Spark node tests need Java + pyspark; if Java is missing, report it
+     and run the other two files: 89 passed).
+
+Step 3 — inventory for the clean-up (report only, change nothing)
+a) Registered pipelines: from the pipeline registry, list the crx_persona pipelines and
+   every module they import, transitively, inside src/enbd_collections/pipelines/crx_persona/.
+b) Bundle files: every path in BUNDLE.md's "### FILE: `...`" headers that exists on disk,
+   plus extract_bundle.py, results/, validation/, __pycache__/ and .gitkeep files under
+   docs/deterioration_states/. Separately: anything under docs/deterioration_states/ that
+   is NOT from the bundle (my notes, real-data outputs in results/) -> "ask", never "delete".
+c) Dead code in src/enbd_collections/pipelines/crx_persona/ left by the rewrite:
+   functions, constants and imports nothing references any more (e.g. old resolve_gaps /
+   encode_transitions / classify_from_grid, old _log_* helpers, _CC_HISTORY_FLOOR_DATE,
+   _DET_OPTION, _SCHEME, _AUDIT_COLS, unused imports). Confirm each with grep across
+   src/ (including src/tests/), conf/ and notebooks/; if available, also run
+   `ruff check --select F401,F811,F841` (or the repo's linter) and
+   `python -m vulture src/enbd_collections/pipelines/crx_persona` as a hint, not a verdict.
+d) Old tests, notebooks and docs that reference removed names (e.g. tests of resolve_gaps /
+   encode_transitions) or docs/deterioration_states paths.
+e) Parameters and catalog entries no longer read by any node.
+Show the plan as one table: path or symbol | evidence it is unused | action
+(delete / keep / ask). Defaults:
+- docs/deterioration_states/**: delete everything from the bundle EXCEPT BUNDLE.md (the
+  archive to re-extract from) — i.e. spark/ (its code is in src/, its tests now in
+  src/tests/), dpd_states/, snippets/, run.py, extract_bundle.py, METHODOLOGY.md / .pdf,
+  README.md, REVIEW.md, PROMPTS.md, validation/, __pycache__/.
+- results/ with real-data outputs: ask.
+- src/: delete only symbols with zero references.
+STOP — wait for my approval of the table.
+
+Step 4 — apply the approved table only
+git rm the files; remove dead symbols and unused imports with minimal edits (no
+reformatting of untouched code); remove empty folders. Leave BUNDLE.md unchanged.
+
+Step 5 — verify (offline) and report verbatim
+1. The repo's lint command on src/enbd_collections/pipelines/crx_persona/ and
+   src/tests/nodes/crx_persona/, src/tests/pipelines/crx_persona/.
+2. python -m pytest src/tests/nodes/crx_persona src/tests/pipelines/crx_persona -> all pass
+   (and the rest of src/tests, if it ran green before).
+3. kedro registry list   (imports every pipeline; no data) — crx_persona pipelines listed.
+4. grep -rn "docs/deterioration_states\|resolve_gaps\|encode_transitions\|classify_from_grid" src/ conf/
+   -> nothing (or only what I approved to keep).
+5. git status --short and git diff --stat.
+```
+

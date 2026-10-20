@@ -157,7 +157,21 @@ fewer EPD / early-life (expected: they are cropped).
 
 ## 4. Tests
 
+Shipped with the pipeline (P9 copies them to `src/tests/`; they import
+`enbd_collections.pipelines.crx_persona` and need no bundle files):
+
+| file | what | needs |
+|---|---|---|
+| `tests/nodes/crx_persona/test_dpd_journey.py` | 84 unit tests: business cases (CC + RL numbering), crop cases, ceiling / unknown, 180+, gap rules | nothing |
+| `tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py` | 7 Spark tests: raw tables with real-source noise → node functions → every account checked; ANSI on | Java + pyspark |
+| `tests/nodes/crx_persona/conftest.py` | local `spark` fixture (skip if `src/tests` has one) | |
+| `tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py` | 5 wiring tests: node names, functions, inputs, outputs, tags, order, params | kedro |
+
+Bundle-only (stay in BUNDLE.md): `tests/conftest.py` (maps the package name onto the staged
+copy so the shipped tests run here), and:
+
 ```bash
+python -m pytest docs/deterioration_states/spark/tests/nodes docs/deterioration_states/spark/tests/pipelines   # -> 96 passed
 python docs/deterioration_states/spark/tests/test_parity.py     # no Spark: core vs numpy reference -> PARITY PASSED (~30 s)
 python docs/deterioration_states/spark/tests/test_spark_e2e.py  # local Spark (Java 17, pyspark) -> SPARK E2E PASSED
 ```
@@ -243,6 +257,12 @@ review.
 
 **P3 — decide** (business owner): are truncated / inferred-gap accounts acceptable as
 classified, and is the `unknown` share at 180+ acceptable as reported?
+
+**P4 — tests and clean-up** (Sonnet, after P8): **PROMPTS.md P9** checks `src/` matches
+the bundle, adds the regression tests (`spark/tests/nodes/crx_persona/` ->
+`src/tests/nodes/crx_persona/`, `spark/tests/pipelines/crx_persona/` ->
+`src/tests/pipelines/crx_persona/`; 96 tests), then removes everything unpacked from the
+bundle except BUNDLE.md, plus dead code the rewrite left in `src/`.
 
 ## 6. Open points
 

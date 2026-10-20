@@ -31,7 +31,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**.
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-20 by `dpd_states/bundle.py`. 36 files, 5,938 lines.
+Generated 2026-10-20 by `dpd_states/bundle.py`. 41 files, 6,557 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -193,6 +193,11 @@ docs/deterioration_states/
 ├── spark/crx_persona/rl_a4_deterioration/pipeline.py
 ├── spark/tests/test_parity.py
 ├── spark/tests/test_spark_e2e.py
+├── spark/tests/conftest.py
+├── spark/tests/nodes/crx_persona/conftest.py
+├── spark/tests/nodes/crx_persona/test_dpd_journey.py
+├── spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py
+├── spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py
 ├── spark/prod_check.py
 ├── results/
 ├── validation/
@@ -207,7 +212,7 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `f76867bd2c8a87e028e6a372de8d37dae0f93fda9335e49bb28c7bf4b5122444` · 121 lines · trailing newline: yes
+sha256 `37694cc63e0f164cdc238c505951cb5125f5b8aec1ff698ab904ec6246f4210a` · 121 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
@@ -266,7 +271,7 @@ deterioration_states/
 │   ├── crx_persona/          drop-in: _dpd_journey.py engine + cc/rl full_history + a4_deterioration nodes
 │   ├── conf/                 parameters (dpd_journey: floor, segment, option, gap rules)
 │   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only)
-│   └── tests/                test_parity.py (vs this package) · test_spark_e2e.py (local Spark)
+│   └── tests/                nodes/ + pipelines/crx_persona/ (96 tests, ship to src/tests/) · test_parity.py · test_spark_e2e.py (bundle-only)
 ├── validation/               evidence from synthetic runs (committed)
 └── results/                  real-data outputs land here (aggregates only)
 ```
@@ -934,7 +939,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `74e67739d9e1f2f7b29d00255eb440c2742b77b3d713b93ca51f00858e768dfc` · 320 lines · trailing newline: yes
+sha256 `20f207e74d363862e497eb488271bb829c407d6a03197a26b060af1de67496a5` · 427 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -947,6 +952,9 @@ Order: **P0 → P1 (file mode) → P2**, then P3 / P4 as the results require, th
 **P8 ships the reviewed PySpark pipeline (CC + RL)** into the existing Kedro code — it
 replaces P7 for that work. Sonnet has no PROD data access: P8 is code changes and offline
 tests only; the user runs the pipelines and `spark/prod_check.py` in PROD.
+**P9 runs after P8**: adds the regression tests under `src/tests/{nodes,pipelines}/crx_persona/`
+and removes everything unpacked from the bundle (recoverable from BUNDLE.md), plus any dead
+code the rewrite left in `src/`.
 
 ---
 
@@ -1257,6 +1265,110 @@ Step 4 — offline verification (after the files are written)
 Report every result verbatim. Then list what I must run in PROD (REVIEW_SPARK.md §5
 P1-P2) using this repo's real pipeline names.
 ```
+
+---
+
+## P9 — Add the tests, then clean up (after P8)
+
+Before pasting: replace `docs/deterioration_states/BUNDLE.md` in the workplace repo with
+the **latest raw** BUNDLE.md (it now carries the tests). The pipeline code in it is the
+same as the bundle P8 used — step 1 checks that.
+
+```
+Context: P8 is done — the reviewed DPD-journey deterioration pipelines (CC + RL) are in
+src/enbd_collections/pipelines/crx_persona/. I have just replaced
+docs/deterioration_states/BUNDLE.md with a newer version that adds regression tests.
+Now: (1) check src/ matches the bundle, (2) add the tests under src/tests/, (3) remove
+everything else unpacked from the bundle and any dead code, so the repo holds only what
+the registered pipelines use, plus their tests. I will re-extract from BUNDLE.md if I
+ever need the rest.
+
+Hard rules:
+- No PROD data access: never call catalog.load, never run kedro run, never query a table.
+- Delete nothing before I approve the plan (STOP below). Use `git rm` / `git mv`.
+  Do not commit or push.
+- Never delete anything a registered pipeline imports, any test of it, or any file that
+  was not unpacked from the bundle without asking me.
+
+Step 1 — re-extract and check src/ is current (report only)
+1. python docs/deterioration_states/extract_bundle.py docs/deterioration_states/BUNDLE.md
+   -> must end with "0 mismatched" (if extract_bundle.py is gone, recreate it from the
+   bundle's "Extractor" section first).
+2. Compare the bundled engine and nodes with src/, ignoring import lines and formatting:
+     docs/deterioration_states/spark/crx_persona/_dpd_journey.py   vs src/.../crx_persona/_dpd_journey.py
+     .../spark/crx_persona/cc_full_history/nodes.py                vs src/.../cc_full_history/nodes.py
+     .../spark/crx_persona/rl_full_history/nodes.py                vs src/.../rl_full_history/nodes.py
+     .../spark/crx_persona/cc_a4_deterioration/nodes.py, pipeline.py vs src/...
+     .../spark/crx_persona/rl_a4_deterioration/nodes.py, pipeline.py vs src/...
+   Report every LOGIC difference (anything beyond imports, the repo's _DPD_BUCKET_REGEX,
+   logging and lint style). Quick check that the latest rules are in src/:
+   grep -n "starts_delinquent\|def _stabilized\|\"unknown\"" src/enbd_collections/pipelines/crx_persona/_dpd_journey.py
+   must show all three.
+If there is any logic difference, STOP and show me before going on.
+
+Step 2 — add the tests (only after step 1 is clean)
+Copy, keeping file names:
+  docs/deterioration_states/spark/tests/nodes/crx_persona/test_dpd_journey.py
+  docs/deterioration_states/spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py
+  docs/deterioration_states/spark/tests/nodes/crx_persona/conftest.py
+      -> src/tests/nodes/crx_persona/
+  docs/deterioration_states/spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py
+      -> src/tests/pipelines/crx_persona/
+Create the crx_persona folders; add __init__.py files only if the sibling test folders
+under src/tests/nodes and src/tests/pipelines have them. If src/tests (or a parent
+conftest) already defines a session-scoped `spark` fixture, do not copy conftest.py — the
+tests use the existing fixture. Do NOT copy docs/deterioration_states/spark/tests/conftest.py
+or test_parity.py / test_spark_e2e.py (bundle-only: an import shim and the one-time proof
+against the numpy reference). If step 1 found that the repo's pipeline uses different
+dataset or node names, adapt the EXPECTED table in test_a4_deterioration_pipelines.py to
+the repo — never the pipeline to the test.
+Run:
+  python -m pytest src/tests/nodes/crx_persona src/tests/pipelines/crx_persona
+  -> 96 passed (the Spark node tests need Java + pyspark; if Java is missing, report it
+     and run the other two files: 89 passed).
+
+Step 3 — inventory for the clean-up (report only, change nothing)
+a) Registered pipelines: from the pipeline registry, list the crx_persona pipelines and
+   every module they import, transitively, inside src/enbd_collections/pipelines/crx_persona/.
+b) Bundle files: every path in BUNDLE.md's "### FILE: `...`" headers that exists on disk,
+   plus extract_bundle.py, results/, validation/, __pycache__/ and .gitkeep files under
+   docs/deterioration_states/. Separately: anything under docs/deterioration_states/ that
+   is NOT from the bundle (my notes, real-data outputs in results/) -> "ask", never "delete".
+c) Dead code in src/enbd_collections/pipelines/crx_persona/ left by the rewrite:
+   functions, constants and imports nothing references any more (e.g. old resolve_gaps /
+   encode_transitions / classify_from_grid, old _log_* helpers, _CC_HISTORY_FLOOR_DATE,
+   _DET_OPTION, _SCHEME, _AUDIT_COLS, unused imports). Confirm each with grep across
+   src/ (including src/tests/), conf/ and notebooks/; if available, also run
+   `ruff check --select F401,F811,F841` (or the repo's linter) and
+   `python -m vulture src/enbd_collections/pipelines/crx_persona` as a hint, not a verdict.
+d) Old tests, notebooks and docs that reference removed names (e.g. tests of resolve_gaps /
+   encode_transitions) or docs/deterioration_states paths.
+e) Parameters and catalog entries no longer read by any node.
+Show the plan as one table: path or symbol | evidence it is unused | action
+(delete / keep / ask). Defaults:
+- docs/deterioration_states/**: delete everything from the bundle EXCEPT BUNDLE.md (the
+  archive to re-extract from) — i.e. spark/ (its code is in src/, its tests now in
+  src/tests/), dpd_states/, snippets/, run.py, extract_bundle.py, METHODOLOGY.md / .pdf,
+  README.md, REVIEW.md, PROMPTS.md, validation/, __pycache__/.
+- results/ with real-data outputs: ask.
+- src/: delete only symbols with zero references.
+STOP — wait for my approval of the table.
+
+Step 4 — apply the approved table only
+git rm the files; remove dead symbols and unused imports with minimal edits (no
+reformatting of untouched code); remove empty folders. Leave BUNDLE.md unchanged.
+
+Step 5 — verify (offline) and report verbatim
+1. The repo's lint command on src/enbd_collections/pipelines/crx_persona/ and
+   src/tests/nodes/crx_persona/, src/tests/pipelines/crx_persona/.
+2. python -m pytest src/tests/nodes/crx_persona src/tests/pipelines/crx_persona -> all pass
+   (and the rest of src/tests, if it ran green before).
+3. kedro registry list   (imports every pipeline; no data) — crx_persona pipelines listed.
+4. grep -rn "docs/deterioration_states\|resolve_gaps\|encode_transitions\|classify_from_grid" src/ conf/
+   -> nothing (or only what I approved to keep).
+5. git status --short and git diff --stat.
+```
+
 `````
 
 ### FILE: `dpd_states/__init__.py`
@@ -3924,7 +4036,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `353bd59085a88dec851d70f19c677b02700cd2d2e3dd9ab38819b80a28d372be` · 268 lines · trailing newline: yes
+sha256 `ec0b73498bce96c5aaa7c9efb967cce8525f5a58a36914e6a05d6a551828264a` · 273 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -3985,6 +4097,11 @@ FILES = [
     "spark/crx_persona/rl_a4_deterioration/pipeline.py",
     "spark/tests/test_parity.py",
     "spark/tests/test_spark_e2e.py",
+    "spark/tests/conftest.py",
+    "spark/tests/nodes/crx_persona/conftest.py",
+    "spark/tests/nodes/crx_persona/test_dpd_journey.py",
+    "spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py",
+    "spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py",
     "spark/prod_check.py",
 ]
 EMPTY_DIRS = ["results", "validation"]
@@ -4112,7 +4229,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**.
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -4451,7 +4568,7 @@ def main(catalog, model_id=None, out_dir=None, sample_n=100_000, check_only=Fals
 `````
 
 ### FILE: `spark/REVIEW_SPARK.md`
-sha256 `03d255c4b6081d9417eb4d92bed0b116f4aed5b862e53f4288e41065e131d23b` · 258 lines · trailing newline: yes
+sha256 `d1995e34ec86c442f170bbe369f17449379ca2d43d3430db4614599389e91e2f` · 278 lines · trailing newline: yes
 
 `````markdown
 # PySpark deterioration pipeline — review and rewrite (CC + RL)
@@ -4613,7 +4730,21 @@ fewer EPD / early-life (expected: they are cropped).
 
 ## 4. Tests
 
+Shipped with the pipeline (P9 copies them to `src/tests/`; they import
+`enbd_collections.pipelines.crx_persona` and need no bundle files):
+
+| file | what | needs |
+|---|---|---|
+| `tests/nodes/crx_persona/test_dpd_journey.py` | 84 unit tests: business cases (CC + RL numbering), crop cases, ceiling / unknown, 180+, gap rules | nothing |
+| `tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py` | 7 Spark tests: raw tables with real-source noise → node functions → every account checked; ANSI on | Java + pyspark |
+| `tests/nodes/crx_persona/conftest.py` | local `spark` fixture (skip if `src/tests` has one) | |
+| `tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py` | 5 wiring tests: node names, functions, inputs, outputs, tags, order, params | kedro |
+
+Bundle-only (stay in BUNDLE.md): `tests/conftest.py` (maps the package name onto the staged
+copy so the shipped tests run here), and:
+
 ```bash
+python -m pytest docs/deterioration_states/spark/tests/nodes docs/deterioration_states/spark/tests/pipelines   # -> 96 passed
 python docs/deterioration_states/spark/tests/test_parity.py     # no Spark: core vs numpy reference -> PARITY PASSED (~30 s)
 python docs/deterioration_states/spark/tests/test_spark_e2e.py  # local Spark (Java 17, pyspark) -> SPARK E2E PASSED
 ```
@@ -4699,6 +4830,12 @@ review.
 
 **P3 — decide** (business owner): are truncated / inferred-gap accounts acceptable as
 classified, and is the `unknown` share at 180+ acceptable as reported?
+
+**P4 — tests and clean-up** (Sonnet, after P8): **PROMPTS.md P9** checks `src/` matches
+the bundle, adds the regression tests (`spark/tests/nodes/crx_persona/` ->
+`src/tests/nodes/crx_persona/`, `spark/tests/pipelines/crx_persona/` ->
+`src/tests/pipelines/crx_persona/`; 96 tests), then removes everything unpacked from the
+bundle except BUNDLE.md, plus dead code the rewrite left in `src/`.
 
 ## 6. Open points
 
@@ -6244,6 +6381,523 @@ def main(n: int = 4000) -> int:
 
 if __name__ == "__main__":
     sys.exit(main(int(sys.argv[1]) if len(sys.argv) > 1 else 4000))
+`````
+
+### FILE: `spark/tests/conftest.py`
+sha256 `14104ec1b07262fce76d614832c6c4f0ee1cb358684925bc151b2bd1f352dbe4` · 28 lines · trailing newline: yes
+
+`````python
+"""BUNDLE-ONLY (not shipped): lets the shipped tests under tests/nodes/ and tests/pipelines/
+import `enbd_collections.pipelines.crx_persona` exactly as they will in the workplace repo,
+by mapping that package name onto ../crx_persona (the staged copy).
+
+In the workplace repo the real package is installed, so this file is not copied.
+"""
+import importlib.util
+import pathlib
+import sys
+import types
+
+_STAGED = pathlib.Path(__file__).resolve().parents[1] / "crx_persona"
+_NAME = "enbd_collections.pipelines.crx_persona"
+
+if _NAME not in sys.modules:
+    try:
+        import enbd_collections  # noqa: F401  — the real package is present: use it
+    except ImportError:
+        for name in ("enbd_collections", "enbd_collections.pipelines"):
+            mod = types.ModuleType(name)
+            mod.__path__ = []
+            sys.modules[name] = mod
+        spec = importlib.util.spec_from_file_location(
+            _NAME, _STAGED / "__init__.py", submodule_search_locations=[str(_STAGED)])
+        pkg = importlib.util.module_from_spec(spec)
+        sys.modules[_NAME] = pkg
+        spec.loader.exec_module(pkg)
+        sys.modules["enbd_collections.pipelines"].crx_persona = pkg
+`````
+
+### FILE: `spark/tests/nodes/crx_persona/conftest.py`
+sha256 `4207bdcd56c66cafdd9256cb78c9fc5818d2963928e5f68efe0adf30c48a2ba9` · 27 lines · trailing newline: yes
+
+`````python
+"""Local SparkSession for the crx_persona node tests (synthetic data only, no catalog).
+
+If src/tests already provides a session-scoped `spark` fixture, delete this file and the
+tests use that one. Needs Java 8/11/17 on the machine (JAVA_HOME) and pyspark >= 3.3.
+"""
+import os
+import sys
+
+import pytest
+
+
+@pytest.fixture(scope="session")
+def spark():
+    from pyspark.sql import SparkSession
+
+    os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
+    session = (
+        SparkSession.builder.master("local[2]")
+        .appName("crx_persona_tests")
+        .config("spark.sql.shuffle.partitions", "4")
+        .config("spark.ui.enabled", "false")
+        .config("spark.sql.ansi.enabled", "true")      # the strictest setting (Spark 4 default)
+        .getOrCreate()
+    )
+    session.sparkContext.setLogLevel("ERROR")
+    yield session
+    session.stop()
+`````
+
+### FILE: `spark/tests/nodes/crx_persona/test_dpd_journey.py`
+sha256 `f28b985ea042fb45b521fb42673d603a18bc88162657be559fc9e58ec5259ef1` · 181 lines · trailing newline: yes
+
+`````python
+"""Unit tests for crx_persona/_dpd_journey.py — self-contained (no Spark session, no data).
+
+Workplace location: src/tests/nodes/crx_persona/test_dpd_journey.py.
+Run: python -m pytest src/tests/nodes/crx_persona
+
+The cases are the business edge cases agreed for the deterioration states (option B),
+the history-window (crop) cases, the ceiling / unknown rules, and the Stage 1 gap rules.
+Exact parity of the engine with the numpy reference was proven separately
+(docs/deterioration_states/spark/tests/test_parity.py, recoverable from BUNDLE.md).
+"""
+from __future__ import annotations
+
+import pytest
+
+from enbd_collections.pipelines.crx_persona import _dpd_journey as J
+
+# (oldest -> newest CC buckets, expected option-B state, why)
+CASES = [   ('0 2 0 2 3 4', 'early_payment_default', '3 months incl. one blip, then straight roll'),
+    ('0 0 0 2 3 4', 'early_payment_default', '3 clean months, straight roll'),
+    ('0 2 3 4 5', 'early_payment_default', '1 clean month'),
+    ('0 0 2 0 2 3 4', 'straight_roller_early_life', '4 months of history: too long for EPD'),
+    (   '0 0 0 0 0 0 2 3 4',
+        'straight_roller_early_life',
+        '6 clean months: early-life default, not EPD'),
+    ('0 2 0 2 0 2 3 4', 'straight_roller_early_life', 'two blips: not EPD'),
+    ('0 2 3 4 0 0 2 3 4 5 6', 'repeat_delinquent', 'paid off from 4, then relapsed'),
+    ('0 0 2 2 3 4', 'slow_roller', 'held once on the way down'),
+    ('0 0 0 0 2 2 2 2 3 3 3 4 4 4 4 4 4 4 5', 'stabilized', 'staircase holding at 4 then one step'),
+    ('000000000000002345', 'straight_roller_seasoned', '14 clean months, straight roll'),
+    (   '0000000000000234444567',
+        'straight_roller_seasoned',
+        'held at 4, then rolled 3 buckets: not stable'),
+    ('0000000000000023455555', 'stabilized', 'holding at 5'),
+    ('00000000234443345433456554', 'stabilized', 'oscillating payer (example 1)'),
+    (   '00000000234443345433456654',
+        'stabilized',
+        'oscillating payer that just paid down 6-5-4 (example 2)'),
+    (   '0 0 2 3 4 4 4 4 4 4',
+        'stabilized',
+        'entered like EPD but pays the monthly due since: not EPD'),
+    (   '0 0 2 3 4 4 5 6',
+        'straight_roller_early_life',
+        'entered like EPD, paid once at 4: EPD needs no payment'),
+    ('4 5 6 7', 'unknown', 'string starts delinquent (restructured / missing history)'),
+    ('4 4 4 4 4 5', 'stabilized', 'starts delinquent but holding: stabilized needs only 6 months'),
+    ('0 0 0 2 3 4 4 4 4 4', 'stabilized', 'journey observed from 0 DPD, holding at 4'),
+    (   '0000000000000000224',
+        'straight_roller_seasoned',
+        '+2 jump after a hold at 2: repaired to 2 3 4'),
+    (   '00000000000000002244',
+        'straight_roller_seasoned',
+        'same account a month later: fixed state must not change'),
+    ('000034', 'straight_roller_early_life', 'jump from clean to 3: no clean month is borrowed'),
+    (   '0 2 3 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 3 4',
+        'straight_roller_seasoned',
+        'cured 20 months earlier: outside 12-month window'),
+    (   '0 2 3 4 0 0 0 0 0 0 0 0 2 3 4 5',
+        'repeat_delinquent',
+        'cured 8 months earlier: repeat delinquent'),
+    (   '0000000000000000 2 3 4 4 0 4 5',
+        'stabilized',
+        'single 0 inside a spell at 4 is a glitch, not a cure'),
+    (   '0000 3 0000000000000 2 3 4',
+        'straight_roller_seasoned',
+        'single spike 0 3 0 is a glitch, not an earlier spell')]
+
+# (oldest -> newest, months kept by the history window, expected option-B state, why)
+CROP_CASES = [   (   '00000000002344545454545454545454545454545454545454',
+        32,
+        'stabilized',
+        'spell older than the window: not a data-quality case; long-run holder -> stabilized'),
+    (   '0000000000000000000000000000000000000000234',
+        32,
+        'straight_roller_seasoned',
+        'long clean history cropped: still seasoned'),
+    (   '0000000000234',
+        6,
+        'straight_roller_seasoned',
+        'cropped to 0 0 0 2 3 4: looks like EPD, but older than the window'),
+    ('0 0 0 2 3 4', 32, 'early_payment_default', 'short history, not cropped: EPD')]
+
+# 180+ segment (canonical cap: CC 9, RL 7 -> 8) and the ceiling / unknown rules
+CASES_180 = [
+    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9] + [9] * 12, "straight_roller_seasoned"),  # at the cap: not stabilized
+    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], "stabilized"),               # holding at 8, below the cap
+    ("cc", [8, 9, 9, 9, 9, 9, 9], "unknown"),                                            # journey start not observed
+    ("cc", [0] * 20 + [2, 3, 4, 5, 6, 7, 8, 9, 9, 8, 9], "paying_in_default"),
+    ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 7], "straight_roller_seasoned"),
+    ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7, 7, 6, 7], "paying_in_default"),
+    ("rl", [7, 7, 7, 7], "unknown"),
+    ("rl", [0, 0, 1, 2, 3, 4, 5, 6, 7], "early_payment_default"),
+    ("rl", [0] * 20 + [1, 2, 3, 4, 5] + [6] * 12 + [7, 7], "broken_payer"),
+    ("rl", [0] * 20 + [1, 2, 3, 4, 5, 6, 7] + [7] * 12, "straight_roller_seasoned"),     # 12 months at the cap
+]
+SCHEME = {"cc": (0, 9), "rl": (1, 8)}     # (offset, canonical cap)
+
+
+def _to_rl(cc: list[int]) -> list[int]:
+    """CC buckets -> RL native (CC 0/1 -> 0, CC 2 -> 1, ..., CC 8/9 -> 7)."""
+    return [min(max(x, 1), 8) - 1 for x in cc]
+
+
+def _chron(text: str) -> list[int]:
+    return [int(ch) for ch in text.replace(" ", "")]
+
+
+@pytest.mark.parametrize("chron,want,why", CASES)
+@pytest.mark.parametrize("product", ["cc", "rl"])
+def test_business_case(product, chron, want, why):
+    b = _chron(chron)
+    buckets = b if product == "cc" else _to_rl(b)
+    off, top = SCHEME[product]
+    assert J.classify(buckets, False, off, top, "60_180", "B_balanced_6")["det_state"] == want, why
+
+
+@pytest.mark.parametrize("chron,n,want,why", CROP_CASES)
+def test_crop_case(chron, n, want, why):
+    b = _chron(chron)
+    got = J.classify(b[-n:], len(b) >= n, 0, 9, "60_180", "B_balanced_6")["det_state"]
+    assert got == want, why
+
+
+@pytest.mark.parametrize("product,buckets,want", CASES_180)
+def test_180_and_ceiling(product, buckets, want):
+    off, top = SCHEME[product]
+    assert J.classify(buckets, False, off, top, "180_plus", "B_balanced_6")["det_state"] == want
+
+
+def test_every_option_is_mece():
+    """Each option returns exactly one known state for every case."""
+    for option in J.OPTIONS:
+        for chron, _, _ in CASES:
+            assert J.classify(_chron(chron), False, 0, 9, "60_180", option)["det_state"] in J.DISPLAY_NAMES
+
+
+def _hist(rows, first_raw=None, gmin=0, offset=0, fill=True, how="truncate", max_inf=2):
+    first_raw = first_raw if first_raw is not None else min(r[0] for r in rows)
+    return J.build_history(rows, first_raw, gmin, offset, fill, how, True, max_inf)
+
+
+@pytest.mark.parametrize("kwargs,check", [
+    (dict(rows=[(100, 1, 3), (101, 5, 4), (101, 9, 5), (102, 1, 5)]),
+     lambda r: r["buckets"] == [3, 5, 5] and r["n_dup_month_rows"] == 1),            # latest in month wins
+    (dict(rows=[(100, 1, 3), (101, 5, 4), (101, 5, 6), (102, 1, 6)]),
+     lambda r: r["buckets"] == [3, 6, 6]),                                           # same day: worst wins
+    (dict(rows=[(100, 1, 4), (102, 1, 4)]),
+     lambda r: r["buckets"] == [4, 4, 4] and r["n_gap_months_filled"] == 1),         # hold through
+    (dict(rows=[(100, 1, 0), (102, 1, 1)]),
+     lambda r: r["buckets"] == [0, 0, 1] and r["n_months_truncated"] == 0),          # CC 0 _ 1 is clean
+    (dict(rows=[(100, 1, 3), (103, 1, 6)]),
+     lambda r: r["buckets"] == [3, 4, 5, 6] and r["n_gap_months_rolled"] == 2),      # straight roll
+    (dict(rows=[(100, 1, 0), (102, 1, 2)], offset=1),
+     lambda r: r["buckets"] == [0, 1, 2]),                                           # RL straight roll
+    (dict(rows=[(100, 1, 0), (101, 1, 0), (105, 1, 4), (106, 1, 5)]),
+     lambda r: r["buckets"] == [4, 5] and r["n_months_truncated"] == 5
+     and r["history_cropped"] and r["legacy_drop"]),                                 # unresolvable: truncate
+    (dict(rows=[(100, 1, 3), (102, 1, 4)]),
+     lambda r: r["buckets"] == [3, 3, 4] and r["n_gap_months_inferred"] == 1),       # inferred, roll late
+    (dict(rows=[(100, 1, 6), (103, 1, 3)]),
+     lambda r: r["buckets"] == [6, 6, 6, 3] and r["n_gap_months_inferred"] == 2),    # carry, pay at end
+    (dict(rows=[(100, 1, 3), (102, 1, 4)], max_inf=0),
+     lambda r: r["buckets"] == [4] and r["n_months_truncated"] == 2),                # inference off
+    (dict(rows=[(100, 30, 2), (101, 60, 3), (101, 61, 4), (103, 90, 5)]),
+     lambda r: r["buckets"] == [2, 3, 4, 5] and r["n_cycle_shift_moves"] == 1),      # cycle shift forward
+    (dict(rows=[(100, 1, 2), (102, 50, 3), (102, 80, 4), (103, 90, 5)]),
+     lambda r: r["buckets"] == [2, 3, 4, 5] and r["n_cycle_shift_moves"] == 1),      # cycle shift back
+    (dict(rows=[(100, 1, 0), (102, 1, 4)], how="drop", max_inf=0),
+     lambda r: r["build_status"] == "dropped_unresolvable_gap"),
+    (dict(rows=[(100, 1, 0), (101, 1, 2)], fill=False),
+     lambda r: r["history_cropped"] is False),
+    (dict(rows=[(110, 1, 0), (111, 1, 2)], first_raw=90),
+     lambda r: r["history_cropped"]),                                                # older rows before the floor
+    (dict(rows=[(110, 1, 0), (111, 1, 2)], gmin=110),
+     lambda r: r["history_cropped"]),                                                # starts with the source
+])
+def test_build_history(kwargs, check):
+    assert check(_hist(**kwargs))
+
+
+def test_build_history_empty():
+    assert J.build_history([], 100, 0, 0)["build_status"] == "no_rows_in_window"
+`````
+
+### FILE: `spark/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py`
+sha256 `9b53aa34ee505b041bfd2e508b70445d078ab90ce7a3f49c616df58e766ddf64` · 192 lines · trailing newline: yes
+
+`````python
+"""Spark tests for the crx_persona deterioration nodes — synthetic data, no catalog, no PROD.
+
+Workplace location: src/tests/nodes/crx_persona/test_dpd_journey_spark_nodes.py.
+Run: python -m pytest src/tests/nodes/crx_persona   (needs Java + pyspark >= 3.3)
+
+Builds raw tables the way the sources look (CC billing with add_info, RL monthly loan
+master) with their known noise — same-day duplicates, unparseable add_info, billing-cycle
+shifts, months missing between equal neighbours, unresolvable gaps, history before the CC
+floor, double spine keys — runs the node functions end to end, and checks every account
+against the per-account engine (itself covered by test_dpd_journey.py).
+"""
+from __future__ import annotations
+
+import datetime as dt
+import random
+
+import pytest
+from pyspark.sql import functions as F
+
+from enbd_collections.pipelines.crx_persona import _dpd_journey as J
+from enbd_collections.pipelines.crx_persona.cc_a4_deterioration.nodes import (
+    build_cc_a4_deterioration, build_cc_dpd_sequences)
+from enbd_collections.pipelines.crx_persona.cc_full_history.nodes import build_cc_full_history
+from enbd_collections.pipelines.crx_persona.rl_a4_deterioration.nodes import (
+    build_rl_a4_deterioration, build_rl_dpd_sequences)
+from enbd_collections.pipelines.crx_persona.rl_full_history.nodes import build_rl_full_history
+
+SNAP = dt.date(2026, 8, 31)
+SNAP_IDX = SNAP.year * 12 + SNAP.month - 1
+FLOOR_IDX = 2024 * 12                      # 2024-01, the CC history floor default
+N = 600
+
+
+def _journey(rng: random.Random) -> list[int]:
+    """One CC journey, oldest -> newest, ending in the 60-180 or 180+ segment."""
+    b = [0] * rng.randint(0, 60)
+    if rng.random() < 0.25:                                    # an earlier cured spell
+        b += [2, 3][: rng.randint(1, 2)] + [0] * rng.randint(1, 20)
+    level = 2
+    b.append(level)
+    target = rng.choice([4, 5, 6, 7, 7, 9])
+    while level < target:
+        u = rng.random()
+        if u < 0.7:
+            level += 1                                         # roll
+        elif u < 0.9 or level < 4:
+            pass                                               # hold
+        else:
+            level -= 1                                         # pay two months
+        b.append(level)
+    for _ in range(rng.randint(0, 14)):                        # life in the segment
+        u = rng.random()
+        if target == 9 or u < 0.5:
+            pass
+        elif u < 0.8 and level < 7:
+            level += 1
+        elif level > 4:
+            level -= 1
+        b.append(level)
+    if rng.random() < 0.05:
+        b = [rng.choice([4, 5, 9])] * rng.randint(3, 10)       # history starts delinquent
+    return b
+
+
+def _month(idx: int, day: int) -> dt.datetime:
+    y, m = divmod(idx, 12)
+    return dt.datetime(y, m + 1, day)
+
+
+@pytest.fixture(scope="module")
+def journeys():
+    rng = random.Random(11)
+    return [_journey(rng) for _ in range(N)]
+
+
+def _cc_raw(journeys):
+    """raw_stg_billing rows and the expected (kept history, cropped) per account."""
+    rng = random.Random(5)
+    rows, expected = [], {}
+    for k, b in enumerate(journeys):
+        acc = 900_000_000 + k
+        start = SNAP_IDX - len(b) + 1
+        months = {start + t: v for t, v in enumerate(b)}
+        bills = [(m, 15, v) for m, v in months.items()]
+        first_kept = max(start, FLOOR_IDX)
+        interior = [m for m in months if first_kept + 1 < m < SNAP_IDX - 4]
+        u = rng.random()
+        if u < 0.10 and len(interior) > 2:                     # billing-cycle shift
+            m = rng.choice(interior)
+            bills = [x for x in bills if x[0] != m] + [(m + 1, 1, months[m])]
+        elif u < 0.20 and len(interior) > 2:                   # gap between equal neighbours
+            cand = [m for m in interior if months[m - 1] == months[m] == months[m + 1]]
+            if cand:
+                bills = [x for x in bills if x[0] != rng.choice(cand)]
+        elif u < 0.25 and len(interior) > 6:                   # unresolvable 3-month gap
+            m = interior[len(interior) // 2 - 3]
+            cl, cr = max(months[m - 1], 1), max(months[m + 3], 1)
+            if cl != cr and cr - cl != 4:
+                bills = [x for x in bills if not m <= x[0] <= m + 2]
+                first_kept = max(first_kept, m + 3)
+        for m, day, v in bills:
+            rows.append((float(acc), _month(m, day), f"A=1;BS_PMT_CYCLE_DUE={v};B=2"))
+            if rng.random() < 0.03:
+                rows.append((float(acc), _month(m, day), f"A=1;BS_PMT_CYCLE_DUE={v};B=2"))
+            if rng.random() < 0.03:
+                rows.append((float(acc), _month(m, day), "A=1;NO_BUCKET"))
+        kept = [months[m] for m in range(first_kept, SNAP_IDX + 1)]
+        expected[acc] = (kept, first_kept > start)
+    return rows, expected
+
+
+@pytest.fixture(scope="module")
+def cc(spark, journeys):
+    rows, expected = _cc_raw(journeys)
+    raw = spark.createDataFrame(rows, "contract_idt double, billing_date timestamp, add_info string")
+    spine = spark.createDataFrame([(float(a),) for a in expected], "contract_id double")
+    spells = spark.createDataFrame(
+        [(a, "restructured_entry" if a % 37 == 0 else "none") for a in expected],
+        "account_id long, censored_subtype string")
+    return raw, spine, spells, expected
+
+
+@pytest.mark.parametrize("segment", ["60_180", "180_plus"])
+def test_cc_end_to_end(cc, segment):
+    raw, spine, spells, expected = cc
+    params = {"persona_end_date": str(SNAP), "dpd_journey": {"segment": segment}}
+    seq = build_cc_dpd_sequences(build_cc_full_history(raw, spine), spells, params)
+    got = {r.account_id: r for r in build_cc_a4_deterioration(seq, params).collect()}
+    want = {a: J.classify(k, c, 0, 9, segment, "B_balanced_6")
+            for a, (k, c) in expected.items() if max(k[-1], 1) in J.SEGMENTS[segment]}
+    assert set(got) == set(want), "every account in the segment is classified, no others"
+    for a, w in want.items():
+        assert got[a].det_state == w["det_state"], (a, expected[a])
+        assert got[a].history_cropped == expected[a][1], a
+        assert got[a].det_state_label == J.DISPLAY_NAMES[w["det_state"]]
+    statuses = {r.build_status for r in seq.select("build_status").distinct().collect()}
+    assert statuses == {"ok"}, "no account dropped"
+
+
+def test_cc_audit_columns(cc):
+    raw, spine, spells, _ = cc
+    params = {"persona_end_date": str(SNAP)}
+    seq = build_cc_dpd_sequences(build_cc_full_history(raw, spine), spells, params)
+    r = seq.agg(*[F.sum(c).alias(c) for c in ("n_cycle_shift_moves", "n_gap_months_filled",
+                                              "n_months_truncated", "restructure_blind_spot_flag")],
+                F.sum(F.col("legacy_drop").cast("int")).alias("legacy_drop")).first()
+    assert r.n_cycle_shift_moves > 0 and r.n_gap_months_filled > 0 and r.n_months_truncated > 0
+    assert r.legacy_drop > 0, "the old rule would have dropped some of these accounts"
+    assert r.restructure_blind_spot_flag == len([a for a in cc[3] if a % 37 == 0])
+
+
+def test_cc_full_history_dedupe_and_bad_rows(spark):
+    raw = spark.createDataFrame([
+        (1.0, dt.datetime(2025, 1, 15), "BS_PMT_CYCLE_DUE=3"),
+        (1.0, dt.datetime(2025, 1, 15), "BS_PMT_CYCLE_DUE=4"),     # same date: worst wins
+        (1.0, dt.datetime(2025, 2, 15), "NO_BUCKET"),               # unparseable: NULL, no error
+        (2.0, dt.datetime(2025, 1, 15), "BS_PMT_CYCLE_DUE=2"),      # not in the spine
+    ], "contract_idt double, billing_date timestamp, add_info string")
+    spine = spark.createDataFrame([(1.0,)], "contract_id double")
+    out = {(r.billing_date.month, r.dlq_bucket) for r in build_cc_full_history(raw, spine).collect()}
+    assert out == {(1, 4), (2, None)}
+
+
+@pytest.mark.parametrize("segment", ["60_180", "180_plus"])
+def test_rl_end_to_end(spark, journeys, segment):
+    rows, want = [], {}
+    rl = {f"L{k:07d}": [min(max(x, 1), 8) - 1 for x in b] for k, b in enumerate(journeys)}
+    global_min = min(SNAP_IDX - len(b) + 1 for b in rl.values())
+    for acc, b in rl.items():
+        start = SNAP_IDX - len(b) + 1
+        rows += [(acc, _month(start + t, 28).date(), v, 1.0, 100.0, 0, "PL") for t, v in enumerate(b)]
+        if max(b[-1] + 1, 1) in J.SEGMENTS[segment]:
+            want[acc] = J.classify(b, start <= global_min, 1, 8, segment, "B_balanced_6")["det_state"]
+    master = spark.createDataFrame(rows, "account_id string, observation_date date, dpd_bucket int, "
+                                         "emi_coverage_ratio double, outstanding_balance double, "
+                                         "is_restructured int, loan_type string")
+    spine = spark.createDataFrame([(a,) for a in rl], "account_id string")
+    params = {"persona_end_date": str(SNAP), "dpd_journey": {"segment": segment}}
+    seq = build_rl_dpd_sequences(build_rl_full_history(spine, master, params), params)
+    got = {r.account_id: r for r in build_rl_a4_deterioration(seq, params).collect()}
+    assert {a: r.det_state for a, r in got.items()} == want
+    allowed = set(J.RL.native_buckets(J.SEGMENTS[segment]))
+    assert {r.current_bucket for r in got.values()} <= allowed
+
+
+def test_rl_double_spine_key_matches_string_master(spark):
+    master = spark.createDataFrame(
+        [(str(123456789 + k), dt.date(2026, 8, 31), 3, 1.0, 1.0, 0, "PL") for k in range(20)],
+        "account_id string, observation_date date, dpd_bucket int, emi_coverage_ratio double, "
+        "outstanding_balance double, is_restructured int, loan_type string")
+    spine = spark.createDataFrame([(float(123456789 + k),) for k in range(20)], "account_id double")
+    assert build_rl_full_history(spine, master).select("account_id").distinct().count() == 20
+`````
+
+### FILE: `spark/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py`
+sha256 `e8fbb8cf167cde3166b15e3ac35b17e30a22f87fc72a95238cb990ebafe8c724` · 59 lines · trailing newline: yes
+
+`````python
+"""Wiring of the CC / RL deterioration pipelines — no Spark, no data.
+
+Workplace location: src/tests/pipelines/crx_persona/test_a4_deterioration_pipelines.py.
+Run: python -m pytest src/tests/pipelines/crx_persona
+"""
+import pytest
+
+from enbd_collections.pipelines.crx_persona import _dpd_journey as J
+from enbd_collections.pipelines.crx_persona.cc_a4_deterioration import nodes as cc_nodes
+from enbd_collections.pipelines.crx_persona.cc_a4_deterioration.pipeline import (
+    create_pipeline as create_cc_pipeline)
+from enbd_collections.pipelines.crx_persona.rl_a4_deterioration import nodes as rl_nodes
+from enbd_collections.pipelines.crx_persona.rl_a4_deterioration.pipeline import (
+    create_pipeline as create_rl_pipeline)
+
+EXPECTED = {
+    "cc": (create_cc_pipeline, [
+        ("build_crx_cc_dpd_sequences", cc_nodes.build_cc_dpd_sequences,
+         ["crx_cc_full_history", "crx_cc_spell_table", "params:crx_persona"], ["crx_cc_dpd_sequences"]),
+        ("build_crx_cc_a4_deterioration", cc_nodes.build_cc_a4_deterioration,
+         ["crx_cc_dpd_sequences", "params:crx_persona"], ["crx_cc_a4_deterioration"]),
+    ]),
+    "rl": (create_rl_pipeline, [
+        ("build_crx_rl_dpd_sequences", rl_nodes.build_rl_dpd_sequences,
+         ["crx_rl_full_history", "params:crx_persona"], ["crx_rl_dpd_sequences"]),
+        ("build_crx_rl_a4_deterioration", rl_nodes.build_rl_a4_deterioration,
+         ["crx_rl_dpd_sequences", "params:crx_persona"], ["crx_rl_a4_deterioration"]),
+    ]),
+}
+
+
+@pytest.mark.parametrize("product", sorted(EXPECTED))
+def test_pipeline_wiring(product):
+    create, spec = EXPECTED[product]
+    pipe = create()
+    by_name = {n.name.split(".")[-1]: n for n in pipe.nodes}     # namespaced names end in the node name
+    assert set(by_name) == {name for name, *_ in spec}
+    for name, func, inputs, outputs in spec:
+        n = by_name[name]
+        assert n.func is func
+        assert n.inputs == inputs
+        assert n.outputs == outputs
+        assert {"crx", product, "crx_persona"} <= set(n.tags)
+
+
+@pytest.mark.parametrize("product", sorted(EXPECTED))
+def test_sequences_run_before_classification(product):
+    pipe = EXPECTED[product][0]()
+    order = [n.name.split(".")[-1] for n in pipe.nodes]          # Kedro returns topological order
+    assert order.index(f"build_crx_{product}_dpd_sequences") < order.index(f"build_crx_{product}_a4_deterioration")
+
+
+def test_params_defaults_are_valid():
+    """The params the nodes read: defaults resolve, and a bad value fails loudly."""
+    p = J.journey_params({"persona_end_date": "2026-08-31"}, J.CC)
+    assert p.floor_date == "2024-01-01" and p.segment == "60_180" and p.det_option == "B_balanced_6"
+    assert J.journey_params({"persona_end_date": "2026-08-31"}, J.RL).floor_date is None
+    with pytest.raises(ValueError):
+        J.journey_params({"persona_end_date": "2026-08-31", "dpd_journey": {"segment": "90_plus"}}, J.CC)
 `````
 
 ### FILE: `spark/prod_check.py`
