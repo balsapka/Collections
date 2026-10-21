@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,330 lines.
+Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,326 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `04a9351b09da6dc26d9c80f86c0ca0df4eb030d61bfd418ba81834069821f0bc` · 660 lines · trailing newline: yes
+sha256 `0b8f85e96aab8cbc9396aff838af0126f21e7bab9065fcea367bcbe61cb3a19c` · 656 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7380,14 +7380,10 @@ EXAMPLES = [   # (CC buckets oldest -> newest, history cropped by the window, ex
      "Reached 61–90 DPD, caught up, fell back 8 months later."),
     ([0] * 14 + [2, 3, 4, 5], False, "straight_roller_seasoned",
      "14 clean months, then missed every payment."),
-    ([0, 0, 0, 2, 3, 4], True, "straight_roller_seasoned",
-     f"History starts before {CC_WINDOW}: older than a year."),
     ([0] * 6 + [2, 3, 4, 5], False, "straight_roller_early_life",
      "6 clean months, then a straight roll."),
     ([0] * 10 + [2, 2, 3, 3, 4, 5], False, "slow_roller",
      "Paid one month at 1–30 and at 31–60 DPD, still rolled."),
-    ([0] * 12 + [2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8], False, "straight_roller_seasoned",
-     "Holding at 181–210 DPD is not Stabilized (61–180 DPD only)."),
     ([6, 6, 7, 7, 8, 9], True, "unknown",
      "Already 121–150 DPD in the oldest month we hold."),
 ]
