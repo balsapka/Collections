@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `9c7d279fbac1bde83ba166c7c0f9caff389b89ca4a73e6e91ed679221cbb93ee` · 652 lines · trailing newline: yes
+sha256 `bffc70082e06853d14e6f117e3fb1612b2b574cd1c229675a8ea1feb61767041` · 652 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7341,7 +7341,7 @@ STEPS = [   # (step, question, state on yes, exact test)
      "An earlier delinquency reached 31+ DPD, was cured, and ended at most "
      f"{R['repeat_window_months']} months before this one began."),
     ("4", "Straight roller?", "straight_roller_seasoned",
-     "1–30 → 31–60 → 61–90 DPD in three consecutive months (no payment). Seasoned if "
+     "0 → 1–30 → 31–60 → 61–90 DPD, one step a month (no payment). Seasoned if "
      f"{R['seasoned_min_months']}+ months of history before this delinquency (or history older "
      "than the window); otherwise Early-life."),
     ("5", "Otherwise", "slow_roller",

@@ -201,7 +201,7 @@ STEPS = [   # (step, question, state on yes, exact test)
      "An earlier delinquency reached 31+ DPD, was cured, and ended at most "
      f"{R['repeat_window_months']} months before this one began."),
     ("4", "Straight roller?", "straight_roller_seasoned",
-     "1–30 → 31–60 → 61–90 DPD in three consecutive months (no payment). Seasoned if "
+     "0 → 1–30 → 31–60 → 61–90 DPD, one step a month (no payment). Seasoned if "
      f"{R['seasoned_min_months']}+ months of history before this delinquency (or history older "
      "than the window); otherwise Early-life."),
     ("5", "Otherwise", "slow_roller",
