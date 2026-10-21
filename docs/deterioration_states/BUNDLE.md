@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `c69ef0606c10d5e2df751e0a1e614adf729270315cd54ea08d91ed066c128819` · 649 lines · trailing newline: yes
+sha256 `fb0a831138c61a6e2dab2d41bf1b3e3bba6f8620e5ff231ca2974bc24798acfa` · 649 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7654,7 +7654,7 @@ def _data_handling(wb: Workbook) -> None:
         ("Longer gaps", "History starts after the gap.", "As for history before the window start."),
         ("One-month data errors (4 0 4, 0 3 0)", "Corrected to the neighbours.",
          "No false cure or false earlier delinquency."),
-        ("Billing-cycle jumps (3 3 5 for 3 4 5)", "Corrected to the roll.", "No false payment."),
+        ("Billing-cycle jumps (3 3 5 for 3 4 5), CC", "Corrected to the roll.", "No false payment."),
         ("No usable bucket in the window", "Not classified.", "Counts against coverage (target "
          "99.9%)."),
         ("Latest month older than the scoring date", "Flagged.", "Classified on the history we have."),
