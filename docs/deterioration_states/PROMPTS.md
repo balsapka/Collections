@@ -14,7 +14,7 @@ code the rewrite left in `src/`.
 **P10 fixes the state vocabulary** (after P9): one tree and the same 7 states for 60–180
 and 180+ (option B only), no stabilized at 180+, holds at the ceiling are not payments.
 **P11 rebuilds the stakeholder workbook** (after P10) from the deployed engine plus the
-PROD counts — replaces `dpd_states_review_20261016.xlsx`.
+PROD counts — replaces `dpd_states_review_20261016.xlsx` (7 business-facing sheets).
 
 ---
 
@@ -527,13 +527,12 @@ to a temp folder as in step 1, then in the Kedro session
 ## P11 — Rebuild the stakeholder workbook (after P10)
 
 What it produces: `dpd_deterioration_states_<YYYYMMDD>.xlsx`, replacing
-`dpd_states_review_20261016.xlsx`. Eight sheets: **Overview** (the 7 states, one sentence,
-action, whether they change over time) · **How states are assigned** (a visual flow of the
-6 ordered questions + the exact tests + terms) · **Worked examples** (month-by-month
-coloured journeys, each run through the production rules at build time) · **Thresholds**
-(plain names; code names in a side column) · **Buckets & segments** (CC vs RL, the
-ceiling) · **Data handling** · **Results** (counts per product × segment × state; shares
-and coverage are formulas) · **What changed**. Rules, thresholds and examples are read
+`dpd_states_review_20261016.xlsx`. Seven business-facing sheets: **Overview** (the states:
+one sentence, action, whether they change over time) · **How states are assigned** (a
+visual flow of the 6 ordered questions, the exact tests, terms) · **Worked examples** (CC
+only: month-by-month coloured journeys) · **Thresholds** (plain names, value, why) ·
+**Buckets & segments** (CC vs RL, the ceiling) · **Data handling** · **Results** (counts
+per product × segment × state; shares and coverage are formulas). Rules, thresholds and examples are read
 from the deployed engine, so the workbook cannot drift from the pipeline; the build fails
 if an example no longer gets the state it illustrates. The old "Rule tester" sheet is gone
 (it was a second copy of the rules in Excel formulas and had drifted), and so is roll rate
@@ -557,7 +556,7 @@ src/enbd_collections/pipelines/crx_persona/ are up to date with
 docs/deterioration_states/BUNDLE.md (P10 done). The stakeholder workbook
 <PATH>/dpd_states_review_20261016.xlsx is outdated. Rebuild it with the bundled generator.
 Results JSONs (aggregates from PROD): <PATH>/dpd_journey_results_60_180.json and
-<PATH>/dpd_journey_results_180_plus.json. Snapshot month: <Mon YYYY>.
+<PATH>/dpd_journey_results_180_plus.json. Scoring date: <Mon YYYY>.
 
 Hard rules:
 - No PROD data access: never call catalog.load, never run kedro run, never query a table.
@@ -588,15 +587,15 @@ python $T/spark/stakeholder/build_states_workbook.py \
     --out <PATH>/dpd_deterioration_states_<YYYYMMDD>.xlsx \
     --results <PATH>/dpd_journey_results_60_180.json \
     --results <PATH>/dpd_journey_results_180_plus.json \
-    --snapshot "<Mon YYYY>"
+    --scoring-date "<Mon YYYY>"
 If it stops with "example ... now gives ...", STOP and report it verbatim — the deployed
 engine differs from the bundle; do not edit the examples.
 If I approved items in step 2, add them ONLY as a new last sheet "Notes" (plain text,
-Arial 10), never by editing the generated sheets.
+Arial 10, short, business wording), never by editing the generated sheets.
 
 Step 4 — verify and report
 1. Sheet names: Overview, How states are assigned, Worked examples, Thresholds,
-   Buckets & segments, Data handling, Results, What changed (+ Notes if added).
+   Buckets & segments, Data handling, Results (+ Notes if added).
 2. Results: for each product x segment, the account counts in the sheet equal the JSON
    state_counts (print a small comparison table); every state present; RL/CC 180+ blocks
    filled if their JSON had them, otherwise yellow and empty (say which).
