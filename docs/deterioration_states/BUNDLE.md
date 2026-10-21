@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `ae3ba373c71f3ba6fa58a10328d70cbd105a5e4c8dd27084778ad3209de1764d` · 653 lines · trailing newline: yes
+sha256 `ecdcd5727d4a2b084ec4f6a6ff2904f02c1d5b9892df2c8f9950fc56caacf6ba` · 653 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7578,11 +7578,11 @@ def _thresholds(wb: Workbook) -> None:
          f"≤ {R['stabilized_long_run_max_rise']} bucket", "More than one bucket means still getting worse."),
         ("Stabilized", "Highest DPD", "151–180", "At 180+ a flat bucket is not evidence of payment."),
         ("Repeat delinquent", "Depth of the earlier delinquency", "31+ DPD",
-         "Matches the bank's re-default view."),
+         "A cure from 31+ DPD shows real ability to catch up."),
         ("Repeat delinquent", "Months since it ended", f"≤ {R['repeat_window_months']}",
-         "Common re-default window."),
+         "A relapse within a year points to the same underlying problem."),
         ("Seasoned vs early-life", "Months before this delinquency",
-         f"{R['seasoned_min_months']}+", "Standard first-year window."),
+         f"{R['seasoned_min_months']}+", "First-year defaults point to acquisition; later ones to a change in circumstances."),
         ("History window", "CC data used from", CC_WINDOW, "Older CC data has known quality issues."),
         ("History window", "RL data used from", RL_WINDOW, "Start of the RL window."),
         ("Missing months", "Filled if the gap is at most", f"{gap} months",
