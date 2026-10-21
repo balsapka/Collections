@@ -395,8 +395,6 @@ def _examples(wb: Workbook) -> None:
             c.border = BOX
             c.alignment = CENTER
             if k < pad:
-                c.value = "" if cropped else "·"
-                c.font = _font(color=RULE)
                 continue
             b = shown[k - pad]
             canon = max(b, 1)
@@ -412,8 +410,6 @@ def _examples(wb: Workbook) -> None:
         ws.merge_cells(start_row=r, start_column=last_col - 1, end_row=r, end_column=last_col)
         ws.row_dimensions[r].height = 28
         r += 1
-    ws.cell(row=r + 1, column=1, value="'·' = no history yet (account not open)."
-            ).font = _font(italic=True, color=GREY)
     _widths(ws, [28, 10] + [5.2] * TIMELINE + [44, 6])
     ws.freeze_panes = ws.cell(row=8, column=3)
     _print(ws)

@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,326 lines.
+Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,322 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `0b8f85e96aab8cbc9396aff838af0126f21e7bab9065fcea367bcbe61cb3a19c` · 656 lines · trailing newline: yes
+sha256 `9c7d279fbac1bde83ba166c7c0f9caff389b89ca4a73e6e91ed679221cbb93ee` · 652 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7535,8 +7535,6 @@ def _examples(wb: Workbook) -> None:
             c.border = BOX
             c.alignment = CENTER
             if k < pad:
-                c.value = "" if cropped else "·"
-                c.font = _font(color=RULE)
                 continue
             b = shown[k - pad]
             canon = max(b, 1)
@@ -7552,8 +7550,6 @@ def _examples(wb: Workbook) -> None:
         ws.merge_cells(start_row=r, start_column=last_col - 1, end_row=r, end_column=last_col)
         ws.row_dimensions[r].height = 28
         r += 1
-    ws.cell(row=r + 1, column=1, value="'·' = no history yet (account not open)."
-            ).font = _font(italic=True, color=GREY)
     _widths(ws, [28, 10] + [5.2] * TIMELINE + [44, 6])
     ws.freeze_panes = ws.cell(row=8, column=3)
     _print(ws)
