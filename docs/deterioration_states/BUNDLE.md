@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,317 lines.
+Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,316 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `975a020947baee430d5bc818d4cc2ee38126230b6038e79461548becbce7d929` · 647 lines · trailing newline: yes
+sha256 `d46825b72da553dc1548847df84a7979b98024ed85386a7f7d6de6b5e5bf7ffe` · 646 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7655,7 +7655,6 @@ def _data_handling(wb: Workbook) -> None:
         ("One-month data errors (4 0 4, 0 3 0)", "Corrected to the neighbours.",
          "No false cure or false earlier delinquency."),
         ("Billing-cycle jumps (3 3 5 for 3 4 5), CC", "Corrected to the roll.", "No false payment."),
-        ("Latest month older than the scoring date", "Flagged.", "Classified on the history we have."),
     ]
     for row in rows:
         _row(ws, r, list(row), bold_first=True, height=30)

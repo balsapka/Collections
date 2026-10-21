@@ -515,7 +515,6 @@ def _data_handling(wb: Workbook) -> None:
         ("One-month data errors (4 0 4, 0 3 0)", "Corrected to the neighbours.",
          "No false cure or false earlier delinquency."),
         ("Billing-cycle jumps (3 3 5 for 3 4 5), CC", "Corrected to the roll.", "No false payment."),
-        ("Latest month older than the scoring date", "Flagged.", "Classified on the history we have."),
     ]
     for row in rows:
         _row(ws, r, list(row), bold_first=True, height=30)
