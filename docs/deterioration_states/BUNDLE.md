@@ -31,7 +31,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+); **P11** rebuilds the stakeholder workbook.
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+); **P11** fills in the stakeholder workbook's Results sheet from a results file.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,316 lines.
+Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,296 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -213,7 +213,7 @@ docs/deterioration_states/
 ## Files
 
 ### FILE: `README.md`
-sha256 `dabd6c3fa3a1a93d53d74036f19310987551da39902751808ba9556223b4b239` · 123 lines · trailing newline: yes
+sha256 `b633d76b9fbdd5fb484c5f9147d7028f85310f5c62faeb9139c35799aef089a8` · 123 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — DPD-journey states for the bucket 4–7 credit-card spine
@@ -272,7 +272,7 @@ deterioration_states/
 │   ├── crx_persona/          drop-in: _dpd_journey.py engine + cc/rl full_history + a4_deterioration nodes
 │   ├── conf/                 parameters (dpd_journey: floor, segment, option, gap rules)
 │   ├── prod_check.py         run in PROD after the pipelines: coverage + state shares (aggregates only; save_json for the workbook)
-│   ├── stakeholder/          build_states_workbook.py: the stakeholder xlsx, rules + examples from the engine (PROMPTS P11);
+│   ├── stakeholder/          build_states_workbook.py: the stakeholder xlsx, rules + examples from the engine (Results filled via PROMPTS P11);
 │   │                         dpd_deterioration_states_reference.xlsx = reference copy, Results empty (git only, not in the bundle)
 │   └── tests/                nodes/ + pipelines/crx_persona/ (96 tests, ship to src/tests/) · test_parity.py · test_spark_e2e.py (bundle-only)
 ├── validation/               evidence from synthetic runs (committed)
@@ -945,7 +945,7 @@ in `dpd_states/selftest.py`.
 `````
 
 ### FILE: `PROMPTS.md`
-sha256 `6857ab3f9c05a2765ca828b0dfa68c368390985a7c55061bebb44bc8c60693a5` · 606 lines · trailing newline: yes
+sha256 `273a00b084f87fafb53faa51c8a933b976b3656169735001cc54258309c97113` · 586 lines · trailing newline: yes
 
 `````markdown
 # Prompts for running the deterioration states at the workplace
@@ -963,8 +963,8 @@ and removes everything unpacked from the bundle (recoverable from BUNDLE.md), pl
 code the rewrite left in `src/`.
 **P10 fixes the state vocabulary** (after P9): one tree and the same 7 states for 60–180
 and 180+ (option B only), no stabilized at 180+, holds at the ceiling are not payments.
-**P11 rebuilds the stakeholder workbook** (after P10) from the deployed engine plus the
-PROD counts — replaces `dpd_states_review_20261016.xlsx` (7 business-facing sheets).
+**P11 fills in the Results sheet** of the stakeholder workbook from a results file you
+specify (e.g. the prod_check JSON).
 
 ---
 
@@ -1474,86 +1474,66 @@ to a temp folder as in step 1, then in the Kedro session
 
 ---
 
-## P11 — Rebuild the stakeholder workbook (after P10)
+## P11 — Fill in the Results sheet of the stakeholder workbook
 
-What it produces: `dpd_deterioration_states_<YYYYMMDD>.xlsx`, replacing
-`dpd_states_review_20261016.xlsx`. Seven business-facing sheets: **Overview** (the states:
-one sentence, action, whether they change over time) · **How states are assigned** (a
-visual flow of the 6 ordered questions, the exact tests, terms) · **Worked examples** (CC
-only: month-by-month coloured journeys) · **Thresholds** (plain names, value, why) ·
-**Buckets & segments** (CC vs RL, the ceiling) · **Data handling** · **Results** (counts
-per product × segment × state; shares and coverage are formulas). Rules, thresholds and examples are read
-from the deployed engine, so the workbook cannot drift from the pipeline; the build fails
-if an example no longer gets the state it illustrates. The old "Rule tester" sheet is gone
-(it was a second copy of the rules in Excel formulas and had drifted), and so is roll rate
-(circular: measured on the months that define the state).
-
-Reference copy (layout and content, Results left empty — the real counts come from your
-PROD JSONs): `docs/deterioration_states/spark/stakeholder/dpd_deterioration_states_reference.xlsx`
-on GitHub (branch `feat/dpd-deterioration-states`). It is not inside BUNDLE.md (binary).
-
-**You, in PROD first** (after P10 is deployed), once per segment run of Node 2:
-1. Extract the bundle to a temp folder (P10 step 1), then in the Kedro session:
-   `sys.path.insert(0, "<temp>/spark"); from prod_check import report`
-2. After the 60_180 run: `report(catalog, save_json="dpd_journey_results_60_180.json")`;
-   after the 180_plus run: `report(catalog, save_json="dpd_journey_results_180_plus.json")`.
-   The JSONs hold counts only (no account ids, no DPD histories).
-3. Put both JSONs where Sonnet can read them (e.g. next to the old workbook) and paste P11.
+Before pasting: put the stakeholder workbook in the repo (the reference copy is
+`docs/deterioration_states/spark/stakeholder/dpd_deterioration_states_reference.xlsx` on
+GitHub) and have the results file ready. Replace the three `<...>` below.
 
 ```
-Context: the DPD-journey deterioration pipelines (CC + RL) in
-src/enbd_collections/pipelines/crx_persona/ are up to date with
-docs/deterioration_states/BUNDLE.md (P10 done). The stakeholder workbook
-<PATH>/dpd_states_review_20261016.xlsx is outdated. Rebuild it with the bundled generator.
-Results JSONs (aggregates from PROD): <PATH>/dpd_journey_results_60_180.json and
-<PATH>/dpd_journey_results_180_plus.json. Scoring date: <Mon YYYY>.
+Task: fill in the "Results" sheet of <WORKBOOK PATH> from <RESULTS FILE PATH>.
+Scoring date: <Mon YYYY>.
 
-Hard rules:
-- No PROD data access: never call catalog.load, never run kedro run, never query a table.
-- Extract the bundle OUTSIDE the repo (a temp folder) and delete it at the end. Do not add
-  the generator script to the repo.
-- Never hand-edit rule text, thresholds or examples in the workbook: they come from the
-  engine. Never type numbers into Results: they come from the JSONs.
-- Do not delete the old workbook; do not commit or push.
+Rules:
+- Edit ONLY the Results sheet, ONLY the input cells listed below, plus the subtitle in A2.
+  Never touch formulas, other cells, other sheets or formatting beyond what is stated.
+- Never type or compute shares or totals: they are formulas.
+- Never guess a count. If the file has no data for a block, leave that block empty.
+- No PROD data access: read only the given file. Save as a NEW file
+  <WORKBOOK NAME>_<YYYYMMDD>.xlsx next to the original; keep the original. Do not commit.
 
-Step 1 — extract and check
-1. T=$(mktemp -d); create $T/extract_bundle.py from BUNDLE.md's "Extractor" section;
-   python $T/extract_bundle.py docs/deterioration_states/BUNDLE.md $T  -> "0 mismatched".
-2. From the repo root, confirm the generator will use the DEPLOYED engine:
-   python -c "from enbd_collections.pipelines.crx_persona import _dpd_journey as J; print(J.STATES)"
-   -> the 7 states. If the import fails, STOP and tell me (do not let it fall back to the
-   bundled copy).
+Results sheet layout (find rows and columns by these labels, not by number; STOP if one
+is missing):
+- Count columns (header in row 4): "CC 61–180 DPD accounts" (B), "CC 180+ DPD accounts" (D),
+  "RL 61–180 DPD accounts" (F), "RL 180+ DPD accounts" (H). Columns C, E, G, I are
+  share formulas — never write there.
+- State rows (labels in column A): Unknown · Early payment default (EPD) · Stabilized ·
+  Repeat delinquent · Seasoned straight roller · Early-life straight roller ·
+  Slow roller (partial payer). Plus the row "In segment, not classified".
+  "Classified accounts" and "Coverage (target 99.9%)" are formulas — never write there.
 
-Step 2 — read the old workbook (report only)
-Open <PATH>/dpd_states_review_20261016.xlsx (openpyxl or markitdown) and list anything it
-holds that the new workbook does not cover — e.g. stakeholder names, owner decisions,
-comments, extra notes. Do NOT carry over: the 'Rule tester' sheet, roll rates, 'Not
-classified — history starts delinquent', option A/C states, or the 16-Oct shares (they
-predate the Unknown / 180+ rules). STOP — show me the list and wait.
+Mapping from the file:
+- State codes: unknown -> Unknown; early_payment_default -> Early payment default (EPD);
+  stabilized -> Stabilized; repeat_delinquent -> Repeat delinquent;
+  straight_roller_seasoned -> Seasoned straight roller; straight_roller_early_life ->
+  Early-life straight roller; slow_roller -> Slow roller (partial payer).
+- Blocks: product cc / rl; segment 60_180 -> "61–180 DPD", 180_plus -> "180+ DPD".
+- If the file is the JSON from prod_check: products.<cc|rl>.segments.<60_180|180_plus>
+  .state_counts (a state missing there = 0) and .in_segment_not_classified.
+  Several JSON files (one per segment run) are fine: merge them; the same block in two
+  files is an error — STOP.
+- Any other format: show me how you read it and STOP before writing.
 
-Step 3 — build
-From the repo root:
-python $T/spark/stakeholder/build_states_workbook.py \
-    --out <PATH>/dpd_deterioration_states_<YYYYMMDD>.xlsx \
-    --results <PATH>/dpd_journey_results_60_180.json \
-    --results <PATH>/dpd_journey_results_180_plus.json \
-    --scoring-date "<Mon YYYY>"
-If it stops with "example ... now gives ...", STOP and report it verbatim — the deployed
-engine differs from the bundle; do not edit the examples.
-If I approved items in step 2, add them ONLY as a new last sheet "Notes" (plain text,
-Arial 10, short, business wording), never by editing the generated sheets.
+Step 1 — read (report only): print a table product | segment | state | count, the total
+per block, and which blocks have no data. STOP for my OK.
 
-Step 4 — verify and report
-1. Sheet names: Overview, How states are assigned, Worked examples, Thresholds,
-   Buckets & segments, Data handling, Results (+ Notes if added).
-2. Results: for each product x segment, the account counts in the sheet equal the JSON
-   state_counts (print a small comparison table); every state present; RL/CC 180+ blocks
-   filled if their JSON had them, otherwise yellow and empty (say which).
-3. If LibreOffice is available: recalculate (soffice --headless --convert-to xlsx) and
-   confirm no #DIV/0!, #REF!, #NAME?. Otherwise say that Excel computes the shares on open.
-4. Delete $T. Report the output path, and git status --short (the xlsx may be untracked).
+Step 2 — write (after my OK):
+- Write each count as an integer into its cell; keep the blue font; remove the yellow
+  fill from every cell you fill.
+- Set A2 to: "Accounts per state, scoring date <Mon YYYY>. Blue = counts from the scoring
+  run; shares and coverage are calculated." Add " Yellow = to fill in." only if a block is
+  still empty.
+- Set wb.calculation.fullCalcOnLoad = True (Excel recalculates on open). Save the new file.
+
+Step 3 — verify and report:
+- Reopen the new file: every written cell equals the file; each block's sum equals the
+  file's total.
+- Every formula on the Results sheet is identical to the original file.
+- Stabilized in the two 180+ blocks should be 0 (by design). If not, report it — do not
+  change it.
+- If LibreOffice is available, recalculate a COPY and confirm no #DIV/0!, #REF!, #NAME?.
+- Report the new file's path.
 ```
-
 `````
 
 ### FILE: `dpd_states/__init__.py`
@@ -4193,7 +4173,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `dpd_states/bundle.py`
-sha256 `e53b3ecdfb16870b036b9b2e3365b285a77124881ebc61c8a0148abc67fdbeb3` · 274 lines · trailing newline: yes
+sha256 `aef4ade71eece69b0c52b9ef7e71ea6ba30979091058d14b32cf56dc4e768ef3` · 274 lines · trailing newline: yes
 
 ``````python
 """Build BUNDLE.md: every source file of docs/deterioration_states in one markdown file,
@@ -4387,7 +4367,7 @@ python docs/deterioration_states/spark/tests/test_spark_e2e.py   # -> "SPARK E2E
 code (F1–F12), the rewrite design, the coverage plan (99.9%) and the shipping steps (§5).
 Roles: the workplace assistant has **no PROD data access** — it edits code and runs the
 offline tests only (S1–S4, never `catalog.load`). The user runs the pipelines in PROD and
-then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+); **P11** rebuilds the stakeholder workbook.
+then `spark/prod_check.py` (P1–P2), which prints aggregates only. The copy-paste prompt for the assistant is **PROMPTS.md P8**; **P9** adds the tests to `src/tests/` and cleans up afterwards; **P10** moves the repo to one state vocabulary for both segments (no stabilized at 180+); **P11** fills in the stakeholder workbook's Results sheet from a results file.
 
 Step 1 needs `extract_bundle.py` — create it from the **Extractor** section below the first
 time. Step 4 prints the checks between `=== DPD_STATES OUTPUT START ===` and `END` and writes
