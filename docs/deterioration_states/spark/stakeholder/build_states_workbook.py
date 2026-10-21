@@ -425,12 +425,13 @@ def _thresholds(wb: Workbook) -> None:
     rows = [
         ("Early payment default", "Months before first falling behind",
          f"≤ {R['epd_max_history']}", "Someone who never pays misses the 1st or 2nd bill."),
-        ("Early payment default", "Short paid-off slips allowed",
-         str(R["epd_max_blips"]), "One brief slip doesn't show good behaviour."),
-        ("Straight roller", "Months from first miss to 61–90 DPD",
-         str(R["straight_max_runup"]), "Three misses in a row: nothing paid on the way."),
+        ("Early payment default", "Earlier short slips allowed (1–2 months, paid off)",
+         str(R["epd_max_blips"]), "One quickly repaid late payment does not rule out EPD."),
+        ("Straight roller", "Delinquent months to reach 61–90 DPD (1–30, 31–60, 61–90)",
+         str(R["straight_max_runup"]), "One bucket a month: nothing paid on the way."),
         ("Stabilized", "Last 6 months within one bucket of today's",
-         f"{R['stabilized_min_in_band']} of 6", "The bank's existing rule."),
+         f"{R['stabilized_min_in_band']} of 6",
+         "Staying near the same bucket means about one month's due is paid each month."),
         ("Stabilized (long-term)", "Months since reaching 61+ DPD",
          f"{R['stabilized_long_run_months']}+", "Gives uneven payers time before a plateau counts."),
         ("Stabilized (long-term)", "Rise vs 6 months ago",
@@ -515,7 +516,7 @@ def _data_handling(wb: Workbook) -> None:
         (f"Other gaps of up to {gap} months", "Filled: last bucket carried, rising as late as "
          "possible.", "Can read as a payment."),
         ("Longer gaps", "History starts after the gap.", "As for history before the window start."),
-        ("One-month blips (4 0 4, 0 3 0)", "Corrected to the neighbours.",
+        ("One-month data errors (4 0 4, 0 3 0)", "Corrected to the neighbours.",
          "No false cure or false earlier delinquency."),
         ("Billing-cycle jumps (3 3 5 for 3 4 5)", "Corrected to the roll.", "No false payment."),
         ("No usable bucket in the window", "Not classified.", "Counts against coverage (target "

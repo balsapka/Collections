@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,322 lines.
+Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,323 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `bffc70082e06853d14e6f117e3fb1612b2b574cd1c229675a8ea1feb61767041` · 652 lines · trailing newline: yes
+sha256 `ae3ba373c71f3ba6fa58a10328d70cbd105a5e4c8dd27084778ad3209de1764d` · 653 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7565,12 +7565,13 @@ def _thresholds(wb: Workbook) -> None:
     rows = [
         ("Early payment default", "Months before first falling behind",
          f"≤ {R['epd_max_history']}", "Someone who never pays misses the 1st or 2nd bill."),
-        ("Early payment default", "Short paid-off slips allowed",
-         str(R["epd_max_blips"]), "One brief slip doesn't show good behaviour."),
-        ("Straight roller", "Months from first miss to 61–90 DPD",
-         str(R["straight_max_runup"]), "Three misses in a row: nothing paid on the way."),
+        ("Early payment default", "Earlier short slips allowed (1–2 months, paid off)",
+         str(R["epd_max_blips"]), "One quickly repaid late payment does not rule out EPD."),
+        ("Straight roller", "Delinquent months to reach 61–90 DPD (1–30, 31–60, 61–90)",
+         str(R["straight_max_runup"]), "One bucket a month: nothing paid on the way."),
         ("Stabilized", "Last 6 months within one bucket of today's",
-         f"{R['stabilized_min_in_band']} of 6", "The bank's existing rule."),
+         f"{R['stabilized_min_in_band']} of 6",
+         "Staying near the same bucket means about one month's due is paid each month."),
         ("Stabilized (long-term)", "Months since reaching 61+ DPD",
          f"{R['stabilized_long_run_months']}+", "Gives uneven payers time before a plateau counts."),
         ("Stabilized (long-term)", "Rise vs 6 months ago",
@@ -7655,7 +7656,7 @@ def _data_handling(wb: Workbook) -> None:
         (f"Other gaps of up to {gap} months", "Filled: last bucket carried, rising as late as "
          "possible.", "Can read as a payment."),
         ("Longer gaps", "History starts after the gap.", "As for history before the window start."),
-        ("One-month blips (4 0 4, 0 3 0)", "Corrected to the neighbours.",
+        ("One-month data errors (4 0 4, 0 3 0)", "Corrected to the neighbours.",
          "No false cure or false earlier delinquency."),
         ("Billing-cycle jumps (3 3 5 for 3 4 5)", "Corrected to the roll.", "No false payment."),
         ("No usable bucket in the window", "Not classified.", "Counts against coverage (target "
