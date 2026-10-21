@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,323 lines.
+Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,319 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -7135,7 +7135,7 @@ def report(catalog, products=("cc", "rl"), save_json: str | None = None) -> str:
 `````
 
 ### FILE: `spark/stakeholder/build_states_workbook.py`
-sha256 `ecdcd5727d4a2b084ec4f6a6ff2904f02c1d5b9892df2c8f9950fc56caacf6ba` · 653 lines · trailing newline: yes
+sha256 `c69ef0606c10d5e2df751e0a1e614adf729270315cd54ea08d91ed066c128819` · 649 lines · trailing newline: yes
 
 `````python
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
@@ -7647,10 +7647,6 @@ def _data_handling(wb: Workbook) -> None:
          "Never EPD; a straight roller counts as seasoned."),
         ("History starts already overdue", "Start of the delinquency is missing.",
          "Unknown, unless Stabilized."),
-        ("RL loan 1–30 DPD in its first month", "Normal: its first payment is due that month.",
-         "Classified as usual."),
-        ("Two bills in one month, none in the next (CC)", "One bill moved to the empty month.",
-         "None."),
         ("Missing month between two equal buckets", "Filled with that bucket.", "None."),
         ("Missing month where only a straight roll fits", "Filled as the roll.", "None."),
         (f"Other gaps of up to {gap} months", "Filled: last bucket carried, rising as late as "

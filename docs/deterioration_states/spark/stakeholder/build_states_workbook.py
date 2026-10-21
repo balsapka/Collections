@@ -507,10 +507,6 @@ def _data_handling(wb: Workbook) -> None:
          "Never EPD; a straight roller counts as seasoned."),
         ("History starts already overdue", "Start of the delinquency is missing.",
          "Unknown, unless Stabilized."),
-        ("RL loan 1–30 DPD in its first month", "Normal: its first payment is due that month.",
-         "Classified as usual."),
-        ("Two bills in one month, none in the next (CC)", "One bill moved to the empty month.",
-         "None."),
         ("Missing month between two equal buckets", "Filled with that bucket.", "None."),
         ("Missing month where only a straight roll fits", "Filled as the roll.", "None."),
         (f"Other gaps of up to {gap} months", "Filled: last bucket carried, rising as late as "
