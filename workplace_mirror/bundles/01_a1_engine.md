@@ -1,6 +1,6 @@
 # Mirror bundle 01 — Shared helpers, observation base and A1 engine (CC)
 
-apply_bundle version: 5 · built 2026-10-23 from `0c45e6e..c5811fd` · source: 7 added, 6 replaced, 0 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-23 from `0c45e6e..a75c9b2` · source: 7 added, 6 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -2163,7 +2163,7 @@ def register_pipelines() -> dict[str, Pipeline]:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
-action: add · new sha256 `69266100d0a55b19bcd5cacce6e406bd06e056c3db65e40b54c5aec9759813a1` · new trailing newline: yes
+action: add · new sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · new trailing newline: yes
 
 New:
 
@@ -2191,7 +2191,6 @@ from typing import Sequence
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
-from enbd_collections.pipelines.crx_persona._spine_utils import _build_cif_bridge
 
 LOG = logging.getLogger(__name__)
 
@@ -2320,30 +2319,24 @@ def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
 # ── Observation base ──────────────────────────────────────────────────────────
 
 
-def build_cc_obs_base(
-    cc_spine: DataFrame, contract: DataFrame, client: DataFrame
-) -> DataFrame:
-    """Every CC spine row with its ``cif_id`` (NULL if the contract has no client).
+def _obs_base(spine: DataFrame, id_col: str) -> DataFrame:
+    """Every spine row with the ``cif_id`` the spine already carries.
 
     Rows without a CIF are kept: customer-level signals are simply absent for them.
     """
-    spine = cc_spine.select(
-        F.col("contract_id").cast("string").alias("account_id"),
-        F.col("observation_date").cast("date"),
-    ).dropDuplicates(list(GRAIN))
-    bridge = _build_cif_bridge(contract, client).select(
-        F.col("contract_id").cast("string").alias("account_id"), "cif_id"
-    )
-    return spine.join(bridge, on="account_id", how="left")
-
-
-def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
-    """Every RL spine row with the ``cif_id`` the spine already carries."""
-    return rl_spine.select(
-        F.col("account_id").cast("string"),
+    return spine.select(
+        F.col(id_col).cast("string").alias("account_id"),
         F.col("observation_date").cast("date"),
         "cif_id",
     ).dropDuplicates(list(GRAIN))
+
+
+def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
+    return _obs_base(cc_spine, "contract_id")
+
+
+def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
+    return _obs_base(rl_spine, "account_id")
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/__init__.py`
@@ -4249,7 +4242,7 @@ __all__ = ["create_cc_pipeline", "create_rl_pipeline"]
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/obs_base/pipeline.py`
-action: add · new sha256 `d1b957c04ba57fea55b0e37a00af27c1bcf48f8ffb260500bb05c472e4541fdc` · new trailing newline: yes
+action: add · new sha256 `c924e25529b82e01dc2b85ddc07f2c7255c1b281b61281ac3dedd213a0e2ec4c` · new trailing newline: yes
 
 New:
 
@@ -4270,7 +4263,7 @@ def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
         [
             node(
                 func=build_cc_obs_base,
-                inputs=["cc_spine", "prm_contract", "prm_client"],
+                inputs="cc_spine",
                 outputs="crx_cc_obs_base",
                 name="build_crx_cc_obs_base",
             )
