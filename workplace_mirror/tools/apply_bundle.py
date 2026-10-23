@@ -32,7 +32,7 @@ import re
 import subprocess
 import sys
 
-APPLY_VERSION = 1
+APPLY_VERSION = 2
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
@@ -245,6 +245,18 @@ def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
     return failures
 
 
+def _prune_empty_dirs(folder: pathlib.Path) -> None:
+    """Remove folders left with nothing but bytecode caches after a delete."""
+    import shutil
+
+    while folder != pathlib.Path(".") and folder.is_dir():
+        rest = [p for p in folder.iterdir() if p.name != "__pycache__"]
+        if rest:
+            return
+        shutil.rmtree(folder)
+        folder = folder.parent
+
+
 # ── Commands ─────────────────────────────────────────────────────────────────
 
 
@@ -283,6 +295,7 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
         path = pathlib.Path(e["path"])
         if e["action"] == "delete":
             path.unlink()
+            _prune_empty_dirs(path.parent)
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(e["new"].encode("utf-8"))

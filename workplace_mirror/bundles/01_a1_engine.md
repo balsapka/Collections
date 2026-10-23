@@ -1,10 +1,10 @@
 # Mirror bundle 01 — Shared helpers, observation base and A1 engine (CC)
 
-apply_bundle version: 1 · built 2026-10-23 from `0c45e6e..09039d7` · 7 added, 6 replaced, 0 deleted
+apply_bundle version: 2 · built 2026-10-23 from `0c45e6e..2824a8d` · 7 added, 6 replaced, 0 deleted
 
 **What this bundle does.** Adds the shared helpers every persona axis will use
 (`crx_persona/_common.py`), a per-product observation base (`obs_base/`: datasets
-`crx_cc_obs_base`, `crx_rl_obs_base`) and the A1 ability engine (`crx_persona/_a1/`), which
+`crx_cc_obs_base`, `crx_rl_obs_base`) and the A1 ability engine (`crx_persona/a1_ability/`), which
 implements the GRR workbook `A1_ability_20261022` (spec: `specs/A1_ability_spec.md` in the
 mirror repo). The CC A1 axis (`cc_a1_ability_v2`) becomes a thin wrapper on the engine.
 CC A1 v1, RL A1 and every other axis are untouched.
@@ -28,7 +28,7 @@ CC A1 v1, RL A1 and every other axis are untouched.
   Required: `wm_fea_salary_days_since_increment.ft_days_since_salary_transaction`,
   `wm_fea_casa_eod_avg_balance.ft_avg_casa_eod_balance_in_last_0_3_weeks_avg`.
 
-**TODOs for the workplace assistant** (search `TODO(sonnet)` in `_a1/signals.py`):
+**TODOs for the workplace assistant** (search `TODO(sonnet)` in `a1_ability/signals.py`):
 1. Internal cheque bounces / DDS returns: find the source (CASA transaction codes or
    narrations in `comp_financial_tran_repos_dly`, a DDS mandate table), build
    `(cif_id, event_date)` across all of the customer's accounts, and pass it as
@@ -73,10 +73,10 @@ Undo before committing: `python docs/mirror_bundles/apply_bundle.py docs/mirror_
 | replace | `conf/base/parameters/parameters_crx_persona.yml` |
 | add | `docs/context/snippets/b01_a1_engine_check.py` |
 | replace | `src/enbd_collections/pipeline_registry.py` |
-| add | `src/enbd_collections/pipelines/crx_persona/_a1/__init__.py` |
-| add | `src/enbd_collections/pipelines/crx_persona/_a1/classify.py` |
-| add | `src/enbd_collections/pipelines/crx_persona/_a1/signals.py` |
 | add | `src/enbd_collections/pipelines/crx_persona/_common.py` |
+| add | `src/enbd_collections/pipelines/crx_persona/a1_ability/__init__.py` |
+| add | `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py` |
+| add | `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/__init__.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py` |
@@ -2168,7 +2168,191 @@ def register_pipelines() -> dict[str, Pipeline]:
     }
 `````
 
-### FILE: `src/enbd_collections/pipelines/crx_persona/_a1/__init__.py`
+### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
+action: add · new sha256 `69266100d0a55b19bcd5cacce6e406bd06e056c3db65e40b54c5aec9759813a1` · new trailing newline: yes
+
+New:
+
+`````python
+"""Shared building blocks for the crx_persona axes.
+
+Every axis works at the observation grain ``(account_id, observation_date)`` and looks
+up customer-level sources by ``cif_id``. The helpers here encode the conventions once:
+
+* missing source columns stop the run (``require_columns``);
+* point-in-time lookups read strictly before the observation date and can be bounded in
+  age (``pit_latest``), window aggregates read ``[start, observation_date)``
+  (``window_agg``);
+* source partition floors follow from the earliest observation date
+  (``lookback_floor``);
+* logging is opt-in and costs one job (``log_distribution``).
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import date, timedelta
+from typing import Sequence
+
+from pyspark.sql import Column, DataFrame, Window
+from pyspark.sql import functions as F
+
+from enbd_collections.pipelines.crx_persona._spine_utils import _build_cif_bridge
+
+LOG = logging.getLogger(__name__)
+
+GRAIN = ("account_id", "observation_date")
+
+
+def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
+    """Raise if ``df`` lacks any of ``columns`` — a renamed source must fail the run."""
+    missing = [c for c in columns if c not in df.columns]
+    if missing:
+        raise ValueError(f"{source} is missing required columns {missing}")
+
+
+def parse_yyyymmdd(col: str) -> Column:
+    """``20260531`` (int or string) -> date."""
+    return F.to_date(F.col(col).cast("string"), "yyyyMMdd")
+
+
+def _days_before(anchor: Column, days: int) -> Column:
+    return F.date_sub(anchor, days)
+
+
+def pit_latest(  # pylint: disable=too-many-arguments
+    base: DataFrame,
+    src: DataFrame,
+    *,
+    date_col: str,
+    value_cols: Sequence[str],
+    key: str = "cif_id",
+    anchor: Column | None = None,
+    max_age_days: int | None = None,
+    inclusive: bool = False,
+) -> DataFrame:
+    """Latest ``src`` row dated before each base row's anchor, per ``GRAIN``.
+
+    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
+    defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
+    day snapshots). ``max_age_days`` drops rows older than that, so a stale record never
+    stands in for a current one. Ties on the date are broken by the values (descending),
+    so reruns agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
+    """
+    anchor = F.col("observation_date") if anchor is None else anchor
+    before = (
+        F.col("_d") <= F.col("_anchor") if inclusive else F.col("_d") < F.col("_anchor")
+    )
+    cond = before
+    if max_age_days is not None:
+        cond = cond & (F.col("_d") >= _days_before(F.col("_anchor"), max_age_days))
+    order = [F.col("_d").desc(), *[F.col(c).desc_nulls_last() for c in value_cols]]
+    return (
+        base.select(*GRAIN, key, anchor.alias("_anchor"))
+        .join(src.select(key, F.col(date_col).alias("_d"), *value_cols), on=key)
+        .filter(cond)
+        .withColumn(
+            "_rn", F.row_number().over(Window.partitionBy(*GRAIN).orderBy(*order))
+        )
+        .filter(F.col("_rn") == 1)
+        .select(*GRAIN, *value_cols)
+    )
+
+
+def window_agg(  # pylint: disable=too-many-arguments
+    base: DataFrame,
+    src: DataFrame,
+    *,
+    date_col: str,
+    aggs: Sequence[Column],
+    days: int | None = None,
+    months: int | None = None,
+    key: str = "cif_id",
+) -> DataFrame:
+    """Aggregate ``src`` rows dated in a window ending before each observation date.
+
+    ``days``: ``[obs - days, obs)``. ``months``: whole calendar months
+    ``[trunc(obs) - months, trunc(obs))`` — for month-stamped series.
+    ``src`` holds ``key``, ``date_col`` and the columns ``aggs`` read.
+    Returns ``GRAIN + aggs`` for base rows with at least one row in the window.
+    """
+    if (days is None) == (months is None):
+        raise ValueError("give exactly one of days / months")
+    obs = F.col("observation_date")
+    if days is not None:
+        start, end = _days_before(obs, days), obs
+    else:
+        end = F.trunc(obs, "month")
+        start = F.add_months(end, -months)
+    return (
+        base.select(*GRAIN, key)
+        .join(src, on=key)
+        .filter((F.col(date_col) >= start) & (F.col(date_col) < end))
+        .groupBy(*GRAIN)
+        .agg(*aggs)
+    )
+
+
+def lookback_floor(base: DataFrame, days: int) -> str:
+    """ISO date ``days`` before the earliest observation date (partition floor)."""
+    first: date = base.agg(F.min("observation_date")).first()[0]
+    return (first - timedelta(days=days)).isoformat()
+
+
+def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
+    """Left-join every part onto ``base.select(*GRAIN)`` on ``GRAIN``."""
+    result = base.select(*GRAIN)
+    for part in parts:
+        result = result.join(part, on=list(GRAIN), how="left")
+    return result
+
+
+def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
+    """Log the value distribution of ``col`` (one job) when ``enabled``."""
+    if not enabled:
+        return
+    rows = df.groupBy(col).count().orderBy(col).collect()
+    total = sum(r["count"] for r in rows)
+    LOG.info("%s — %s distribution (n=%d)", name, col, total)
+    for r in rows:
+        LOG.info(
+            "  %-28s %9d  (%5.1f%%)",
+            r[col],
+            r["count"],
+            100.0 * r["count"] / max(total, 1),
+        )
+
+
+# ── Observation base ──────────────────────────────────────────────────────────
+
+
+def build_cc_obs_base(
+    cc_spine: DataFrame, contract: DataFrame, client: DataFrame
+) -> DataFrame:
+    """Every CC spine row with its ``cif_id`` (NULL if the contract has no client).
+
+    Rows without a CIF are kept: customer-level signals are simply absent for them.
+    """
+    spine = cc_spine.select(
+        F.col("contract_id").cast("string").alias("account_id"),
+        F.col("observation_date").cast("date"),
+    ).dropDuplicates(list(GRAIN))
+    bridge = _build_cif_bridge(contract, client).select(
+        F.col("contract_id").cast("string").alias("account_id"), "cif_id"
+    )
+    return spine.join(bridge, on="account_id", how="left")
+
+
+def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
+    """Every RL spine row with the ``cif_id`` the spine already carries."""
+    return rl_spine.select(
+        F.col("account_id").cast("string"),
+        F.col("observation_date").cast("date"),
+        "cif_id",
+    ).dropDuplicates(list(GRAIN))
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/__init__.py`
 action: add · new sha256 `de7eff27ace0fdcdc5690de1b1cd9c56a44085dae4e10e8c75e0a33ae1cecf4e` · new trailing newline: yes
 
 New:
@@ -2191,7 +2375,7 @@ __all__ = [
 ]
 `````
 
-### FILE: `src/enbd_collections/pipelines/crx_persona/_a1/classify.py`
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py`
 action: add · new sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · new trailing newline: yes
 
 New:
@@ -2340,7 +2524,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
     return out
 `````
 
-### FILE: `src/enbd_collections/pipelines/crx_persona/_a1/signals.py`
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py`
 action: add · new sha256 `1736daea69c92ee7bcec3245b5f5ca33319f8e9ade24c5e1ad12ec654173e8f5` · new trailing newline: yes
 
 New:
@@ -2658,192 +2842,8 @@ def build_distress_signals(
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
 `````
 
-### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
-action: add · new sha256 `69266100d0a55b19bcd5cacce6e406bd06e056c3db65e40b54c5aec9759813a1` · new trailing newline: yes
-
-New:
-
-`````python
-"""Shared building blocks for the crx_persona axes.
-
-Every axis works at the observation grain ``(account_id, observation_date)`` and looks
-up customer-level sources by ``cif_id``. The helpers here encode the conventions once:
-
-* missing source columns stop the run (``require_columns``);
-* point-in-time lookups read strictly before the observation date and can be bounded in
-  age (``pit_latest``), window aggregates read ``[start, observation_date)``
-  (``window_agg``);
-* source partition floors follow from the earliest observation date
-  (``lookback_floor``);
-* logging is opt-in and costs one job (``log_distribution``).
-"""
-
-from __future__ import annotations
-
-import logging
-from datetime import date, timedelta
-from typing import Sequence
-
-from pyspark.sql import Column, DataFrame, Window
-from pyspark.sql import functions as F
-
-from enbd_collections.pipelines.crx_persona._spine_utils import _build_cif_bridge
-
-LOG = logging.getLogger(__name__)
-
-GRAIN = ("account_id", "observation_date")
-
-
-def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
-    """Raise if ``df`` lacks any of ``columns`` — a renamed source must fail the run."""
-    missing = [c for c in columns if c not in df.columns]
-    if missing:
-        raise ValueError(f"{source} is missing required columns {missing}")
-
-
-def parse_yyyymmdd(col: str) -> Column:
-    """``20260531`` (int or string) -> date."""
-    return F.to_date(F.col(col).cast("string"), "yyyyMMdd")
-
-
-def _days_before(anchor: Column, days: int) -> Column:
-    return F.date_sub(anchor, days)
-
-
-def pit_latest(  # pylint: disable=too-many-arguments
-    base: DataFrame,
-    src: DataFrame,
-    *,
-    date_col: str,
-    value_cols: Sequence[str],
-    key: str = "cif_id",
-    anchor: Column | None = None,
-    max_age_days: int | None = None,
-    inclusive: bool = False,
-) -> DataFrame:
-    """Latest ``src`` row dated before each base row's anchor, per ``GRAIN``.
-
-    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
-    defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
-    day snapshots). ``max_age_days`` drops rows older than that, so a stale record never
-    stands in for a current one. Ties on the date are broken by the values (descending),
-    so reruns agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
-    """
-    anchor = F.col("observation_date") if anchor is None else anchor
-    before = (
-        F.col("_d") <= F.col("_anchor") if inclusive else F.col("_d") < F.col("_anchor")
-    )
-    cond = before
-    if max_age_days is not None:
-        cond = cond & (F.col("_d") >= _days_before(F.col("_anchor"), max_age_days))
-    order = [F.col("_d").desc(), *[F.col(c).desc_nulls_last() for c in value_cols]]
-    return (
-        base.select(*GRAIN, key, anchor.alias("_anchor"))
-        .join(src.select(key, F.col(date_col).alias("_d"), *value_cols), on=key)
-        .filter(cond)
-        .withColumn(
-            "_rn", F.row_number().over(Window.partitionBy(*GRAIN).orderBy(*order))
-        )
-        .filter(F.col("_rn") == 1)
-        .select(*GRAIN, *value_cols)
-    )
-
-
-def window_agg(  # pylint: disable=too-many-arguments
-    base: DataFrame,
-    src: DataFrame,
-    *,
-    date_col: str,
-    aggs: Sequence[Column],
-    days: int | None = None,
-    months: int | None = None,
-    key: str = "cif_id",
-) -> DataFrame:
-    """Aggregate ``src`` rows dated in a window ending before each observation date.
-
-    ``days``: ``[obs - days, obs)``. ``months``: whole calendar months
-    ``[trunc(obs) - months, trunc(obs))`` — for month-stamped series.
-    ``src`` holds ``key``, ``date_col`` and the columns ``aggs`` read.
-    Returns ``GRAIN + aggs`` for base rows with at least one row in the window.
-    """
-    if (days is None) == (months is None):
-        raise ValueError("give exactly one of days / months")
-    obs = F.col("observation_date")
-    if days is not None:
-        start, end = _days_before(obs, days), obs
-    else:
-        end = F.trunc(obs, "month")
-        start = F.add_months(end, -months)
-    return (
-        base.select(*GRAIN, key)
-        .join(src, on=key)
-        .filter((F.col(date_col) >= start) & (F.col(date_col) < end))
-        .groupBy(*GRAIN)
-        .agg(*aggs)
-    )
-
-
-def lookback_floor(base: DataFrame, days: int) -> str:
-    """ISO date ``days`` before the earliest observation date (partition floor)."""
-    first: date = base.agg(F.min("observation_date")).first()[0]
-    return (first - timedelta(days=days)).isoformat()
-
-
-def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
-    """Left-join every part onto ``base.select(*GRAIN)`` on ``GRAIN``."""
-    result = base.select(*GRAIN)
-    for part in parts:
-        result = result.join(part, on=list(GRAIN), how="left")
-    return result
-
-
-def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
-    """Log the value distribution of ``col`` (one job) when ``enabled``."""
-    if not enabled:
-        return
-    rows = df.groupBy(col).count().orderBy(col).collect()
-    total = sum(r["count"] for r in rows)
-    LOG.info("%s — %s distribution (n=%d)", name, col, total)
-    for r in rows:
-        LOG.info(
-            "  %-28s %9d  (%5.1f%%)",
-            r[col],
-            r["count"],
-            100.0 * r["count"] / max(total, 1),
-        )
-
-
-# ── Observation base ──────────────────────────────────────────────────────────
-
-
-def build_cc_obs_base(
-    cc_spine: DataFrame, contract: DataFrame, client: DataFrame
-) -> DataFrame:
-    """Every CC spine row with its ``cif_id`` (NULL if the contract has no client).
-
-    Rows without a CIF are kept: customer-level signals are simply absent for them.
-    """
-    spine = cc_spine.select(
-        F.col("contract_id").cast("string").alias("account_id"),
-        F.col("observation_date").cast("date"),
-    ).dropDuplicates(list(GRAIN))
-    bridge = _build_cif_bridge(contract, client).select(
-        F.col("contract_id").cast("string").alias("account_id"), "cif_id"
-    )
-    return spine.join(bridge, on="account_id", how="left")
-
-
-def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
-    """Every RL spine row with the ``cif_id`` the spine already carries."""
-    return rl_spine.select(
-        F.col("account_id").cast("string"),
-        F.col("observation_date").cast("date"),
-        "cif_id",
-    ).dropDuplicates(list(GRAIN))
-`````
-
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/__init__.py`
-action: replace · base sha256 `6499bc5e770ab066f3d239787726d3fe5c992d62b6ee9db71854e6058e8c5f35` · base trailing newline: yes · new sha256 `fb7fc1c45e3cbb4e868956df219329fce6b4cde99372aeff71f3b3c0e67dc5ee` · new trailing newline: yes
+action: replace · base sha256 `6499bc5e770ab066f3d239787726d3fe5c992d62b6ee9db71854e6058e8c5f35` · base trailing newline: yes · new sha256 `65c9988c7d9e81a1dfeba967bdfe4f03037ccf21b7749032026e46e7beafee42` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2858,7 +2858,7 @@ __all__ = ["create_pipeline"]
 New:
 
 `````python
-"""CC A1 ability axis (GRR MECE points) on the shared ``_a1`` engine."""
+"""CC A1 ability axis (GRR MECE points) on the shared ``a1_ability`` engine."""
 
 from .pipeline import create_pipeline
 
@@ -2866,7 +2866,7 @@ __all__ = ["create_pipeline"]
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py`
-action: replace · base sha256 `0eebf8f3efc79067df2ef50942774f405de3e9889ed05bcf591369ddaf2ef142` · base trailing newline: yes · new sha256 `8ea58ab45ff337b86008342aa4ff0f9aa63693becb487c9f39958c3f789d1d2c` · new trailing newline: yes
+action: replace · base sha256 `0eebf8f3efc79067df2ef50942774f405de3e9889ed05bcf591369ddaf2ef142` · base trailing newline: yes · new sha256 `5cb0d9f21a093685fc39936236a09c381eb18af5487326b1ae630b55d0a81036` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3823,7 +3823,7 @@ New:
 `````python
 """CC-specific part of the A1 ability axis: the liquidity anchor.
 
-Everything else (evidence, levels, points, state) is the shared engine in ``_a1``.
+Everything else (evidence, levels, points, state) is the shared ``a1_ability`` engine.
 """
 
 from pyspark.sql import DataFrame
@@ -3879,7 +3879,7 @@ def build_cc_liquidity_anchor(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py`
-action: replace · base sha256 `3f1c91165090f34d46cce7e3291d004e0414fcf045b758c75f08731eb2e51b6d` · base trailing newline: yes · new sha256 `05d867a3e057d2d16ce6c9c6d8ed7f6f5a061024c0717b17efcd7aad2fceb653` · new trailing newline: yes
+action: replace · base sha256 `3f1c91165090f34d46cce7e3291d004e0414fcf045b758c75f08731eb2e51b6d` · base trailing newline: yes · new sha256 `ad2071bcfae2ddfff5691fd9597d30eceaa91d9fec5df525823dd58d665a3e29` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -4003,7 +4003,7 @@ extra inputs of the distress node once they exist.
 
 from kedro.pipeline import Pipeline, node
 
-from .._a1 import (
+from ..a1_ability import (
     build_a1_ability,
     build_distress_signals,
     build_income_signals,
@@ -4130,7 +4130,7 @@ def create_rl_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 
 ## Apply script
 
-Save as `docs/mirror_bundles/apply_bundle.py` (only when missing or older than version 1).
+Save as `docs/mirror_bundles/apply_bundle.py` (only when missing or older than version 2).
 
 `````python
 """Apply a mirror bundle (.md) to the workplace repo — safely.
@@ -4167,7 +4167,7 @@ import re
 import subprocess
 import sys
 
-APPLY_VERSION = 1
+APPLY_VERSION = 2
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
@@ -4380,6 +4380,18 @@ def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
     return failures
 
 
+def _prune_empty_dirs(folder: pathlib.Path) -> None:
+    """Remove folders left with nothing but bytecode caches after a delete."""
+    import shutil
+
+    while folder != pathlib.Path(".") and folder.is_dir():
+        rest = [p for p in folder.iterdir() if p.name != "__pycache__"]
+        if rest:
+            return
+        shutil.rmtree(folder)
+        folder = folder.parent
+
+
 # ── Commands ─────────────────────────────────────────────────────────────────
 
 
@@ -4418,6 +4430,7 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
         path = pathlib.Path(e["path"])
         if e["action"] == "delete":
             path.unlink()
+            _prune_empty_dirs(path.parent)
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(e["new"].encode("utf-8"))
