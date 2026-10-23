@@ -306,8 +306,9 @@ def build_distress_signals(
 
 
 def build_internal_returns(obs_base: DataFrame, casa_txn: DataFrame) -> DataFrame:
-    """The bank's own returned cheques / DDS returns as ``(cif_id, event_date, reason)``,
-    across all of the customer's CASA accounts.
+    """The bank's own returned cheques / DDS returns as distinct
+    ``(cif_id, event_date, reason)``, across all of the customer's CASA accounts (the
+    same return reloaded in several ``edp_load_date`` partitions counts once).
 
     ``casa_txn`` is ``comp_financial_tran_repos_dly`` (2.4B rows): scoped to the
     observation base's CIFs before any other filter (R20), partitions pruned on
@@ -333,4 +334,5 @@ def build_internal_returns(obs_base: DataFrame, casa_txn: DataFrame) -> DataFram
             F.to_date("tran_date").alias("event_date"),
             F.col("reason_for_excluding").alias("reason"),
         )
+        .distinct()
     )

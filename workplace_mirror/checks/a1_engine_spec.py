@@ -176,5 +176,10 @@ for acct, (name, want) in expect.items():
 # 180+ has no anchor
 assert build_cc_liquidity_anchor(obs, df(rows["bal"], f"contract_id string, observation_date date, {bcols}"),
                                  "cc_180_plus").filter(F.col("liquidity_anchor_amt").isNotNull()).count() == 0
+# a return reloaded in a later edp_load_date partition counts once
+ret_schema = "cif_id long, edp_load_date string, tran_date date, reason_for_excluding string"
+reloaded = rows["ret"] + [(c, (d + timedelta(days=1)).isoformat(), d, r) for c, _, d, r in rows["ret"]]
+assert (build_internal_returns(obs, df(reloaded, ret_schema)).count()
+        == build_internal_returns(obs, df(rows["ret"], ret_schema)).count() == 2)
 print(f"\n{len(expect) - fails}/{len(expect)} cases pass")
 sys.exit(1 if fails else 0)

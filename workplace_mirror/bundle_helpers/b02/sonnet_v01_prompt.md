@@ -45,6 +45,10 @@ H7  Salary has stopped, not gone missing. About 50% of the population had a sala
     some point, but only ~3% of rows have one in the last 3 months. Expect most former
     salary customers' last credit to fall before the 3-month window (salary stopped or moved
     before or during delinquency).
+H8  Bureau bounces are dated by the extract, not by the bounce. The engine flags a row when
+    prm_bureau_alert_enriched has bounced_cheque_amount > 0 with extract_date in the window.
+    If the same bounce repeats in every monthly extract, old bounces keep the flag on
+    (bureau-only rows: 11,477). Look for a real bounce/event date column in the table.
 H5  feat_payroll_indicator.month_number is stamped one month after the salary month
     (in PROD, a payroll flag in month M+1 matched a recovered salary credit in month M
     98% of the time).
@@ -106,12 +110,17 @@ A. Write the snippet: tmp_validation/a1_v01/a1_v01_snippet.py, plus a README.md 
                      (bands: 1-3, 4-6, 7-12, 13-24, 25+, never), and last-credit amount band
                      (<1000, 1000-3000, 3000+), crossed with a1_income_level and
                      ever_in_casa_table. Count rows for each combination.
+   t8_bureau (H8)    prm_bureau_alert_enriched for the obs base's CIFs: extracts per CIF (p50/
+                     p90/max); for CIFs with bounced_cheque_amount > 0, the number of
+                     consecutive extracts with the same amount (p50/p90/max) and the share
+                     whose amount never changes; every date-like column found, with its
+                     null share and the lag to extract_date in days (p10/p50/p90).
    t6_payroll (H5)   feat_payroll_indicator: count of rows by day-of-month of the parsed
                      month_number, and min/max month_number vs min/max observation_date of the
                      obs base.
 
 B. Analysis (only when I give you the committed results file): read
-   results_cc_60_180.json. For each hypothesis H1-H7, give:
+   results_cc_60_180.json. For each hypothesis H1-H8, give:
    - a verdict: CONFIRMED / REJECTED / INCONCLUSIVE;
    - the 3-6 numbers that decide it;
    - one line on what it means for the engine.
@@ -126,6 +135,8 @@ B. Analysis (only when I give you the committed results file): read
      distress or something else);
    - H7: the share of salary_ever rows whose last credit was 4+ months before observation,
      with the months-since bands;
+   - H8: whether a bounce date exists, and the share of bureau-flagged rows whose bounce is
+     really older than the window (if that can be told);
    - List columns_found and any table that came back empty.
    Don't propose code changes. Plain text, under 50 lines. Save it as
    tmp_validation/a1_v01/summary.md, then commit and push.
