@@ -1,6 +1,6 @@
 # Mirror bundle 01 — Shared helpers, observation base and A1 engine (CC)
 
-apply_bundle version: 3 · built 2026-10-23 from `0c45e6e..4756b25` · source: 6 added, 6 replaced, 0 deleted · helpers: 1
+apply_bundle version: 4 · built 2026-10-23 from `0c45e6e..4756b25` · source: 6 added, 6 replaced, 0 deleted · helpers: 1
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -4243,7 +4243,7 @@ import re
 import subprocess
 import sys
 
-APPLY_VERSION = 3
+APPLY_VERSION = 4
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
@@ -4264,8 +4264,53 @@ def _loose(text: str) -> str:
     )
 
 
+def _strip_docstrings(tree):
+    import ast
+
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if (
+            isinstance(body, list)
+            and body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(getattr(body[0], "value", None), ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            node.body = body[1:] or [ast.Pass()]
+    return tree
+
+
+def _same_code(path: str, a: str, b: str) -> bool:
+    """Same Python code (comments and docstrings aside) or the same YAML content."""
+    try:
+        if path.endswith(".py"):
+            import ast
+
+            dump = lambda t: ast.dump(_strip_docstrings(ast.parse(t)))  # noqa: E731
+            return dump(a) == dump(b)
+        if path.endswith((".yml", ".yaml")):
+            import yaml
+
+            return yaml.safe_load(a) == yaml.safe_load(b)
+    except Exception:  # pylint: disable=broad-except
+        return False
+    return False
+
+
+def _is_new(current: str, e: dict) -> bool:
+    """The repo file already holds the bundle's new version (comment noise aside)."""
+    return _loose(current) == _loose(e["new"]) or _same_code(e["path"], current, e["new"])
+
+
 def _matches_base(current: str | None, e: dict) -> bool:
-    return current is not None and _loose(current) == _loose(e["base"])
+    """The repo file is the version the bundle was built from: identical up to
+    separator lengths and trailing spaces, or — since comments and docstrings are
+    transcribed from photos — the same code / YAML content."""
+    if current is None:
+        return False
+    if _loose(current) == _loose(e["base"]):
+        return True
+    return _same_code(e["path"], current, e["base"])
 
 
 def _rebase(new: str, base: str, current: str) -> str:
@@ -4275,6 +4320,8 @@ def _rebase(new: str, base: str, current: str) -> str:
     so the repo's own separators survive and ``git diff`` shows only real changes.
     """
     base_l, new_l, cur_l = (_norm(t).split("\n") for t in (base, new, current))
+    if len(cur_l) != len(base_l):  # comments wrapped differently: no line alignment
+        return new
     out: list[str] = []
     for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
         None, base_l, new_l, autojunk=False
@@ -4403,7 +4450,11 @@ def file_status(e: dict) -> str:
             return "todo"
         return "done" if cur_sha == e["new_sha"] else "conflict"
     if e["action"] == "replace":
-        if cur_sha == e["new_sha"] or _loose(current or "") == _loose(e["new"]):
+        if current is not None and _loose(current) == _loose(e["new"]):
+            return "done"
+        if current is not None and _loose(current) == _loose(e["base"]):
+            return "todo"
+        if current is not None and _same_code(e["path"], current, e["new"]):
             return "done"
         return "todo" if _matches_base(current, e) else "conflict"
     # delete
@@ -4423,7 +4474,8 @@ def explain_conflict(e: dict) -> None:
         if current is None:
             print("    the file does not exist in this repo.")
             return
-    print("    (separator-line lengths and trailing spaces are ignored; real differences only)")
+    print("    (the code differs, not just comments: separator lengths, trailing spaces,")
+    print("     comments and docstrings are ignored by the check; diff below is the raw text)")
     diff = list(
         difflib.unified_diff(
             _loose(expected).splitlines(),
@@ -4440,11 +4492,22 @@ def explain_conflict(e: dict) -> None:
         print(f"    ... {len(diff) - 80} more diff lines")
 
 
+def _comment_only(e: dict) -> bool:
+    current = _read(pathlib.Path(e["path"]))
+    return (
+        e["action"] in ("replace", "delete")
+        and current is not None
+        and _loose(current) != _loose(e["base"])
+        and _matches_base(current, e)
+    )
+
+
 def print_table(entries: list[dict], statuses: list[str]) -> None:
     word = {"todo": "will apply", "done": "already applied", "conflict": "CONFLICT"}
     width = max(len(e["path"]) for e in entries)
     for e, s in zip(entries, statuses):
-        print(f"  {e['action']:<8} {e['path']:<{width}}  {word[s]}")
+        note = "  (comments differ from the bundle's copy — fine)" if s == "todo" and _comment_only(e) else ""
+        print(f"  {e['action']:<8} {e['path']:<{width}}  {word[s]}{note}")
 
 
 # ── Post-apply checks ────────────────────────────────────────────────────────
@@ -4574,7 +4637,7 @@ def cmd_revert(entries: list[dict]) -> bool:
                     parent.rmdir()
             elif current is not None:
                 skipped.append(e["path"])
-        elif (current is not None and _loose(current) == _loose(e["new"] or "")) or (
+        elif (current is not None and e["new"] is not None and _is_new(current, e)) or (
             e["action"] == "delete" and current is None
         ):
             # restore the committed bytes (the repo's own file, exactly)

@@ -230,3 +230,6 @@ Comment rules (`# ── Node 1 ────`, `####…`) are transcribed with a
 exact count of `─`/`#`/`-` cannot be read from a photo (first seen: bundle 01 check,
 2026-10-23). `apply_bundle.py` v3 compares runs of 4+ separator characters as equal and
 keeps the workplace file's own separators on apply, so this never blocks a bundle.
+The same goes for spacing and wrapping inside comments and docstrings (second PROD check,
+2026-10-23): v4 accepts a file whose Python code (AST without docstrings) or YAML content
+equals the photographed base. Only real code differences conflict.
