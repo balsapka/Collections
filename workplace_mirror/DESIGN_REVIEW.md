@@ -1,6 +1,6 @@
 # crx_persona — design review and refactor proposal
 
-Status: **proposal; D3–D5 decided 2026-10-23 (§6), D1/D2 open.** Nothing is changed yet.
+Status: **D2–D6 decided 2026-10-23 (§6); D1 waits for the R4 grep.** Nothing is changed yet.
 Scope: every persona axis in the mirror except A3 (DE-owned). Builds on the findings
 O1–O41 in `REVIEW_OBSERVATIONS.md`.
 
@@ -158,6 +158,10 @@ separately so each change in numbers has one cause.
 
 ## 6. Decisions taken (2026-10-23) and what they change
 
+- **D2 — missing source columns stop the run.** Required inputs go through `require_columns`
+  and raise, naming the table and the columns. Only sources that do not exist in PROD yet
+  (`prm_bureau_payment_order`, …) are explicit optional parameters.
+
 - **D3 — docstrings:** remove ticket-history references and every docstring/comment that does not
   describe what the code does now. History stays in git and `RESULTS*.md`.
 - **D4 — fixes are folded into the refactor bundles.** No row-by-row parity checks; each
@@ -172,10 +176,19 @@ separately so each change in numbers has one cause.
   | `rl_a4_spine`, `join_spine_to_spell`, `build_rl_depart_spine` | replaced by the obs base `(account_id, observation_date, cif_id)` |
   | T0-anchored windows in the departure trail (travel H2, salary stop gap) | anchored on `observation_date` |
   | `cc_raw_extract` (scoped by T0 windows), `cc_payment_trajectory`, `cc_utilisation` | removed; CC card transactions scoped by the spine instead |
-  | A2 contact window `[t0, observation_date)` | needs a replacement start (D6) |
+  | A2 contact window `[t0, observation_date)` | `[collections_entry_date, observation_date)` (D6) |
   | A4 | unchanged — it never used the spell tables |
 
   This removes O3, O4, O22, O26, O27, O34 with the code.
+- **D6 — DCORE windows start at collections entry.** Contact attempts are counted from when the
+  account entered collections (that is what T0 meant). Without spell tables the entry date is
+  taken point-in-time from the DPD history: the start of the current delinquency episode as of
+  the observation date, which the A4 engine already computes (`months_before_spell`). Same
+  meaning as today's T0, without the O26 look-ahead. Data check before shipping: compare it
+  with DCORE's own agreement start date, if `dcore_stg_scope_agreements` carries one.
+- **A3 keeps the spell tables** until the DE moves it to `observation_date`; bundle 7 then
+  deletes them.
+
   **Blocker:** the DE's A3 (`cc_a3_payment_credibility`, `rl_a3_payment_credibility`) is keyed on
   `(account_id, spell_id)` and reads the spell tables. The spell tables can only be deleted after
   A3 moves off them; until then they stay, unused by the other axes.
