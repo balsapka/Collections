@@ -173,42 +173,42 @@ def enrich_salary_stop_month(
     """
     if "payroll_flag" not in feat_payroll.columns:
         LOG.warning(
-# <<MIRROR GAP: enrichers.py line 176 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 177 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 178 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 179 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 180 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 181 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 182 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 183 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 184 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 185 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 186 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 187 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 188 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 189 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 190 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 191 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 192 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 193 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 194 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 195 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 196 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 197 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 198 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 199 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 200 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 201 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 202 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 203 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 204 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 205 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 206 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 207 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 208 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 209 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 210 not photographed (IMG_8260 missing)>>
-# <<MIRROR GAP: enrichers.py line 211 not photographed (IMG_8260 missing)>>
+            "enrich_salary_stop_month: feat_payroll_indicator missing 'payroll_flag'"
+            " — salary_stop_month will be NULL for all rows"
+        )
+        return None
+
+    fp_dated = feat_payroll.withColumn(
+        "_month_date", F.to_date(F.col("month_number").cast("string"), "yyyyMMdd")
+    ).select("cif_id", "_month_date", "payroll_flag")
+
+    stop_month = (
+        cif_base.join(fp_dated, on="cif_id", how="inner")
+        .filter(
+            (
+                F.col("_month_date")
+                >= F.add_months(F.trunc(F.col(anchor_col), "month"), -6)
+            )
+            & (
+                F.col("_month_date")
+                < F.add_months(F.trunc(F.col(anchor_col), "month"), -3)
+            )
+            & (F.col("payroll_flag") == 1)
+        )
+        .groupBy(*grain_key)
+        .agg(F.max("_month_date").alias("salary_stop_month"))
+    )
+
+    return stop_month
+
+
+# ── CASA EOD avg balance column names (wm_fea_casa_eod_avg_balance, WM) ───────
+# RL-A1-20: 3 balance-scope prefixes — ca (current-account-only, diagnostic),
+# casa (CA+SA, the primary balance-vs-EMI gate), all (CASA+investments+FDs,
+# diagnostic) — at 2 windows (spot ~0-3wk, avg_3m ~0-11wk), each with a plain
+# avg and a _max aggregation. ca columns were RL-A1-8/9's confirmed real
+# names; casa/all columns confirmed real in the same PROD schema capture
+# (RESULTS_RL.md 2026-10-06, TRL_A1_8 check1_schema_guard.actual_columns).
 _CASA_EOD_BAL_SOURCE_COLS = {
     "ca": {
         "spot": "ft_avg_ca_eod_balance_in_last_0_3_weeks_avg",

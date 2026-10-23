@@ -169,7 +169,7 @@ absent)" is on screen as written.
 | `conf/base/parameters/parameters_crx_persona.yml` | 21 | 21 | complete |
 | `conf/base/catalog/catalog_crx.yml` | 676 | 676 | complete — path of the file inside `conf/base` assumed |
 | `crx_persona/cc_a1_ability/__init__.py` | 5 | 5 | complete |
-| `crx_persona/cc_a1_ability/enrichers.py` | 1191 | 1191 | **gap: lines 176–211 not photographed** (IMG_8260 missing) |
+| `crx_persona/cc_a1_ability/enrichers.py` | 1191 | 1191 | complete — lines 176–211 filled from the re-photo (IMG_8332) |
 | `crx_persona/cc_a1_ability/nodes.py` | 1407 | 1407 | complete — all 17 `def`s on the same line as on screen |
 | `crx_persona/cc_a1_ability/pipeline.py` | 198 | 198 | complete |
 | `crx_persona/scoring_engine.py` | 100 | 100 | complete |
@@ -190,6 +190,27 @@ consumers — reporting, notebooks, `conf/` outside the catalog — are not).
 Uncertain characters: `enrichers.py:1117` the box between `cif_id` and `month_number` read as `×`;
 `nodes.py:162` "N×M" (box glyph); `nodes.py:924` "D1–D5" (box glyph, read as en dash);
 `pipeline.py:12–17` bracket glyphs beside "parallel".
+
+### Batch 6 follow-up (IMG_8332–8334)
+
+`enrichers.py` 176–211 transcribed; the file compiles and `cc_a1_ability`, `cc_a1_ability_v2`,
+`rl_a1_ability` and `rl_a2_locatability` pipelines import (kedro stubbed). Every `catalog_crx.yml`
+line number in the grep output (30 hits, 296–578) matches the transcription exactly.
+
+**A1 reference grep** (outside the three ability folders; `.pyc` hits ignored):
+
+| Where | What | Matters for v1 removal |
+|---|---|---|
+| `pipeline_registry.py:88, 91, 104, 232, 233, 239` | imports + registers `crx_cc_a1_ability`, `crx_cc_a1_ability_v2`, `crx_rl_a1_ability` | yes — rename / unregister |
+| `conf/base/catalog/catalog_crx.yml:296–578` | v1, v2 and RL A1 dataset entries | yes — rename v2 to plain names, drop v1 / RL waterfall entries |
+| `src/tests/pipelines/crx_persona/schema_registry.py:181, 187, 219` | `CRX_CC_A1_ABILITY` schema with `a1_state` | yes — **not in the mirror yet** |
+| `src/tests/pipelines/crx_persona/test_crx_persona.py:31, 190` | imports `cc_a1_ability.nodes`, loads `cc_a1_ability_empty` | yes — **not in the mirror yet** |
+| `src/tests/README_TEST_STRUCTURE.md:40` | tree listing `cc_a1_ability/` | doc only |
+| `conf/base/catalog/catalog_casa_plus_ftr.yml:102` | comment mentioning `build_rl_a1_group_b_income_obs_anchored` | comment only |
+| `_spine_utils.py:3`, `cc_spell/nodes.py:10`, `scoring_engine.py:3`, `rl_departure_signature/nodes.py:5, 8, 9` | docstrings naming the ability pipelines | text only |
+
+No reporting, modelling or other pipeline reads `a1_state` / `crx_*_a1_*` — the A1 outputs have no
+downstream consumer outside the persona code and its tests.
 
 ## Review findings
 
