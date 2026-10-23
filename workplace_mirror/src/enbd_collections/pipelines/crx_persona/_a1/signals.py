@@ -1,21 +1,26 @@
 """A1 ability evidence at (account_id, observation_date), shared by CC and RL.
 
-Three evidence groups feed the classifier (``classify.py``):
+Spec: ``workplace_mirror/specs/A1_ability_spec.md`` (GRR workbook A1_ability_20261022).
 
-* income    — payroll months, latest WM salary (if still current), bureau salary;
-* liquidity — CASA balance (recent vs prior quarter), payments to external cards,
-              CASA in/outflow activity;
-* distress  — bounced cheques (plus optional sources not yet materialised in PROD).
+"The last 3 months" are the three complete calendar months before the observation month
+(m1 = the month before, m2, m3); "the prior 3 months" are m4–m6. The builders return the
+amounts the classifier compares with its thresholds:
 
-Every builder takes the observation base ``(account_id, observation_date, cif_id)`` and
-returns one row per base row that has evidence; the classifier left-joins them.
+* income    — salary received in each month (internal credit or bureau salary,
+              the larger);
+* liquidity — CASA average balance in each month, largest single external card payment;
+* activity  — any CASA transaction in the last 3 months (the Unknown gate);
+* distress  — a cheque bounce or direct-debit return in the last 3 months.
+
 Customer-level sources are always read for the whole CIF — all the customer's accounts —
 never for the scored account_id alone (an RL account_id is not a CASA account).
 """
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame
+from typing import Sequence
+
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from .._common import (
@@ -23,80 +28,88 @@ from .._common import (
     left_join_all,
     lookback_floor,
     parse_yyyymmdd,
-    pit_latest,
     require_columns,
-    window_agg,
 )
 
-# WM salary snapshot rows are weekly; one older than this means the feed stopped.
-_SALARY_SNAPSHOT_MAX_AGE_D = 35
-# A salary credited longer ago than this is not current income.
-_SALARY_MAX_AGE_D = 90
-_CASA_BAL_COL = "ft_avg_eod_balance_in_last_0_2_months_avg"  # trailing 3-month average
+_CASA_MONTH_COL = "ft_avg_casa_eod_balance_in_last_0_3_weeks_avg"  # CA+SA, ~1 month
 _CASA_IN_COL = "ft_inflow_casa_amt_in_last_0_0_weeks_sum"
 _CASA_OUT_COL = "ft_outflow_casa_amt_in_last_0_0_weeks_sum"
+
+
+def _month_index(date: Column) -> Column:
+    """1 for the month before the observation month, 2 for the one before, …"""
+    obs_month = F.trunc(F.col("observation_date"), "month")
+    return F.months_between(obs_month, F.trunc(date, "month")).cast("int")
+
+
+def _by_month(obs: DataFrame, series: DataFrame, value: str, prefix: str) -> DataFrame:
+    """Spread a ``(cif_id, month, value)`` series over ``{prefix}_m1 … _m6`` per
+    observation (NULL where the month has no value)."""
+    return (
+        obs.select(*GRAIN, "cif_id")
+        .join(series, on="cif_id")
+        .withColumn("_k", _month_index(F.col("month")))
+        .filter(F.col("_k").between(1, 6))
+        .groupBy(*GRAIN)
+        .agg(
+            *[
+                F.max(F.when(F.col("_k") == i, F.col(value))).alias(f"{prefix}_m{i}")
+                for i in range(1, 7)
+            ]
+        )
+    )
+
+
+def _last_3_months(
+    obs: DataFrame, src: DataFrame, date_col: str, aggs: Sequence[Column]
+) -> DataFrame:
+    """Aggregate ``src`` rows dated in the last 3 complete months, per observation."""
+    return (
+        obs.select(*GRAIN, "cif_id")
+        .join(src, on="cif_id")
+        .filter(_month_index(F.col(date_col)).between(1, 3))
+        .groupBy(*GRAIN)
+        .agg(*aggs)
+    )
 
 
 # ── Income ────────────────────────────────────────────────────────────────────
 
 
-def _payroll_months(obs: DataFrame, feat_payroll: DataFrame) -> DataFrame:
-    """Months with a payroll credit in the last 3 complete months."""
-    require_columns(
-        feat_payroll,
-        ["cif_id", "month_number", "payroll_flag"],
-        "feat_payroll_indicator",
-    )
-    src = feat_payroll.select(
-        "cif_id", parse_yyyymmdd("month_number").alias("month"), "payroll_flag"
-    )
-    return window_agg(
-        obs,
-        src,
-        date_col="month",
-        months=3,
-        aggs=[
-            F.sum((F.col("payroll_flag") == 1).cast("int")).alias("salary_months_h2")
-        ],
-    )
+def _internal_salary(wm_salary: DataFrame) -> DataFrame:
+    """Salary credits by month, recovered from the weekly WM snapshots.
 
+    Each snapshot carries the last salary credited and how many days before the snapshot
+    it was, so snapshot date minus that gap is the credit date. Several snapshots see
+    the same credit; they collapse to one value per month.
 
-def _wm_salary(obs: DataFrame, wm_salary: DataFrame) -> DataFrame:
-    """Latest WM salary amount, only while the salary itself is recent.
-
-    The weekly snapshot carries the last salary ever seen;
-    ``ft_days_since_salary_transaction`` says how old it was on the snapshot date. Both
-    ages are bounded.
+    TODO(sonnet): validate against ``feat_payroll_indicator`` (payroll months without a
+    recovered credit and vice versa), and switch to an internal table with salary credit
+    amounts per month if one exists.
     """
-    days_col = "ft_days_since_salary_transaction"
     require_columns(
         wm_salary,
-        ["cif_id", "week_number", "ft_last_salary_amount", days_col],
+        [
+            "cif_id",
+            "week_number",
+            "ft_last_salary_amount",
+            "ft_days_since_salary_transaction",
+        ],
         "wm_fea_salary_days_since_increment",
     )
-    src = wm_salary.select(
+    credit_date = F.date_sub(
+        parse_yyyymmdd("week_number"),
+        F.col("ft_days_since_salary_transaction").cast("int"),
+    )
+    return wm_salary.select(
         "cif_id",
-        parse_yyyymmdd("week_number").alias("week"),
-        F.col("ft_last_salary_amount").cast("double").alias("_amt"),
-        F.col(days_col).cast("int").alias("_days_since"),
-    )
-    latest = pit_latest(
-        obs,
-        src,
-        date_col="week",
-        value_cols=["_amt", "_days_since", "week"],
-        max_age_days=_SALARY_SNAPSHOT_MAX_AGE_D,
-    )
-    age = F.col("_days_since") + F.datediff(F.col("observation_date"), F.col("week"))
-    return latest.select(
-        *GRAIN, F.when(age <= _SALARY_MAX_AGE_D, F.col("_amt")).alias("salary_amt_last")
+        F.trunc(credit_date, "month").alias("month"),
+        F.col("ft_last_salary_amount").cast("double").alias("amount"),
     )
 
 
-def _bureau_salary(
-    obs: DataFrame, salary_hist: DataFrame, cif_bridge: DataFrame
-) -> DataFrame:
-    """Bureau salary credits in the last 6 months: presence and latest amount."""
+def _bureau_salary(salary_hist: DataFrame, cif_bridge: DataFrame) -> DataFrame:
+    """Bureau-reported salary by month."""
     require_columns(
         salary_hist,
         [
@@ -110,79 +123,58 @@ def _bureau_salary(
     bridge = cif_bridge.select(
         F.col("bureau_file_id").alias("subj_salcr_hist_hdr_file_id"), "cif_id"
     ).distinct()
-    src = salary_hist.join(bridge, on="subj_salcr_hist_hdr_file_id").select(
+    return salary_hist.join(bridge, on="subj_salcr_hist_hdr_file_id").select(
         "cif_id",
         F.to_date("subj_salcr_hist_ref_mnth", "MMyyyy").alias("month"),
-        F.col("subj_salcr_hist_tot_sal_amt")
-        .cast("double")
-        .alias("bureau_salary_amt_last"),
+        F.col("subj_salcr_hist_tot_sal_amt").cast("double").alias("amount"),
     )
-    latest = pit_latest(
-        obs,
-        src,
-        date_col="month",
-        value_cols=["bureau_salary_amt_last"],
-        max_age_days=183,
-    )
-    return latest.withColumn("bureau_salary_present_6m_flag", F.lit(1))
 
 
 def build_income_signals(
     obs_base: DataFrame,
-    feat_payroll: DataFrame,
     wm_salary: DataFrame,
     salary_hist: DataFrame,
     bureau_cif_bridge: DataFrame,
 ) -> DataFrame:
-    """Payroll months, current WM salary and bureau salary per observation."""
+    """``income_m1 … income_m6``: salary received per month — the larger of the internal
+    credit and the bureau salary (NULL: no salary that month)."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
-    return left_join_all(
-        obs_base,
-        [
-            _payroll_months(obs, feat_payroll),
-            _wm_salary(obs, wm_salary),
-            _bureau_salary(obs, salary_hist, bureau_cif_bridge),
-        ],
+    monthly = (
+        _internal_salary(wm_salary)
+        .unionByName(_bureau_salary(salary_hist, bureau_cif_bridge))
+        .groupBy("cif_id", "month")
+        .agg(F.max("amount").alias("amount"))
     )
+    return left_join_all(obs_base, [_by_month(obs, monthly, "amount", "income")])
 
 
-# ── Liquidity ─────────────────────────────────────────────────────────────────
+# ── Liquidity and activity ────────────────────────────────────────────────────
 
 
-def _casa_quarters(obs: DataFrame, feat_casa_bal: DataFrame) -> DataFrame:
-    """Trailing-3-month CASA balance at the latest month-end of each of the last two
-    quarters (``casa_recent3m_avg``, ``casa_prior3m_avg``)."""
+def _casa_by_month(wm_casa_bal: DataFrame) -> DataFrame:
+    """CASA (current + savings) average balance per month: the 4-week average at the
+    month's last weekly snapshot."""
     require_columns(
-        feat_casa_bal,
-        ["cif_id", "month_end_date", _CASA_BAL_COL],
-        "feat_casa_eod_balance",
+        wm_casa_bal,
+        ["cif_id", "week_number", _CASA_MONTH_COL],
+        "wm_fea_casa_eod_avg_balance",
     )
-    src = feat_casa_bal.select(
-        "cif_id",
-        F.col("month_end_date").cast("date").alias("month_end"),
-        F.col(_CASA_BAL_COL).cast("double").alias("_bal"),
+    week = parse_yyyymmdd("week_number")
+    last_in_month = F.max(
+        F.struct(week.alias("w"), F.col(_CASA_MONTH_COL).cast("double").alias("v"))
     )
-    obs_date = F.col("observation_date")
-    recent = pit_latest(
-        obs, src, date_col="month_end", value_cols=["_bal"], max_age_days=90
-    )
-    prior = pit_latest(
-        obs,
-        src,
-        date_col="month_end",
-        value_cols=["_bal"],
-        anchor=F.date_sub(obs_date, 90),
-        max_age_days=90,
-    )
-    return recent.withColumnRenamed("_bal", "casa_recent3m_avg").join(
-        prior.withColumnRenamed("_bal", "casa_prior3m_avg"), on=list(GRAIN), how="outer"
+    return (
+        wm_casa_bal.groupBy("cif_id", F.trunc(week, "month").alias("month"))
+        .agg(last_in_month.alias("_last"))
+        .select("cif_id", "month", F.col("_last.v").alias("balance"))
     )
 
 
 def _ext_card_payments(
     obs: DataFrame, labelled_txn: DataFrame, beneficiary_cards: DataFrame
 ) -> DataFrame:
-    """CASA payments to the customer's registered external credit cards, last 90 days.
+    """Largest single CASA payment to one of the customer's registered external credit
+    cards in the last 3 months.
 
     ``raw_beneficiary_cards`` is a live snapshot: a card registered after the
     observation date still counts (mild look-ahead, accepted).
@@ -211,34 +203,22 @@ def _ext_card_payments(
     )
     src = (
         labelled_txn.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs, 90)))
+            (F.col("tran_date") >= F.lit(lookback_floor(obs, 100)))
             & (F.col("in_out_flow") == "outflow")
             & (F.col("product_category") == "CASA")
         )
         .join(F.broadcast(cards), on="transaction_acid", how="leftsemi")
         .select(
-            "cif_id",
-            F.col("tran_date").cast("date").alias("tran_date"),
-            F.col("tran_amt").cast("double"),
+            "cif_id", F.col("tran_date").cast("date"), F.col("tran_amt").cast("double")
         )
     )
-    return window_agg(
-        obs,
-        src,
-        date_col="tran_date",
-        days=90,
-        aggs=[
-            F.sum("tran_amt").alias("ext_cc_payment_amt_h2"),
-            # weeks with a payment
-            F.countDistinct(F.date_trunc("week", "tran_date")).alias(
-                "ext_cc_payment_cnt_h2"
-            ),
-        ],
+    return _last_3_months(
+        obs, src, "tran_date", [F.max("tran_amt").alias("ext_card_payment_max_3m")]
     )
 
 
 def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame) -> DataFrame:
-    """Weeks with any CASA inflow / outflow in the last 90 days."""
+    """Any CASA credit or debit in the last 3 months."""
     require_columns(
         wm_casa_flow,
         ["cif_id", "week_number", _CASA_IN_COL, _CASA_OUT_COL],
@@ -247,34 +227,26 @@ def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame) -> DataFrame:
     src = wm_casa_flow.select(
         "cif_id",
         parse_yyyymmdd("week_number").alias("week"),
-        _CASA_IN_COL,
-        _CASA_OUT_COL,
+        ((F.col(_CASA_IN_COL) > 0) | (F.col(_CASA_OUT_COL) > 0))
+        .cast("int")
+        .alias("_active"),
     )
-    return window_agg(
-        obs,
-        src,
-        date_col="week",
-        days=90,
-        aggs=[
-            F.sum((F.col(_CASA_IN_COL) > 0).cast("int")).alias("casa_inflow_cnt_h2"),
-            F.sum((F.col(_CASA_OUT_COL) > 0).cast("int")).alias("casa_outflow_cnt_h2"),
-        ],
-    )
+    return _last_3_months(obs, src, "week", [F.max("_active").alias("casa_active_3m")])
 
 
 def build_liquidity_signals(
     obs_base: DataFrame,
-    feat_casa_bal: DataFrame,
+    wm_casa_bal: DataFrame,
     wm_casa_flow: DataFrame,
     labelled_txn: DataFrame,
     beneficiary_cards: DataFrame,
 ) -> DataFrame:
-    """CASA balance by quarter, external card payments and CASA activity."""
+    """``casa_m1 … casa_m6``, ``ext_card_payment_max_3m``, ``casa_active_3m``."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     return left_join_all(
         obs_base,
         [
-            _casa_quarters(obs, feat_casa_bal),
+            _by_month(obs, _casa_by_month(wm_casa_bal), "balance", "casa"),
             _ext_card_payments(obs, labelled_txn, beneficiary_cards),
             _casa_activity(obs, wm_casa_flow),
         ],
@@ -290,7 +262,7 @@ def build_distress_signals(
     payment_order: DataFrame | None = None,
     internal_returns: DataFrame | None = None,
 ) -> DataFrame:
-    """distress_flag: a cheque bounce or direct-debit (DDS) return in the last 90 days,
+    """distress_flag: a cheque bounce or direct-debit (DDS) return in the last 3 months,
     from the bureau and from the bank's own records.
 
     * ``bureau_alert`` — bureau-reported bounced cheques (always wired);
@@ -332,11 +304,7 @@ def build_distress_signals(
                 "cif_id", F.to_date("event_date").alias("event_date")
             )
         )
-    hits = window_agg(
-        obs,
-        events,
-        date_col="event_date",
-        days=90,
-        aggs=[F.max(F.lit(1)).alias("distress_flag")],
+    hits = _last_3_months(
+        obs, events, "event_date", [F.max(F.lit(1)).alias("distress_flag")]
     )
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])

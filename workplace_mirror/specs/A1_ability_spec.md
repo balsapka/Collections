@@ -67,18 +67,22 @@ Every customer-level signal (salary, CASA, external payments, cheque bounces, DD
 is read across **all accounts of the customer's CIF**, not the scored account — an RL
 `account_id` is never the customer's CASA account (user, 2026-10-23).
 
-## 4. Code vs spec (CC A1 — v2 and the bundle-01 engine behave the same)
+## 4. Decisions (2026-10-23) and how the engine implements them
 
-| # | Spec | Code | Status |
+The shared engine (`crx_persona/_a1`, bundle 01) follows sections 1–3, with these
+decisions by the user where the workbook and the earlier code disagreed:
+
+| # | Topic | Decision | Implementation |
 |---|---|---|---|
-| S1 | Anchor = minimum due = max(5% × outstanding, AED 100) | oldest overdue bucket (`prm_balance.overdue_bucket_01..08`) | **differs — decision** |
-| S2 | Income threshold max(AED 3,000, **2 ×** minimum due) (`k_inc` = 2) | flat AED 3,000 (`k_inc` = 0) | **differs — decision** |
-| S3 | Salary month = a month with a credit ≥ threshold; Stable = 2 of last 3 | payroll-flag months ≥ 2 **and** the latest salary amount ≥ threshold | approximation (no monthly salary amounts used) |
-| S4 | Stable also needs income not > 25% below the prior quarter (`d_inc`) | not implemented | missing |
-| S5 | Weak income = ≥ AED 1,000 in any of the last 3 months | any payroll month, or any bureau salary in **6** months, or latest amount ≥ 1,000 | looser than spec |
-| S6 | Bureau salary looked at over the last 3 months | last 6 months | differs |
-| S7 | CASA Adequate = balance ≥ floor in 2 of the last 3 months + not > 50% below prior quarter | latest trailing-3-month average ≥ floor + not > 50% below the one a quarter earlier | approximation |
-| S8 | External card payment: **one payment** ≥ max(AED 500, minimum due) / ≥ AED 1,000 for Weak | **sum** of payments in 90 days | differs (more lenient) |
-| S9 | Distress = cheque bounces **or DDS returns**, checked in the bureau **and internally** (user, 2026-10-23) | bureau bounced cheques only; slots for bureau payment orders and internal returns exist but no source is wired | gap — TODO for the workplace Sonnet: find the internal returned-cheque / DDS-return source |
-| S10 | Unknown gate, map, points, distress demotion | as spec | matches |
-| S11 | Thresholds `f_*`, `d_casa`, `demin`, `s_*` | as spec | matches |
+| S1 | Anchor (the workbook's "minimum due") | **CC 60–180: the amount in the oldest overdue bucket**, excluding the 181–210 bucket and the 211+ catch-all; **CC 180+: no anchor** (absolute thresholds only); **RL: one EMI**. Missing → flat floors | `build_cc_liquidity_anchor`: oldest non-zero of `overdue_bucket_01..06` on the latest snapshot ≤ 31 days old; NULL at 180+ |
+| S2 | Income multiple | Income ≥ max(AED 3,000, **2 × anchor**) | `K_INC = 2` |
+| S3 | Salary month | per-month amount ≥ threshold, Stable = 2 of the last 3 | internal credits recovered per month from the WM salary snapshots (credit date = snapshot − days since credit); bureau salary per month; the larger counts. TODO(sonnet): validate against `feat_payroll_indicator` |
+| S4 | Income weakening | last-3-month average ≥ 75% of the prior 3 | `D_INC = 0.25`, months without salary count as 0 |
+| S5/S6 | Weak income, bureau window | any month ≥ AED 1,000 in the last 3 months (bureau included) | 3 complete calendar months before the observation month |
+| S7 | CASA | ≥ floor in 2 of the last 3 months and not > 50% below the prior 3 | monthly CASA (CA+SA) average from `wm_fea_casa_eod_avg_balance` (4-week average at the month's last weekly snapshot) |
+| S8 | External card payment | one payment ≥ max(AED 500, anchor) / ≥ AED 1,000 for Weak | largest single payment in the last 3 months |
+| S9 | Distress | cheque bounces and DDS returns, bureau **and internal**, across all the customer's accounts | bureau bounced cheques wired; `payment_order` and `internal_returns` slots ready. TODO(sonnet): find the internal returned-cheque / DDS-return source |
+
+Every customer-level signal is read across **all accounts of the CIF**. Local check:
+`workplace_mirror/checks/a1_engine_spec.py` — 25 cases built from the workbook rows, all
+passing.

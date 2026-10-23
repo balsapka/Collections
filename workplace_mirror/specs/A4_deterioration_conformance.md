@@ -22,7 +22,8 @@ of one kind (D1 below). Thresholds in `STATE_RULES` are identical.
 | D4 | +2 billing-cycle jump repair described for CC | RL skips the repair (`BucketScheme.repair_jumps=False`); an RL +2 is a real move | RL only |
 | D5 | One CC history floor (2024-01) | Separate overridable floor for CC 180+ (`cc_history_floor_date_180_plus`, same default) | None until overridden |
 
-## Recommendation
+## Decision (2026-10-23)
 
-Accept D1–D5 as the current spec and update `METHODOLOGY.md` §2/§4 (Q0 wording, the two
-blind-spot flags, the RL scheme). No code change.
+The code is the spec. `METHODOLOGY.md` §2 and §4 now describe D1–D5 (Q0 for unobserved
+starts only, the restructure and RL ECL-gap blind spots, the RL scale, the CC 180+ floor).
+No code change.

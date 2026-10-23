@@ -5,9 +5,9 @@
                      ├─ distress signals ──┼─► crx_cc_a1_ability_v2
                      └─ liquidity anchor ──┘
 
-Needs crx_cc_obs_base (``kedro run --pipeline=crx_cc_obs_base``) first.
-prm_bureau_payment_order is not in PROD yet; once it is, add it as the third input of
-the distress node.
+Needs crx_cc_obs_base (``kedro run --pipeline=crx_cc_obs_base``) first. Optional
+distress sources (prm_bureau_payment_order, internal cheque / DDS returns) are added as
+extra inputs of the distress node once they exist.
 
     kedro run --pipeline=crx_cc_a1_ability_v2
 """
@@ -22,16 +22,16 @@ from .._a1 import (
 )
 from .nodes import build_cc_liquidity_anchor
 
+_OBS = "crx_cc_obs_base"
+
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    obs = "crx_cc_obs_base"
     return Pipeline(
         [
             node(
                 build_income_signals,
                 [
-                    obs,
-                    "feat_payroll_indicator",
+                    _OBS,
                     "wm_fea_salary_days_since_increment",
                     "stg_aecb_salary_history",
                     "prm_bureau_cif_bridge",
@@ -42,8 +42,8 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
             node(
                 build_liquidity_signals,
                 [
-                    obs,
-                    "feat_casa_eod_balance",
+                    _OBS,
+                    "wm_fea_casa_eod_avg_balance",
                     "wm_fea_casa_cc_inflow_outflow",
                     "wm_pri_labelled_transactions",
                     "raw_beneficiary_cards",
@@ -53,20 +53,20 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
             ),
             node(
                 build_distress_signals,
-                [obs, "prm_bureau_alert_enriched"],
+                [_OBS, "prm_bureau_alert_enriched"],
                 "crx_cc_a1_distress_signals",
                 name="build_crx_cc_a1_distress_signals",
             ),
             node(
                 build_cc_liquidity_anchor,
-                [obs, "prm_balance"],
+                [_OBS, "prm_balance", "params:model_id"],
                 "crx_cc_a1_liquidity_anchor",
                 name="build_crx_cc_a1_liquidity_anchor",
             ),
             node(
                 build_a1_ability,
                 [
-                    obs,
+                    _OBS,
                     "crx_cc_a1_income_signals",
                     "crx_cc_a1_liquidity_signals",
                     "crx_cc_a1_distress_signals",

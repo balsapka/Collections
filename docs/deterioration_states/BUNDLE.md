@@ -56,7 +56,7 @@ result = main(catalog)           # full validation incl. backtest -> results/
 
 ---
 
-Generated 2026-10-21 by `dpd_states/bundle.py`. 42 files, 7,296 lines.
+Generated 2026-10-23 by `dpd_states/bundle.py`. 42 files, 7,311 lines.
 This one markdown file contains **every source file** of `docs/deterioration_states/`, for
 environments where `.py` files cannot be opened. Regenerate it after any change with
 `python docs/deterioration_states/run.py bundle`.
@@ -398,7 +398,7 @@ if __name__ == "__main__":
 `````
 
 ### FILE: `METHODOLOGY.md`
-sha256 `c1cfdcb731453183676a0d8af865e4e8f91c7d06734ffff2cbc54aaf24565a27` · 487 lines · trailing newline: yes
+sha256 `8a8cc9d9eade31f15f8e59994ac8ce04320c907c39da386318e2cbba2e5dc642` · 502 lines · trailing newline: yes
 
 `````markdown
 # Deterioration states — methodology
@@ -466,6 +466,10 @@ Design rules agreed with the business owner:
 - **Read it as text.** A numeric column drops digits (Excel keeps 15 significant digits;
   leading zeros vanish). The file reader refuses number-like values.
 - **0 ≡ 1.** Bucket 1 (a few days late) is treated as normal.
+- **Retail loans** use the same tree on a shifted scale: RL native bucket + 1 = canonical
+  bucket (RL 0 = current, 1 = 1–30 DPD, …, 7 = 180+), no history floor, and no +2 jump
+  repair (one row per loan and month, so a +2 is a real move). The CC 180+ segment has its
+  own overridable history floor (`cc_history_floor_date_180_plus`, default 2024-01).
 - **Monthly movement `d` = bucket this month − bucket last month**, which reads as a payment:
 
   | d | Meaning | Months paid that month (= 1 − d) |
@@ -518,9 +522,15 @@ only. The current-behaviour inputs are confined to the stabilized question and t
 Questions are asked **in order**; the first "yes" assigns the state.
 
 ```
-Q0  Journey start observed?  the oldest OBSERVED month is already at bucket 2+ (spell
-                            older than the window / floor, restructured re-open, migrated
-                            or missing history): stabilized if Q2 holds, else -> unknown
+ECL RL source gap?          disbursed before the ECL/DPL seam with a product code
+                            outside the ECL extract: the visible run-up may be an artefact
+                            of the gap -> stabilized if Q2 holds, else -> unknown
+Q0  Journey start observed?  the oldest observed month is already at bucket 2+ AND the
+                            start is not observed (history cropped by the window / floor /
+                            an unresolvable gap, or the account was restructured):
+                            stabilized if Q2 holds, else -> unknown. A delinquent start
+                            that IS observed (an RL loan missing its first EMI) goes on
+                            through the tree
 Q1  Early payment default?  <= 3 months of history before this spell (at most one blip,
                             no earlier real spell) AND never paid since crossing bucket 2
                             (every month of the spell a roll — still falling)
@@ -538,6 +548,11 @@ Q5  Straight roller?        run-up (last clean month -> first month at 4) <= 3 m
       no  -> slow_roller      [C: paid 2+ months at once on the way down
                                -> slow_roller_erratic, else slow_roller_intermittent]
 ```
+
+**Blind spots** (`history_blind` = cropped or restructured) also mean: never EPD, and a
+straight roller is always seasoned — the time on book before the visible window is unknown.
+A restructured account counts as blind because its new contract hides the predecessor's
+history.
 
 (Q3 "paying since bucket 4" was tested and rejected — §6.4.) Q0 is a confidence guard,
 not a behaviour state: when the history starts at 0 DPD the whole journey is observed and
