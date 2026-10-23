@@ -13,7 +13,8 @@ but the choice is questionable.
 
 Last updated: 2026-10-23 (batches 1–3: cc_spell, cc_full_history, cc_raw_extract,
 cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry,
-cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability).
+cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability, cc_a1_ability_v2,
+`_spine_utils`, `stg_rr_portf`, `nodes/utils/config`).
 
 ---
 
@@ -41,6 +42,11 @@ cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability).
 | O18 | L | confirmed | cc_a2_locatability Node 3 | `contact_confirmed_n` / `rpc_rate` double-count outbound SUC events that are also on the RPC list |
 | O19 | M | design | cc_a4_deterioration | "Restructure" flag cannot tell a restructure from an account already delinquent at the data start |
 | O20 | M | confirmed | crx_persona (all) | Repeated `.count()` logging without `persist` recomputes each node's full lineage |
+| O21 | H | confirmed | departure Pass A + D | `fee_accel_h2` divides finance charges by late + overlimit fees — two different fee types |
+| O22 | M | confirmed | `_spine_utils.join_spine_to_spell` | Drops spine rows whose account has spells but none covering the date (docstring says all rows kept) |
+| O23 | M | data check | stg_rr_portf | Dedup keys on `ra_org_app_id`, not `acct_num` — can drop a second loan sharing an application |
+| O24 | M | confirmed | cc_a1_ability_v2 Node 3 | `oldest_overdue_amount` uses the latest balance snapshot however old it is |
+| O25 | M | data check | cc_raw_extract + config | `TXN_CATEGORIES` codes are zero-padded strings; an unpadded `txn_code` leaves every category NULL |
 
 ---
 
@@ -67,6 +73,8 @@ Whatever the real sign is, at least one is wrong:
 - If payments are negative: T04b's `p_m` is negative → `pay_ratio_m ≤ 0` for everyone.
 
 **Check:** `select direction, sign(settl_amount), count(*) from raw_transaction … group by 1, 2`.
+Batch 4 note: `TXN_CATEGORIES["payment"]` exists (`nodes/utils/config.py:98`), so Pass K's
+`txn_category == "payment"` fallback does work — but only if O25 is not hitting.
 **Likely fix:** make Pass K use `direction` like T04b/T05 (`direction == 1` payment,
 `direction == -1` purchase, `abs()` for amounts), and state the convention once in `cc_raw_extract`.
 
@@ -177,6 +185,12 @@ is NULL.
   (878) checks it again — harmless duplication.
 - `cc_a2_locatability/nodes.py:136–138`: "CC's crx_cc_a2_base does not [carry cif_id]" — it does
   (Node 1 adds it at 311–317), so the `_build_cif_bridge` branch at 1229–1237 is dead code for CC.
+- `stg_rr_portf.py:157`: comment "Restrict DPL tables from 2025-11" — the code uses
+  `ECL_CUTOFF_DATE` = 2025-12-01.
+- `computed_at` type differs per axis: `date` (A1 v2, `cc_a1_ability_v2/nodes.py:926`), `string`
+  (A2), `timestamp` (T04b/T05/T06/A4).
+- `cc_a1_ability_v2/nodes.py:933`: `_log_a1v2_stats` has no `try/except` (every other stats logger
+  does) — a logging failure fails the node.
 - `cc_a4_deterioration/nodes.py:20`: "Mirrors cc_spell/nodes.py's _RESTRUCTURE_DLQ_THRESHOLD" —
   `cc_spell` has no such constant; its censoring rule uses `>= 2` (`_CC_DELINQ_MIN`), A4 uses `>= 4`.
 
@@ -251,6 +265,64 @@ re-runs the node's joins — on the CASA/DCORE-sized inputs this is several extr
 run. **Fix:** compute stats from the saved output, gate them behind a `log_stats` param as
 `_dpd_journey` does, or `persist()` before counting.
 
+### O21 — `fee_accel_h2` compares two different kinds of fee (H, confirmed)
+
+`fee_accel_h2 = (H2 fees / H2 months) / fee_rate_life` (departure `nodes.py:1209–1220`), but:
+- **numerator** `_fee_amt_h2` (Pass A, 746–748, 774–776) sums transactions with
+  `txn_category == "fee"`, and `TXN_CATEGORIES["fee"]` is `["500", "485"]` — *finance charges /
+  billed interest* (`nodes/utils/config.py:127–129`), plus a narration fallback;
+- **denominator** `fee_rate_life` (Pass D, 1195–1196) is lifetime **late + overlimit** fees from
+  `prm_turnovers`, divided by tenure.
+
+So the ratio is interest-this-quarter over penalty-fees-per-month. Accounts carrying a balance get
+very large values regardless of any change in behaviour; the docstring's "fees accelerated in the
+3 months before T0" reading does not hold. The `_FEE_CATEGORY = "fee"  # <<FILL-IN: verify>>`
+(125) is exactly where this slipped through.
+**Fix:** numerator from `late_fee` + `overlimit_fee` codes (`254, 255, 504, 519, 256, 257, 503`), or
+denominator from the same finance-charge codes — same fee definition on both sides.
+
+### O22 — `join_spine_to_spell` silently drops spine rows (M, confirmed)
+
+`_spine_utils.py:19–21` promises "Left join preserves all spine rows; spell columns are NULL…".
+The code (41–53) left-joins on account only, then filters `t0 IS NULL OR t0 <= obs` and
+`spell_end IS NULL OR obs <= spell_end`. An account that **has** spells, but none covering this
+`observation_date`, produces only joined rows that fail the filter — so the spine row disappears
+instead of coming through with NULL spell columns. Typical trigger: CC billing dates (spell `t0`)
+vs spine observation dates on different days of the same month, or a spine date after a cure.
+Used by A1 (v1), A2 Node 1, A3 — those axes lose rows without a log line.
+**Fix:** move both date conditions into the join (`on=[eq, t0 <= obs, (spell_end null | obs <=
+spell_end)]`, still a left join) — the efficiency note in the docstring is about a cross-join plan,
+which an equi-join plus extra conditions does not trigger.
+
+### O23 — `stg_rr_portf` dedup key is the application, not the account (M, data check)
+
+Module grain is `acct_num × ss_dt` (`stg_rr_portf.py:4`), but the dedup window (204–211)
+partitions by `(ra_org_app_id, edp_load_date)` and keeps one row. If one application can carry
+more than one `acct_num` (top-up / takeover — `ra_ln_nat_nm` has NEW/TOPUP/TAKEOVER), the second
+account is dropped from every RL table built on this staging layer.
+**Check:** `count(distinct acct_num) > 1 group by ra_org_app_id, edp_load_date`.
+**Fix:** partition by `(acct_num, edp_load_date)` (or both keys).
+
+### O24 — A1 v2 overdue anchor has no staleness bound (M, confirmed)
+
+`_enrich_oldest_overdue_amount` (`cc_a1_ability_v2/nodes.py:304–327`) takes the latest
+`prm_balance` row with `_bal_obs_date <= observation_date`, with **no lower bound**. If the
+account's balance snapshots stopped (closed/blocked card), a snapshot from months or years earlier
+sets `oldest_overdue_amount`, which then sets both liquidity floors (`_casa_floor`, `_pay_floor`).
+Every other A1 v2 source is windowed (90 or 180 days).
+**Fix:** require `_bal_obs_date >= observation_date - 31 days` (or the same month); NULL otherwise
+→ falls back to the flat floor, as the docstring already allows.
+
+### O25 — Transaction category codes may never match (M, data check)
+
+`cc_raw_extract/nodes.py:97–102` maps `txn_code` to a category with
+`F.col("txn_code").isin(codes)`, where `codes` are zero-padded strings such as `"036"`,
+`"500"` (`nodes/utils/config.py:76–137`). If `raw_transaction.txn_code` is a string without
+padding (`"36"`) or a double (`36.0` → `"36.0"` when compared as string), nothing matches and
+`txn_category` is NULL for all rows: Pass A fees fall back to the narration regex only, Pass K
+payments fall back to the sign test only (see O1).
+**Check:** `select txn_code, count(*) from raw_transaction group by 1 order by 2 desc limit 20`.
+
 ---
 
 ## Not issues (checked, fine)
@@ -263,3 +335,7 @@ run. **Fix:** compute stats from the saved output, gate them behind a `log_stats
   truncation are consistent with their docstrings; a smoke test of `classify` on a clean
   straight-roll sequence returns `early_payment_default` as the tree says it should.
 - A2 Node 2 login window (`< trunc(obs, 'month')`) has no look-ahead.
+- `stg_rr_portf` `_SELECT_COLS` has exactly 58 columns, as `build()`'s docstring says.
+- A1 v2 CASA recent/prior windows (latest month-end row in `[obs-90d, obs)` vs `[obs-180d,
+  obs-90d)`) do not overlap, since each row is already a trailing 3-month average.
+- Departure Pass K's `_PAYMENT_CATEGORY = "payment"` matches the `TXN_CATEGORIES` key.

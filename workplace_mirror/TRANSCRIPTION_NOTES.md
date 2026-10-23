@@ -98,6 +98,29 @@ Uncertain characters (comments/strings only):
 - `cc_a2_locatability/constants.py:271`: `"MOBILE SWICTHED OFF"` (typo) sits next to
   `"MOBILE SWITCHED OFF"` on screen — kept both; the typo is probably the real DCORE value.
 
+## Batch 4 — A1 ability v2, `_spine_utils`, `stg_rr_portf`, `utils/config` (photos IMG_8076–8130)
+
+| Module | Lines (screen) | Lines here | Status |
+|---|---|---|---|
+| `crx_persona/cc_a1_ability_v2/__init__.py` | 5 | 5 | complete |
+| `crx_persona/cc_a1_ability_v2/nodes.py` | 945 | 945 | complete |
+| `crx_persona/cc_a1_ability_v2/pipeline.py` | 98 | 98 | complete |
+| `crx_persona/_spine_utils.py` | 120 | 120 | complete |
+| `nodes/staging/retail_loans/stg_rr_portf.py` | 266 | 266 | complete |
+| `nodes/utils/config.py` | 619 | 619 | complete |
+
+IMG_8084 was not in the batch; IMG_8083 → IMG_8085 overlap (lines 254–300), so nothing is missing.
+Checks: everything compiles, ruff F/E9 clean, and `cc_raw_extract`, `cc_a2_locatability` and
+`_dpd_journey` now import for real (no stubs needed any more).
+
+Still not seen (imported by `cc_a1_ability_v2`): `crx_persona/cc_a1_ability/enrichers.py`
+(`enrich_salary_months_h2`, `enrich_salary_pit`, `enrich_bureau_salary`,
+`enrich_ext_cc_payments_h2`, `enrich_casa_inflow_h2`, `_CASA_BAL_COL`) and
+`crx_persona/scoring_engine.py` (`StateLadder`, `points_from_level`).
+
+Uncertain characters: `stg_rr_portf.py:4` "acct_num × ss_dt" (box glyph, read as ×);
+`cc_a1_ability_v2/pipeline.py:10–12` the bracket glyphs drawn beside "parallel" (┐ ┤ ┘).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
