@@ -1,0 +1,37 @@
+# PARTIAL — src/enbd_collections/pipeline_registry.py, lines 220-255 only (inside register_pipelines(), def at line 117).
+# Line 220 is partly cut off at the top of the photo.
+        "rl_180_plus.intermediate": retail_loans_int.create_pipeline(),
+        "rl_180_plus.cc_scope": cc_way4.create_rl_scoped_pipeline(),
+        # -- CRX Persona (experimental, additive) ---------------------------
+        # Revert: remove this entry + the import above + rm -r crx_persona/
+        "crx_cc_spell_table": crx_cc_spell.create_pipeline(),
+        "crx_cc_full_history": crx_cc_full_history.create_pipeline(),
+        "crx_cc_raw_extract": crx_cc_raw_extract.create_pipeline(),
+        "crx_cc_payment_trajectory": crx_cc_payment_trajectory.create_pipeline(),
+        "crx_cc_utilisation_features": crx_cc_utilisation.create_pipeline(),
+        "crx_cc_departure_signature": crx_cc_departure.create_pipeline(),
+        "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
+        "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
+        "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
+        "crx_cc_a1_ability_v2": crx_cc_a1_ability_v2.create_pipeline(),
+        "crx_cc_a3_payment_credibility": crx_cc_a3_payment_credibility.create_pipeline(),
+        "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
+        "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
+        "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
+        "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
+        "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
+        "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
+        "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
+        "crx_rl_a3_payment_credibility": crx_rl_a3_payment_credibility.create_pipeline(),
+        # -- Digital login (OMB) --------------------------------------------
+        "digital_login": dl.create_pipeline(),
+        # -- Default ---------------------------------------------------------
+        "__default__": cc_way4.create_pipeline(),
+        "rerun": model_input.create_features_pipeline()
+        + model_training.create_pipeline()
+        + model_reporting.create_pipeline(),
+        "rerun_full": model_input.create_base_pipeline()
+        + model_input.create_features_pipeline()
+        + model_training.create_pipeline()
+        + model_reporting.create_pipeline(),
+    }
