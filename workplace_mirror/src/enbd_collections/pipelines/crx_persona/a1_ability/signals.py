@@ -31,9 +31,9 @@ from .._common import (
     require_columns,
 )
 
-# reason_for_excluding values marking a returned cheque or DDS return (from a profiled
-# sample of comp_financial_tran_repos_dly, not a code dictionary; checked in PROD).
-RETURN_REASONS = ("CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS")
+# reason_for_excluding values that count as distress. prm_casa_return_events also carries
+# "RETURNS", which is POS reversals (checked in PROD, Sonnet v01).
+DISTRESS_RETURN_REASONS = ("CHEQUE RETURNS", "DDS Rejects/Reversal")
 _CASA_MONTH_COL = "ft_avg_casa_eod_balance_in_last_0_3_weeks_avg"  # CA+SA, ~1 month
 _CASA_IN_COL = "ft_inflow_casa_amt_in_last_0_0_weeks_sum"
 _CASA_OUT_COL = "ft_outflow_casa_amt_in_last_0_0_weeks_sum"
@@ -267,7 +267,8 @@ def build_distress_signals(
     """distress_flag: a cheque bounce or direct-debit (DDS) return in the last 3 months,
     from the bureau and from the bank's own records.
 
-    * ``bureau_alert`` — bureau-reported bounced cheques (always wired);
+    * ``bureau_alert`` — bureau-reported bounced cheques, dated by the bureau pull
+      date (the extract date repeats an old bounce in every later extract);
     * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet;
     * ``internal_returns`` — the bank's own returned cheques / DDS returns as
       ``(cif_id, event_date)`` from ``build_internal_returns``.
@@ -275,11 +276,11 @@ def build_distress_signals(
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     require_columns(
         bureau_alert,
-        ["cif_id", "extract_date", "bounced_cheque_amount"],
+        ["cif_id", "bureau_pull_date", "bounced_cheque_amount"],
         "prm_bureau_alert_enriched",
     )
     events = bureau_alert.filter(F.col("bounced_cheque_amount") > 0).select(
-        "cif_id", F.to_date("extract_date").alias("event_date")
+        "cif_id", F.to_date("bureau_pull_date").alias("event_date")
     )
     if payment_order is not None:
         require_columns(
@@ -305,30 +306,23 @@ def build_distress_signals(
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
 
 
-def build_internal_returns(obs_base: DataFrame, casa_txn: DataFrame) -> DataFrame:
-    """The bank's own returned cheques / DDS returns as distinct
-    ``(cif_id, event_date, reason)``, across all of the customer's CASA accounts (the
-    same return reloaded in several ``edp_load_date`` partitions counts once).
-
-    ``casa_txn`` is ``comp_financial_tran_repos_dly`` (2.4B rows): scoped to the
-    observation base's CIFs before any other filter (R20), partitions pruned on
-    ``edp_load_date``.
+def build_internal_returns(obs_base: DataFrame, return_events: DataFrame) -> DataFrame:
+    """The bank's own returned cheques and DDS returns for the observation base's CIFs, as
+    distinct ``(cif_id, event_date, reason)`` from ``prm_casa_return_events`` (all of the
+    customer's CASA accounts; the debit and credit legs of a return collapse to one row).
     """
     require_columns(
-        casa_txn,
-        ["cif_id", "edp_load_date", "tran_date", "reason_for_excluding"],
-        "comp_financial_tran_repos_dly",
+        return_events,
+        ["cif_id", "tran_date", "reason_for_excluding"],
+        "prm_casa_return_events",
     )
-    floor = F.lit(lookback_floor(obs_base, 100))
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
     return (
-        casa_txn.select("cif_id", "edp_load_date", "tran_date", "reason_for_excluding")
-        .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
-        .filter(
-            (F.col("edp_load_date") >= floor)
-            & (F.col("tran_date") >= floor)
-            & F.col("reason_for_excluding").isin(*RETURN_REASONS)
+        return_events.filter(
+            (F.col("tran_date") >= F.lit(lookback_floor(obs_base, 100)))
+            & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
         )
+        .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
         .select(
             "cif_id",
             F.to_date("tran_date").alias("event_date"),

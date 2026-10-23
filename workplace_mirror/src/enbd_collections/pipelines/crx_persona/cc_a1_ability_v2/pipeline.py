@@ -68,7 +68,7 @@ def create_pipeline(
             ),
             node(
                 build_internal_returns,
-                [_OBS, "comp_financial_tran_repos_dly"],
+                [_OBS, "prm_casa_return_events"],
                 "crx_cc_a1_internal_returns",
                 name="build_crx_cc_a1_internal_returns",
             ),

@@ -80,7 +80,7 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounce=None, activ
         rows["alert"].append((cif, m(bounce), 500.0))
     if internal is not None:  # (k, reason_for_excluding)
         k, reason = internal
-        rows["ret"].append((cif, m(k).isoformat(), m(k), reason))
+        rows["ret"].append((cif, m(k), reason))
     if active:
         rows["flow"].append((cif, yyyymmdd(m(1, 8)), 100.0, 0.0))
     b = buckets or [0.0] * 8
@@ -129,6 +129,8 @@ case("internal DDS return counts", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000
      internal=(1, "DDS Rejects/Reversal"), state="ability_moderate")
 case("other internal reasons ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
      internal=(1, "CHARGES"), state="ability_high")
+case("RETURNS (POS reversals) ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
+     internal=(1, "RETURNS"), state="ability_high")
 case("bounce older than 3 months ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
      bounce=4, state="ability_high")
 
@@ -154,10 +156,10 @@ out = build_a1_ability(
     ),
     build_distress_signals(
         obs,
-        df(rows["alert"], "cif_id long, extract_date date, bounced_cheque_amount double"),
+        df(rows["alert"], "cif_id long, bureau_pull_date date, bounced_cheque_amount double"),
         internal_returns=build_internal_returns(
             obs,
-            df(rows["ret"], "cif_id long, edp_load_date string, tran_date date, reason_for_excluding string"),
+            df(rows["ret"], "cif_id long, tran_date date, reason_for_excluding string"),
         ),
     ),
     build_cc_liquidity_anchor(obs, df(rows["bal"], f"contract_id string, observation_date date, {bcols}"), "cc_60_180"),
@@ -176,10 +178,9 @@ for acct, (name, want) in expect.items():
 # 180+ has no anchor
 assert build_cc_liquidity_anchor(obs, df(rows["bal"], f"contract_id string, observation_date date, {bcols}"),
                                  "cc_180_plus").filter(F.col("liquidity_anchor_amt").isNotNull()).count() == 0
-# a return reloaded in a later edp_load_date partition counts once
-ret_schema = "cif_id long, edp_load_date string, tran_date date, reason_for_excluding string"
-reloaded = rows["ret"] + [(c, (d + timedelta(days=1)).isoformat(), d, r) for c, _, d, r in rows["ret"]]
-assert (build_internal_returns(obs, df(reloaded, ret_schema)).count()
+# the debit and credit legs of one return count once
+ret_schema = "cif_id long, tran_date date, reason_for_excluding string"
+assert (build_internal_returns(obs, df(rows["ret"] * 2, ret_schema)).count()
         == build_internal_returns(obs, df(rows["ret"], ret_schema)).count() == 2)
 print(f"\n{len(expect) - fails}/{len(expect)} cases pass")
 sys.exit(1 if fails else 0)
