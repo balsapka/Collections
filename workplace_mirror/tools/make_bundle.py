@@ -2,7 +2,8 @@
 
     python workplace_mirror/tools/make_bundle.py --base <commit> --slug a1_engine \\
         --title "..." [--head HEAD] [--branch feature/x] [--summary-file f.md] \\
-        [--run-file f.md] [--cleanup-file f.md] [--helper path ...]
+        [--uat-file f.md] [--run-file f.md] [--cleanup-file f.md] [--helper path ...] \\
+        [--accept src/path.py ...] [--message "workplace commit message"]
 
 Writes workplace_mirror/bundles/NN_<slug>.md:
 
@@ -11,7 +12,8 @@ Writes workplace_mirror/bundles/NN_<slug>.md:
   the workplace side refuses to touch a file that differs from what was photographed;
 * helpers (``--helper``, e.g. a PROD check snippet): shipped to the workplace's gitignored
   ``data/input/mirror_bundles/`` — never part of the source, never committed;
-* the exact steps on top, the apply script and a cleanup prompt at the bottom.
+* the exact steps on top (UAT: apply, commit src/ + conf/, push; PROD: pull, run the
+  bundle's check pipeline), the apply script and a cleanup prompt at the bottom.
 """
 
 from __future__ import annotations
@@ -87,9 +89,12 @@ def _file_entry(
     return md
 
 
-def _steps(name: str, branch: str, run_md: str) -> list[str]:
+def _steps(
+    name: str, branch: str, uat_md: str, run_md: str, accept: list[str], message: str
+) -> list[str]:
     md_path = f"{WORK_DIR}/{name}"
     apply = f"python {WORK_DIR}/apply_bundle.py {md_path}"
+    accepts = "".join(f" --accept {a}" for a in accept)
     # One line, no heredoc, no backticks: survives copy-paste into bash or zsh.
     extract = (
         'python -c "import pathlib, re; '
@@ -101,15 +106,29 @@ def _steps(name: str, branch: str, run_md: str) -> list[str]:
         "print('apply_bundle.py written')\""
     )
 
+    # uat_md / run_md number their own steps, continuing from the fixed ones.
+    n_uat = uat_md.count("**Step ")
+
     def step(n: int, text: str, cmd: str) -> list[str]:
         return [f"**Step {n}.** {text}", "", "```bash", cmd, "```", ""]
 
+    accept_note = (
+        [
+            f"`--accept {' / '.join(accept)}` covers a known transcription slip in the bundle's",
+            "copy of that file. Any other **CONFLICT**: stop and send the printed diff back.",
+            "",
+        ]
+        if accept
+        else ["On a **CONFLICT**: stop and send the printed diff back.", ""]
+    )
     return [
         "## Steps — do these in order, from the workplace repo root",
         "",
-        f"Everything this bundle adds outside `src/` and `conf/` lives in `{WORK_DIR}/`",
-        "(gitignored). Nothing here is committed; commit `src/` and `conf/` only if you",
-        "decide to keep the change. Copy each command block exactly as it is.",
+        f"The bundle file and the apply script live in `{WORK_DIR}/` (gitignored) and are",
+        f"never committed; only `src/` and `conf/` are (step {6 + n_uat}). Copy each command block",
+        "exactly as it is.",
+        "",
+        "### In UAT",
         "",
         *step(
             1,
@@ -130,34 +149,39 @@ def _steps(name: str, branch: str, run_md: str) -> list[str]:
         ),
         *step(
             4,
-            "Dry run — must end with `CHECK PASSED` (nothing is written):",
-            f"{apply} --check",
+            "Apply — checks every file first, writes, compiles and imports; must end with "
+            "`APPLY PASSED`:",
+            f"{apply} --apply{accepts}",
         ),
-        "If step 4 reports a **CONFLICT** for a file nobody edited by hand, the code-only",
-        "diff it prints is a transcription slip in the bundle's copy. Re-run step 4, then",
-        "step 5, with `--accept <path>` added for that file, e.g.:",
-        "",
-        "```bash",
-        f"{apply} --check --accept src/path/of/the/file.py",
-        "```",
-        "",
+        *accept_note,
         *step(
             5,
-            "Apply — must end with `APPLY PASSED` (add the same `--accept` if you "
-            "used one in step 4):",
-            f"{apply} --apply",
+            "Look at what changed (nothing under `data/input/` shows up):",
+            "git status && git diff --stat",
         ),
-        *step(6, "Look at what changed:", "git status && git diff --stat"),
-        run_md.strip(),
-        "",
-        "**Undo** (before any commit) — restores every touched file exactly:",
+        *([uat_md.strip(), ""] if uat_md.strip() else []),
+        *step(
+            6 + n_uat,
+            "Commit the source only, and push:",
+            f'git add src conf && git commit -m "{message}" && git push -u origin {branch}',
+        ),
+        f"**Undo** (before step {6 + n_uat}) — restores every touched file exactly:",
         "",
         "```bash",
         f"{apply} --revert",
         "```",
         "",
+        "### In PROD",
+        "",
+        *step(
+            7 + n_uat,
+            "Get the branch:",
+            f"git fetch origin && git checkout {branch} && git pull",
+        ),
+        run_md.strip(),
+        "",
         "**When you are done**, give the *Cleanup prompt* at the bottom to the workplace",
-        "assistant (or run its steps yourself).",
+        "assistant in UAT.",
         "",
     ]
 
@@ -166,16 +190,16 @@ def _cleanup(name: str, extra_md: str) -> list[str]:
     return [
         "## Cleanup prompt",
         "",
-        "Copy this to the workplace assistant once the bundle's checks are done:",
+        "Copy this to the workplace assistant in UAT once the bundle's PROD checks are done:",
         "",
         "````text",
-        f"Clean up after mirror bundle {name}. Leave src/ and conf/ as they are, apart from",
-        "any temporary switch a step below asks you to make and undo.",
+        f"Clean up after mirror bundle {name}, on the bundle's branch.",
         *([extra_md.strip()] if extra_md.strip() else []),
-        f"- Delete the folder {WORK_DIR}/ (bundle file, apply script, helpers, results):",
+        f"- Delete the folder {WORK_DIR}/ (bundle file, apply script):",
         f"  rm -rf {WORK_DIR}",
-        "- Run `git status` and confirm nothing under data/input/ is tracked or staged and",
-        "  that no other file changed. Report what you deleted.",
+        "- Run `git status`: only the files named above may have changed, nothing under",
+        "  data/input/ is tracked or staged. Commit src/ and conf/ and push. Report what",
+        "  you removed and the hdfs commands the user still has to run in PROD.",
         "````",
         "",
     ]
@@ -209,7 +233,8 @@ def build(args: argparse.Namespace) -> pathlib.Path:
         f" · source: {counts['add']} added, {counts['replace']} replaced, "
         f"{counts['delete']} deleted · helpers: {len(helpers)}",
         "",
-        *_steps(name, branch, read(args.run_file)),
+        *_steps(name, branch, read(args.uat_file), read(args.run_file), args.accept or [],
+               args.message or f"Mirror bundle {number:02d}: {args.title}"),
         "## What this bundle does",
         "",
         read(args.summary_file).strip() or "_No summary given._",
@@ -217,10 +242,11 @@ def build(args: argparse.Namespace) -> pathlib.Path:
         "## Instructions for the workplace assistant",
         "",
         "1. Do not retype or hand-edit code from this file; `apply_bundle.py` writes it.",
-        "2. `--check` must print **CHECK PASSED**. On CONFLICT the workplace file differs from",
-        "   the version this bundle was built from: stop and show the printed diff to the user.",
+        "2. `--apply` must print **APPLY PASSED**. On CONFLICT (other than an `--accept`ed",
+        "   file) the workplace file differs from the version this bundle was built from:",
+        "   stop and show the printed diff to the user.",
         "3. `DAMAGED` means the markdown copy was altered — recopy the raw file.",
-        "4. `--apply` must print **APPLY PASSED**; if an import fails, run `--revert` and report.",
+        "4. If an import fails, run `--revert` and report.",
         f"5. Touch nothing outside the manifest. Never commit `{WORK_DIR}/`.",
         "",
         "## Manifest",
@@ -269,6 +295,9 @@ def main() -> None:
     ap.add_argument("--branch", default=None, help="workplace branch name")
     ap.add_argument("--summary-file", default=None)
     ap.add_argument(
+        "--uat-file", default=None, help="UAT steps before the commit (markdown)"
+    )
+    ap.add_argument(
         "--run-file", default=None, help="PROD run / check steps (markdown)"
     )
     ap.add_argument(
@@ -277,6 +306,10 @@ def main() -> None:
     ap.add_argument(
         "--helper", action="append", help="file shipped to data/input/mirror_bundles"
     )
+    ap.add_argument(
+        "--accept", action="append", help="workplace path with a known transcription slip"
+    )
+    ap.add_argument("--message", default=None, help="workplace commit message")
     out = build(ap.parse_args())
     print(f"wrote {out.relative_to(REPO)}")
 

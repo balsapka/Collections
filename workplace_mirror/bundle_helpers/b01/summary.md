@@ -24,13 +24,14 @@ CC A1 v1, RL A1 and every other axis are untouched.
   Required: `wm_fea_salary_days_since_increment.ft_days_since_salary_transaction`,
   `wm_fea_casa_eod_avg_balance.ft_avg_casa_eod_balance_in_last_0_3_weeks_avg`.
 
-**TODOs for the workplace assistant** (search `TODO(sonnet)` in `a1_ability/signals.py`):
-1. Internal cheque bounces / DDS returns: find the source (CASA transaction codes or
-   narrations in `comp_financial_tran_repos_dly`, a DDS mandate table), build
-   `(cif_id, event_date)` across all of the customer's accounts, and pass it as
-   `internal_returns` to the distress node.
-2. Validate the per-month internal salary credits recovered from the WM snapshots against
-   `feat_payroll_indicator`; prefer a table with monthly salary amounts if one exists.
+**TODOs** (`TODO(sonnet)` in `a1_ability/signals.py`), handled before any pipeline runs:
+1. Internal cheque bounces / DDS returns — step 6 has the workplace assistant wire an
+   existing internal source at CIF level, or report candidates for a data check.
+2. Salary months recovered from the WM snapshots — validated in the PROD run against
+   `feat_payroll_indicator` (the `B01 SALARY` block).
 
-The PROD check snippet (`b01_a1_engine_check.py`) is shipped to `data/input/mirror_bundles/`;
-its snapshot copy lives on HDFS next to the A1 output and is deleted by the cleanup step.
+**Temporary check (removed by the cleanup).** Pipeline `crx_cc_a1_ability_b01_check` =
+observation base + the A1 nodes writing to the temporary dataset
+`crx_cc_a1_ability_b01_check` + two log-only comparison nodes
+(`cc_a1_ability_v2/b01_check.py`). The real `crx_cc_a1_ability_v2` is read, never
+overwritten.

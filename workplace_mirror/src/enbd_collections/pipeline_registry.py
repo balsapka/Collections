@@ -232,6 +232,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
         "crx_cc_a1_ability_v2": crx_cc_a1_ability_v2.create_pipeline(),
+        # TEMPORARY (mirror bundle 01 check) — remove with its catalog entry
+        "crx_cc_a1_ability_b01_check": crx_cc_a1_ability_v2.create_b01_check_pipeline(),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_a3_payment_credibility": crx_cc_a3_payment_credibility.create_pipeline(),
