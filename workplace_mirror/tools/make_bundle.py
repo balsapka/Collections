@@ -1,13 +1,17 @@
 """Build a mirror bundle: the workplace_mirror changes between two commits, as one .md file.
 
-    python workplace_mirror/tools/make_bundle.py --base <baseline-commit> --slug a1_engine \\
-        --title "Extract the shared A1 engine" [--head HEAD] [--branch crx/a1-engine] \\
-        [--summary-file notes.md]
+    python workplace_mirror/tools/make_bundle.py --base <commit> --slug a1_engine \\
+        --title "..." [--head HEAD] [--branch feature/x] [--summary-file f.md] \\
+        [--run-file f.md] [--cleanup-file f.md] [--helper path ...]
 
-Writes workplace_mirror/bundles/NN_<slug>.md. Only files under workplace_mirror/src/,
-conf/ and docs/ are bundled; their path inside the bundle is the workplace repo path
-(src/..., conf/...). Every replaced or deleted file carries its base version, so the
-workplace side can refuse to touch a file that differs from what was photographed.
+Writes workplace_mirror/bundles/NN_<slug>.md:
+
+* source changes: files under workplace_mirror/src/ and conf/ changed between the two
+  commits, at their workplace path; replaced / deleted files carry their base version so
+  the workplace side refuses to touch a file that differs from what was photographed;
+* helpers (``--helper``, e.g. a PROD check snippet): shipped to the workplace's gitignored
+  ``data/input/mirror_bundles/`` — never part of the source, never committed;
+* the exact steps on top, the apply script and a cleanup prompt at the bottom.
 """
 
 from __future__ import annotations
@@ -20,11 +24,11 @@ import subprocess
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 MIRROR = "workplace_mirror/"
-BUNDLED_ROOTS = ("src/", "conf/", "docs/")
+SOURCE_ROOTS = ("src/", "conf/")
 OUT_DIR = REPO / "workplace_mirror" / "bundles"
 APPLY = pathlib.Path(__file__).with_name("apply_bundle.py")
 LANG = {".py": "python", ".yml": "yaml", ".yaml": "yaml", ".md": "markdown"}
-WORKPLACE_DIR = "docs/mirror_bundles"
+WORK_DIR = "data/input/mirror_bundles"  # gitignored in the workplace repo
 
 
 def _git(*args: str) -> str:
@@ -41,122 +45,196 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
 
 
-def _fence(text: str) -> str:
+def _block(text: str, lang: str) -> list[str]:
     fence = "`````"
     while any(line.startswith(fence) for line in text.split("\n")):
         fence += "`"
-    return fence
-
-
-def _block(text: str, lang: str) -> list[str]:
-    fence = _fence(text)
-    body = text[:-1] if text.endswith("\n") else text
-    return [f"{fence}{lang}", body, fence]
+    return [f"{fence}{lang}", text[:-1] if text.endswith("\n") else text, fence]
 
 
 def changed_files(base: str, head: str) -> list[tuple[str, str]]:
-    """[(action, workplace_path)] for bundled files changed between base and head."""
+    """[(action, workplace_path)] for source files changed between base and head."""
     out = _git("diff", "--no-renames", "--name-status", base, head, "--", MIRROR)
     result = []
     for line in out.splitlines():
         status, path = line.split("\t", 1)
-        rel = path[len(MIRROR):]
-        if not rel.startswith(BUNDLED_ROOTS):
-            continue
-        action = {"A": "add", "M": "replace", "D": "delete"}[status[0]]
-        result.append((action, rel))
-    return sorted(result, key=lambda x: ({"delete": 2}.get(x[0], 1), x[1]))
+        rel = path[len(MIRROR) :]
+        if rel.startswith(SOURCE_ROOTS):
+            result.append(({"A": "add", "M": "replace", "D": "delete"}[status[0]], rel))
+    return sorted(result, key=lambda x: (x[0] == "delete", x[1]))
 
 
-def build(base: str, head: str, slug: str, title: str, branch: str, summary: str) -> pathlib.Path:
-    files = changed_files(base, head)
-    if not files:
-        raise SystemExit(f"No changes under {MIRROR}src|conf between {base} and {head}.")
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    number = len(list(OUT_DIR.glob("[0-9][0-9]_*.md"))) + 1
-    name = f"{number:02d}_{slug}.md"
-    base_sha = _git("rev-parse", "--short", base).strip()
-    head_sha = _git("rev-parse", "--short", head).strip()
-    apply_src = APPLY.read_text(encoding="utf-8")
-    apply_version = next(
-        line.split("=")[1].strip()
-        for line in apply_src.splitlines()
-        if line.startswith("APPLY_VERSION")
+def _file_entry(rel: str, action: str, base_txt: str | None, new_txt: str | None) -> list[str]:
+    lang = LANG.get(pathlib.PurePosixPath(rel).suffix, "")
+    meta = [f"action: {action}"]
+    for kind, txt in (("base", base_txt), ("new", new_txt)):
+        if txt is not None:
+            meta.append(f"{kind} sha256 `{_sha(txt)}`")
+            meta.append(f"{kind} trailing newline: {'yes' if txt.endswith(chr(10)) else 'no'}")
+    md = [f"### FILE: `{rel}`", " · ".join(meta), ""]
+    if base_txt is not None:
+        md += ["Base (as photographed — used only for the safety check and --revert):", ""]
+        md += _block(base_txt, lang) + [""]
+    if new_txt is not None:
+        md += ["New:", ""] + _block(new_txt, lang) + [""]
+    return md
+
+
+def _steps(name: str, branch: str, run_md: str) -> list[str]:
+    md_path = f"{WORK_DIR}/{name}"
+    apply = f"python {WORK_DIR}/apply_bundle.py {md_path}"
+    extract = (
+        "python - <<'EOF'\n"
+        "import pathlib, re\n"
+        f"d = pathlib.Path('{WORK_DIR}')\n"
+        f"md = (d / '{name}').read_text(encoding='utf-8')\n"
+        "sec = md.split('## Apply script', 1)[1]\n"
+        "m = re.search(r'^(`{5,})python\\n(.*?)\\n\\1$', sec, re.S | re.M)\n"
+        "(d / 'apply_bundle.py').write_text(m.group(2) + '\\n', encoding='utf-8')\n"
+        "print('apply_bundle.py written')\n"
+        "EOF"
     )
-    bundle_path = f"{WORKPLACE_DIR}/{name}"
-    run = f"python {WORKPLACE_DIR}/apply_bundle.py {bundle_path}"
-
-    counts = {a: sum(1 for x, _ in files if x == a) for a in ("add", "replace", "delete")}
-    md: list[str] = [
-        f"# Mirror bundle {number:02d} — {title}",
+    lines = [
+        "## Steps — do these in order, from the workplace repo root",
         "",
-        f"apply_bundle version: {apply_version} · built {datetime.date.today()} from "
-        f"`{base_sha}..{head_sha}` · {counts['add']} added, {counts['replace']} replaced, "
-        f"{counts['delete']} deleted",
+        f"Everything this bundle adds outside `src/` and `conf/` lives in `{WORK_DIR}/`",
+        "(gitignored). Nothing here is committed; commit `src/` and `conf/` only if you",
+        "decide to keep the change.",
         "",
-        summary.strip() or "_No summary given._",
+        "1. Work on a branch (the apply script refuses to run on main):",
         "",
-        "## Run this (from the workplace repo root)",
+        "   ```bash",
+        f"   git checkout -b {branch}",
+        "   ```",
+        "",
+        f"2. Save this file **raw** (GitHub → Raw → copy all) as `{md_path}`:",
+        "",
+        "   ```bash",
+        f"   mkdir -p {WORK_DIR}",
+        "   ```",
+        "",
+        "3. Write the apply script from the *Apply script* section at the bottom:",
+        "",
+        "   ```bash",
+        *[f"   {line}" for line in extract.split("\n")],
+        "   ```",
+        "",
+        "4. Dry run — must end with `CHECK PASSED` (nothing is written):",
+        "",
+        "   ```bash",
+        f"   {apply} --check",
+        "   ```",
+        "",
+        "5. Apply — must end with `APPLY PASSED`:",
+        "",
+        "   ```bash",
+        f"   {apply} --apply",
+        "   ```",
+        "",
+        "6. Look at what changed:",
+        "",
+        "   ```bash",
+        "   git status && git diff --stat",
+        "   ```",
+        "",
+        run_md.strip(),
+        "",
+        "**Undo** (before any commit) — restores every touched file exactly:",
         "",
         "```bash",
-        f"git checkout -b {branch}            # never apply on main",
-        f"# save this file RAW as {bundle_path}",
-        f"# first time / version bump only: create {WORKPLACE_DIR}/apply_bundle.py "
-        "from the 'Apply script' section",
-        f"{run} --check     # dry run -> CHECK PASSED",
-        f"{run} --apply     # writes + compile + imports -> APPLY PASSED",
-        "git status && git diff --stat",
-        f'git add -A src conf docs && git commit -m "Mirror bundle {number:02d}: {title}"',
+        f"{apply} --revert",
         "```",
         "",
-        f"Undo before committing: `{run} --revert`. After committing: `git revert <commit>`.",
+        "**When you are done**, give the *Cleanup prompt* at the bottom to the workplace",
+        "assistant (or run its steps yourself).",
+        "",
+    ]
+    return lines
+
+
+def _cleanup(name: str, extra_md: str) -> list[str]:
+    return [
+        "## Cleanup prompt",
+        "",
+        "Copy this to the workplace assistant once the bundle's checks are done:",
+        "",
+        "````text",
+        f"Clean up after mirror bundle {name}. Do not edit anything under src/ or conf/.",
+        *([extra_md.strip()] if extra_md.strip() else []),
+        f"- Delete the folder {WORK_DIR}/ (bundle file, apply script, helpers, results):",
+        f"  rm -rf {WORK_DIR}",
+        "- Run `git status` and confirm nothing under data/input/ is tracked or staged and",
+        "  that no other file changed. Report what you deleted.",
+        "````",
+        "",
+    ]
+
+
+def build(args: argparse.Namespace) -> pathlib.Path:
+    base, head = args.base, args.head
+    files = changed_files(base, head)
+    if not files:
+        raise SystemExit(f"No src/ or conf/ changes between {base} and {head}.")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    number = len(list(OUT_DIR.glob("[0-9][0-9]_*.md"))) + 1
+    name = f"{number:02d}_{args.slug}.md"
+    read = lambda p: pathlib.Path(p).read_text(encoding="utf-8") if p else ""  # noqa: E731
+    apply_src = APPLY.read_text(encoding="utf-8")
+    version = next(
+        ln.split("=")[1].strip() for ln in apply_src.splitlines() if ln.startswith("APPLY_VERSION")
+    )
+    helpers = [pathlib.Path(h) for h in args.helper or []]
+    counts = {a: sum(1 for x, _ in files if x == a) for a in ("add", "replace", "delete")}
+    branch = args.branch or f"feature/{args.slug}"
+    md = [
+        f"# Mirror bundle {number:02d} — {args.title}",
+        "",
+        f"apply_bundle version: {version} · built {datetime.date.today()} from "
+        f"`{_git('rev-parse', '--short', base).strip()}..{_git('rev-parse', '--short', head).strip()}`"
+        f" · source: {counts['add']} added, {counts['replace']} replaced, "
+        f"{counts['delete']} deleted · helpers: {len(helpers)}",
+        "",
+        *_steps(name, branch, read(args.run_file)),
+        "## What this bundle does",
+        "",
+        read(args.summary_file).strip() or "_No summary given._",
         "",
         "## Instructions for the workplace assistant",
         "",
-        "1. **Do not retype or hand-edit code from this file.** Save it raw (GitHub \"Copy raw "
-        "file\", not the rendered page) and let `apply_bundle.py` write the files.",
-        "2. `--check` must print **CHECK PASSED**. If it prints CONFLICT, the workplace file "
-        "differs from the version this bundle was built from: stop, and give the printed diff "
-        "to the user. Do not edit files to make the check pass.",
+        "1. Do not retype or hand-edit code from this file; `apply_bundle.py` writes it.",
+        "2. `--check` must print **CHECK PASSED**. On CONFLICT the workplace file differs from",
+        "   the version this bundle was built from: stop and show the printed diff to the user.",
         "3. `DAMAGED` means the markdown copy was altered — recopy the raw file.",
-        "4. `--apply` must print **APPLY PASSED**. If an import fails, run `--revert` and report "
-        "the message.",
-        "5. Touch nothing outside the files listed in the manifest.",
+        "4. `--apply` must print **APPLY PASSED**; if an import fails, run `--revert` and report.",
+        f"5. Touch nothing outside the manifest. Never commit `{WORK_DIR}/`.",
         "",
         "## Manifest",
         "",
         "| Action | Path |",
         "|---|---|",
         *[f"| {a} | `{p}` |" for a, p in files],
+        *[f"| add (helper) | `{WORK_DIR}/{h.name}` |" for h in helpers],
         "",
         "## Files",
         "",
     ]
     for action, rel in files:
-        lang = LANG.get(pathlib.PurePosixPath(rel).suffix, "")
-        base_txt = _show(base, MIRROR + rel) if action != "add" else None
-        new_txt = _show(head, MIRROR + rel) if action != "delete" else None
-        meta = [f"action: {action}"]
-        for kind, txt in (("base", base_txt), ("new", new_txt)):
-            if txt is not None:
-                meta.append(f"{kind} sha256 `{_sha(txt)}`")
-                meta.append(f"{kind} trailing newline: {'yes' if txt.endswith(chr(10)) else 'no'}")
-        md += [f"### FILE: `{rel}`", " · ".join(meta), ""]
-        if base_txt is not None:
-            md += ["Base (as photographed — used only for the safety check and --revert):", ""]
-            md += _block(base_txt, lang) + [""]
-        if new_txt is not None:
-            md += ["New:", ""]
-            md += _block(new_txt, lang) + [""]
-
+        md += _file_entry(
+            rel,
+            action,
+            _show(base, MIRROR + rel) if action != "add" else None,
+            _show(head, MIRROR + rel) if action != "delete" else None,
+        )
+    for h in helpers:
+        md += _file_entry(f"{WORK_DIR}/{h.name}", "add", None, h.read_text(encoding="utf-8"))
     md += [
         "## Apply script",
         "",
-        f"Save as `{WORKPLACE_DIR}/apply_bundle.py` (only when missing or older than version "
-        f"{apply_version}).",
+        f"Written to `{WORK_DIR}/apply_bundle.py` by step 3.",
         "",
         *_block(apply_src, "python"),
         "",
+        *_cleanup(name, read(args.cleanup_file)),
     ]
     out = OUT_DIR / name
     out.write_text("\n".join(md), encoding="utf-8")
@@ -169,20 +247,12 @@ def main() -> None:
     ap.add_argument("--head", default="HEAD")
     ap.add_argument("--slug", required=True)
     ap.add_argument("--title", required=True)
-    ap.add_argument("--branch", default=None, help="suggested workplace branch name")
+    ap.add_argument("--branch", default=None, help="workplace branch name")
     ap.add_argument("--summary-file", default=None)
-    args = ap.parse_args()
-    summary = (
-        pathlib.Path(args.summary_file).read_text(encoding="utf-8") if args.summary_file else ""
-    )
-    out = build(
-        args.base,
-        args.head,
-        args.slug,
-        args.title,
-        args.branch or f"crx/{args.slug.replace('_', '-')}",
-        summary,
-    )
+    ap.add_argument("--run-file", default=None, help="PROD run / check steps (markdown)")
+    ap.add_argument("--cleanup-file", default=None, help="extra cleanup lines (markdown)")
+    ap.add_argument("--helper", action="append", help="file shipped to data/input/mirror_bundles")
+    out = build(ap.parse_args())
     print(f"wrote {out.relative_to(REPO)}")
 
 

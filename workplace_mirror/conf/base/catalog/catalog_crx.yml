@@ -435,15 +435,6 @@ crx_cc_a1_ability_v2:
   save_args:
     mode: overwrite
 
-# Temporary: copy of the pre-refactor output for the bundle 01 check
-# (docs/context/snippets/b01_a1_engine_check.py). Remove after the check.
-crx_cc_a1_ability_pre_refactor:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_pre_refactor"
-  save_args:
-    mode: overwrite
-
 # ── A3 Payment Credibility (T27) ────────────────────────────────────────────
 # Grain: (account_id, spell_id). observation_date = coalesce(spell_end, current_date()).
 # a3_state_v1 ∈ {payment_credibility_high, payment_credibility_moderate,
