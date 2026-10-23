@@ -121,6 +121,45 @@ Still not seen (imported by `cc_a1_ability_v2`): `crx_persona/cc_a1_ability/enri
 Uncertain characters: `stg_rr_portf.py:4` "acct_num × ss_dt" (box glyph, read as ×);
 `cc_a1_ability_v2/pipeline.py:10–12` the bracket glyphs drawn beside "parallel" (┐ ┤ ┘).
 
+## Batch 5 — the RL chain (photos IMG_8131–8233)
+
+| Module | Lines (screen) | Lines here | Status |
+|---|---|---|---|
+| `crx_persona/rl_full_history/__init__.py` | 5 | 5 | complete |
+| `crx_persona/rl_full_history/pipeline.py` | 33 | 33 | complete |
+| `crx_persona/rl_full_history/nodes.py` | 96 | 96 | complete |
+| `crx_persona/rl_spell_table/__init__.py` | 5 | 5 | complete |
+| `crx_persona/rl_spell_table/pipeline.py` | 32 | 32 | complete |
+| `crx_persona/rl_spell_table/nodes.py` | 366 | 366 | complete |
+| `crx_persona/rl_departure_signature/__init__.py` | 10 | 10 | complete |
+| `crx_persona/rl_departure_signature/nodes.py` | 998 | 998 | complete |
+| `crx_persona/rl_a4_spine/__init__.py` | 9 | 9 | complete (no `nodes.py` — reuses `build_rl_depart_spine`) |
+| `crx_persona/rl_a4_spine/pipeline.py` | 39 | 39 | complete |
+| `crx_persona/rl_a4_deterioration/__init__.py` | 5 | 5 | complete |
+| `crx_persona/rl_a4_deterioration/nodes.py` | 50 | 50 | complete |
+| `crx_persona/rl_a4_deterioration/pipeline.py` | 47 | 47 | complete |
+| `crx_persona/rl_a2_locatability/__init__.py` | 5 | 5 | complete |
+| `crx_persona/rl_a2_locatability/nodes.py` | 214 | 214 | complete |
+| `crx_persona/rl_a2_locatability/pipeline.py` | 113 | 113 | complete |
+| `crx_persona/rl_a1_ability/__init__.py` | 5 | 5 | complete |
+| `crx_persona/rl_a1_ability/nodes.py` | 1360 | 1360 | complete — all 11 `def`s on the same line as on screen |
+| `crx_persona/rl_a1_ability/pipeline.py` | 113 | 113 | complete |
+
+IMG_8133 was not in the batch; every file still reaches its on-screen line count, so nothing is missing. IMG_8233 is
+the Explorer tree (no code).
+Checks: everything compiles, ruff F/E9 clean; the RL wrappers' calls match the signatures of the
+mirrored CC / `_dpd_journey` functions they delegate to.
+
+Not seen yet: `rl_departure_signature/pipeline.py` (registered in `pipeline_registry.py:240`),
+`rl_a3_payment_credibility/`, `cc_a3_payment_credibility/`, `cc_a4_class/`, `cc_a1_ability/`
+(`nodes.py` — `_TAU_SALARY_H2_MIN` — and `enrichers.py`, now also `enrich_salary_stop_month`,
+`enrich_casa_eod_avg_balance`, `enrich_ext_loan_payments_h2`, `join_required_signals`,
+`RequiredJoin`, `log_a1_stats`), `scoring_engine.py`.
+
+Uncertain characters: `rl_a1_ability/pipeline.py:13–15` bracket glyphs beside "parallel"
+(┐ ┤ ┘, as in batch 4); `rl_a1_ability/nodes.py:613–614` the "~" in "(NULL ~where feature
+absent)" is on screen as written.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

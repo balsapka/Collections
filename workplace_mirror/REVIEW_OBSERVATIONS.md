@@ -14,7 +14,9 @@ but the choice is questionable.
 Last updated: 2026-10-23 (batches 1–3: cc_spell, cc_full_history, cc_raw_extract,
 cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry,
 cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability, cc_a1_ability_v2,
-`_spine_utils`, `stg_rr_portf`, `nodes/utils/config`).
+`_spine_utils`, `stg_rr_portf`, `nodes/utils/config`; batch 5: the RL chain — rl_full_history,
+rl_spell_table, rl_departure_signature, rl_a4_spine, rl_a4_deterioration, rl_a2_locatability,
+rl_a1_ability).
 
 ---
 
@@ -47,6 +49,16 @@ cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability, cc_a1_ability_v
 | O23 | M | data check | stg_rr_portf | Dedup keys on `ra_org_app_id`, not `acct_num` — can drop a second loan sharing an application |
 | O24 | M | confirmed | cc_a1_ability_v2 Node 3 | `oldest_overdue_amount` uses the latest balance snapshot however old it is |
 | O25 | M | data check | cc_raw_extract + config | `TXN_CATEGORIES` codes are zero-padded strings; an unpadded `txn_code` leaves every category NULL |
+| O26 | H | confirmed | rl_departure_signature Node 0 (= crx_rl_a4_spine) | Only the *still-open* spell is joined: spine rows of later-cured spells lose their spell (feature nullness leaks the cure) or vanish |
+| O27 | H | confirmed | rl_departure_signature Node 1 | CASA / payroll partition floors are `persona_start − 12m`, windows reach `t0 − 24m` / `t0 − 12m` — truncated or empty for older T0s |
+| O28 | H | confirmed | rl_departure_signature Pass I | Same month-end `pay_month` off-by-one as O2 (copied from CC) |
+| O29 | M | confirmed | rl_departure_signature Node 3 | Login PIT filter after a left join drops rows whose CIF has only later logins — their FX flag becomes 0 |
+| O30 | M | confirmed | rl_a1_ability Node 4r | `[obs − 3m, obs]` on month-end dates keeps 4 months incl. the obs month; docstring says "3 months before" |
+| O31 | M | design | rl_a1_ability Node 4r | `monthly_emi_recent` falls back to `overdue_total`, several EMIs at 60+ DPD — inflates the threshold |
+| O32 | M | confirmed | rl_a1_ability Node 5 | The NULL-EMI sentinel (1e18) makes `casa_low` (`<`) **True**, not False as documented |
+| O33 | M | confirmed | rl_a1_ability Node 2r | `wm_pri_labelled_transactions` floored at `persona_start`, but the H2 window reaches 3 months earlier |
+| O34 | M | data check | rl_full_history → rl_spell_table | No per-(account, month) dedupe; duplicate months make spell boundaries non-deterministic |
+| O35 | L | confirmed | RL modules | Docstring/naming drift (see list) |
 
 ---
 
@@ -323,6 +335,132 @@ padding (`"36"`) or a double (`36.0` → `"36.0"` when compared as string), noth
 payments fall back to the sign test only (see O1).
 **Check:** `select txn_code, count(*) from raw_transaction group by 1 order by 2 desc limit 20`.
 
+### O26 — RL spine keeps only the still-open spell (H, confirmed)
+
+`build_rl_depart_spine` (`rl_departure_signature/nodes.py:120–133`) keeps spells with
+`spell_end IS NULL` only, left-joins them on `account_id`, then filters
+`t0 IS NULL OR t0 <= observation_date`. `spell_end` is computed from the **full** history up to
+today (`rl_spell_table/nodes.py:133–147`), not as of the observation date. So for a spine row in a
+spell that cured later:
+- the account has no open spell now → the row comes through with NULL `spell_id`/`t0`, so every
+  spell-anchored signal (Node 1 CASA/payroll, Node 2 travel, Node 3 FX, A1 `eosb_like_flag`) is
+  NULL or coalesced to 0;
+- the account re-defaulted later → the open spell's `t0` is after the row's date → the row is
+  **dropped**.
+Either way, whether a row has spell features depends on what happened after the observation date,
+which is the cure/roll outcome the model predicts — a leak, not just missing data.
+`crx_rl_a4_spine` is the same function (`rl_a4_spine/pipeline.py:19`), so A1 and A2 inherit it,
+while `rl_a4_deterioration` uses the full `rl_spine` — the axes end up with different row sets.
+**Fix:** pick the spell that covers the date — join on `account_id` with
+`t0 <= obs AND (spell_end IS NULL OR obs < spell_end)` inside the left join (as O22 proposes for
+CC), and drop the `spell_end IS NULL` pre-filter. Keep `t0_censored_flag == 0` if wanted.
+
+### O27 — Departure CASA / payroll floors are tied to the persona window, not to T0 (H, confirmed)
+
+`build_rl_depart_casa_signals` (`rl_departure_signature/nodes.py:219–234`) filters
+`comp_financial_tran_repos_dly` to `edp_load_date >= persona_start − 12m` and payroll to
+`month_number >= persona_start − 12m`. The windows are anchored on `t0`: Pass B reads
+`[t0 − 24m, t0)` (median from months 7–24), Pass I reads `[t0 − 12m, t0)`. `t0` is the start of
+the delinquency spell, which is before the observation date and, for rl_180_plus, at least 6
+months before it. For any `t0` before `persona_start`, months are missing:
+- `t0` = `persona_start`: salary median uses months 7–12 only;
+- `t0` < `persona_start − 12m`: Pass B sees no data → `casa_inflow_stop_gap_d` and
+  `eosb_like_flag` NULL; Pass I sees no H1 → `payroll_stopped_flag` NULL.
+The comment says the floor is "for efficiency — same as former build_rl_a4_casa_signals", so the
+bug is older than this module.
+**Fix:** floor at `min(t0) − 24m` (CASA) and `min(t0) − 12m` (payroll), computed from
+`spell_base` (one small aggregate), or drop the floor and rely on the CIF leftsemi.
+
+### O28 — RL Pass I repeats the CC month-end off-by-one (H, confirmed)
+
+`_build_rl_pass_i` (`rl_departure_signature/nodes.py:449, 466–474`) is a port of CC Pass I and
+carries O2 unchanged: `pay_month` is the month-end date, and `months_between(trunc(t0), pay_month)`
+is not truncated, so M0-1 gets index 0 and falls out of H2. `payroll_present_h2` and
+`payroll_stopped_flag` (A2 departure trail, A1 inputs) are shifted by a month.
+**Fix:** same as O2 — `F.trunc(F.col("pay_month"), "month")` inside `months_between`.
+
+### O29 — Node 3 login PIT filter drops rows (M, confirmed)
+
+`build_rl_depart_foreign_signals` (`rl_departure_signature/nodes.py:802–810`) left-joins every
+login month of the CIF, then filters `login_month IS NULL OR login_month <= trunc(obs)`. A CIF
+whose logins all fall after the observation date has joined rows that all fail the filter, so the
+row disappears from Node 3's output, together with its already-computed `last_txn_foreign_flag`.
+Node 4 left-joins and coalesces to 0, so those rows report `last_txn_foreign_flag = 0` even
+when FX leakage was positive.
+**Fix:** put the date condition into the join condition (left join keeps the row with NULL
+login), as for O22.
+
+### O30 — Group C EMI window is 4 months and includes the obs month (M, confirmed)
+
+`build_rl_a1_group_c_recent` (`rl_a1_ability/nodes.py:650–653`) keeps
+`_loan_obs_date >= add_months(observation_date, −3)` and `<= observation_date`. Both are
+month-ends, and `add_months` keeps the last day of the month (Mar-31 → Dec-31), so the window holds
+Dec, Jan, Feb, Mar: four rows, including the observation month. The docstring (580–582) says
+"the 3 months immediately before each observation_date". `emi_coverage_mean_recent` is a 4-month
+mean.
+**Fix:** `>` instead of `>=` for 3 months including obs, or `< observation_date` plus
+`>= add_months(obs, −3)` for the 3 months before it — then decide which one the docstring means.
+
+### O31 — `monthly_emi_recent` falls back to the overdue total (M, design)
+
+`rl_a1_ability/nodes.py:674` uses `coalesce(installment_due_amount, overdue_total)`. At 60+ DPD
+the overdue total is two or more instalments plus charges, so wherever `installment_due_amount` is
+NULL the EMI threshold is a multiple of the real EMI. High Arms 1/4/6/6b (`>= _emi`) then fire less
+often, and `casa_low` (`< _emi`) more often — a systematic push towards `ability_low` for exactly
+the rows with missing instalment data.
+**Fix:** leave EMI NULL (and handle it explicitly, see O32), or derive it from contract terms; at
+least log how many rows use the fallback.
+
+### O32 — NULL-EMI sentinel makes `casa_low` True (M, confirmed)
+
+`_build_rl_ability_conditions` (`rl_a1_ability/nodes.py:1018`) sets
+`_emi = coalesce(monthly_emi_recent, 1e18)`, and the docstring (1003–1005) says this makes "the
+comparison False, not NULL". That holds for `>= _emi` (High Arms). But `casa_low` (1046–1048) is
+`casa_avg < _emi`, which is **True** for every non-NULL balance when EMI is missing. So with no EMI,
+`low_cond1` reduces to "salary stopped and no new salary account" and the row goes to
+`ability_low` without any balance check.
+**Fix:** `casa_low = casa NULL | (emi NOT NULL & casa < emi)` — or decide that "no EMI" is
+`ability_unknown` and gate on it first.
+
+### O33 — External CC payments truncated in the first months of the persona window (M, confirmed)
+
+`build_rl_a1_group_b_income_recent` (`rl_a1_ability/nodes.py:345–348`) filters
+`wm_pri_labelled_transactions` to `tran_date >= persona_start`, but `enrich_ext_cc_payments_h2`
+reads `[obs − 3m, obs)`. For observation dates in the first three months of the window, part of the
+H2 window is cut, so `ext_cc_payment_amt_h2_recent` is understated and High Arm 6 fires less. The
+payroll floor right below it correctly uses `persona_start − 12m`.
+**Fix:** floor at `persona_start − 3 months` (or −4 for safety with month-ends).
+
+### O34 — RL history has no per-month dedupe (M, data check)
+
+`build_rl_full_history` passes `int_loan_master` through without deduplicating
+`(account_id, observation_date)`; `build_rl_spell_table` orders by `month_end_date` with `lag` and
+`row_number` (`rl_spell_table/nodes.py:88–121`). If a month has two rows (snapshot reloads,
+restructures), the order between them is arbitrary: a spell can start or end on the "wrong" twin,
+and the censored check (`_rn == 1`) can flip between runs. The `_dpd_journey` engine dedupes its
+own input, so A4 is unaffected.
+**Check:** `count(*) > 1 group by account_id, observation_date` on `int_loan_master`.
+**Fix:** dedupe in `build_rl_full_history` (worst bucket wins, like the amended CC node).
+
+### O35 — RL docstring / naming drift (L, confirmed)
+
+- `rl_full_history/nodes.py:55` selects `cif_id`, but neither the Args list nor the Returns
+  schema (32–47) mention it.
+- `rl_a1_ability/nodes.py:875` renames `prior_spell_cnt_12m` to `prior_spell_cnt_24m` — the window
+  is 12 months; the column is also never used or output.
+- `rl_a1_ability/nodes.py` computes `eosb_post_salary_flag` and `eosb_post_salary_flag_recent`
+  with identical expressions (911–933).
+- `high_arm2` (1058–1060): `salary_stopped_flag_recent == 0` is implied by
+  `salary_months_h2_recent >= _TAU_SALARY_H2_MIN` — redundant clause.
+- `ext_loan_payment_cnt_h2` is cast to `double` (307), its CC sibling `ext_cc_payment_cnt_h2` to
+  `int`.
+- `computed_at` is a `date` here (1253) and a `timestamp` in rl_full_history / rl_spell_table.
+- `rl_a2_locatability/nodes.py:69` says `casa_inflow_stop_gap_d` is "forwarded from
+  crx_rl_a4_class" (it comes from `crx_rl_departure_signature`); line 72 says all 4 departure
+  columns are non-null on a join hit, but `casa_inflow_stop_gap_d` is not coalesced.
+- `rl_a1_ability/pipeline.py:7` says Node 4b Group D was removed, the node module says it is kept
+  but not wired.
+
 ---
 
 ## Not issues (checked, fine)
@@ -339,3 +477,11 @@ payments fall back to the sign test only (see O1).
 - A1 v2 CASA recent/prior windows (latest month-end row in `[obs-90d, obs)` vs `[obs-180d,
   obs-90d)`) do not overlap, since each row is already a trailing 3-month average.
 - Departure Pass K's `_PAYMENT_CATEGORY = "payment"` matches the `TXN_CATEGORIES` key.
+- RL wrappers match their callees: `build_a2_login_presence(obs_month_end=True)`,
+  `build_a2_contact_signals(base, observation_spine, followup)`, the `build_a2_locatability`
+  kwargs in `rl_a2_locatability/pipeline.py`, and `_dpd_journey`'s `build_dpd_sequences` /
+  `build_deterioration` / `journey_params`.
+- `rl_spell_table` `w_pre_clean_m` and `prior_spell_cnt_12m` window logic is consistent with the
+  docstrings (NULL buckets count as clean, which is acceptable for RL).
+- A1 Node 3r `_recent` renaming: every column the classifier reads (`aecb_*_recent`,
+  `a1_new_salary_acct_flag_recent`, …) exists after the rename loop in `_assemble_rl_classify_inputs`.
