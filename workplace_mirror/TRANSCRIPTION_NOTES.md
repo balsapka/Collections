@@ -212,6 +212,14 @@ line number in the grep output (30 hits, 296–578) matches the transcription ex
 No reporting, modelling or other pipeline reads `a1_state` / `crx_*_a1_*` — the A1 outputs have no
 downstream consumer outside the persona code and its tests.
 
+### `rl_departure_signature/pipeline.py` (IMG_8336–8338)
+
+116 lines, matches the screen; all `crx_rl_*` packages now import (kedro stubbed).
+Uncertain glyph: line 15 "steps 1–4" (box glyph, read as en dash).
+The two test modules from the grep (`src/tests/pipelines/crx_persona/schema_registry.py`,
+`test_crx_persona.py`) are **deliberately not mirrored**: the user will have the workplace Sonnet
+update them as part of the A1 bundle prompt.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
