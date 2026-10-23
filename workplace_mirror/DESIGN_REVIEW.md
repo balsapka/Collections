@@ -204,3 +204,52 @@ separately so each change in numbers has one cause.
 | 5 | Departure trail on `observation_date` (CC + RL), A2 on the obs base + split + D6 window | A2 crosstab vs old |
 | 6 | Delete T0-only packages (`cc_raw_extract`, `cc_payment_trajectory`, `cc_utilisation`, `rl_a4_spine`, departure passes) | imports |
 | 7 | Delete spell tables — after A3 has moved off them | — |
+
+## 7. Data layers (decided 2026-10-23)
+
+Persona pipelines read **primary and feature datasets only**. A raw source is read once,
+upstream, by a primary node that every consumer reuses. This is the rule for new DE and persona
+pipelines alike.
+
+| Layer | Reads | Holds | Business rules |
+|---|---|---|---|
+| Raw / staging (`raw_`, `stg_`, `comp_`) | — | the source as loaded | — |
+| Primary (`prm_`, `wm_pri_`) | raw only | one table per entity or event, all customers, typed, deduplicated, at its natural grain | none |
+| Feature (`feat_`, `wm_fea_`) | primary | generic per-customer aggregates | generic only |
+| Persona signals (`crx_*_signals`) | primary + feature, never raw | point-in-time aggregates per observation-base row | yes: thresholds, reason lists |
+| Persona axes (`crx_*_a1…`) | signals only | states | ladders |
+
+- **One owner per raw table.** A persona node that needs raw data is a request for a new
+  primary dataset, not a direct read.
+- **Primary datasets carry no decisions.** They keep every value (all reasons, all codes);
+  which values count is decided in the signal layer, so a decision never needs a rebuild.
+- **Reverse-engineering is a smell.** A signal reconstructed indirectly (salary months
+  recovered from "days since last salary" snapshots) marks a missing primary dataset. Log it
+  as a candidate; don't build one on the spot. Salary stays on the WM features (decided);
+  the GRR bureau feed is the planned coverage fix.
+- **Enforced by a test** (Sonnet): no `crx_` node takes a `raw_` / `stg_` / `comp_` input.
+
+### First primary: `prm_casa_return_events` (bundle 03)
+
+Its own pipeline outside `crx_persona`, built from `comp_financial_tran_repos_dly`:
+- one row per distinct return event, for **all CIFs** (CC and RL A1 both read it);
+- columns: `cif_id`, account, `tran_date`, `reason_for_excluding`, transaction key, amount,
+  debit/credit and type/code columns — the key and columns are fixed by Sonnet v01's
+  `columns_found`;
+- every return-type reason, not only the three A1 counts today;
+- deduplicated on the transaction key, so reloads across `edp_load_date` count once;
+- refreshed incrementally: each run rebuilds only the last N days of `edp_load_date`
+  (parameter, to catch late reloads) and overwrites the affected event months; only the first
+  build scans the full table.
+
+`build_internal_returns` then becomes a filter on it (reason list, window) in the persona layer.
+
+### Raw inputs the persona pipelines still read
+
+| Raw input | Read by | Plan |
+|---|---|---|
+| `comp_financial_tran_repos_dly` | CC / RL A1 | → `prm_casa_return_events` (bundle 03) |
+| `raw_transaction`, `raw_stg_limit`, `raw_stg_balance`, `raw_stg_account_group` | `cc_raw_extract` | deleted in ship step 6 |
+| `raw_stg_billing` | `cc_spell` (step 6/7), `cc_full_history` (feeds A4) | a primary billing-history dataset, or an existing `prm_` equivalent |
+| `stg_aecb_salary_history` | bureau salary | GRR's bureau primary when it lands |
+| `raw_beneficiary_cards` | external card payments | a `prm_` snapshot later (small, low priority) |
