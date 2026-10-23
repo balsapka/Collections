@@ -62,30 +62,6 @@ Box glyphs in this batch (docstrings/comments only), rendered as: `318–327`, `
 `2022–2023`, `1–2 days` (en dash) and `cif_id × month_number`, `3× the monthly median` (times sign).
 The registry's `# -- Section ------` comment dash counts are approximate.
 
-## Spotted while transcribing (left as-is; candidates for the review tasks)
+## Review findings
 
-- `cc_utilisation/nodes.py` 226–228: comment says "take max util if duplicates" but code uses
-  `F.first` → non-deterministic. Same pattern in `cc_payment_trajectory/nodes.py` 638–639 (`F.first("d_m")`).
-- `cc_spell/nodes.py` 97: `regexp_extract(...).cast("int")` on `""` — the ANSI-mode issue already fixed
-  in `cc_full_history` (F1) is still present here; dedupe is `.distinct()`, not worst-bucket (F2).
-- `account_id` leaves T04b/T05 as `string` (trajectory 170, utilisation 127) while spell/raw-extract use `long`.
-- `spend_cliff_flag` falls back to `0`, never NULL, so its logged coverage is always 100%.
-- `txn_cnt_slope` / H1–H2 spend means only see months with ≥1 outflow; zero-spend months are absent, not 0.
-- `_compute_w_pre_truncation` docstring says account-open month is "min obs_date"; code uses `open_date`.
-- `cc_spell` steps go 0 → 2 (no Step 1).
-
-Batch 2:
-- Departure Pass A sign convention vs Pass K: Pass K treats `txn_amount_aed > 0` as purchase, while
-  `cc_utilisation` (T05) says outflows are negative and filters `direction == -1`. One of them is wrong
-  for `crx_cc_transactions` (`settl_amount` cast straight through in `cc_raw_extract`).
-- Pass A `last_txn_foreign_flag` and Pass J read up to `spine_obs_date` (post-T0) — intentional per the
-  docstring "anchor-change", but it breaks the module header's "all joins enforce strict obs_date < M0".
-- Pass B filters `tran_dc == 'C'` before computing `is_salary`, then `is_salary` re-checks it (harmless).
-- Pass E (`aecb_leverage_slope`) and `cross_border_outflow_cnt_h2` are documented as always NULL (T21 drop).
-- **Likely bug — Pass I (nodes 1945–1951):** `m_from_m0 = floor(months_between(trunc(t0), pay_month))`
-  but `pay_month` is a month-END date (yyyyMMdd last day). For t0 in June: May-31 → 0.03 → 0,
-  Apr-30 → 1, Mar-31 → 2. So the M0-1 month gets index 0 and drops out of H2 = [1, 3]; H2 really
-  sees only 2 months and H1 starts one month late. `payroll_present_h2` / `payroll_stopped_flag`
-  are affected. Fix: `trunc(pay_month, 'month')` inside months_between, as Passes A/D/E do.
-- `build_departure_spell_base` takes `max(observation_date)` from `cc_spine` per contract — multiple
-  spine rows (re-entry) collapse to the latest.
+Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
