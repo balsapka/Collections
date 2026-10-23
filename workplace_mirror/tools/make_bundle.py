@@ -88,7 +88,7 @@ def _steps(name: str, branch: str, run_md: str) -> list[str]:
         "import pathlib, re\n"
         f"d = pathlib.Path('{WORK_DIR}')\n"
         f"md = (d / '{name}').read_text(encoding='utf-8')\n"
-        "sec = md.split('## Apply script', 1)[1]\n"
+        "sec = md.split('\\n## Apply script\\n', 1)[1]\n"
         "m = re.search(r'^(`{5,})python\\n(.*?)\\n\\1$', sec, re.S | re.M)\n"
         "(d / 'apply_bundle.py').write_text(m.group(2) + '\\n', encoding='utf-8')\n"
         "print('apply_bundle.py written')\n"
