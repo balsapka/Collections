@@ -62,6 +62,42 @@ Box glyphs in this batch (docstrings/comments only), rendered as: `318–327`, `
 `2022–2023`, `1–2 days` (en dash) and `cif_id × month_number`, `3× the monthly median` (times sign).
 The registry's `# -- Section ------` comment dash counts are approximate.
 
+## Batch 3 — A4 deterioration, `_dpd_journey` engine, A2 locatability (photos IMG_7984–8075)
+
+| Module | Lines (screen) | Lines here | Status |
+|---|---|---|---|
+| `crx_persona/cc_a4_deterioration/pipeline.py` | 47 | 47 | complete |
+| `crx_persona/cc_a4_deterioration/nodes.py` | 81 | 81 | complete |
+| `crx_persona/_dpd_journey/__init__.py` | 85 | 85 | complete |
+| `crx_persona/_dpd_journey/_dates.py` | 31 | 31 | complete |
+| `crx_persona/_dpd_journey/constants.py` | 40 | 40 | complete |
+| `crx_persona/_dpd_journey/core.py` | 172 | 172 | complete |
+| `crx_persona/_dpd_journey/history.py` | 165 | 165 | complete |
+| `crx_persona/_dpd_journey/logging.py` | 100 | 100 | complete |
+| `crx_persona/_dpd_journey/params.py` | 92 | 92 | complete |
+| `crx_persona/_dpd_journey/spark.py` | 399 | 399 | complete |
+| `crx_persona/_dpd_journey/states.py` | 144 | 144 | complete |
+| `crx_persona/cc_a2_locatability/__init__.py` | 5 | 5 | complete |
+| `crx_persona/cc_a2_locatability/pipeline.py` | 104 | 104 | complete |
+| `crx_persona/cc_a2_locatability/constants.py` | 299 | 299 | complete |
+| `crx_persona/cc_a2_locatability/nodes.py` | 1320 | 1320 | complete — all 6 `def`s on the same line as on screen |
+
+Checks: all files compile; `ruff --select F,E9` is clean apart from the intentional re-exports in
+`_dpd_journey/__init__.py` (the original carries `# pylint: disable=unused-import`); the engine
+imports and classifies a sample sequence with a stub for `stg_rr_portf`.
+
+Not seen, so not created: `crx_persona/_spine_utils.py` (`join_spine_to_spell`, `_build_cif_bridge`),
+`enbd_collections/nodes/staging/retail_loans/stg_rr_portf.py` (`ECL_CUTOFF_DATE`,
+`ECL_WINNOWED_PRODUCT_CODES`), `_dpd_journey/history.py` is complete but its RL callers are not.
+
+Uncertain characters (comments/strings only):
+- `_dpd_journey/history.py:47, 92`: the glyph between `0` and `1` in "CC 0 · 1" (and `3 · 5`) is a
+  box on screen; I used `·`. Same in `params.py:33`.
+- `cc_a2_locatability/constants.py:65, 235`: `"DIGITAL COLLECT  PTP SUBSCRIBED"` has **two** spaces
+  on screen — kept as seen (it must match the DCORE value exactly).
+- `cc_a2_locatability/constants.py:271`: `"MOBILE SWICTHED OFF"` (typo) sits next to
+  `"MOBILE SWITCHED OFF"` on screen — kept both; the typo is probably the real DCORE value.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

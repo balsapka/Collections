@@ -11,8 +11,9 @@ but the choice is questionable.
 **Severity:** **H** = feature values are wrong · **M** = wrong in edge cases / silent drift ·
 **L** = docs, naming, hygiene.
 
-Last updated: 2026-10-23 (batches 1–2: cc_spell, cc_full_history, cc_raw_extract,
-cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry).
+Last updated: 2026-10-23 (batches 1–3: cc_spell, cc_full_history, cc_raw_extract,
+cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry,
+cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability).
 
 ---
 
@@ -32,6 +33,14 @@ cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry
 | O10 | L | confirmed | T04b, T05, T06 outputs | `account_id` cast to `string` while upstream tables use `long` |
 | O11 | L | confirmed | cc_utilisation | `spend_cliff_flag` never NULL → logged coverage always 100% |
 | O12 | L | confirmed | various | Docstring/comment drift (see list) |
+| O13 | H | data check | cc_a2_locatability Node 1 | `cif_id` re-attached from `cc_spine` without `distinct` — rows multiply per spine row |
+| O14 | H | data check | cc_a2_locatability Node 3 | Spine schema guard requires `account_id`; docstrings say the column is `contract_id` → all contact signals NULL |
+| O15 | M | data check | cc_a2_locatability Node 4 | Way4 deceased join on exact `observation_date` — likely why cc_180_plus matched zero rows |
+| O16 | M | data check | cc_a2_locatability Node 4 | Demographics deceased join has no point-in-time filter and may multiply rows |
+| O17 | M | confirmed | cc_a2_locatability Node 3/4 | Recent-avoidance compares an *event* count to a *date* count |
+| O18 | L | confirmed | cc_a2_locatability Node 3 | `contact_confirmed_n` / `rpc_rate` double-count outbound SUC events that are also on the RPC list |
+| O19 | M | design | cc_a4_deterioration | "Restructure" flag cannot tell a restructure from an account already delinquent at the data start |
+| O20 | M | confirmed | crx_persona (all) | Repeated `.count()` logging without `persist` recomputes each node's full lineage |
 
 ---
 
@@ -166,6 +175,81 @@ is NULL.
 - `cc_departure_signature/nodes.py:2147–2148`: sign convention contradicts T05 (see O1).
 - `cc_departure_signature/nodes.py:898` (Pass B): filters `tran_dc == 'C'` and `is_salary`
   (878) checks it again — harmless duplication.
+- `cc_a2_locatability/nodes.py:136–138`: "CC's crx_cc_a2_base does not [carry cif_id]" — it does
+  (Node 1 adds it at 311–317), so the `_build_cif_bridge` branch at 1229–1237 is dead code for CC.
+- `cc_a4_deterioration/nodes.py:20`: "Mirrors cc_spell/nodes.py's _RESTRUCTURE_DLQ_THRESHOLD" —
+  `cc_spell` has no such constant; its censoring rule uses `>= 2` (`_CC_DELINQ_MIN`), A4 uses `>= 4`.
+
+### O13 — A2 Node 1 multiplies rows when re-attaching `cif_id` (H, data check)
+
+`cc_a2_locatability/nodes.py:311–317` selects `(contract_id, cif_id)` from `cc_spine` **without
+`.distinct()`** and left-joins it on `account_id` alone. `cc_spine` has one row per
+(contract, observation_date) — A4's `build_deterioration` says so explicitly ("classifies EVERY
+spine row"), and departure Node 1 aggregates it with `max(observation_date)` for the same reason.
+So an account with *k* spine rows comes out of `build_a2_base` with *k × k* rows, and every
+later join on `(account_id, observation_date)` keeps the duplicates; counts and the state
+distribution are inflated.
+**Check:** the `build_a2_base: %d rows` log line vs `cc_spine.count()`.
+**Fix:** `.select(...).distinct()` (or `dropDuplicates(["_cid"])`), as departure Node 2 does.
+
+### O14 — A2 contact-signal spine guard looks for the wrong column name (H, data check)
+
+`cc_a2_locatability/nodes.py:583` requires `{"account_id", "observation_date", "agreement_id",
+"cif_id"}` on `dcore_observation_spine`, but the pipeline header (pipeline.py:21) and the node
+docstring (485–487) both say the column is `contract_id`. If the table really carries
+`contract_id`, the guard fires on every run and the node silently returns all-NULL contact
+signals → every reachability state is `Unknown` (only a WARNING log line).
+**Check:** `dcore_observation_spine` columns, or the `DCORE coverage` log (0% would confirm).
+**Fix:** match the real name, or alias `contract_id → account_id` before the guard.
+
+### O15 — Way4 deceased corroboration joins on an exact date (M, data check)
+
+`cc_a2_locatability/nodes.py:1205–1213` joins `prm_contract` block codes on
+`(account_id, observation_date)` — an exact-date match between Way4 contract snapshots and the
+spine's per-account billing dates. If the two tables date their rows differently (month-end
+snapshot vs billing day), almost nothing matches. That is a simpler explanation for the
+"cc_180_plus prm_contract matched zero rows" anomaly the docstring (130–131) records.
+**Fix:** match on month (`trunc(…, 'month')`) or take the latest snapshot `<= observation_date`.
+
+### O16 — Demographics deceased join has no point-in-time filter (M, data check)
+
+`cc_a2_locatability/nodes.py:1239–1242` joins `feat_demographics_cif` on `cif_id` only. If that
+table has more than one row per CIF (monthly snapshots), rows multiply; and a deceased flag set
+*after* `observation_date` is applied to earlier rows (look-ahead).
+**Check:** grain of `feat_demographics_cif`. **Fix:** latest row with date `<= observation_date`.
+
+### O17 — Recent-avoidance rule mixes event and date counts (M, confirmed)
+
+Step 5c (`cc_a2_locatability/nodes.py:790–814`) ranks attempt *dates* (`dense_rank`) but sums
+*events* per date. Node 4 (1114–1118) then requires `recent3_ringing_n == 3`. So:
+- three ringing dates where one date had two ringing calls → `ringing_n = 4` → flag **not** set;
+- three dates with one ringing event each plus a LINE BUSY (neither ringing nor confirmed) → flag
+  set although not every attempt was ringing.
+**Fix:** count distinct ringing dates, and require every ranked date to be ringing-only.
+
+### O18 — Confirmed-contact count double-counts (L, confirmed)
+
+`contact_confirmed_n = _rpc_n + _rpc_proxy_n` (888–890) and `rpc_rate` (822–827): an outbound
+`SUC` event whose `result_name` is also on the RPC allowlist is counted in both. The flag that uses
+it (`> 0`) is unaffected; `rpc_rate` can exceed 1 (numerator counts events, denominator counts
+distinct dates). **Fix:** one `F.when(suc_outbound | rpc_name, 1)` per event.
+
+### O19 — A4 restructure flag also catches data-start censoring (M, design)
+
+`cc_a4_deterioration/nodes.py:41–58` flags `restructure_blind_spot_flag = 1` when the account's
+earliest billing row is already `>= 4`. An account that was simply already delinquent when the
+billing table starts looks identical. In `assign_state` both feed `history_blind`, so states are
+unaffected, but the output column over-states restructures.
+**Fix:** require the earliest row to be later than the table's global start month (the same
+`_global_min` Stage 1 already computes), or rename the flag.
+
+### O20 — Logging counts recompute whole lineages (M, confirmed)
+
+Every A2 node logs with one to three `.count()` calls (326–328, 437–438, 574, 970–971, plus
+`_log_a2_stats` at 1299) on un-persisted DataFrames, and T04b/T05/T06 do the same. Each count
+re-runs the node's joins — on the CASA/DCORE-sized inputs this is several extra full scans per
+run. **Fix:** compute stats from the saved output, gate them behind a `log_stats` param as
+`_dpd_journey` does, or `persist()` before counting.
 
 ---
 
@@ -175,3 +259,7 @@ is NULL.
   M0-3..M0-1.
 - Pass E bureau slope (always NULL in PROD) is documented as a T21 drop; code is consistent.
 - `cc_raw_extract` per-account T0 windows: same logic in all three builders.
+- `_dpd_journey` engine: Stage 1 gap-fill, cycle-shift and dedupe rules, and Stage 2 point-in-time
+  truncation are consistent with their docstrings; a smoke test of `classify` on a clean
+  straight-roll sequence returns `early_payment_default` as the tree says it should.
+- A2 Node 2 login window (`< trunc(obs, 'month')`) has no look-ahead.
