@@ -16,7 +16,7 @@ cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry
 cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability, cc_a1_ability_v2,
 `_spine_utils`, `stg_rr_portf`, `nodes/utils/config`; batch 5: the RL chain — rl_full_history,
 rl_spell_table, rl_departure_signature, rl_a4_spine, rl_a4_deterioration, rl_a2_locatability,
-rl_a1_ability).
+rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_crx and globals).
 
 ---
 
@@ -59,6 +59,12 @@ rl_a1_ability).
 | O33 | M | confirmed | rl_a1_ability Node 2r | `wm_pri_labelled_transactions` floored at `persona_start`, but the H2 window reaches 3 months earlier |
 | O34 | M | data check | rl_full_history → rl_spell_table | No per-(account, month) dedupe; duplicate months make spell boundaries non-deterministic |
 | O35 | L | confirmed | RL modules | Docstring/naming drift (see list) |
+| O36 | M | confirmed | cc_a1_ability enrichers (salary PIT) | `salary_amt_last` is the latest WM salary row before the anchor, however old — a years-old salary still scores A1 v2 income as "weak" |
+| O37 | M | confirmed | cc_a1_ability_v2 Node 3 (+ v1, RL) | `wm_pri_labelled_transactions` floored at `persona_start`, H2 window reaches 3 months earlier (O33 in CC) |
+| O38 | M | data check | cc_a1_ability enrichers (fea alerts) | `month_number` parsed as `yyyyMMdd`; docstring says the column is `YYYY-MM-DD` → `fea_salary_acct_flag` all NULL |
+| O39 | M | confirmed | cc_a1_ability enrichers (bureau salary) | Ties on the latest salary month pick an arbitrary row; bridge dedup keeps an arbitrary `cif_id`; an extra `.count()` job |
+| O40 | L | data check | enrichers (CASA avg balance, ext loans) | PIT filter is `<= anchor` (others use `<`) — a weekly row dated on/after the obs week can leak up to 6 days |
+| O41 | L | confirmed | catalog_crx.yml, model_configs.yml | Config comments drift from code (see list) |
 
 ---
 
@@ -461,6 +467,77 @@ own input, so A4 is unaffected.
 - `rl_a1_ability/pipeline.py:7` says Node 4b Group D was removed, the node module says it is kept
   but not wired.
 
+### O36 — Stale WM salary counts as income evidence (M, confirmed)
+
+`enrich_salary_pit` (`cc_a1_ability/enrichers.py:388–437`) takes the latest
+`wm_fea_salary_days_since_increment` row with `week_date < anchor`, with no lower bound, and
+returns `ft_last_salary_amount` as `salary_amt_last`. A customer whose salary stopped years ago
+still carries their old salary. In A1 v2, `_income_level_col` (`cc_a1_ability_v2/nodes.py:766–785`)
+treats `coalesce(salary_amt_last, bureau_salary_amt_last) >= _DEMIN` as **weak income** on its own,
+so a stale salary is worth 1 income point. `bureau_salary_amt_last` is windowed to 6 months, the
+WM one is not. Same pattern as O24.
+**Fix:** require the PIT row within e.g. 90 days of the anchor (or use the source's own
+`ft_days_since_salary_transaction` ≤ 90), NULL otherwise. Matters for the shared A1 engine
+(CC + RL).
+
+### O37 — External CC payments truncated in the first months (M, confirmed)
+
+`build_a1v2_liquidity_signals` (`cc_a1_ability_v2/nodes.py:472–474`) and v1's
+`build_a1_group_b_income` (`cc_a1_ability/nodes.py:374–376`) filter `wm_pri_labelled_transactions`
+to `tran_date >= persona_start`, while `enrich_ext_cc_payments_h2` reads `[obs − 90d, obs)`. For
+observation dates in the first three months of the persona window, part of the window is cut, so
+`ext_cc_payment_amt_h2` is understated and the liquidity level drops. Same as O33 (RL).
+**Fix:** floor at `persona_start − 3 months` in the shared engine.
+
+### O38 — AECB feature-space alerts may never parse (M, data check)
+
+`enrich_fea_bureau_alerts` (`cc_a1_ability/enrichers.py:1105–1176`) documents `month_number` as
+"last day of month, YYYY-MM-DD" (1117) but parses it with `to_date(cast(string), "yyyyMMdd")`
+(1152–1154). If the column really is `2026-05-31`, the parse returns NULL (or raises under ANSI),
+every row fails the PIT filter, and `fea_salary_acct_flag` is NULL — so `a1_new_salary_acct_flag`
+rests on `prm_bureau_alert_enriched` alone. The other `month_number` sources (payroll) are
+`yyyyMMdd` ints, which is probably where the format was copied from.
+**Check:** `select month_number from fea_monthly_aecb_alerts limit 5`.
+**Fix:** parse with the format the column actually has (or `to_date` without a format if it is
+already a date string).
+
+### O39 — Bureau salary: non-deterministic picks and an extra job (M, confirmed)
+
+`enrich_bureau_salary` (`cc_a1_ability/enrichers.py:910–1016`):
+- the CIF bridge is deduplicated with `dropDuplicates(["bureau_file_id"])` (971–974), which keeps
+  an arbitrary `cif_id` if a file id maps to more than one;
+- the PIT window orders by `_sal_date` only (1003); salary history is reloaded per
+  `edp_load_date` and parsed to the 1st of the month, so several rows tie on the latest month and
+  `bureau_salary_amt_last` is whichever Spark returns first;
+- `sal_with_cif.count()` (988) runs an extra full job over the bridged history on every call
+  (called twice per run: T0 and obs-date variants).
+**Fix:** order by `(_sal_date desc, _sal_amt desc)` or dedupe per (cif, month) first; replace the
+count with a cheap `limit(1)` emptiness check or drop it.
+
+### O40 — Inclusive PIT filter on weekly WM features (L, data check)
+
+`enrich_casa_eod_avg_balance` (`enrichers.py:298–300`) and `enrich_ext_loan_payments_h2`
+(`enrichers.py:713–715`) keep rows with `_snap_date <= anchor`; every other PIT enricher uses
+`<`. If `week_number` is the week's start date, the row for the week containing the observation
+date aggregates days after it — up to 6 days of look-ahead in the CASA balance gate (RL High
+Arms 1/4).
+**Check:** is `week_number` the first or the last day of the week?
+**Fix:** `<` (or `<= anchor − 6 days` if it is the start date).
+
+### O41 — Config comment drift (L, confirmed)
+
+- `catalog_crx.yml` RL-B2 block says the spell table is "one row per account_id … spell_id=1 /
+  spell_end=NULL adapter"; `rl_spell_table` builds several spells per account with real
+  `spell_end` (this mismatch is the root of O26).
+- `catalog_crx.yml` RL A1 block still declares `crx_rl_a1_group_a` and `crx_rl_a1_group_d`
+  (nodes removed / not wired) and says Node 4r reads `feature_retail_loans` (it reads
+  `int_loan_master`).
+- `catalog_crx.yml` RL departure block numbers the travel / foreign nodes 1 / 2 (code: 2 / 3) and
+  has no entries for `crx_rl_depart_spine` / `crx_rl_depart_casa_signals` (they run as memory
+  datasets — fine, but undocumented).
+- `model_configs.yml` `cc_180_plus` / `rl_180_plus`: comment "3-month look-ahead" next to
+  `target_horizon_months: 12`.
+
 ---
 
 ## Not issues (checked, fine)
@@ -485,3 +562,12 @@ own input, so A4 is unaffected.
   docstrings (NULL buckets count as clean, which is acceptable for RL).
 - A1 Node 3r `_recent` renaming: every column the classifier reads (`aecb_*_recent`,
   `a1_new_salary_acct_flag_recent`, …) exists after the rename loop in `_assemble_rl_classify_inputs`.
+
+- `enrich_salary_months_h2` / `_h4_h6`: `month_number` is a month-end date and the windows are
+  `[trunc(anchor) − 3m, trunc(anchor))` / `[− 6m, − 3m)` on it — exactly 3 months each, no
+  off-by-one (unlike O2, which uses `months_between`).
+- `scoring_engine.StateLadder.state`: unknown first, then High, one-rung demotion to Moderate,
+  Low floor — matches its docstring and A1 v2's use.
+- Every enricher name imported by `cc_a1_ability_v2` and `rl_a1_ability` exists in
+  `cc_a1_ability/enrichers.py` (`enrich_casa_self_transfer_wash_h2` is only mentioned in a
+  docstring).

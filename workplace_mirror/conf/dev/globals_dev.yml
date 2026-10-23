@@ -1,0 +1,57 @@
+execution_environment: "dev"
+spark_env: "medium"
+
+nameservice: "hdfs://cdpprod"
+aacoe_prefix: "ai_"
+tenant: "sandpit_aacoe"
+aacoe_entity_name: "enbd"
+use_case_name: "risk_collections"
+
+# Active model variant — change this to switch the namespace for all domain pipeline runs.
+# ModelConfigHook reads this when running non-model-variant pipelines (bureau, demographics, etc.).
+# Overridden automatically when running a model variant pipeline (kedro run --pipeline=rl_60_180).
+# model_id: "cc_180_plus"
+model_id: "cc_60_180"
+# model_id: "rl_60_180"
+# model_id: "rl_180_plus"
+dlq_min: 4
+dlq_max: 7
+collateral_codes: ["WO", "SK"]    # default matches cc_60_180; overridden by ModelConfigHook at runtime
+
+folders:
+  dct: "00_dictionary"
+  raw: "01_raw"
+  stg: "02_stg"
+  int: "03_int"
+  prm: "04_prm"
+  feat: "05_feat"
+  spine_int: "06_spine_int"
+  spine: "07_spine"
+  mip: "08_mip"
+  mop: "09_mop"
+  persona: "10_persona"
+
+modelling:
+  rl_60_180:
+    start_date: "2019-01-01"
+    end_date: "2026-08-31"
+  rl_180_plus:
+    start_date: "2019-01-01"
+    end_date: "2026-08-31"
+  cc_60_180:
+    start_date: "2025-01-01"
+    end_date: "2026-08-31"
+  cc_180_plus:
+    start_date: "2025-01-01"
+    end_date: "2026-08-31"
+  target_horizon_months: 1
+
+crx_persona:
+  persona_start_date: "2026-01-01"
+  persona_end_date:   "2026-08-31"
+
+# Snapshot partition key — update to latest available partition before each run.
+# WM 04_feature and RFS datasets are partitioned by adv_load_date (YYYY-MM-DD);
+# each partition is a full-history snapshot so we pin to the latest one.
+# WM 03_primary (pri_labelled_transactions) is NOT a snapshot — filtered in node code.
+snapshot_adv_load_date: "2026-09-02"

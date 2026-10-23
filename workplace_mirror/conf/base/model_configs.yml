@@ -1,0 +1,36 @@
+models:
+  cc_60_180:
+    product_domain: "credit_card_way4"   # Way4 source
+    dlq_min: 4
+    dlq_max: 7                           # CC bucket encoding: 4=61-90d, 7=151-180d
+    target_type: "next_bucket"           # 1-cycle look-ahead: cure/stay/roll
+    grain: "account_x_billing_cycle"
+    collateral_codes: ["WO", "SK"]       # exclude write-off and skip-trace codes
+    target_horizon_months: 1
+
+  cc_180_plus:
+    product_domain: "credit_card_way4"   # Way4 only — DPL pipelines dropped
+    dlq_min: 8
+    dlq_max: 9                           # CC bucket encoding: 8=181-210d, 9=211+d
+    target_type: "recovery"              # 3-month look-ahead: any payment received
+    grain: "account_x_billing_cycle"
+    collateral_codes: []                 # no collateral exclusion at 180+ DPD
+    target_horizon_months: 12
+
+  rl_60_180:
+    product_domain: "retail_loans"
+    dlq_min: 3
+    dlq_max: 6                           # RL bucket encoding: 3=61-90d, 6=151-180d (offset -1 vs CC)
+    products: ["Personal", "Personal Cash", "Auto"]
+    target_type: "next_bucket"
+    grain: "account_x_month_end"
+    target_horizon_months: 1
+
+  rl_180_plus:
+    product_domain: "retail_loans"
+    dlq_min: 7
+    dlq_max: 7                           # RL bucket encoding: 7=180+d (single bucket)
+    products: ["Personal", "Personal Cash", "Auto"]
+    target_type: "recovery"              # 3-month look-ahead: any payment received
+    grain: "account_x_month_end"
+    target_horizon_months: 12

@@ -1,0 +1,21 @@
+##################################################
+# CRX PERSONA PIPELINE CONFIGURATION
+##################################################
+# Evaluation window for the RL persona pipeline.
+# These dates control which spine rows are included in persona outputs
+# (crx_rl_a4_spine and all downstream assets).
+#
+# Filter is applied at the spine-join step (RL-A4-2), NOT on raw history
+# or T0 tables — full history is required for T0 identification and
+# pre-T0 feature lookback.
+#
+# Orthogonal to modelling.start_date / modelling.end_date (training spine window).
+##################################################
+
+crx_persona: "${globals:crx_persona}"
+
+# Segment id for the currently-running model variant (cc_60_180 / cc_180_plus /
+# rl_60_180 / rl_180_plus). Additive key (R18) — used by cc_a2_locatability and
+# rl_a2_locatability (Node 4, T29/RL-A2-3 design, promoted 2026-10-22) to select
+# segment-aware thresholds; same resolver pattern as crx_persona above.
+model_id: "${globals:model_id}"

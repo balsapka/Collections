@@ -160,6 +160,37 @@ Uncertain characters: `rl_a1_ability/pipeline.py:13–15` bracket glyphs beside 
 (┐ ┤ ┘, as in batch 4); `rl_a1_ability/nodes.py:613–614` the "~" in "(NULL ~where feature
 absent)" is on screen as written.
 
+## Batch 6 — CC A1 v1, scoring_engine, conf (photos IMG_8234–8331)
+
+| Module | Lines (screen) | Lines here | Status |
+|---|---|---|---|
+| `conf/dev/globals_dev.yml` | 57 | 57 | complete |
+| `conf/base/model_configs.yml` | 36 | 36 | complete — comment column alignment approximate |
+| `conf/base/parameters/parameters_crx_persona.yml` | 21 | 21 | complete |
+| `conf/base/catalog/catalog_crx.yml` | 676 | 676 | complete — path of the file inside `conf/base` assumed |
+| `crx_persona/cc_a1_ability/__init__.py` | 5 | 5 | complete |
+| `crx_persona/cc_a1_ability/enrichers.py` | 1191 | 1191 | **gap: lines 176–211 not photographed** (IMG_8260 missing) |
+| `crx_persona/cc_a1_ability/nodes.py` | 1407 | 1407 | complete — all 17 `def`s on the same line as on screen |
+| `crx_persona/cc_a1_ability/pipeline.py` | 198 | 198 | complete |
+| `crx_persona/scoring_engine.py` | 100 | 100 | complete |
+
+**`enrichers.py` gap:** IMG_8259 ends at line 175 (`LOG.warning(` inside `enrich_salary_stop_month`)
+and IMG_8261 starts at 212 (`_CASA_EOD_BAL_SOURCE_COLS = {`). Lines 176–211 hold the rest of
+`enrich_salary_stop_month` and probably a comment block for the CASA columns. They are filled with
+`# <<MIRROR GAP …>>` marker lines so the line numbers stay aligned; the file does **not compile**
+until they are replaced. Re-photograph `enrichers.py` lines 170–215. Never bundle this file before.
+
+Checks: everything else compiles; ruff F/E9 clean apart from the known `__init__` re-exports and the
+gap; YAML files parse; every enricher name `cc_a1_ability_v2` and `rl_a1_ability` import exists.
+
+**The grep output was not in this batch** (IMG_8331 is the last `scoring_engine.py` page) — still
+needed before removing v1 (catalog references are now visible in `catalog_crx.yml`, but other
+consumers — reporting, notebooks, `conf/` outside the catalog — are not).
+
+Uncertain characters: `enrichers.py:1117` the box between `cif_id` and `month_number` read as `×`;
+`nodes.py:162` "N×M" (box glyph); `nodes.py:924` "D1–D5" (box glyph, read as en dash);
+`pipeline.py:12–17` bracket glyphs beside "parallel".
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
