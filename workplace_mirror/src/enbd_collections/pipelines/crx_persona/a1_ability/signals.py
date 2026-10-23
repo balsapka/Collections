@@ -268,14 +268,7 @@ def build_distress_signals(
     * ``bureau_alert`` — bureau-reported bounced cheques (always wired);
     * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet;
     * ``internal_returns`` — the bank's own returned cheques / DDS returns as
-      ``(cif_id, event_date)``.
-
-    TODO(sonnet): no internal source exists in the code base yet. Find where returned
-    cheques and DDS returns are recorded internally (candidates: CASA transaction codes
-    or narrations in ``comp_financial_tran_repos_dly``, a DDS mandate table), build a
-    ``(cif_id, event_date)`` frame and pass it here from the pipeline. Take every
-    account of the customer (CIF level), not the scored account: an RL account_id is
-    not the customer's CASA account.
+      ``(cif_id, event_date)``; CC: ``cc_a1_ability_v2.nodes.build_cc_internal_returns``.
     """
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     require_columns(

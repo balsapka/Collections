@@ -421,6 +421,13 @@ crx_cc_a1_distress_signals:
   save_args:
     mode: overwrite
 
+crx_cc_a1_internal_returns:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_internal_returns"
+  save_args:
+    mode: overwrite
+
 crx_cc_a1_liquidity_anchor:
   type: spark.SparkDataset
   file_format: parquet

@@ -1,4 +1,4 @@
-"""CC-specific part of the A1 ability axis: the liquidity anchor.
+"""CC-specific parts of the A1 ability axis: the liquidity anchor and internal returns.
 
 Everything else (evidence, levels, points, state) is the shared ``a1_ability`` engine.
 """
@@ -6,12 +6,14 @@ Everything else (evidence, levels, points, state) is the shared ``a1_ability`` e
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, pit_latest, require_columns
+from .._common import GRAIN, lookback_floor, pit_latest, require_columns
 from .._dpd_journey import MODEL_ID_SEGMENT
 
 # OVD_k holds the amount k cycles overdue (DPD bucket k+1): OVD_01 1-30 … OVD_06
 # 151-180 DPD. OVD_07 (181-210) and the catch-all OVD_08 (211+) never anchor.
 _OVERDUE_BUCKETS = [f"overdue_bucket_{i:02d}" for i in range(1, 7)]
+# reason_for_excluding values marking a returned cheque or DDS return (profiled sample).
+_RETURN_REASONS = ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
 # A balance snapshot older than this means the card stopped reporting; no anchor then.
 _BALANCE_MAX_AGE_D = 31
 
@@ -53,3 +55,27 @@ def build_cc_liquidity_anchor(
         *[F.when(F.col(c) > 0, F.col(c)) for c in reversed(_OVERDUE_BUCKETS)]
     )
     return latest.select(*GRAIN, oldest.alias("liquidity_anchor_amt"))
+
+
+def build_cc_internal_returns(
+    obs_base: DataFrame, comp_financial_tran_repos_dly: DataFrame
+) -> DataFrame:
+    """The bank's own returned cheques / DDS returns as ``(cif_id, event_date)``, across
+    all of the customer's CASA accounts (R20: scoped by CIF before any other filter)."""
+    require_columns(
+        comp_financial_tran_repos_dly,
+        ["cif_id", "tran_date", "reason_for_excluding"],
+        "comp_financial_tran_repos_dly",
+    )
+    cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
+    return (
+        comp_financial_tran_repos_dly.select(
+            "cif_id", "tran_date", "reason_for_excluding"
+        )
+        .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
+        .filter(
+            (F.col("tran_date") >= F.lit(lookback_floor(obs_base, 100)))
+            & F.col("reason_for_excluding").isin(_RETURN_REASONS)
+        )
+        .select("cif_id", F.to_date("tran_date").alias("event_date"))
+    )

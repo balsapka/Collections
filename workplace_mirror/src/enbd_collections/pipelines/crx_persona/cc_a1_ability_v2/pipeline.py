@@ -28,7 +28,7 @@ from ..a1_ability import (
 )
 from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
 from .b01_check import compare_a1_outputs, compare_salary_months
-from .nodes import build_cc_liquidity_anchor
+from .nodes import build_cc_internal_returns, build_cc_liquidity_anchor
 
 _OBS = "crx_cc_obs_base"
 
@@ -63,8 +63,18 @@ def create_pipeline(
                 name="build_crx_cc_a1_liquidity_signals",
             ),
             node(
+                build_cc_internal_returns,
+                [_OBS, "comp_financial_tran_repos_dly"],
+                "crx_cc_a1_internal_returns",
+                name="build_crx_cc_a1_internal_returns",
+            ),
+            node(
                 build_distress_signals,
-                [_OBS, "prm_bureau_alert_enriched"],
+                {
+                    "obs_base": _OBS,
+                    "bureau_alert": "prm_bureau_alert_enriched",
+                    "internal_returns": "crx_cc_a1_internal_returns",
+                },
                 "crx_cc_a1_distress_signals",
                 name="build_crx_cc_a1_distress_signals",
             ),
