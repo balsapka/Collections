@@ -1,4 +1,4 @@
-"""CC A1 ability axis (GRR MECE points) on the shared ``_a1`` engine."""
+"""CC A1 ability axis (GRR MECE points) on the shared ``a1_ability`` engine."""
 
 from .pipeline import create_pipeline
 

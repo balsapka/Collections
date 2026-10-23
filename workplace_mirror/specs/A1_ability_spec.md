@@ -69,7 +69,7 @@ is read across **all accounts of the customer's CIF**, not the scored account �
 
 ## 4. Decisions (2026-10-23) and how the engine implements them
 
-The shared engine (`crx_persona/_a1`, bundle 01) follows sections 1–3, with these
+The shared engine (`crx_persona/a1_ability`, bundle 01) follows sections 1–3, with these
 decisions by the user where the workbook and the earlier code disagreed:
 
 | # | Topic | Decision | Implementation |

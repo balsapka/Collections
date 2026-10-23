@@ -14,7 +14,7 @@ extra inputs of the distress node once they exist.
 
 from kedro.pipeline import Pipeline, node
 
-from .._a1 import (
+from ..a1_ability import (
     build_a1_ability,
     build_distress_signals,
     build_income_signals,

@@ -93,7 +93,7 @@ suffixes.
 Reference design. Only P3 applies (logging already opt-in in the engine).
 
 ### A1 ability — one engine, two wrappers (agreed direction)
-`_a1/` package, product-agnostic, on the obs base:
+`a1_ability/` package, product-agnostic, on the obs base:
 - `signals.py` — income (payroll months, WM salary PIT with max age, bureau salary), liquidity
   (CASA recent/prior averages, external card payments, CASA in/outflow counts), distress
   (bounced cheque + optional sources); built on `pit_latest` / `window_agg`.

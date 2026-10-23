@@ -1,6 +1,6 @@
 """CC-specific part of the A1 ability axis: the liquidity anchor.
 
-Everything else (evidence, levels, points, state) is the shared engine in ``_a1``.
+Everything else (evidence, levels, points, state) is the shared ``a1_ability`` engine.
 """
 
 from pyspark.sql import DataFrame

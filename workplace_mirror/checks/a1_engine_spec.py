@@ -1,4 +1,4 @@
-"""Local spec test for the A1 engine (``_a1``) against specs/A1_ability_spec.md.
+"""Local spec test for the A1 engine (``a1_ability``) against specs/A1_ability_spec.md.
 
     python workplace_mirror/checks/a1_engine_spec.py      (needs pyspark + Java 17)
 
@@ -27,7 +27,7 @@ spark = (
 spark.sparkContext.setLogLevel("ERROR")
 
 from enbd_collections.pipelines.crx_persona import _common  # noqa: E402
-from enbd_collections.pipelines.crx_persona._a1 import (  # noqa: E402
+from enbd_collections.pipelines.crx_persona.a1_ability import (  # noqa: E402
     build_a1_ability,
     build_distress_signals,
     build_income_signals,
