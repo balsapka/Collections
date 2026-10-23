@@ -1,6 +1,6 @@
 # crx_persona — design review and refactor proposal
 
-Status: **proposal, waiting for decisions** (bottom of this file). Nothing is changed yet.
+Status: **proposal; D3–D5 decided 2026-10-23 (§6), D1/D2 open.** Nothing is changed yet.
 Scope: every persona axis in the mirror except A3 (DE-owned). Builds on the findings
 O1–O41 in `REVIEW_OBSERVATIONS.md`.
 
@@ -155,3 +155,39 @@ separately so each change in numbers has one cause.
   or fold fixes into the refactor to save a PROD cycle.
 - **D5** — Order: A1 first as planned (recommended), or foundation (bundle 6) first, since O26
   affects every RL axis.
+
+## 6. Decisions taken (2026-10-23) and what they change
+
+- **D3 — docstrings:** remove ticket-history references and every docstring/comment that does not
+  describe what the code does now. History stays in git and `RESULTS*.md`.
+- **D4 — fixes are folded into the refactor bundles.** No row-by-row parity checks; each
+  bundle's PROD check is a before/after distribution plus a crosstab old vs new state, and the
+  bundle notes list which O-findings explain the differences.
+- **D5 — deprecate the spell concept.** The axes are now anchored on the scoring date
+  (`observation_date`), so tables keyed on spell onset (T0) are no longer needed:
+
+  | Today | After |
+  |---|---|
+  | `cc_spell`, `rl_spell_table` | removed |
+  | `rl_a4_spine`, `join_spine_to_spell`, `build_rl_depart_spine` | replaced by the obs base `(account_id, observation_date, cif_id)` |
+  | T0-anchored windows in the departure trail (travel H2, salary stop gap) | anchored on `observation_date` |
+  | `cc_raw_extract` (scoped by T0 windows), `cc_payment_trajectory`, `cc_utilisation` | removed; CC card transactions scoped by the spine instead |
+  | A2 contact window `[t0, observation_date)` | needs a replacement start (D6) |
+  | A4 | unchanged — it never used the spell tables |
+
+  This removes O3, O4, O22, O26, O27, O34 with the code.
+  **Blocker:** the DE's A3 (`cc_a3_payment_credibility`, `rl_a3_payment_credibility`) is keyed on
+  `(account_id, spell_id)` and reads the spell tables. The spell tables can only be deleted after
+  A3 moves off them; until then they stay, unused by the other axes.
+
+### Revised ship order
+
+| # | Bundle | PROD check |
+|---|---|---|
+| 1 | Shared utils (`require_columns`, `pit_latest`, `window_agg`, obs base, `log_stats`) | imports |
+| 2 | A1 engine + CC A1 on it, with fixes O24/O36/O37/O39 | distribution + crosstab vs v2 |
+| 3 | RL A1 on the engine | distribution + crosstab vs RL waterfall |
+| 4 | Remove CC v1 + RL waterfall, drop `_v2` names, registry + catalog; Sonnet updates the 2 tests | imports, catalog resolves |
+| 5 | Departure trail on `observation_date` (CC + RL), A2 on the obs base + split + D6 window | A2 crosstab vs old |
+| 6 | Delete T0-only packages (`cc_raw_extract`, `cc_payment_trajectory`, `cc_utilisation`, `rl_a4_spine`, departure passes) | imports |
+| 7 | Delete spell tables — after A3 has moved off them | — |
