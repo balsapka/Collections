@@ -32,13 +32,44 @@ import re
 import subprocess
 import sys
 
-APPLY_VERSION = 2
+APPLY_VERSION = 3
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
 
 def _norm(text: str) -> str:
     return text.replace("\r\n", "\n")
+
+
+# Separator lines in comments (``# ── Node 1 ─────``, ``#######``) are transcribed from
+# photos, where their exact length cannot be read. Runs of 4+ identical separator
+# characters therefore compare equal whatever their length; so do trailing spaces.
+_RULE_RUN = re.compile(r"([─━═=\-#*~_])\1{3,}")
+
+
+def _loose(text: str) -> str:
+    return "\n".join(
+        _RULE_RUN.sub(r"\1\1\1\1", line.rstrip()) for line in _norm(text).split("\n")
+    )
+
+
+def _matches_base(current: str | None, e: dict) -> bool:
+    return current is not None and _loose(current) == _loose(e["base"])
+
+
+def _rebase(new: str, base: str, current: str) -> str:
+    """``new`` with every line the bundle did not change taken from ``current``.
+
+    ``current`` matches ``base`` line by line up to separator lengths (``_matches_base``),
+    so the repo's own separators survive and ``git diff`` shows only real changes.
+    """
+    base_l, new_l, cur_l = (_norm(t).split("\n") for t in (base, new, current))
+    out: list[str] = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
+        None, base_l, new_l, autojunk=False
+    ).get_opcodes():
+        out += cur_l[i1:i2] if tag == "equal" else new_l[j1:j2]
+    return "\n".join(out)
 
 
 def _sha(text: str) -> str:
@@ -161,13 +192,13 @@ def file_status(e: dict) -> str:
             return "todo"
         return "done" if cur_sha == e["new_sha"] else "conflict"
     if e["action"] == "replace":
-        if cur_sha == e["base_sha"]:
-            return "todo"
-        return "done" if cur_sha == e["new_sha"] else "conflict"
+        if cur_sha == e["new_sha"] or _loose(current or "") == _loose(e["new"]):
+            return "done"
+        return "todo" if _matches_base(current, e) else "conflict"
     # delete
     if current is None:
         return "done"
-    return "todo" if cur_sha == e["base_sha"] else "conflict"
+    return "todo" if _matches_base(current, e) else "conflict"
 
 
 def explain_conflict(e: dict) -> None:
@@ -181,10 +212,11 @@ def explain_conflict(e: dict) -> None:
         if current is None:
             print("    the file does not exist in this repo.")
             return
+    print("    (separator-line lengths and trailing spaces are ignored; real differences only)")
     diff = list(
         difflib.unified_diff(
-            _norm(expected).splitlines(),
-            _norm(current or "").splitlines(),
+            _loose(expected).splitlines(),
+            _loose(current or "").splitlines(),
             fromfile=label,
             tofile="this repo",
             lineterm="",
@@ -297,8 +329,11 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
             path.unlink()
             _prune_empty_dirs(path.parent)
         else:
+            new = e["new"]
+            if e["action"] == "replace":
+                new = _rebase(new, e["base"], _read(path))
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(e["new"].encode("utf-8"))
+            path.write_bytes(new.encode("utf-8"))
     bad = [e["path"] for e in entries if file_status(e) != "done"]
     failures = [f"not in the expected final state: {p}" for p in bad]
     failures += compile_and_import(entries, do_import)
@@ -328,13 +363,15 @@ def cmd_revert(entries: list[dict]) -> bool:
                     parent.rmdir()
             elif current is not None:
                 skipped.append(e["path"])
-        elif cur_sha == e["new_sha"] or (e["action"] == "delete" and current is None):
-            # prefer the committed bytes (keeps the repo's own line endings)
+        elif (current is not None and _loose(current) == _loose(e["new"] or "")) or (
+            e["action"] == "delete" and current is None
+        ):
+            # restore the committed bytes (the repo's own file, exactly)
             committed = _head_version(e["path"])
-            restore = committed if committed and _sha(committed) == e["base_sha"] else e["base"]
+            restore = committed if _matches_base(committed, e) else e["base"]
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(restore.encode("utf-8"))
-        elif cur_sha != e["base_sha"]:
+        elif not _matches_base(current, e):
             skipped.append(e["path"])
     for p in skipped:
         print(f"left alone (edited after apply): {p}")
