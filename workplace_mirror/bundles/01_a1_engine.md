@@ -6,82 +6,76 @@ apply_bundle version: 2 · built 2026-10-23 from `0c45e6e..4756b25` · source: 6
 
 Everything this bundle adds outside `src/` and `conf/` lives in `data/input/mirror_bundles/`
 (gitignored). Nothing here is committed; commit `src/` and `conf/` only if you
-decide to keep the change.
+decide to keep the change. Copy each command block exactly as it is.
 
-1. Work on a branch (the apply script refuses to run on main):
+**Step 1.** Work on a branch (the apply script refuses to run on main):
 
-   ```bash
-   git checkout -b feature/persona_redesign_b01
-   ```
+```bash
+git checkout -b feature/persona_redesign_b01
+```
 
-2. Save this file **raw** (GitHub → Raw → copy all) as `data/input/mirror_bundles/01_a1_engine.md`:
+**Step 2.** Create the folder, then save this file **raw** (GitHub → Raw → copy all) as `data/input/mirror_bundles/01_a1_engine.md`:
 
-   ```bash
-   mkdir -p data/input/mirror_bundles
-   ```
+```bash
+mkdir -p data/input/mirror_bundles
+```
 
-3. Write the apply script from the *Apply script* section at the bottom:
+**Step 3.** Write the apply script from the *Apply script* section at the bottom (prints `apply_bundle.py written`):
 
-   ```bash
-   python - <<'EOF'
-   import pathlib, re
-   d = pathlib.Path('data/input/mirror_bundles')
-   md = (d / '01_a1_engine.md').read_text(encoding='utf-8')
-   sec = md.split('\n## Apply script\n', 1)[1]
-   m = re.search(r'^(`{5,})python\n(.*?)\n\1$', sec, re.S | re.M)
-   (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8')
-   print('apply_bundle.py written')
-   EOF
-   ```
+```bash
+python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '01_a1_engine.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')"
+```
 
-4. Dry run — must end with `CHECK PASSED` (nothing is written):
+**Step 4.** Dry run — must end with `CHECK PASSED` (nothing is written):
 
-   ```bash
-   python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --check
-   ```
+```bash
+python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --check
+```
 
-5. Apply — must end with `APPLY PASSED`:
+**Step 5.** Apply — must end with `APPLY PASSED`:
 
-   ```bash
-   python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --apply
-   ```
+```bash
+python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --apply
+```
 
-6. Look at what changed:
+**Step 6.** Look at what changed:
 
-   ```bash
-   git status && git diff --stat
-   ```
+```bash
+git status && git diff --stat
+```
 
-7. **Before re-running A1**, keep a copy of the current output. In a Kedro notebook
-   (`kedro jupyter notebook`, from any folder in the repo):
+**Step 7.** Before re-running A1, keep a copy of the current output. In a Kedro notebook
+(`kedro jupyter notebook`), run this cell:
 
-   ```python
-   import sys, pathlib
-   _c = pathlib.Path.cwd()
-   ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
-   sys.path.insert(0, str(ROOT / "data" / "input" / "mirror_bundles"))
-   from b01_a1_engine_check import main
-   main(catalog, step="snapshot")
-   ```
+```python
+import sys, pathlib
+_c = pathlib.Path.cwd()
+ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
+sys.path.insert(0, str(ROOT / "data" / "input" / "mirror_bundles"))
+from b01_a1_engine_check import main
+main(catalog, step="snapshot")
+```
 
-8. Rebuild the observation base and the A1 axis (terminal):
+**Step 8.** Rebuild the observation base, then the A1 axis (terminal):
 
-   ```bash
-   kedro run --pipeline=crx_cc_obs_base
-   ```
+```bash
+kedro run --pipeline=crx_cc_obs_base
+```
 
-   ```bash
-   kedro run --pipeline=crx_cc_a1_ability_v2
-   ```
+```bash
+kedro run --pipeline=crx_cc_a1_ability_v2
+```
 
-9. Compare old vs new (same notebook) and paste the printed `B01 OUTPUT` block back:
+**Step 9.** Compare old vs new in the same notebook and paste the printed `B01 OUTPUT`
+block back:
 
-   ```python
-   main(catalog, step="compare")
-   ```
+```python
+main(catalog, step="compare")
+```
 
-10. Repeat 7–9 for the other CC segment: set `model_id` in `conf/dev/globals_dev.yml`
-    (`cc_60_180` ↔ `cc_180_plus`), restart the notebook kernel, run again.
+**Step 10.** Repeat steps 7–9 for the other CC segment: set `model_id` in
+`conf/dev/globals_dev.yml` (`cc_60_180` ↔ `cc_180_plus`), restart the notebook kernel, run
+again.
 
 **Undo** (before any commit) — restores every touched file exactly:
 

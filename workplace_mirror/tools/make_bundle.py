@@ -90,60 +90,51 @@ def _file_entry(
 def _steps(name: str, branch: str, run_md: str) -> list[str]:
     md_path = f"{WORK_DIR}/{name}"
     apply = f"python {WORK_DIR}/apply_bundle.py {md_path}"
+    # One line, no heredoc, no backticks: survives copy-paste into bash or zsh.
     extract = (
-        "python - <<'EOF'\n"
-        "import pathlib, re\n"
-        f"d = pathlib.Path('{WORK_DIR}')\n"
-        f"md = (d / '{name}').read_text(encoding='utf-8')\n"
-        "sec = md.split('\\n## Apply script\\n', 1)[1]\n"
-        "m = re.search(r'^(`{5,})python\\n(.*?)\\n\\1$', sec, re.S | re.M)\n"
-        "(d / 'apply_bundle.py').write_text(m.group(2) + '\\n', encoding='utf-8')\n"
-        "print('apply_bundle.py written')\n"
-        "EOF"
+        'python -c "import pathlib, re; '
+        f"d = pathlib.Path('{WORK_DIR}'); "
+        f"md = (d / '{name}').read_text(encoding='utf-8'); "
+        "sec = md.split('\\n## Apply script\\n', 1)[1]; "
+        "m = re.search(r'^(\\x60{5,})python\\n(.*?)\\n\\1$', sec, re.S | re.M); "
+        "(d / 'apply_bundle.py').write_text(m.group(2) + '\\n', encoding='utf-8'); "
+        "print('apply_bundle.py written')\""
     )
-    lines = [
+
+    def step(n: int, text: str, cmd: str) -> list[str]:
+        return [f"**Step {n}.** {text}", "", "```bash", cmd, "```", ""]
+
+    return [
         "## Steps — do these in order, from the workplace repo root",
         "",
         f"Everything this bundle adds outside `src/` and `conf/` lives in `{WORK_DIR}/`",
         "(gitignored). Nothing here is committed; commit `src/` and `conf/` only if you",
-        "decide to keep the change.",
+        "decide to keep the change. Copy each command block exactly as it is.",
         "",
-        "1. Work on a branch (the apply script refuses to run on main):",
-        "",
-        "   ```bash",
-        f"   git checkout -b {branch}",
-        "   ```",
-        "",
-        f"2. Save this file **raw** (GitHub → Raw → copy all) as `{md_path}`:",
-        "",
-        "   ```bash",
-        f"   mkdir -p {WORK_DIR}",
-        "   ```",
-        "",
-        "3. Write the apply script from the *Apply script* section at the bottom:",
-        "",
-        "   ```bash",
-        *[f"   {line}" for line in extract.split("\n")],
-        "   ```",
-        "",
-        "4. Dry run — must end with `CHECK PASSED` (nothing is written):",
-        "",
-        "   ```bash",
-        f"   {apply} --check",
-        "   ```",
-        "",
-        "5. Apply — must end with `APPLY PASSED`:",
-        "",
-        "   ```bash",
-        f"   {apply} --apply",
-        "   ```",
-        "",
-        "6. Look at what changed:",
-        "",
-        "   ```bash",
-        "   git status && git diff --stat",
-        "   ```",
-        "",
+        *step(
+            1,
+            "Work on a branch (the apply script refuses to run on main):",
+            f"git checkout -b {branch}",
+        ),
+        *step(
+            2,
+            f"Create the folder, then save this file **raw** (GitHub → Raw → copy all) "
+            f"as `{md_path}`:",
+            f"mkdir -p {WORK_DIR}",
+        ),
+        *step(
+            3,
+            "Write the apply script from the *Apply script* section at the bottom "
+            "(prints `apply_bundle.py written`):",
+            extract,
+        ),
+        *step(
+            4,
+            "Dry run — must end with `CHECK PASSED` (nothing is written):",
+            f"{apply} --check",
+        ),
+        *step(5, "Apply — must end with `APPLY PASSED`:", f"{apply} --apply"),
+        *step(6, "Look at what changed:", "git status && git diff --stat"),
         run_md.strip(),
         "",
         "**Undo** (before any commit) — restores every touched file exactly:",
@@ -156,7 +147,6 @@ def _steps(name: str, branch: str, run_md: str) -> list[str]:
         "assistant (or run its steps yourself).",
         "",
     ]
-    return lines
 
 
 def _cleanup(name: str, extra_md: str) -> list[str]:
