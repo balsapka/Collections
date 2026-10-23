@@ -6,9 +6,8 @@ applied). Then:
 1. **UAT:** Sonnet writes the snippet, then commits and pushes `tmp_validation/a1_v01/`.
 2. **PROD:** pull and open a Kedro notebook (`kedro jupyter notebook`). Paste the snippet
    and run it. It writes `results_<model_id>.json` into the same folder.
-   Run it for `cc_60_180`. Then switch `model_id` in `globals_dev.yml`, restart the kernel
-   and run it again for `cc_180_plus`. Bundle 02's check pipeline must already have run for
-   each model_id.
+   Run it for `cc_60_180` only (the `model_id` already in `globals_dev.yml`; cc_180_plus is
+   skipped for now).
    Then commit and push only `tmp_validation/a1_v01/`.
 3. **UAT:** pull and ask Sonnet for the analysis (step B of the prompt). Paste the summary
    back here.
@@ -111,9 +110,8 @@ A. Write the snippet: tmp_validation/a1_v01/a1_v01_snippet.py, plus a README.md 
                      month_number, and min/max month_number vs min/max observation_date of the
                      obs base.
 
-B. Analysis (only when I give you the committed results files): read
-   results_cc_60_180.json and results_cc_180_plus.json. For each hypothesis H1-H7 and each
-   model_id, give:
+B. Analysis (only when I give you the committed results file): read
+   results_cc_60_180.json. For each hypothesis H1-H7, give:
    - a verdict: CONFIRMED / REJECTED / INCONCLUSIVE;
    - the 3-6 numbers that decide it;
    - one line on what it means for the engine.
