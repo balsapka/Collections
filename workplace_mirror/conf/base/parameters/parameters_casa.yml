@@ -1,0 +1,10 @@
+##################################################
+# CASA PRIMARY
+##################################################
+casa_primary:
+  # reason_for_excluding values kept in prm_casa_return_events (all return types;
+  # which ones count as distress is decided in the persona signal layer).
+  return_reasons: ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
+  # Event months rebuilt per run: from the month start of (today - rebuild_days).
+  # Covers late reloads; the first build overrides it with --params.
+  rebuild_days: 45

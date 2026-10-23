@@ -30,6 +30,8 @@ from enbd_collections.pipelines.bureau import primary as bureau_prm
 from enbd_collections.pipelines.bureau import intermediate as bureau_int
 from enbd_collections.pipelines.bureau import features as bureau_feat
 
+from enbd_collections.pipelines.casa import primary as casa_prm
+
 from enbd_collections.pipelines.retail_loans import staging as retail_loans_stg
 from enbd_collections.pipelines.retail_loans import primary as retail_loans_prm
 from enbd_collections.pipelines.retail_loans import intermediate as retail_loans_int
@@ -159,6 +161,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "bureau_primary": bureau_prm.create_pipeline(),
         "bureau_intermediate": bureau_int.create_pipeline(),
         "bureau_features": bureau_feat.create_pipeline(),
+        # -- CASA (domain) ---------------------------------------------------
+        "casa_primary": casa_prm.create_pipeline(),
         # -- Retail Loans (domain) -----------------------------------------
         "retail_loans": retail_loans.create_pipeline(),
         "retail_loans_staging": retail_loans_stg.create_pipeline(),
