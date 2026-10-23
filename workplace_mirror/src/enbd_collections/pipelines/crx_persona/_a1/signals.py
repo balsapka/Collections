@@ -9,6 +9,8 @@ Three evidence groups feed the classifier (``classify.py``):
 
 Every builder takes the observation base ``(account_id, observation_date, cif_id)`` and
 returns one row per base row that has evidence; the classifier left-joins them.
+Customer-level sources are always read for the whole CIF — all the customer's accounts —
+never for the scored account_id alone (an RL account_id is not a CASA account).
 """
 
 from __future__ import annotations
@@ -286,12 +288,22 @@ def build_distress_signals(
     obs_base: DataFrame,
     bureau_alert: DataFrame,
     payment_order: DataFrame | None = None,
+    internal_returns: DataFrame | None = None,
 ) -> DataFrame:
-    """distress_flag: a bounced cheque (or, once materialised, a returned payment order)
-    reported in the last 90 days.
+    """distress_flag: a cheque bounce or direct-debit (DDS) return in the last 90 days,
+    from the bureau and from the bank's own records.
 
-    ``payment_order`` (prm_bureau_payment_order) does not exist in PROD yet; wire it in
-    the pipeline when it does.
+    * ``bureau_alert`` — bureau-reported bounced cheques (always wired);
+    * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet;
+    * ``internal_returns`` — the bank's own returned cheques / DDS returns as
+      ``(cif_id, event_date)``.
+
+    TODO(sonnet): no internal source exists in the code base yet. Find where returned
+    cheques and DDS returns are recorded internally (candidates: CASA transaction codes
+    or narrations in ``comp_financial_tran_repos_dly``, a DDS mandate table), build a
+    ``(cif_id, event_date)`` frame and pass it here from the pipeline. Take every
+    account of the customer (CIF level), not the scored account: an RL account_id is
+    not the customer's CASA account.
     """
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     require_columns(
@@ -311,6 +323,13 @@ def build_distress_signals(
         events = events.unionByName(
             payment_order.filter(F.col("reason_code").isNotNull()).select(
                 "cif_id", F.to_date("return_date").alias("event_date")
+            )
+        )
+    if internal_returns is not None:
+        require_columns(internal_returns, ["cif_id", "event_date"], "internal_returns")
+        events = events.unionByName(
+            internal_returns.select(
+                "cif_id", F.to_date("event_date").alias("event_date")
             )
         )
     hits = window_agg(
