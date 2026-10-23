@@ -2,12 +2,12 @@
 
 Run from the workplace repo root:
 
-    python docs/mirror_bundles/apply_bundle.py docs/mirror_bundles/<bundle>.md --check
+    python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/<bundle>.md --check
         -> dry run, changes nothing. Must end with "CHECK PASSED".
-    python docs/mirror_bundles/apply_bundle.py docs/mirror_bundles/<bundle>.md --apply
+    python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/<bundle>.md --apply
         -> writes the files, verifies them, compiles and imports every touched module.
            Must end with "APPLY PASSED".
-    python docs/mirror_bundles/apply_bundle.py docs/mirror_bundles/<bundle>.md --revert
+    python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/<bundle>.md --revert
         -> puts every touched file back the way it was before --apply (uncommitted work only).
 
 Safety rules:
@@ -19,6 +19,8 @@ Safety rules:
     markdown, smart quotes, lost lines) is detected before anything is written.
 
 Options: --no-import skips the import check (e.g. outside the dev container).
+         --accept PATH (repeatable) replaces a conflicting file anyway — only after
+         reading its code diff, and only for a file nobody edited by hand.
 """
 
 from __future__ import annotations
@@ -32,7 +34,7 @@ import re
 import subprocess
 import sys
 
-APPLY_VERSION = 4
+APPLY_VERSION = 5
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
@@ -89,6 +91,22 @@ def _same_code(path: str, a: str, b: str) -> bool:
 def _is_new(current: str, e: dict) -> bool:
     """The repo file already holds the bundle's new version (comment noise aside)."""
     return _loose(current) == _loose(e["new"]) or _same_code(e["path"], current, e["new"])
+
+
+def _code_text(path: str, text: str) -> str:
+    """The text with comments and docstrings removed (Python) or normalised (YAML)."""
+    try:
+        if path.endswith(".py"):
+            import ast
+
+            return ast.unparse(_strip_docstrings(ast.parse(text)))
+        if path.endswith((".yml", ".yaml")):
+            import yaml
+
+            return yaml.safe_dump(yaml.safe_load(text), sort_keys=True)
+    except Exception:  # pylint: disable=broad-except
+        pass
+    return _loose(text)
 
 
 def _matches_base(current: str | None, e: dict) -> bool:
@@ -230,8 +248,11 @@ def git_problems(entries: list[dict]) -> list[str]:
 # ── Status ───────────────────────────────────────────────────────────────────
 
 
+ACCEPTED: set[str] = set()  # paths given with --accept
+
+
 def file_status(e: dict) -> str:
-    """One of: todo, done, conflict."""
+    """One of: todo, done, conflict, accepted."""
     current = _read(pathlib.Path(e["path"]))
     cur_sha = None if current is None else _sha(current)
     if e["action"] == "add":
@@ -245,11 +266,15 @@ def file_status(e: dict) -> str:
             return "todo"
         if current is not None and _same_code(e["path"], current, e["new"]):
             return "done"
-        return "todo" if _matches_base(current, e) else "conflict"
+        if _matches_base(current, e):
+            return "todo"
+        return "accepted" if e["path"] in ACCEPTED else "conflict"
     # delete
     if current is None:
         return "done"
-    return "todo" if _matches_base(current, e) else "conflict"
+    if _matches_base(current, e):
+        return "todo"
+    return "accepted" if e["path"] in ACCEPTED else "conflict"
 
 
 def explain_conflict(e: dict) -> None:
@@ -263,12 +288,12 @@ def explain_conflict(e: dict) -> None:
         if current is None:
             print("    the file does not exist in this repo.")
             return
-    print("    (the code differs, not just comments: separator lengths, trailing spaces,")
-    print("     comments and docstrings are ignored by the check; diff below is the raw text)")
+    print("    The CODE differs (comments, docstrings, spacing are already ignored).")
+    print("    Code-only diff — bundle's copy (-) vs this repo (+):")
     diff = list(
         difflib.unified_diff(
-            _loose(expected).splitlines(),
-            _loose(current or "").splitlines(),
+            _code_text(e["path"], expected).splitlines(),
+            _code_text(e["path"], current or "").splitlines(),
             fromfile=label,
             tofile="this repo",
             lineterm="",
@@ -292,10 +317,17 @@ def _comment_only(e: dict) -> bool:
 
 
 def print_table(entries: list[dict], statuses: list[str]) -> None:
-    word = {"todo": "will apply", "done": "already applied", "conflict": "CONFLICT"}
+    word = {
+        "todo": "will apply",
+        "done": "already applied",
+        "conflict": "CONFLICT",
+        "accepted": "CONFLICT, accepted (--accept): will apply",
+    }
     width = max(len(e["path"]) for e in entries)
     for e, s in zip(entries, statuses):
-        note = "  (comments differ from the bundle's copy — fine)" if s == "todo" and _comment_only(e) else ""
+        note = ""
+        if s == "todo" and _comment_only(e):
+            note = "  (comments differ from the bundle's copy — fine)"
         print(f"  {e['action']:<8} {e['path']:<{width}}  {word[s]}{note}")
 
 
@@ -361,22 +393,25 @@ def cmd_check(entries: list[dict], quiet: bool = False) -> bool:
     if not quiet:
         print_table(entries, statuses)
     for e, s in zip(entries, statuses):
-        if s == "conflict":
+        if s in ("conflict", "accepted"):
             explain_conflict(e)
     for p in problems:
         print("REFUSED: " + p)
     n_conflict = statuses.count("conflict")
     ok = n_conflict == 0 and not problems
+    n_todo = statuses.count("todo") + statuses.count("accepted")
     print(
-        f"\n{statuses.count('todo')} to apply, {statuses.count('done')} already applied, "
+        f"\n{n_todo} to apply, {statuses.count('done')} already applied, "
         f"{n_conflict} conflicts"
     )
     print("CHECK PASSED" if ok else "CHECK FAILED — nothing was written")
     if n_conflict:
         print(
-            "A conflict means this repo's file differs from the version the bundle was "
-            "built from. Do NOT hand-edit to force it: send the diff above back so the "
-            "bundle can be rebuilt."
+            "A conflict means this repo's code differs from the copy the bundle was built\n"
+            "from (above: the code-only diff). If nobody edited that file by hand, the\n"
+            "difference is a transcription slip in the bundle's copy: add\n"
+            "  --accept <path>\n"
+            "to both the --check and the --apply command. Otherwise send the diff back."
         )
     return ok
 
@@ -385,7 +420,8 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
     if not cmd_check(entries, quiet=True):
         return False
     for e in entries:
-        if file_status(e) != "todo":
+        status = file_status(e)
+        if status not in ("todo", "accepted"):
             continue
         path = pathlib.Path(e["path"])
         if e["action"] == "delete":
@@ -393,7 +429,7 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
             _prune_empty_dirs(path.parent)
         else:
             new = e["new"]
-            if e["action"] == "replace":
+            if e["action"] == "replace" and status == "todo":
                 new = _rebase(new, e["base"], _read(path))
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(new.encode("utf-8"))
@@ -429,9 +465,10 @@ def cmd_revert(entries: list[dict]) -> bool:
         elif (current is not None and e["new"] is not None and _is_new(current, e)) or (
             e["action"] == "delete" and current is None
         ):
-            # restore the committed bytes (the repo's own file, exactly)
+            # restore the committed bytes (the repo's own file, exactly); apply refuses
+            # to run over uncommitted changes, so HEAD is the state before --apply
             committed = _head_version(e["path"])
-            restore = committed if _matches_base(committed, e) else e["base"]
+            restore = committed if committed is not None else e["base"]
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(restore.encode("utf-8"))
         elif not _matches_base(current, e):
@@ -450,13 +487,15 @@ def main() -> int:
     mode.add_argument("--apply", action="store_true")
     mode.add_argument("--revert", action="store_true")
     ap.add_argument("--no-import", action="store_true")
+    ap.add_argument("--accept", action="append", default=[], metavar="PATH")
     args = ap.parse_args()
+    ACCEPTED.update(args.accept)
 
     md = pathlib.Path(args.bundle).read_text(encoding="utf-8")
     need = re.search(r"apply_bundle version: (\d+)", md)
     if need and int(need.group(1)) > APPLY_VERSION:
         print(f"This bundle needs apply_bundle.py version {need.group(1)}; you have "
-              f"{APPLY_VERSION}. Recreate it from the bundle's 'Apply script' section.")
+              f"{APPLY_VERSION}. Redo step 3 of the bundle.")
         return 1
     entries = parse_bundle(md)
     if not entries:
