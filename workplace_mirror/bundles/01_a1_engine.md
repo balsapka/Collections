@@ -1,12 +1,14 @@
 # Mirror bundle 01 — Shared helpers, observation base and A1 engine (CC)
 
-apply_bundle version: 5 · built 2026-10-23 from `0c45e6e..4756b25` · source: 6 added, 6 replaced, 0 deleted · helpers: 1
+apply_bundle version: 5 · built 2026-10-23 from `0c45e6e..c5811fd` · source: 7 added, 6 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
-Everything this bundle adds outside `src/` and `conf/` lives in `data/input/mirror_bundles/`
-(gitignored). Nothing here is committed; commit `src/` and `conf/` only if you
-decide to keep the change. Copy each command block exactly as it is.
+The bundle file and the apply script live in `data/input/mirror_bundles/` (gitignored) and are
+never committed; only `src/` and `conf/` are (step 7). Copy each command block
+exactly as it is.
+
+### In UAT
 
 **Step 1.** Work on a branch (the apply script refuses to run on main):
 
@@ -26,73 +28,102 @@ mkdir -p data/input/mirror_bundles
 python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '01_a1_engine.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')"
 ```
 
-**Step 4.** Dry run — must end with `CHECK PASSED` (nothing is written):
+**Step 4.** Apply — checks every file first, writes, compiles and imports; must end with `APPLY PASSED`:
 
 ```bash
-python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --check
+python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --apply --accept src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py
 ```
 
-If step 4 reports a **CONFLICT** for a file nobody edited by hand, the code-only
-diff it prints is a transcription slip in the bundle's copy. Re-run step 4, then
-step 5, with `--accept <path>` added for that file, e.g.:
+`--accept src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py` covers a known transcription slip in the bundle's
+copy of that file. Any other **CONFLICT**: stop and send the printed diff back.
 
-```bash
-python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --check --accept src/path/of/the/file.py
-```
-
-**Step 5.** Apply — must end with `APPLY PASSED` (add the same `--accept` if you used one in step 4):
-
-```bash
-python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --apply
-```
-
-**Step 6.** Look at what changed:
+**Step 5.** Look at what changed (nothing under `data/input/` shows up):
 
 ```bash
 git status && git diff --stat
 ```
 
-**Step 7.** Before re-running A1, keep a copy of the current output. In a Kedro notebook
-(`kedro jupyter notebook`), run this cell:
+**Step 6.** Before committing, give this prompt to the workplace assistant. It works on
+the bundle's `TODO(sonnet)` items. UAT has no data, so it only wires a source that the code
+base already defines; anything that needs data goes back to you as a question:
 
-```python
-import sys, pathlib
-_c = pathlib.Path.cwd()
-ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
-sys.path.insert(0, str(ROOT / "data" / "input" / "mirror_bundles"))
-from b01_a1_engine_check import main
-main(catalog, step="snapshot")
-```
+````text
+Mirror bundle 01 added the A1 engine in src/enbd_collections/pipelines/crx_persona/a1_ability/.
+Work on its TODO(sonnet) items (grep "TODO(sonnet)" in a1_ability/signals.py). Rules: Kedro
+only — every source is a catalog dataset passed as a node input, never spark.read or a path;
+signals are per customer (cif_id) across ALL of the customer's accounts, never the scored
+account_id; a missing required column must raise (use _common.require_columns); touch
+nothing outside crx_persona/a1_ability/, crx_persona/cc_a1_ability_v2/pipeline.py and the
+crx catalog; do not commit.
 
-**Step 8.** Rebuild the observation base, then the A1 axis (terminal):
+1. Internal returned cheques / DDS returns (build_distress_signals, argument
+   internal_returns). Search this repo and the sibling repos (retail.feature_space,
+   wealth_management) and the catalog for an EXISTING definition: a table, feature or
+   transaction-code / narration list for returned cheques, cheque bounces, DDS or direct
+   debit returns (candidates: comp_financial_tran_repos_dly transaction codes, a DDS mandate
+   table).
+   - If you find one that the code already uses, add a node in cc_a1_ability_v2 that builds
+     (cif_id, event_date) from it at CIF level and pass it to build_distress_signals as
+     internal_returns (inputs as a dict, since payment_order stays unset). Remove the TODO.
+   - If you find only candidates (no definition already in use), change nothing. Report each
+     candidate with dataset name, columns, code values and where you found them, so the
+     codes can be checked on data in PROD.
+2. Salary months (build_income_signals TODO): nothing to change in UAT. The bundle's PROD
+   run logs a B01 SALARY block comparing the recovered months with feat_payroll_indicator.
+
+Finish with: files changed, what you wired, open candidates/questions.
+````
+
+Send the report back. If it wired a source, review `git diff`, then check that every
+pipeline still loads (lists `crx_cc_a1_ability_b01_check` among the pipelines):
 
 ```bash
-kedro run --pipeline=crx_cc_obs_base
+kedro registry list
 ```
+
+**Step 7.** Commit the source only, and push:
 
 ```bash
-kedro run --pipeline=crx_cc_a1_ability_v2
+git add src conf && git commit -m "crx_persona: shared helpers, obs base, A1 engine; CC A1 on the engine (mirror bundle 01)" && git push -u origin feature/persona_redesign_b01
 ```
 
-**Step 9.** Compare old vs new in the same notebook and paste the printed `B01 OUTPUT`
-block back:
-
-```python
-main(catalog, step="compare")
-```
-
-**Step 10.** Repeat steps 7–9 for the other CC segment: set `model_id` in
-`conf/dev/globals_dev.yml` (`cc_60_180` ↔ `cc_180_plus`), restart the notebook kernel, run
-again.
-
-**Undo** (before any commit) — restores every touched file exactly:
+**Undo** (before step 7) — restores every touched file exactly:
 
 ```bash
 python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/01_a1_engine.md --revert
 ```
 
+### In PROD
+
+**Step 8.** Get the branch:
+
+```bash
+git fetch origin && git checkout feature/persona_redesign_b01 && git pull
+```
+
+**Step 9.** Run the check pipeline (terminal). It builds `crx_cc_obs_base`, the A1 signals and
+anchor, writes the new A1 output to the **temporary** dataset `crx_cc_a1_ability_b01_check`
+(the current `crx_cc_a1_ability_v2` is read, never overwritten), then logs two blocks:
+
+```bash
+kedro run --pipeline=crx_cc_a1_ability_b01_check
+```
+
+Paste back everything from `=== B01 SALARY START ===` to `=== B01 SALARY END ===` and from
+`=== B01 OUTPUT START ===` to `=== B01 OUTPUT END ===` (aggregates only, no customer rows).
+
+**Step 10.** Repeat step 9 for the other CC segment: in `conf/dev/globals_dev.yml` switch
+`model_id` from `cc_60_180` to `cc_180_plus`, run step 9 again, paste both blocks, then
+switch `model_id` back (do not commit this switch):
+
+```bash
+git diff --stat conf/dev/globals_dev.yml
+```
+
+(must print nothing once `model_id` is switched back).
+
 **When you are done**, give the *Cleanup prompt* at the bottom to the workplace
-assistant (or run its steps yourself).
+assistant in UAT.
 
 ## What this bundle does
 
@@ -122,24 +153,26 @@ CC A1 v1, RL A1 and every other axis are untouched.
   Required: `wm_fea_salary_days_since_increment.ft_days_since_salary_transaction`,
   `wm_fea_casa_eod_avg_balance.ft_avg_casa_eod_balance_in_last_0_3_weeks_avg`.
 
-**TODOs for the workplace assistant** (search `TODO(sonnet)` in `a1_ability/signals.py`):
-1. Internal cheque bounces / DDS returns: find the source (CASA transaction codes or
-   narrations in `comp_financial_tran_repos_dly`, a DDS mandate table), build
-   `(cif_id, event_date)` across all of the customer's accounts, and pass it as
-   `internal_returns` to the distress node.
-2. Validate the per-month internal salary credits recovered from the WM snapshots against
-   `feat_payroll_indicator`; prefer a table with monthly salary amounts if one exists.
+**TODOs** (`TODO(sonnet)` in `a1_ability/signals.py`), handled before any pipeline runs:
+1. Internal cheque bounces / DDS returns — step 6 has the workplace assistant wire an
+   existing internal source at CIF level, or report candidates for a data check.
+2. Salary months recovered from the WM snapshots — validated in the PROD run against
+   `feat_payroll_indicator` (the `B01 SALARY` block).
 
-The PROD check snippet (`b01_a1_engine_check.py`) is shipped to `data/input/mirror_bundles/`;
-its snapshot copy lives on HDFS next to the A1 output and is deleted by the cleanup step.
+**Temporary check (removed by the cleanup).** Pipeline `crx_cc_a1_ability_b01_check` =
+observation base + the A1 nodes writing to the temporary dataset
+`crx_cc_a1_ability_b01_check` + two log-only comparison nodes
+(`cc_a1_ability_v2/b01_check.py`). The real `crx_cc_a1_ability_v2` is read, never
+overwritten.
 
 ## Instructions for the workplace assistant
 
 1. Do not retype or hand-edit code from this file; `apply_bundle.py` writes it.
-2. `--check` must print **CHECK PASSED**. On CONFLICT the workplace file differs from
-   the version this bundle was built from: stop and show the printed diff to the user.
+2. `--apply` must print **APPLY PASSED**. On CONFLICT (other than an `--accept`ed
+   file) the workplace file differs from the version this bundle was built from:
+   stop and show the printed diff to the user.
 3. `DAMAGED` means the markdown copy was altered — recopy the raw file.
-4. `--apply` must print **APPLY PASSED**; if an import fails, run `--revert` and report.
+4. If an import fails, run `--revert` and report.
 5. Touch nothing outside the manifest. Never commit `data/input/mirror_bundles/`.
 
 ## Manifest
@@ -154,16 +187,16 @@ its snapshot copy lives on HDFS next to the A1 output and is deleted by the clea
 | add | `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py` |
 | add | `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/__init__.py` |
+| add | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b01_check.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py` |
 | add | `src/enbd_collections/pipelines/crx_persona/obs_base/__init__.py` |
 | add | `src/enbd_collections/pipelines/crx_persona/obs_base/pipeline.py` |
-| add (helper) | `data/input/mirror_bundles/b01_a1_engine_check.py` |
 
 ## Files
 
 ### FILE: `conf/base/catalog/catalog_crx.yml`
-action: replace · base sha256 `61123e0aac20d9bb2531dd7d5f54ea98212b9a41910a9430480a543936d63dd2` · base trailing newline: yes · new sha256 `f8cf0cfe691280c8ef9bcea7317e7ffdbb28649f83968a2ff5401a0cd4221dd2` · new trailing newline: yes
+action: replace · base sha256 `61123e0aac20d9bb2531dd7d5f54ea98212b9a41910a9430480a543936d63dd2` · base trailing newline: yes · new sha256 `3a16319a2207f54cd6783052aa181cd0c2b3bb2abdcd48946b8a53fd841a9ad4` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -1286,6 +1319,16 @@ crx_cc_a1_ability_v2:
   save_args:
     mode: overwrite
 
+# TEMPORARY (mirror bundle 01 check): the new A1 output, kept apart from
+# crx_cc_a1_ability_v2 so the two can be compared. Remove this entry, the
+# crx_cc_a1_ability_b01_check pipeline and its HDFS folder after the check.
+crx_cc_a1_ability_b01_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b01_check"
+  save_args:
+    mode: overwrite
+
 # ── A3 Payment Credibility (T27) ────────────────────────────────────────────
 # Grain: (account_id, spell_id). observation_date = coalesce(spell_end, current_date()).
 # a3_state_v1 ∈ {payment_credibility_high, payment_credibility_moderate,
@@ -1594,7 +1637,7 @@ crx_log_stats: false
 `````
 
 ### FILE: `src/enbd_collections/pipeline_registry.py`
-action: replace · base sha256 `ef9f6f5a8f2dbf2d5e39f72bd5cbd8e5ca4c9e7dbb806edd79e40e1e912ec7b2` · base trailing newline: yes · new sha256 `976767843031be1f282f9d8257d3c1dce3bd1688ed39d3d28c47b24975768683` · new trailing newline: yes
+action: replace · base sha256 `ef9f6f5a8f2dbf2d5e39f72bd5cbd8e5ca4c9e7dbb806edd79e40e1e912ec7b2` · base trailing newline: yes · new sha256 `ed6a35e31f0791cfa4988408196f4f0d513e56f07e352b71b752b88c034cc445` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2092,6 +2135,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
         "crx_cc_a1_ability_v2": crx_cc_a1_ability_v2.create_pipeline(),
+        # TEMPORARY (mirror bundle 01 check) — remove with its catalog entry
+        "crx_cc_a1_ability_b01_check": crx_cc_a1_ability_v2.create_b01_check_pipeline(),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_a3_payment_credibility": crx_cc_a3_payment_credibility.create_pipeline(),
@@ -2792,7 +2837,7 @@ def build_distress_signals(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/__init__.py`
-action: replace · base sha256 `6499bc5e770ab066f3d239787726d3fe5c992d62b6ee9db71854e6058e8c5f35` · base trailing newline: yes · new sha256 `65c9988c7d9e81a1dfeba967bdfe4f03037ccf21b7749032026e46e7beafee42` · new trailing newline: yes
+action: replace · base sha256 `6499bc5e770ab066f3d239787726d3fe5c992d62b6ee9db71854e6058e8c5f35` · base trailing newline: yes · new sha256 `035d30a72f168a15a2a1ab75ca59a3b3d571cd684a254fc9e728720dbe069fef` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2809,9 +2854,138 @@ New:
 `````python
 """CC A1 ability axis (GRR MECE points) on the shared ``a1_ability`` engine."""
 
-from .pipeline import create_pipeline
+from .pipeline import create_b01_check_pipeline, create_pipeline
 
-__all__ = ["create_pipeline"]
+__all__ = ["create_b01_check_pipeline", "create_pipeline"]
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b01_check.py`
+action: add · new sha256 `4902f638057a7b6f8972d3f1ab11058d64ea03a8644dcda79679539d0803405b` · new trailing newline: yes
+
+New:
+
+`````python
+"""TEMPORARY (mirror bundle 01): checks for the CC A1 rebuild, run in PROD.
+
+The last nodes of the ``crx_cc_a1_ability_b01_check`` pipeline (aggregates only):
+
+* ``compare_a1_outputs`` — the untouched ``crx_cc_a1_ability_v2`` against the new
+  ``crx_cc_a1_ability_b01_check``; logs the ``B01 OUTPUT`` block;
+* ``compare_salary_months`` — salary months recovered from the WM snapshots against
+  ``feat_payroll_indicator``; logs the ``B01 SALARY`` block.
+
+Removed by the bundle's cleanup.
+"""
+
+import logging
+
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+
+LOG = logging.getLogger(__name__)
+_GRAIN = ["account_id", "observation_date"]
+
+
+def _counts(df: DataFrame, col: str) -> dict:
+    return {r[col]: r["count"] for r in df.groupBy(col).count().collect()}
+
+
+def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
+    """Log old vs new state crosstab, level distributions and anchor coverage."""
+    both = (
+        new.select(
+            *_GRAIN,
+            F.col("a1_state").alias("new_state"),
+            "a1_income_level",
+            "a1_liquidity_level",
+            "liquidity_anchor_amt",
+        )
+        .join(
+            old.select(*_GRAIN, F.col("a1_state_v2").alias("old_state")), _GRAIN, "full"
+        )
+        .fillna({"old_state": "(absent)", "new_state": "(absent)"})
+        .cache()
+    )
+    n = both.count()
+    changed = both.filter(F.col("old_state") != F.col("new_state")).count()
+    anchor = both.agg(
+        F.avg(F.col("liquidity_anchor_amt").isNotNull().cast("double")).alias("share"),
+        F.expr("percentile_approx(liquidity_anchor_amt, array(0.1, 0.5, 0.9))").alias(
+            "q"
+        ),
+    ).first()
+    lines = [
+        "=== B01 OUTPUT START ===",
+        f"model_id={model_id} rows={n} changed={changed} "
+        f"({100.0 * changed / max(n, 1):.2f}%)",
+        f"  income levels:    {_counts(both, 'a1_income_level')}",
+        f"  liquidity levels: {_counts(both, 'a1_liquidity_level')}",
+        f"  anchor present: {anchor['share'] or 0.0:.4f}  p10/p50/p90: {anchor['q']}",
+    ]
+    for r in (
+        both.groupBy("old_state", "new_state")
+        .count()
+        .orderBy("old_state", "new_state")
+        .collect()
+    ):
+        lines.append(f"  {r['old_state']:<18} -> {r['new_state']:<18} {r['count']:>9}")
+    lines.append("=== B01 OUTPUT END ===")
+    LOG.info("\n%s", "\n".join(lines))
+    both.unpersist()
+
+
+def compare_salary_months(
+    obs_base: DataFrame, income: DataFrame, payroll: DataFrame
+) -> None:
+    """Log recovered salary months (income_m1..m3 > 0) against feat_payroll_indicator."""
+    months = (
+        income.join(obs_base.select(*_GRAIN, "cif_id"), _GRAIN)
+        .select(
+            "cif_id",
+            F.explode(
+                F.array(
+                    *[
+                        F.struct(
+                            F.trunc(
+                                F.add_months("observation_date", -k), "month"
+                            ).alias("month"),
+                            (F.coalesce(F.col(f"income_m{k}"), F.lit(0.0)) > 0).alias(
+                                "recovered"
+                            ),
+                        )
+                        for k in (1, 2, 3)
+                    ]
+                )
+            ).alias("m"),
+        )
+        .select("cif_id", "m.month", "m.recovered")
+        .filter(F.col("cif_id").isNotNull())
+    )
+    flags = (
+        payroll.select(
+            "cif_id",
+            F.trunc(
+                F.to_date(F.col("month_number").cast("string"), "yyyyMMdd"), "month"
+            ).alias("month"),
+            (F.col("payroll_flag") == 1).alias("payroll"),
+        )
+        .groupBy("cif_id", "month")
+        .agg(F.max("payroll").alias("payroll"))
+    )
+    rows = (
+        months.join(flags, ["cif_id", "month"], "left")
+        .fillna({"payroll": False})
+        .groupBy("recovered", "payroll")
+        .count()
+        .orderBy("recovered", "payroll")
+        .collect()
+    )
+    lines = ["=== B01 SALARY START ===", "  recovered  payroll_flag      count"]
+    lines += [
+        f"  {r['recovered']!s:<10} {r['payroll']!s:<13} {r['count']:>9}" for r in rows
+    ]
+    lines.append("=== B01 SALARY END ===")
+    LOG.info("\n%s", "\n".join(lines))
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py`
@@ -3828,7 +4002,7 @@ def build_cc_liquidity_anchor(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py`
-action: replace · base sha256 `3f1c91165090f34d46cce7e3291d004e0414fcf045b758c75f08731eb2e51b6d` · base trailing newline: yes · new sha256 `ad2071bcfae2ddfff5691fd9597d30eceaa91d9fec5df525823dd58d665a3e29` · new trailing newline: yes
+action: replace · base sha256 `3f1c91165090f34d46cce7e3291d004e0414fcf045b758c75f08731eb2e51b6d` · base trailing newline: yes · new sha256 `774c00341e69be4a4f27a390e3503bbed3d829563741bd1fa1bc59da83ad5c1a` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3948,6 +4122,12 @@ distress sources (prm_bureau_payment_order, internal cheque / DDS returns) are a
 extra inputs of the distress node once they exist.
 
     kedro run --pipeline=crx_cc_a1_ability_v2
+
+TEMPORARY (mirror bundle 01): ``create_b01_check_pipeline`` runs the same nodes but
+writes the axis to the temporary dataset ``crx_cc_a1_ability_b01_check`` (the existing
+``crx_cc_a1_ability_v2`` is not overwritten) and logs the old-vs-new comparison
+and recovered salary months vs ``feat_payroll_indicator`` (``b01_check.py``). Removed
+by the bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
@@ -3958,12 +4138,17 @@ from ..a1_ability import (
     build_income_signals,
     build_liquidity_signals,
 )
+from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
+from .b01_check import compare_a1_outputs, compare_salary_months
 from .nodes import build_cc_liquidity_anchor
 
 _OBS = "crx_cc_obs_base"
 
 
-def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+def create_pipeline(
+    output: str = "crx_cc_a1_ability_v2",
+    **kwargs,  # pylint: disable=unused-argument
+) -> Pipeline:
     return Pipeline(
         [
             node(
@@ -4011,11 +4196,42 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                     "crx_cc_a1_liquidity_anchor",
                     "params:crx_log_stats",
                 ],
-                "crx_cc_a1_ability_v2",
+                output,
                 name="build_crx_cc_a1_ability",
             ),
         ],
         tags=["crx_persona", "crx", "a1", "ability", "persona_axis"],
+    )
+
+
+def create_b01_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """TEMPORARY: observation base + the A1 pipeline writing to
+    crx_cc_a1_ability_b01_check + the old-vs-new and salary-month comparison nodes.
+    Remove with b01_check.py and the catalog entry."""
+    return (
+        create_cc_obs_pipeline()
+        + create_pipeline(output="crx_cc_a1_ability_b01_check")
+        + Pipeline(
+            [
+                node(
+                    compare_a1_outputs,
+                    [
+                        "crx_cc_a1_ability_v2",
+                        "crx_cc_a1_ability_b01_check",
+                        "params:model_id",
+                    ],
+                    None,
+                    name="compare_crx_cc_a1_b01",
+                ),
+                node(
+                    compare_salary_months,
+                    [_OBS, "crx_cc_a1_income_signals", "feat_payroll_indicator"],
+                    None,
+                    name="compare_crx_cc_a1_b01_salary",
+                ),
+            ],
+            tags=["crx_persona"],
+        )
     )
 `````
 
@@ -4075,141 +4291,6 @@ def create_rl_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
         ],
         tags=["crx_persona", "crx", "obs_base"],
     )
-`````
-
-### FILE: `data/input/mirror_bundles/b01_a1_engine_check.py`
-action: add · new sha256 `c7ceb6917f3bd6ad3219c1cdbd4f0aaef7c6d9d79fbb9d11d0f65b916432add0` · new trailing newline: yes
-
-New:
-
-`````python
-"""Bundle 01 PROD check: CC A1 ability before vs after the shared-engine refactor.
-
-Lives in data/input/mirror_bundles/ (gitignored) — never commit it. Run in a Kedro
-notebook (``catalog`` defined):
-
-    import sys, pathlib
-    _c = pathlib.Path.cwd()
-    ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
-    sys.path.insert(0, str(ROOT / "data" / "input" / "mirror_bundles"))
-    from b01_a1_engine_check import main
-
-    main(catalog, step="snapshot")  # BEFORE re-running A1: copies the current output
-    # ... run crx_cc_obs_base and crx_cc_a1_ability_v2 ...
-    main(catalog, step="compare")   # old vs new, prints the B01 OUTPUT block
-    main(catalog, step="cleanup")   # deletes the snapshot copy
-
-The snapshot is a parquet copy on HDFS next to the A1 output (``<path>__pre_b01``), so no
-catalog entry is needed. Results (aggregates only) go to
-data/input/mirror_bundles/results/.
-"""
-
-import datetime
-import json
-import pathlib
-import re
-
-DS = "crx_cc_a1_ability_v2"
-GRAIN = ["account_id", "observation_date"]
-
-
-def _dataset_path(catalog) -> str:
-    """Filesystem path of the A1 output dataset (Kedro 0.18 / 0.19 / 1.x)."""
-    getter = getattr(catalog, "_get_dataset", None) or getattr(catalog, "get", None)
-    ds = getter(DS)
-    for attr in ("_filepath", "filepath", "_path"):
-        path = getattr(ds, attr, None)
-        if path:
-            return str(path).rstrip("/")
-    raise RuntimeError(f"cannot read the filepath of {DS}; describe(): {ds._describe()}")
-
-
-def _snapshot_path(catalog) -> str:
-    return _dataset_path(catalog) + "__pre_b01"
-
-
-def _counts(df, col):
-    return {r[col]: r["count"] for r in df.groupBy(col).count().collect()}
-
-
-def main(catalog, step="compare"):
-    from pyspark.sql import functions as F
-
-    model_id = catalog.load("params:model_id")  # ${globals:model_id}
-    print(f"model_id={model_id}  step={step}")
-    current = catalog.load(DS)
-    spark = current.sparkSession
-    snap = _snapshot_path(catalog)
-
-    if step == "snapshot":
-        if "a1_state_v2" not in current.columns:
-            raise ValueError(f"{DS} already has the new schema — snapshot too late")
-        current.select(*GRAIN, "a1_state_v2").write.mode("overwrite").parquet(snap)
-        print(f"saved {spark.read.parquet(snap).count()} rows to {snap}")
-        return None
-
-    if step == "cleanup":
-        jvm = spark.sparkContext._jvm
-        path = jvm.org.apache.hadoop.fs.Path(snap)
-        fs = path.getFileSystem(spark.sparkContext._jsc.hadoopConfiguration())
-        print(f"deleted {snap}: {fs.delete(path, True)}")
-        return None
-
-    if "a1_state" not in current.columns:
-        raise ValueError(f"{DS} still has the old schema — run the pipeline first")
-    old = spark.read.parquet(snap).withColumnRenamed("a1_state_v2", "old_state")
-    both = (
-        current.select(
-            *GRAIN,
-            F.col("a1_state").alias("new_state"),
-            "a1_income_level",
-            "a1_liquidity_level",
-        )
-        .join(old, GRAIN, "full")
-        .fillna({"old_state": "(absent)", "new_state": "(absent)"})
-        .cache()
-    )
-    crosstab = [
-        {"old": r["old_state"], "new": r["new_state"], "rows": r["count"]}
-        for r in both.groupBy("old_state", "new_state")
-        .count()
-        .orderBy("old_state", "new_state")
-        .collect()
-    ]
-    n = both.count()
-    changed = both.filter(F.col("old_state") != F.col("new_state")).count()
-    payload = {
-        "task": "B01_a1_engine",
-        "run_date": datetime.date.today().isoformat(),
-        "model_id": model_id,
-        "scope": f"{snap} (pre-refactor output) vs {DS} (shared engine)",
-        "results": {
-            "rows": n,
-            "changed": changed,
-            "changed_pct": round(100.0 * changed / max(n, 1), 2),
-            "old_states": _counts(both, "old_state"),
-            "new_states": _counts(both, "new_state"),
-            "new_income_levels": _counts(both, "a1_income_level"),
-            "new_liquidity_levels": _counts(both, "a1_liquidity_level"),
-            "crosstab": crosstab,
-        },
-    }
-    out = pathlib.Path(__file__).resolve().parent / "results"
-    out.mkdir(parents=True, exist_ok=True)
-    tag = re.sub(r"[^A-Za-z0-9]+", "_", str(model_id))
-    path = out / f"B01_a1_engine_{tag}_{payload['run_date'].replace('-', '')}.json"
-    path.write_text(json.dumps(payload, indent=2, default=str))
-
-    print("=== B01 OUTPUT START ===")
-    pct = payload["results"]["changed_pct"]
-    print(f"model_id={model_id} rows={n} changed={changed} ({pct}%)")
-    for name in ("new_income_levels", "new_liquidity_levels"):
-        print(f"  {name}: {payload['results'][name]}")
-    for row in crosstab:
-        print(f"  {row['old']:<18} -> {row['new']:<18} {row['rows']:>9}")
-    print("=== B01 OUTPUT END ===")
-    print(f"written: {path}")
-    return payload
 `````
 
 ## Apply script
@@ -4745,22 +4826,29 @@ if __name__ == "__main__":
 
 ## Cleanup prompt
 
-Copy this to the workplace assistant once the bundle's checks are done:
+Copy this to the workplace assistant in UAT once the bundle's PROD checks are done:
 
 ````text
-Clean up after mirror bundle 01_a1_engine.md. Leave src/ and conf/ as they are, apart from
-any temporary switch a step below asks you to make and undo.
-- For each model_id that was checked (cc_60_180, cc_180_plus): set it in
-  conf/dev/globals_dev.yml, then in a Kedro notebook delete the HDFS snapshot copy:
-    import sys, pathlib
-    _c = pathlib.Path.cwd()
-    ROOT = next(p for p in [_c, *_c.parents] if (p / "conf").is_dir())
-    sys.path.insert(0, str(ROOT / "data" / "input" / "mirror_bundles"))
-    from b01_a1_engine_check import main
-    main(catalog, step="cleanup")
-  Restore model_id in globals_dev.yml to what it was before.
-- Delete the folder data/input/mirror_bundles/ (bundle file, apply script, helpers, results):
+Clean up after mirror bundle 01_a1_engine.md, on the bundle's branch.
+- Remove the temporary check (everything marked TEMPORARY for bundle 01):
+  - conf/base/catalog/catalog_crx.yml: the `crx_cc_a1_ability_b01_check` entry and its
+    TEMPORARY comment;
+  - src/enbd_collections/pipeline_registry.py: the `"crx_cc_a1_ability_b01_check"` entry;
+  - crx_persona/cc_a1_ability_v2/pipeline.py: `create_b01_check_pipeline`, the imports of
+    `create_cc_obs_pipeline` and `b01_check`, and the TEMPORARY paragraph of the module
+    docstring;
+  - crx_persona/cc_a1_ability_v2/__init__.py: the `create_b01_check_pipeline` export;
+  - delete crx_persona/cc_a1_ability_v2/b01_check.py.
+  Then check: `kedro registry list` still works and no file mentions `b01`
+  (`grep -rn b01 src conf` prints nothing).
+- HDFS (the user runs this in PROD; UAT has no data): resolve the catalog path
+  `${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b01_check`
+  from the workplace conf for model_id cc_60_180 and cc_180_plus, and write out the two
+  commands in full, e.g. `hdfs dfs -rm -r <resolved path>`. Do this before removing the
+  catalog entry.
+- Delete the folder data/input/mirror_bundles/ (bundle file, apply script):
   rm -rf data/input/mirror_bundles
-- Run `git status` and confirm nothing under data/input/ is tracked or staged and
-  that no other file changed. Report what you deleted.
+- Run `git status`: only the files named above may have changed, nothing under
+  data/input/ is tracked or staged. Commit src/ and conf/ and push. Report what
+  you removed and the hdfs commands the user still has to run in PROD.
 ````
