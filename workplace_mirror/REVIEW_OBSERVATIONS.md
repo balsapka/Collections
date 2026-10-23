@@ -558,6 +558,15 @@ no client link has no row in `crx_cc_a1_ability_v2` (5% of rows in the synthetic
 **Fix (bundle 01):** the observation base keeps every spine row; customer-level signals are
 NULL and the state is `ability_unknown`.
 
+### O44 — CC axes rebuild the CIF bridge the spine already carries (L, confirmed)
+
+`cc_spine` has `cif_id` (`cc_full_history/nodes.py:56–59` reads it directly), yet CC A1 v1
+(`cc_a1_ability/nodes.py:288`), CC A2 (`cc_a2_locatability/nodes.py:1234`) and the first
+obs base joined `prm_contract` → `prm_client` (`_build_cif_bridge`) to get it again: two
+extra table reads and a second CIF source that can disagree with the spine.
+**Fix:** bundle 01 — `crx_cc_obs_base` takes `cif_id` from `cc_spine`; A2 moves onto the obs
+base in bundle 5; v1 is removed in bundle 4.
+
 ---
 
 ## Not issues (checked, fine)

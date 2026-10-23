@@ -14,7 +14,7 @@ def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
         [
             node(
                 func=build_cc_obs_base,
-                inputs=["cc_spine", "prm_contract", "prm_client"],
+                inputs="cc_spine",
                 outputs="crx_cc_obs_base",
                 name="build_crx_cc_obs_base",
             )

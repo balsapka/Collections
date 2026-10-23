@@ -52,7 +52,7 @@ def yyyymmdd(d):
     return int(d.strftime("%Y%m%d"))
 
 
-rows = {k: [] for k in "spine contract client wmsal salhist bridge bal casa flow txn bene alert".split()}
+rows = {k: [] for k in "spine wmsal salhist bridge bal casa flow txn bene alert".split()}
 expect = {}
 
 
@@ -62,9 +62,7 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounce=None, activ
     buckets: overdue_bucket_01..08 on the latest snapshot."""
     i = len(expect)
     acct, cif = f"A{i}", 1000 + i
-    rows["spine"].append((acct, OBS))
-    rows["contract"].append((acct, f"C{i}"))
-    rows["client"].append((f"C{i}", cif))
+    rows["spine"].append((acct, OBS, cif))
     for k, amt in salary:  # one weekly snapshot a few days after each credit
         credit = m(k, 25)
         snap = credit + timedelta(days=3)
@@ -126,9 +124,7 @@ case("bounce older than 3 months ignored", salary=[(1, 5000), (2, 5000)], casa=[
 
 df = spark.createDataFrame
 obs = _common.build_cc_obs_base(
-    df(rows["spine"], "contract_id string, observation_date date"),
-    df(rows["contract"], "contract_id string, client_id string"),
-    df(rows["client"], "client_id string, cif_id long"),
+    df(rows["spine"], "contract_id string, observation_date date, cif_id long")
 )
 bcols = ", ".join(f"overdue_bucket_{i:02d} double" for i in range(1, 9))
 out = build_a1_ability(

@@ -21,7 +21,6 @@ from typing import Sequence
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
-from enbd_collections.pipelines.crx_persona._spine_utils import _build_cif_bridge
 
 LOG = logging.getLogger(__name__)
 
@@ -150,27 +149,21 @@ def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
 # ── Observation base ──────────────────────────────────────────────────────────
 
 
-def build_cc_obs_base(
-    cc_spine: DataFrame, contract: DataFrame, client: DataFrame
-) -> DataFrame:
-    """Every CC spine row with its ``cif_id`` (NULL if the contract has no client).
+def _obs_base(spine: DataFrame, id_col: str) -> DataFrame:
+    """Every spine row with the ``cif_id`` the spine already carries.
 
     Rows without a CIF are kept: customer-level signals are simply absent for them.
     """
-    spine = cc_spine.select(
-        F.col("contract_id").cast("string").alias("account_id"),
-        F.col("observation_date").cast("date"),
-    ).dropDuplicates(list(GRAIN))
-    bridge = _build_cif_bridge(contract, client).select(
-        F.col("contract_id").cast("string").alias("account_id"), "cif_id"
-    )
-    return spine.join(bridge, on="account_id", how="left")
-
-
-def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
-    """Every RL spine row with the ``cif_id`` the spine already carries."""
-    return rl_spine.select(
-        F.col("account_id").cast("string"),
+    return spine.select(
+        F.col(id_col).cast("string").alias("account_id"),
         F.col("observation_date").cast("date"),
         "cif_id",
     ).dropDuplicates(list(GRAIN))
+
+
+def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
+    return _obs_base(cc_spine, "contract_id")
+
+
+def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
+    return _obs_base(rl_spine, "account_id")
