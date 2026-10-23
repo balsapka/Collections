@@ -31,6 +31,7 @@ from enbd_collections.pipelines.crx_persona.a1_ability import (  # noqa: E402
     build_a1_ability,
     build_distress_signals,
     build_income_signals,
+    build_internal_returns,
     build_liquidity_signals,
 )
 from enbd_collections.pipelines.crx_persona.cc_a1_ability_v2.nodes import (  # noqa: E402
@@ -52,12 +53,12 @@ def yyyymmdd(d):
     return int(d.strftime("%Y%m%d"))
 
 
-rows = {k: [] for k in "spine wmsal salhist bridge bal casa flow txn bene alert".split()}
+rows = {k: [] for k in "spine wmsal salhist bridge bal casa flow txn bene alert ret".split()}
 expect = {}
 
 
 def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounce=None, active=True,
-         buckets=None, **want):
+         buckets=None, internal=None, **want):
     """salary / bureau: [(k, amount)]; casa: [(k, balance)]; payments: [(k, amount)];
     buckets: overdue_bucket_01..08 on the latest snapshot."""
     i = len(expect)
@@ -77,6 +78,9 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounce=None, activ
         rows["txn"].append((cif, "outflow", "CASA", m(k), float(amt), f"CARD{i}"))
     if bounce is not None:
         rows["alert"].append((cif, m(bounce), 500.0))
+    if internal is not None:  # (k, reason_for_excluding)
+        k, reason = internal
+        rows["ret"].append((cif, m(k).isoformat(), m(k), reason))
     if active:
         rows["flow"].append((cif, yyyymmdd(m(1, 8)), 100.0, 0.0))
     b = buckets or [0.0] * 8
@@ -119,6 +123,12 @@ case("Stable + Weak + bounce -> Limited", salary=[(1, 5000), (2, 5000)], casa=[(
 case("Weak + None -> Limited", salary=[(1, 1500)], state="ability_low")
 case("None + None, CASA active -> Limited", active=True, state="ability_low")
 case("None + None, no CASA activity -> Unknown", active=False, state="ability_unknown")
+case("High + internal cheque return -> Moderate", salary=[(1, 5000), (2, 5000)],
+     casa=[(1, 4000), (2, 4000)], internal=(2, "CHEQUE RETURNS"), state="ability_moderate")
+case("internal DDS return counts", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
+     internal=(1, "DDS Rejects/Reversal"), state="ability_moderate")
+case("other internal reasons ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
+     internal=(1, "CHARGES"), state="ability_high")
 case("bounce older than 3 months ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
      bounce=4, state="ability_high")
 
@@ -142,7 +152,14 @@ out = build_a1_ability(
         df(rows["txn"], "cif_id long, in_out_flow string, product_category string, tran_date date, tran_amt double, transaction_acid string"),
         df(rows["bene"], "instrument_number string, instrument_type string"),
     ),
-    build_distress_signals(obs, df(rows["alert"], "cif_id long, extract_date date, bounced_cheque_amount double")),
+    build_distress_signals(
+        obs,
+        df(rows["alert"], "cif_id long, extract_date date, bounced_cheque_amount double"),
+        internal_returns=build_internal_returns(
+            obs,
+            df(rows["ret"], "cif_id long, edp_load_date string, tran_date date, reason_for_excluding string"),
+        ),
+    ),
     build_cc_liquidity_anchor(obs, df(rows["bal"], f"contract_id string, observation_date date, {bcols}"), "cc_60_180"),
 ).collect()
 

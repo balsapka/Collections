@@ -3,7 +3,7 @@
     python workplace_mirror/tools/make_bundle.py --base <commit> --slug a1_engine \\
         --title "..." [--head HEAD] [--branch feature/x] [--summary-file f.md] \\
         [--uat-file f.md] [--run-file f.md] [--cleanup-file f.md] [--helper path ...] \\
-        [--accept src/path.py ...] [--message "workplace commit message"]
+        [--accept src/path.py ...] [--message "workplace commit message"] [--existing-branch]
 
 Writes workplace_mirror/bundles/NN_<slug>.md:
 
@@ -90,7 +90,13 @@ def _file_entry(
 
 
 def _steps(
-    name: str, branch: str, uat_md: str, run_md: str, accept: list[str], message: str
+    name: str,
+    branch: str,
+    existing: bool,
+    uat_md: str,
+    run_md: str,
+    accept: list[str],
+    message: str,
 ) -> list[str]:
     md_path = f"{WORK_DIR}/{name}"
     apply = f"python {WORK_DIR}/apply_bundle.py {md_path}"
@@ -114,8 +120,9 @@ def _steps(
 
     accept_note = (
         [
-            f"`--accept {' / '.join(accept)}` covers a known transcription slip in the bundle's",
-            "copy of that file. Any other **CONFLICT**: stop and send the printed diff back.",
+            "The `--accept` files are known to differ from the bundle's base copy (a",
+            "transcription slip, or an edit made at work that this bundle already contains);",
+            "they are replaced as a whole. Any other **CONFLICT**: stop and send the diff back.",
             "",
         ]
         if accept
@@ -130,10 +137,18 @@ def _steps(
         "",
         "### In UAT",
         "",
-        *step(
-            1,
-            "Work on a branch (the apply script refuses to run on main):",
-            f"git checkout -b {branch}",
+        *(
+            step(
+                1,
+                "Continue on the branch of the earlier bundle (nothing uncommitted on it):",
+                f"git checkout {branch} && git pull && git status --short",
+            )
+            if existing
+            else step(
+                1,
+                "Work on a branch (the apply script refuses to run on main):",
+                f"git checkout -b {branch}",
+            )
         ),
         *step(
             2,
@@ -163,7 +178,8 @@ def _steps(
         *step(
             6 + n_uat,
             "Commit the source only, and push:",
-            f'git add src conf && git commit -m "{message}" && git push -u origin {branch}',
+            f'git add src conf && git commit -m "{message}" && git push'
+            + ("" if existing else f" -u origin {branch}"),
         ),
         f"**Undo** (before step {6 + n_uat}) — restores every touched file exactly:",
         "",
@@ -233,8 +249,15 @@ def build(args: argparse.Namespace) -> pathlib.Path:
         f" · source: {counts['add']} added, {counts['replace']} replaced, "
         f"{counts['delete']} deleted · helpers: {len(helpers)}",
         "",
-        *_steps(name, branch, read(args.uat_file), read(args.run_file), args.accept or [],
-               args.message or f"Mirror bundle {number:02d}: {args.title}"),
+        *_steps(
+            name,
+            branch,
+            args.existing_branch,
+            read(args.uat_file),
+            read(args.run_file),
+            args.accept or [],
+            args.message or f"Mirror bundle {number:02d}: {args.title}",
+        ),
         "## What this bundle does",
         "",
         read(args.summary_file).strip() or "_No summary given._",
@@ -307,9 +330,16 @@ def main() -> None:
         "--helper", action="append", help="file shipped to data/input/mirror_bundles"
     )
     ap.add_argument(
-        "--accept", action="append", help="workplace path with a known transcription slip"
+        "--accept",
+        action="append",
+        help="workplace path with a known transcription slip",
     )
     ap.add_argument("--message", default=None, help="workplace commit message")
+    ap.add_argument(
+        "--existing-branch",
+        action="store_true",
+        help="continue on --branch (already pushed by an earlier bundle)",
+    )
     out = build(ap.parse_args())
     print(f"wrote {out.relative_to(REPO)}")
 

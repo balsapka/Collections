@@ -31,6 +31,9 @@ from .._common import (
     require_columns,
 )
 
+# reason_for_excluding values marking a returned cheque or DDS return (from a profiled
+# sample of comp_financial_tran_repos_dly, not a code dictionary; checked in PROD).
+RETURN_REASONS = ("CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS")
 _CASA_MONTH_COL = "ft_avg_casa_eod_balance_in_last_0_3_weeks_avg"  # CA+SA, ~1 month
 _CASA_IN_COL = "ft_inflow_casa_amt_in_last_0_0_weeks_sum"
 _CASA_OUT_COL = "ft_outflow_casa_amt_in_last_0_0_weeks_sum"
@@ -268,7 +271,7 @@ def build_distress_signals(
     * ``bureau_alert`` — bureau-reported bounced cheques (always wired);
     * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet;
     * ``internal_returns`` — the bank's own returned cheques / DDS returns as
-      ``(cif_id, event_date)``; CC: ``cc_a1_ability_v2.nodes.build_cc_internal_returns``.
+      ``(cif_id, event_date)`` from ``build_internal_returns``.
     """
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     require_columns(
@@ -301,3 +304,34 @@ def build_distress_signals(
         obs, events, "event_date", [F.max(F.lit(1)).alias("distress_flag")]
     )
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
+
+
+def build_internal_returns(obs_base: DataFrame, casa_txn: DataFrame) -> DataFrame:
+    """The bank's own returned cheques / DDS returns as ``(cif_id, event_date, reason)``,
+    across all of the customer's CASA accounts.
+
+    ``casa_txn`` is ``comp_financial_tran_repos_dly`` (2.4B rows): scoped to the
+    observation base's CIFs before any other filter (R20), partitions pruned on
+    ``edp_load_date``.
+    """
+    require_columns(
+        casa_txn,
+        ["cif_id", "edp_load_date", "tran_date", "reason_for_excluding"],
+        "comp_financial_tran_repos_dly",
+    )
+    floor = F.lit(lookback_floor(obs_base, 100))
+    cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
+    return (
+        casa_txn.select("cif_id", "edp_load_date", "tran_date", "reason_for_excluding")
+        .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
+        .filter(
+            (F.col("edp_load_date") >= floor)
+            & (F.col("tran_date") >= floor)
+            & F.col("reason_for_excluding").isin(*RETURN_REASONS)
+        )
+        .select(
+            "cif_id",
+            F.to_date("tran_date").alias("event_date"),
+            F.col("reason_for_excluding").alias("reason"),
+        )
+    )
