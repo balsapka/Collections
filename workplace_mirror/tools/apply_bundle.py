@@ -309,7 +309,7 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
         return False
     print(f"{len(entries)} files in their new state, compile OK"
           + (", imports OK" if do_import else " (imports skipped)"))
-    print("APPLY PASSED — review with `git status` / `git diff`, then commit")
+    print("APPLY PASSED — review with `git status` / `git diff`")
     return True
 
 

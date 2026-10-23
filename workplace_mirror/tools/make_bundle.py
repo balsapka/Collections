@@ -64,16 +64,23 @@ def changed_files(base: str, head: str) -> list[tuple[str, str]]:
     return sorted(result, key=lambda x: (x[0] == "delete", x[1]))
 
 
-def _file_entry(rel: str, action: str, base_txt: str | None, new_txt: str | None) -> list[str]:
+def _file_entry(
+    rel: str, action: str, base_txt: str | None, new_txt: str | None
+) -> list[str]:
     lang = LANG.get(pathlib.PurePosixPath(rel).suffix, "")
     meta = [f"action: {action}"]
     for kind, txt in (("base", base_txt), ("new", new_txt)):
         if txt is not None:
             meta.append(f"{kind} sha256 `{_sha(txt)}`")
-            meta.append(f"{kind} trailing newline: {'yes' if txt.endswith(chr(10)) else 'no'}")
+            meta.append(
+                f"{kind} trailing newline: {'yes' if txt.endswith(chr(10)) else 'no'}"
+            )
     md = [f"### FILE: `{rel}`", " · ".join(meta), ""]
     if base_txt is not None:
-        md += ["Base (as photographed — used only for the safety check and --revert):", ""]
+        md += [
+            "Base (as photographed — used only for the safety check and --revert):",
+            "",
+        ]
         md += _block(base_txt, lang) + [""]
     if new_txt is not None:
         md += ["New:", ""] + _block(new_txt, lang) + [""]
@@ -159,7 +166,8 @@ def _cleanup(name: str, extra_md: str) -> list[str]:
         "Copy this to the workplace assistant once the bundle's checks are done:",
         "",
         "````text",
-        f"Clean up after mirror bundle {name}. Do not edit anything under src/ or conf/.",
+        f"Clean up after mirror bundle {name}. Leave src/ and conf/ as they are, apart from",
+        "any temporary switch a step below asks you to make and undo.",
         *([extra_md.strip()] if extra_md.strip() else []),
         f"- Delete the folder {WORK_DIR}/ (bundle file, apply script, helpers, results):",
         f"  rm -rf {WORK_DIR}",
@@ -181,10 +189,14 @@ def build(args: argparse.Namespace) -> pathlib.Path:
     read = lambda p: pathlib.Path(p).read_text(encoding="utf-8") if p else ""  # noqa: E731
     apply_src = APPLY.read_text(encoding="utf-8")
     version = next(
-        ln.split("=")[1].strip() for ln in apply_src.splitlines() if ln.startswith("APPLY_VERSION")
+        ln.split("=")[1].strip()
+        for ln in apply_src.splitlines()
+        if ln.startswith("APPLY_VERSION")
     )
     helpers = [pathlib.Path(h) for h in args.helper or []]
-    counts = {a: sum(1 for x, _ in files if x == a) for a in ("add", "replace", "delete")}
+    counts = {
+        a: sum(1 for x, _ in files if x == a) for a in ("add", "replace", "delete")
+    }
     branch = args.branch or f"feature/{args.slug}"
     md = [
         f"# Mirror bundle {number:02d} — {args.title}",
@@ -226,7 +238,9 @@ def build(args: argparse.Namespace) -> pathlib.Path:
             _show(head, MIRROR + rel) if action != "delete" else None,
         )
     for h in helpers:
-        md += _file_entry(f"{WORK_DIR}/{h.name}", "add", None, h.read_text(encoding="utf-8"))
+        md += _file_entry(
+            f"{WORK_DIR}/{h.name}", "add", None, h.read_text(encoding="utf-8")
+        )
     md += [
         "## Apply script",
         "",
@@ -243,15 +257,23 @@ def build(args: argparse.Namespace) -> pathlib.Path:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--base", required=True, help="commit the workplace files match today")
+    ap.add_argument(
+        "--base", required=True, help="commit the workplace files match today"
+    )
     ap.add_argument("--head", default="HEAD")
     ap.add_argument("--slug", required=True)
     ap.add_argument("--title", required=True)
     ap.add_argument("--branch", default=None, help="workplace branch name")
     ap.add_argument("--summary-file", default=None)
-    ap.add_argument("--run-file", default=None, help="PROD run / check steps (markdown)")
-    ap.add_argument("--cleanup-file", default=None, help="extra cleanup lines (markdown)")
-    ap.add_argument("--helper", action="append", help="file shipped to data/input/mirror_bundles")
+    ap.add_argument(
+        "--run-file", default=None, help="PROD run / check steps (markdown)"
+    )
+    ap.add_argument(
+        "--cleanup-file", default=None, help="extra cleanup lines (markdown)"
+    )
+    ap.add_argument(
+        "--helper", action="append", help="file shipped to data/input/mirror_bundles"
+    )
     out = build(ap.parse_args())
     print(f"wrote {out.relative_to(REPO)}")
 

@@ -15,23 +15,22 @@ safely. Nobody retypes code.
    python workplace_mirror/tools/make_bundle.py --base <base-commit> --slug a1_engine --title "Extract the shared A1 engine" --summary-file notes.md
    ```
 
-   → `workplace_mirror/bundles/NN_<slug>.md`. Only `src/` and `conf/` files are bundled. Each
-   replaced or deleted file carries its base version too, so the workplace side can check it.
+   → `workplace_mirror/bundles/NN_<slug>.md`. `src/` and `conf/` changes are bundled as
+   source (replaced / deleted files carry their base version for the safety check);
+   `--helper` files (e.g. `bundle_helpers/b01_*.py`) go to the workplace's gitignored
+   `data/input/mirror_bundles/`; `--run-file` / `--cleanup-file` add the bundle's own PROD
+   steps and cleanup lines.
 4. Commit and push the bundle.
 
 ## Workplace side
 
-```bash
-git checkout -b crx/<slug>                      # never on main (the script refuses)
-# GitHub -> bundle -> "Copy raw file" -> save as docs/mirror_bundles/NN_<slug>.md
-# first time only: create docs/mirror_bundles/apply_bundle.py from the bundle's "Apply script" section
-python docs/mirror_bundles/apply_bundle.py docs/mirror_bundles/NN_<slug>.md --check   # CHECK PASSED
-python docs/mirror_bundles/apply_bundle.py docs/mirror_bundles/NN_<slug>.md --apply   # APPLY PASSED
-git add -A src conf docs && git commit -m "Mirror bundle NN: <title>"
-```
-
-Then run the bundle's PROD check (parity or distribution snippet, when it has one) before
-merging the branch.
+Every bundle starts with a **Steps** section: the exact commands, in order, from the
+workplace repo root. In short: branch → save the bundle raw to
+`data/input/mirror_bundles/` (gitignored) → write `apply_bundle.py` from the bundle →
+`--check` → `--apply` → the bundle's PROD run and check → paste the output back. Helpers
+(PROD check snippets, their results) also land in `data/input/mirror_bundles/`; nothing
+there is ever committed. Each bundle ends with a **Cleanup prompt** for the workplace
+assistant that deletes that folder and any temporary PROD data the check created.
 
 ## What protects the running code
 
