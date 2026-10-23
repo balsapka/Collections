@@ -4,8 +4,8 @@
         --title "Extract the shared A1 engine" [--head HEAD] [--branch crx/a1-engine] \\
         [--summary-file notes.md]
 
-Writes workplace_mirror/bundles/NN_<slug>.md. Only files under workplace_mirror/src/ and
-workplace_mirror/conf/ are bundled; their path inside the bundle is the workplace repo path
+Writes workplace_mirror/bundles/NN_<slug>.md. Only files under workplace_mirror/src/,
+conf/ and docs/ are bundled; their path inside the bundle is the workplace repo path
 (src/..., conf/...). Every replaced or deleted file carries its base version, so the
 workplace side can refuse to touch a file that differs from what was photographed.
 """
@@ -20,7 +20,7 @@ import subprocess
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 MIRROR = "workplace_mirror/"
-BUNDLED_ROOTS = ("src/", "conf/")
+BUNDLED_ROOTS = ("src/", "conf/", "docs/")
 OUT_DIR = REPO / "workplace_mirror" / "bundles"
 APPLY = pathlib.Path(__file__).with_name("apply_bundle.py")
 LANG = {".py": "python", ".yml": "yaml", ".yaml": "yaml", ".md": "markdown"}
@@ -106,7 +106,7 @@ def build(base: str, head: str, slug: str, title: str, branch: str, summary: str
         f"{run} --check     # dry run -> CHECK PASSED",
         f"{run} --apply     # writes + compile + imports -> APPLY PASSED",
         "git status && git diff --stat",
-        f'git add -A src conf && git commit -m "Mirror bundle {number:02d}: {title}"',
+        f'git add -A src conf docs && git commit -m "Mirror bundle {number:02d}: {title}"',
         "```",
         "",
         f"Undo before committing: `{run} --revert`. After committing: `git revert <commit>`.",

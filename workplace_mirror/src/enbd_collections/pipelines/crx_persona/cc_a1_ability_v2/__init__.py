@@ -1,4 +1,4 @@
-"""T31 — A1 Ability axis v2 (GRR MECE points redesign)."""
+"""CC A1 ability axis (GRR MECE points) on the shared ``_a1`` engine."""
 
 from .pipeline import create_pipeline
 

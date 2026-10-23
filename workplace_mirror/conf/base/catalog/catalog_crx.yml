@@ -381,49 +381,66 @@ crx_cc_a1_ability:
   save_args:
     mode: overwrite
 
-# ── A1 Ability axis v2 (T31 — GRR MECE points redesign) ─────────────────────
-# Additive beside cc_a1_ability (R18) — T26's pipeline/catalog entries above
-# are never modified. Abandon path: delete this block + cc_a1_ability_v2/.
-
-# Node 1: CIF-resolved spine rows (observation_date anchor only — no T0/spell)
-crx_cc_a1v2_cif_base:
+# ── Observation base: (account_id, observation_date, cif_id), one per product ──
+crx_cc_obs_base:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1v2_cif_base"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_obs_base"
   save_args:
     mode: overwrite
 
-# Node 2: income evidence (salary_months_h2, salary_amt_last, bureau salary)
-crx_cc_a1v2_income_signals:
+crx_rl_obs_base:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1v2_income_signals"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_obs_base"
   save_args:
     mode: overwrite
 
-# Node 3: liquidity evidence + oldest-overdue-bucket anchor (blueprint §4)
-crx_cc_a1v2_liquidity_signals:
+# ── CC A1 ability (shared _a1 engine) ───────────────────────────────────────
+# Evidence tables at (account_id, observation_date); the axis is crx_cc_a1_ability_v2
+# until the v1 pipeline is removed. a1_state in {ability_high, ability_moderate,
+# ability_low, ability_unknown}.
+crx_cc_a1_income_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1v2_liquidity_signals"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_income_signals"
   save_args:
     mode: overwrite
 
-# Node 4: distress evidence (cheque bounce / DDS return)
-crx_cc_a1v2_distress_signals:
+crx_cc_a1_liquidity_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1v2_distress_signals"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_liquidity_signals"
   save_args:
     mode: overwrite
 
-# Node 5: assembled A1 ability v2 axis (parallel/temporary beside crx_cc_a1_ability)
-# Grain: (account_id, observation_date). a1_state_v2 in {ability_high,
-# ability_moderate, ability_low, ability_unknown}.
+crx_cc_a1_distress_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_distress_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_liquidity_anchor:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_liquidity_anchor"
+  save_args:
+    mode: overwrite
+
 crx_cc_a1_ability_v2:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_v2"
+  save_args:
+    mode: overwrite
+
+# Temporary: copy of the pre-refactor output for the bundle 01 check
+# (docs/context/snippets/b01_a1_engine_check.py). Remove after the check.
+crx_cc_a1_ability_pre_refactor:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_pre_refactor"
   save_args:
     mode: overwrite
 

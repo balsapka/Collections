@@ -90,6 +90,7 @@ from enbd_collections.pipelines.crx_persona import (
 from enbd_collections.pipelines.crx_persona import (
     cc_a1_ability_v2 as crx_cc_a1_ability_v2,
 )
+from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
 )
@@ -231,6 +232,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
         "crx_cc_a1_ability_v2": crx_cc_a1_ability_v2.create_pipeline(),
+        "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
+        "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_a3_payment_credibility": crx_cc_a3_payment_credibility.create_pipeline(),
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),

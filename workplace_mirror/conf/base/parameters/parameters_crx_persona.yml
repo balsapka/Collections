@@ -19,3 +19,6 @@ crx_persona: "${globals:crx_persona}"
 # rl_a2_locatability (Node 4, T29/RL-A2-3 design, promoted 2026-10-22) to select
 # segment-aware thresholds; same resolver pattern as crx_persona above.
 model_id: "${globals:model_id}"
+
+# Log state distributions (one extra Spark job per axis). Off in production runs.
+crx_log_stats: false

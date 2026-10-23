@@ -65,6 +65,8 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O39 | M | confirmed | cc_a1_ability enrichers (bureau salary) | Ties on the latest salary month pick an arbitrary row; bridge dedup keeps an arbitrary `cif_id`; an extra `.count()` job |
 | O40 | L | data check | enrichers (CASA avg balance, ext loans) | PIT filter is `<= anchor` (others use `<`) — a weekly row dated on/after the obs week can leak up to 6 days |
 | O41 | L | confirmed | catalog_crx.yml, model_configs.yml | Config comments drift from code (see list) |
+| O42 | H | data check | cc_a1_ability enrichers (ext card payments) | `date_format(..., "yyyyww")` is not a valid Spark 3 pattern — the node fails unless PROD runs the legacy time parser |
+| O43 | M | confirmed | cc_a1_ability_v2 Node 1 | Spine rows without a resolved CIF are dropped, so those accounts get no A1 state at all |
 
 ---
 
@@ -537,6 +539,24 @@ Arms 1/4).
   datasets — fine, but undocumented).
 - `model_configs.yml` `cc_180_plus` / `rl_180_plus`: comment "3-month look-ahead" next to
   `target_horizon_months: 12`.
+
+### O42 — Week pattern `yyyyww` fails on Spark 3 (H, data check)
+
+`enrich_ext_cc_payments_h2` (`cc_a1_ability/enrichers.py:645`) counts payment weeks with
+`F.date_format(_tran_date, "yyyyww")`. Spark ≥ 3.0 rejects week-based patterns
+(`INCONSISTENT_BEHAVIOR_CROSS_VERSION.DATETIME_PATTERN_RECOGNITION`) unless
+`spark.sql.legacy.timeParserPolicy=LEGACY`. Reproduced on local Spark 3.5. Either PROD runs
+with the legacy policy, or every A1 run (v1 and v2) fails at this node.
+**Check:** `spark.conf.get("spark.sql.legacy.timeParserPolicy")` in a PROD notebook.
+**Fix (bundle 01):** `F.date_trunc("week", tran_date)`.
+
+### O43 — A1 v2 drops accounts without a CIF (M, confirmed)
+
+`build_a1v2_cif_base` (`cc_a1_ability_v2/nodes.py:177–180`) keeps only spine rows whose
+contract resolves to a CIF, and every later node starts from that table, so an account with
+no client link has no row in `crx_cc_a1_ability_v2` (5% of rows in the synthetic check).
+**Fix (bundle 01):** the observation base keeps every spine row; customer-level signals are
+NULL and the state is `ability_unknown`.
 
 ---
 

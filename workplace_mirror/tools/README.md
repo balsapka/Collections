@@ -27,7 +27,7 @@ git checkout -b crx/<slug>                      # never on main (the script refu
 # first time only: create docs/mirror_bundles/apply_bundle.py from the bundle's "Apply script" section
 python docs/mirror_bundles/apply_bundle.py docs/mirror_bundles/NN_<slug>.md --check   # CHECK PASSED
 python docs/mirror_bundles/apply_bundle.py docs/mirror_bundles/NN_<slug>.md --apply   # APPLY PASSED
-git add -A src conf && git commit -m "Mirror bundle NN: <title>"
+git add -A src conf docs && git commit -m "Mirror bundle NN: <title>"
 ```
 
 Then run the bundle's PROD check (parity or distribution snippet, when it has one) before
