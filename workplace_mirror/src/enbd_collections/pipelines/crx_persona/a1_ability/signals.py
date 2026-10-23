@@ -86,9 +86,8 @@ def _internal_salary(wm_salary: DataFrame) -> DataFrame:
     it was, so snapshot date minus that gap is the credit date. Several snapshots see
     the same credit; they collapse to one value per month.
 
-    TODO(sonnet): validate against ``feat_payroll_indicator`` (payroll months without a
-    recovered credit and vice versa), and switch to an internal table with salary credit
-    amounts per month if one exists.
+    This is the only internal salary source. ``feat_payroll_indicator`` is not used: it is
+    stamped the month after the credit and flags a subset of these months.
     """
     require_columns(
         wm_salary,
