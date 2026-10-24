@@ -166,7 +166,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-9 | Deceased: DCORE note (claims included), Way4 `D`, demographics — any age. |
 | D-A2-10 | Routing flags (promise to pay, hardship, refusing, field visit) leave A2. |
 | D-A2-11 | Output: both dimension columns, `deceased_flag`, and the combined `a2_state` with labels. |
-| D-A2-12 | Results are reported per model variant, RL split by product (Personal Loans, Personal Cash Loans, Auto); 180+ also by vintage = time since the account first reached 180+ DPD (< 6 m, 6–12 m, 1–2 y, 2–3 y, 3+ y). Model doc: `docs/locatability/a2_locatability_reference.xlsx`. |
+| D-A2-12 | Results are reported per model variant, RL split by product (Personal Loans, Personal Cash Loans, Auto); 180+ also by charge-off-age vintage (charged off < 2 years / 2+ years), as on the deterioration axis. Model doc: `docs/locatability/a2_locatability_reference.xlsx`. |
 
 ---
 
