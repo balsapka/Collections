@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..e63a8f9` · source: 8 added, 9 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..688cccc` · source: 8 added, 10 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -139,6 +139,10 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   snapshots, card payments, CASA flows, bureau events), so older history is not shuffled.
   This cuts rows, not necessarily partitions (the WM tables load one `adv_load_date`
   snapshot with the full weekly history); internal returns prune on `event_month`.
+- **State log for the latest month only**, as on the deterioration axis: `build_a1_ability`
+  always logs the `a1_state` distribution of `persona_end_date`'s month
+  (`_common.log_latest_month`, one aggregate job, a warning if it fails). The
+  `crx_log_stats` parameter and `log_distribution` are gone.
 - **`build_distress_signals`** takes `internal_returns` as a required input (it is in PROD
   now); only `payment_order` stays optional.
 - **`a1_ability/README.md`**: the A1 logic in plain terms (sources, windows, the 2-of-3
@@ -166,6 +170,7 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 | add | `conf/base/catalog/catalog_casa.yml` |
 | replace | `conf/base/catalog/catalog_crx.yml` |
 | add | `conf/base/parameters/parameters_casa.yml` |
+| replace | `conf/base/parameters/parameters_crx_persona.yml` |
 | add | `src/enbd_collections/nodes/primary/casa/__init__.py` |
 | add | `src/enbd_collections/nodes/primary/casa/prm_casa.py` |
 | replace | `src/enbd_collections/pipeline_registry.py` |
@@ -1647,6 +1652,65 @@ casa_primary:
   history_months: 6
 `````
 
+### FILE: `conf/base/parameters/parameters_crx_persona.yml`
+action: replace · base sha256 `0ed7b0bb06924ed787a655fbf49119fbe97b771618d3260b1c0d8c9c8cecf023` · base trailing newline: yes · new sha256 `f22f8e063a3b9f4f4439511a2c30bca55d3a3f7c9df194071e39e76eb1cc14f2` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````yaml
+##################################################
+# CRX PERSONA PIPELINE CONFIGURATION
+##################################################
+# Evaluation window for the RL persona pipeline.
+# These dates control which spine rows are included in persona outputs
+# (crx_rl_a4_spine and all downstream assets).
+#
+# Filter is applied at the spine-join step (RL-A4-2), NOT on raw history
+# or T0 tables — full history is required for T0 identification and
+# pre-T0 feature lookback.
+#
+# Orthogonal to modelling.start_date / modelling.end_date (training spine window).
+##################################################
+
+crx_persona: "${globals:crx_persona}"
+
+# Segment id for the currently-running model variant (cc_60_180 / cc_180_plus /
+# rl_60_180 / rl_180_plus). Additive key (R18) — used by cc_a2_locatability and
+# rl_a2_locatability (Node 4, T29/RL-A2-3 design, promoted 2026-10-22) to select
+# segment-aware thresholds; same resolver pattern as crx_persona above.
+model_id: "${globals:model_id}"
+
+# Log state distributions (one extra Spark job per axis). Off in production runs.
+crx_log_stats: false
+`````
+
+New:
+
+`````yaml
+##################################################
+# CRX PERSONA PIPELINE CONFIGURATION
+##################################################
+# Evaluation window for the RL persona pipeline.
+# These dates control which spine rows are included in persona outputs
+# (crx_rl_a4_spine and all downstream assets).
+#
+# Filter is applied at the spine-join step (RL-A4-2), NOT on raw history
+# or T0 tables — full history is required for T0 identification and
+# pre-T0 feature lookback.
+#
+# Orthogonal to modelling.start_date / modelling.end_date (training spine window).
+##################################################
+
+crx_persona: "${globals:crx_persona}"
+
+# Segment id for the currently-running model variant (cc_60_180 / cc_180_plus /
+# rl_60_180 / rl_180_plus). Additive key (R18) — used by cc_a2_locatability and
+# rl_a2_locatability (Node 4, T29/RL-A2-3 design, promoted 2026-10-22) to select
+# segment-aware thresholds; same resolver pattern as crx_persona above.
+model_id: "${globals:model_id}"
+
+`````
+
 ### FILE: `src/enbd_collections/nodes/primary/casa/__init__.py`
 action: add · new sha256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` · new trailing newline: no
 
@@ -2312,7 +2376,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
-action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `8fa4c130837ab7f2175522caa04b130fa27156086ec9d6ed429d864e415539df` · new trailing newline: yes
+action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `608fe1bedfd5a26dc2e789f9a7f06d62bb67aacb071d789a418074b4bac2d62f` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2503,7 +2567,8 @@ up customer-level sources by ``cif_id``. The helpers here encode the conventions
   (``pit_latest``), window aggregates read the last N months (``window_agg``);
 * source partition floors follow from the earliest observation month
   (``lookback_floor``);
-* logging is opt-in and costs one job (``log_distribution``).
+* each axis logs its state distribution for the latest observation month only
+  (``log_latest_month``).
 """
 
 from __future__ import annotations
@@ -2630,13 +2695,24 @@ def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
     return result
 
 
-def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
-    """Log the value distribution of ``col`` (one job) when ``enabled``."""
-    if not enabled:
+def log_latest_month(df: DataFrame, col: str, name: str, persona_end_date: str) -> None:
+    """Log the ``col`` distribution of the latest observation month — the month of
+    ``persona_end_date`` (one aggregate job; the month filter pushes down). A logging
+    failure is a warning, never a failed run."""
+    month = F.trunc(F.lit(str(persona_end_date)), "month")
+    try:
+        rows = (
+            df.filter(F.trunc("observation_date", "month") == month)
+            .groupBy(col)
+            .count()
+            .orderBy(col)
+            .collect()
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        LOG.warning("%s: %s distribution not logged: %s", name, col, exc)
         return
-    rows = df.groupBy(col).count().orderBy(col).collect()
     total = sum(r["count"] for r in rows)
-    LOG.info("%s — %s distribution (n=%d)", name, col, total)
+    LOG.info("%s — %s, month of %s (n=%d)", name, col, persona_end_date, total)
     for r in rows:
         LOG.info(
             "  %-28s %9d  (%5.1f%%)",
@@ -2841,7 +2917,7 @@ Moderate, Moderate → Low).
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py`
-action: replace · base sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · base trailing newline: yes · new sha256 `6412a86bdb880031442810d97446a3976f9d46e2a3034cb744ccf63632a76abe` · new trailing newline: yes
+action: replace · base sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · base trailing newline: yes · new sha256 `5dea5b17e9363e5e62e2c565904765c7c3ff887fbd08c9ed84262a48f4e82074` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3012,7 +3088,7 @@ from __future__ import annotations
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, left_join_all, log_distribution, window_months
+from .._common import GRAIN, left_join_all, log_latest_month, window_months
 from ..scoring_engine import StateLadder, points_from_level
 
 MIN_MONTHS = {3: 2, 6: 3}  # months of the window (by its length) that must qualify
@@ -3099,9 +3175,10 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
     distress: DataFrame,
     anchor: DataFrame,
     model_id: str,
-    log_stats: bool = False,
+    persona_end_date: str,
 ) -> DataFrame:
-    """One A1 state per observation-base row, over ``model_id``'s window.
+    """One A1 state per observation-base row, over ``model_id``'s window; logs the state
+    distribution of the month of ``persona_end_date`` (the latest observation month).
 
     ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
     """
@@ -3140,7 +3217,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
         F.col("liquidity_anchor_amt").cast("double"),
         F.current_date().alias("computed_at"),
     )
-    log_distribution(out, "a1_state", "a1_ability", log_stats)
+    log_latest_month(out, "a1_state", f"a1_ability [{model_id}]", persona_end_date)
     return out
 `````
 
@@ -4197,7 +4274,7 @@ def build_cc_liquidity_anchor(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py`
-action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `3ca4e69cd2cb4561c848e5dc1aa00e16c770dac6761f007a7b7339420ddf946b` · new trailing newline: yes
+action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `b1182348ee131b772d2ca424c95b13f66d23029d73e6d68e07fe9b3b5cf079da` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -4451,7 +4528,7 @@ def create_pipeline(
                     "crx_cc_a1_distress_signals",
                     "crx_cc_a1_liquidity_anchor",
                     "params:model_id",
-                    "params:crx_log_stats",
+                    "params:crx_persona.persona_end_date",
                 ],
                 output,
                 name="build_crx_cc_a1_ability",
