@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..7d2ff80` · source: 8 added, 7 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..c487385` · source: 8 added, 8 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -53,7 +53,7 @@ grep -rnE "max_age_days|window_agg\(|lookback_floor\(|pit_latest\(" src --includ
 **Step 7.** Commit the source only, and push:
 
 ```bash
-git add src conf && git commit -m "crx_persona A1: month-end windows, prm_casa_return_events, distress fixes (mirror bundle 03)" && git push
+git add src conf && git commit -m "crx_persona A1: month-end windows by segment, prm_casa_return_events, distress fixes (mirror bundle 03)" && git push
 ```
 
 **Undo** (before step 7) — restores every touched file exactly:
@@ -112,6 +112,11 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   the observation month. Until `cc_spine` is month-end, `build_cc_obs_base` moves each
   billing-date row to its month end (one row per account and month); any other
   non-month-end spine date stops the run.
+- **Window by segment**, as on the other axes: 3 months at 60–180, 6 months at 180+
+  (`_common.window_months`); "2 of 3" becomes "3 of 6" at 180+, the prior window is the 6
+  months before, and card payments, distress and CASA activity read 6 months. The signal
+  and A1 nodes take `params:model_id`; `ext_card_payment_max_3m` / `casa_active_3m` are
+  now `ext_card_payment_max` / `casa_active`. cc_180_plus is not run by this bundle.
 - **New primary dataset `prm_casa_return_events`** (pipeline `casa_primary`, outside
   crx_persona): every returned CASA transaction (`CHEQUE RETURNS`, `DDS Rejects/Reversal`,
   `RETURNS`; both debit and credit legs) for all CIFs, one row per
@@ -153,6 +158,7 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 | add | `src/enbd_collections/pipelines/casa/primary.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/_common.py` |
 | add | `src/enbd_collections/pipelines/crx_persona/a1_ability/README.md` |
+| replace | `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/__init__.py` |
 | add | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b03_check.py` |
@@ -1607,7 +1613,7 @@ crx_rl_a3_payment_credibility:
 `````
 
 ### FILE: `conf/base/parameters/parameters_casa.yml`
-action: add · new sha256 `dec3ba6571a92fb95ae99b89ab08de232dfe6516863e546d7082fc5ba6c5a661` · new trailing newline: yes
+action: add · new sha256 `a05212055b4f5d2e67b43392366b5e8a53cbe6ac4d8065f777528741ba7ebab2` · new trailing newline: yes
 
 New:
 
@@ -1620,7 +1626,7 @@ casa_primary:
   # which ones count as distress is decided in the persona signal layer).
   return_reasons: ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
   # Months kept up to the persona start month (crx_persona.persona_start_date), so the
-  # first observation month has its full lookback (A1 reads m1-m6).
+  # first observation month has its full distress window (the longest: 6 months at 180+).
   history_months: 6
 `````
 
@@ -2283,7 +2289,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
-action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `b9b017c7705b0ab24b74f7f41dff8a067a6b95618218df7701e61fdf918422e2` · new trailing newline: yes
+action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `1f2a5d9f463a8331ebb559313c28517903b9fcefc40eda096c2a0d955d573f74` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2486,10 +2492,21 @@ from typing import Sequence
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
+from ._dpd_journey.constants import MODEL_ID_SEGMENT
+
 
 LOG = logging.getLogger(__name__)
 
 GRAIN = ("account_id", "observation_date")
+
+# Months every axis looks back, the observation month included; the dry 180+ buckets
+# look further.
+WINDOW_MONTHS = {"60_180": 3, "180_plus": 6}
+
+
+def window_months(model_id: str) -> int:
+    """The lookback window of ``model_id``'s segment, in calendar months."""
+    return WINDOW_MONTHS[MODEL_ID_SEGMENT[model_id]]
 
 
 def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
@@ -2646,7 +2663,7 @@ def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/README.md`
-action: add · new sha256 `613f23f3baaef38711908ab0dd374c8e2710daa63189cc2506e1727463b6de07` · new trailing newline: yes
+action: add · new sha256 `f324a402406f3b48d35f9a0ed576e0a3efec7723f0bda1f8b82b3b1ab6125aeb` · new trailing newline: yes
 
 New:
 
@@ -2666,8 +2683,14 @@ log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (eviden
 - **Grain:** one row per `(account_id, observation_date)` from the observation base.
   Observation dates are **month ends** (CC: until `cc_spine` itself is month-end, the
   observation base moves each billing-date row to its month end).
-- **Windows are calendar months.** m1 = the observation month, m2 and m3 the two before it:
-  "the last 3 months" = m1–m3. "The prior 3 months" = m4–m6 (used to spot a decline).
+- **Windows are calendar months, by segment** (`_common.window_months`), the observation
+  month included (m1 = the observation month, m2 the one before, …):
+  - **60–180: 3 months** (m1–m3); the prior window m4–m6 (used to spot a decline).
+  - **180+: 6 months** (m1–m6); the prior window m7–m12.
+  - Every count scales with it: **"2 of 3" at 60–180 is "3 of 6" at 180+**
+    (`MIN_MONTHS`), and every "in the window" rule (card payment, distress, CASA activity)
+    reads 6 months at 180+.
+  - The sections below are written for 60–180; read m1–m6 / m7–m12 and 3 of 6 for 180+.
 - **Customer level.** Salary, CASA, card payments, bounces and returns are read across
   **all accounts of the customer's CIF**, never the scored account alone.
 - **Anchor** (the workbook's "minimum due"): what the customer must pay now.
@@ -2691,13 +2714,13 @@ month **the larger one wins**.
 - **Bureau salary** — `stg_aecb_salary_history`: `subj_salcr_hist_ref_mnth` (MMyyyy) and
   `subj_salcr_hist_tot_sal_amt`, linked to the CIF through `prm_bureau_cif_bridge`.
 
-The result is `income_m1 … income_m6`; NULL = no salary that month from either source.
+The result is `income_m1 … income_m6` (`… m12` at 180+); NULL = no salary that month from either source.
 
 **Step 2: the level** (`income_level`).
 
 - **Threshold** = max(AED 3,000, 2 × anchor).
 - **2 of 3:** each of `income_m1..m3` scores 1 if it is at or above the threshold (NULL
-  scores 0); Stable needs a count ≥ 2 (`N3 = 2`). Any two months — not necessarily
+  scores 0); Stable needs a count ≥ 2 (`MIN_MONTHS`; 3 of 6 at 180+). Any two months — not necessarily
   consecutive.
 - **Not weakening:** the m1–m3 average must be ≥ 75% of the m4–m6 average
   (`D_INC = 0.25`); months without salary count as 0 here. No salary in m4–m6 → nothing to
@@ -2718,10 +2741,10 @@ below 75% of 5,000 = 3,750 → **Weak**, not Stable. The missing June pulls the 
 
 **Evidence** (`build_liquidity_signals`):
 
-- **CASA balance per month** (`casa_m1 … casa_m6`) — `wm_fea_casa_eod_avg_balance`:
+- **CASA balance per month** (`casa_m1 … casa_m6`, `… m12` at 180+) — `wm_fea_casa_eod_avg_balance`:
   current + savings average balance, taken as the 4-week average on the month's last weekly
   snapshot.
-- **External card payment** (`ext_card_payment_max_3m`) — the largest single CASA outflow
+- **External card payment** (`ext_card_payment_max`) — the largest single CASA outflow
   in m1–m3 (`wm_pri_labelled_transactions`) to a credit card the customer registered as a
   beneficiary (`raw_beneficiary_cards`, card numbers). It shows money paid to other banks'
   cards.
@@ -2753,7 +2776,7 @@ Points = income points + liquidity points (0–4).
 
 | State | Rule |
 |---|---|
-| `ability_unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active_3m`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
+| `ability_unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
 | `ability_high` | 4 points, no distress |
 | `ability_moderate` | 2–3 points without distress, or 4 points with distress |
 | `ability_low` | everything else: 0–1 points, or 2–3 points with distress |
@@ -2778,8 +2801,312 @@ Moderate, Moderate → Low).
   the flag on; when the bounce really happened is under investigation.
 `````
 
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py`
+action: replace · base sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · base trailing newline: yes · new sha256 `6412a86bdb880031442810d97446a3976f9d46e2a3034cb744ccf63632a76abe` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""A1 ability state — GRR MECE points.
+
+Spec: ``workplace_mirror/specs/A1_ability_spec.md``.
+
+    income level     stable 2 / weak 1 / none 0
+  + liquidity level  adequate 2 / weak 1 / none 0
+  = points           4 high, 2–3 moderate, 0–1 low
+  distress (cheque bounce / DDS return) lowers the state one level;
+  no income, no liquidity, no distress and no CASA transaction → unknown.
+
+Thresholds scale with ``liquidity_anchor_amt`` — what the customer must find now
+(CC 60–180: the oldest overdue bucket; RL: one instalment; NULL: flat floors only).
+Values are the workbook's starting values (sheet Thresholds), not yet tuned on PROD.
+"""
+
+from __future__ import annotations
+
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
+
+from .._common import GRAIN, left_join_all, log_distribution
+from ..scoring_engine import StateLadder, points_from_level
+
+N3 = 2  # months of the last 3 that must qualify
+F_INC = 3000.0  # salary floor (internal and bureau), AED
+K_INC = 2.0  # income must also cover this multiple of the anchor
+D_INC = 0.25  # stable income may fall at most this share vs the prior 3 months
+F_CASA = 3000.0
+K_CASA = 1.0
+D_CASA = 0.50
+F_PAY = 500.0
+K_PAY = 1.0
+DEMIN = 1000.0  # smallest amount that counts as any evidence
+
+_LADDER = StateLadder(
+    high="ability_high",
+    moderate="ability_moderate",
+    low="ability_low",
+    unknown="ability_unknown",
+    high_from_points=4,
+    moderate_from_points=2,
+)
+_LAST3, _PRIOR3 = (1, 2, 3), (4, 5, 6)
+
+
+def _months(prefix: str, months: tuple[int, ...]) -> list[Column]:
+    return [F.col(f"{prefix}_m{i}") for i in months]
+
+
+def _count_at_least(cols: list[Column], floor: Column) -> Column:
+    return sum((F.coalesce(c, F.lit(0.0)) >= floor).cast("int") for c in cols)
+
+
+def _mean(cols: list[Column], missing_is_zero: bool) -> Column:
+    """Mean over the months; a month without data counts as 0 (income) or is skipped
+    (balances)."""
+    total = sum(F.coalesce(c, F.lit(0.0)) for c in cols)
+    if missing_is_zero:
+        return total / len(cols)
+    present = sum(c.isNotNull().cast("int") for c in cols)
+    return F.when(present > 0, total / present)
+
+
+def _not_weakening(prefix: str, max_drop: float, missing_is_zero: bool) -> Column:
+    """The last-3-month average is not more than ``max_drop`` below the prior 3 months
+    (true when there is no prior quarter to compare with)."""
+    recent = _mean(_months(prefix, _LAST3), missing_is_zero)
+    prior = _mean(_months(prefix, _PRIOR3), missing_is_zero)
+    return F.coalesce(F.when(prior > 0, recent >= prior * (1 - max_drop)), F.lit(True))
+
+
+def income_level(anchor: Column) -> Column:
+    last3 = _months("income", _LAST3)
+    floor = F.greatest(F.lit(F_INC), K_INC * anchor)
+    stable = (_count_at_least(last3, floor) >= N3) & _not_weakening(
+        "income", D_INC, True
+    )
+    weak = _count_at_least(last3, F.lit(DEMIN)) > 0
+    return F.when(stable, "stable").when(weak, "weak").otherwise("none")
+
+
+def liquidity_level(anchor: Column) -> Column:
+    last3 = _months("casa", _LAST3)
+    payment = F.coalesce(F.col("ext_card_payment_max_3m"), F.lit(0.0))
+    casa_floor = F.greatest(F.lit(F_CASA), K_CASA * anchor)
+    casa_ok = (_count_at_least(last3, casa_floor) >= N3) & _not_weakening(
+        "casa", D_CASA, False
+    )
+    adequate = casa_ok | (payment >= F.greatest(F.lit(F_PAY), K_PAY * anchor))
+    weak = (_count_at_least(last3, F.lit(DEMIN)) > 0) | (payment >= DEMIN)
+    return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
+
+
+def build_a1_ability(  # pylint: disable=too-many-arguments
+    obs_base: DataFrame,
+    income: DataFrame,
+    liquidity: DataFrame,
+    distress: DataFrame,
+    anchor: DataFrame,
+    log_stats: bool = False,
+) -> DataFrame:
+    """One A1 state per observation-base row.
+
+    ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
+    """
+    df = left_join_all(obs_base, [income, liquidity, distress, anchor])
+    amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
+    df = (
+        df.withColumn("a1_income_level", income_level(amt))
+        .withColumn("a1_liquidity_level", liquidity_level(amt))
+        .withColumn("a1_distress_flag", F.col("distress_flag") == 1)
+    )
+    df = df.withColumn(
+        "a1_points_total",
+        points_from_level(F.col("a1_income_level"), {"stable": 2, "weak": 1})
+        + points_from_level(F.col("a1_liquidity_level"), {"adequate": 2, "weak": 1}),
+    )
+    unknown = (
+        (F.col("a1_points_total") == 0)
+        & ~F.col("a1_distress_flag")
+        & (F.coalesce(F.col("casa_active_3m"), F.lit(0)) == 0)
+    )
+    df = df.withColumn(
+        "a1_state",
+        _LADDER.state(F.col("a1_points_total"), F.col("a1_distress_flag"), unknown),
+    )
+    out = df.select(
+        *GRAIN,
+        "a1_state",
+        F.when(F.col("a1_state") == _LADDER.unknown, "no_signal")
+        .otherwise("observed")
+        .alias("a1_provenance"),
+        "a1_income_level",
+        "a1_liquidity_level",
+        F.col("a1_points_total").cast("int"),
+        F.col("a1_distress_flag").cast("int"),
+        F.col("liquidity_anchor_amt").cast("double"),
+        F.current_date().alias("computed_at"),
+    )
+    log_distribution(out, "a1_state", "a1_ability", log_stats)
+    return out
+`````
+
+New:
+
+`````python
+"""A1 ability state — GRR MECE points.
+
+Spec: ``workplace_mirror/specs/A1_ability_spec.md``.
+
+    income level     stable 2 / weak 1 / none 0
+  + liquidity level  adequate 2 / weak 1 / none 0
+  = points           4 high, 2–3 moderate, 0–1 low
+  distress (cheque bounce / DDS return) lowers the state one level;
+  no income, no liquidity, no distress and no CASA transaction → unknown.
+
+Thresholds scale with ``liquidity_anchor_amt`` — what the customer must find now
+(CC 60–180: the oldest overdue bucket; RL: one instalment; NULL: flat floors only).
+Values are the workbook's starting values (sheet Thresholds), not yet tuned on PROD.
+"""
+
+from __future__ import annotations
+
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
+
+from .._common import GRAIN, left_join_all, log_distribution, window_months
+from ..scoring_engine import StateLadder, points_from_level
+
+MIN_MONTHS = {3: 2, 6: 3}  # months of the window (by its length) that must qualify
+F_INC = 3000.0  # salary floor (internal and bureau), AED
+K_INC = 2.0  # income must also cover this multiple of the anchor
+D_INC = 0.25  # stable income may fall at most this share vs the prior window
+F_CASA = 3000.0
+K_CASA = 1.0
+D_CASA = 0.50
+F_PAY = 500.0
+K_PAY = 1.0
+DEMIN = 1000.0  # smallest amount that counts as any evidence
+
+_LADDER = StateLadder(
+    high="ability_high",
+    moderate="ability_moderate",
+    low="ability_low",
+    unknown="ability_unknown",
+    high_from_points=4,
+    moderate_from_points=2,
+)
+
+
+def _window(w: int) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Month indices of the window (m1–mW) and of the prior window (m(W+1)–m(2W))."""
+    return tuple(range(1, w + 1)), tuple(range(w + 1, 2 * w + 1))
+
+
+def _months(prefix: str, months: tuple[int, ...]) -> list[Column]:
+    return [F.col(f"{prefix}_m{i}") for i in months]
+
+
+def _count_at_least(cols: list[Column], floor: Column) -> Column:
+    return sum((F.coalesce(c, F.lit(0.0)) >= floor).cast("int") for c in cols)
+
+
+def _mean(cols: list[Column], missing_is_zero: bool) -> Column:
+    """Mean over the months; a month without data counts as 0 (income) or is skipped
+    (balances)."""
+    total = sum(F.coalesce(c, F.lit(0.0)) for c in cols)
+    if missing_is_zero:
+        return total / len(cols)
+    present = sum(c.isNotNull().cast("int") for c in cols)
+    return F.when(present > 0, total / present)
+
+
+def _not_weakening(
+    prefix: str, max_drop: float, missing_is_zero: bool, w: int
+) -> Column:
+    """The window's average is not more than ``max_drop`` below the prior window's (true
+    when there is no prior window to compare with)."""
+    last, prior_months = _window(w)
+    recent = _mean(_months(prefix, last), missing_is_zero)
+    prior = _mean(_months(prefix, prior_months), missing_is_zero)
+    return F.coalesce(F.when(prior > 0, recent >= prior * (1 - max_drop)), F.lit(True))
+
+
+def income_level(anchor: Column, w: int) -> Column:
+    last = _months("income", _window(w)[0])
+    floor = F.greatest(F.lit(F_INC), K_INC * anchor)
+    stable = (_count_at_least(last, floor) >= MIN_MONTHS[w]) & _not_weakening(
+        "income", D_INC, True, w
+    )
+    weak = _count_at_least(last, F.lit(DEMIN)) > 0
+    return F.when(stable, "stable").when(weak, "weak").otherwise("none")
+
+
+def liquidity_level(anchor: Column, w: int) -> Column:
+    last = _months("casa", _window(w)[0])
+    payment = F.coalesce(F.col("ext_card_payment_max"), F.lit(0.0))
+    casa_floor = F.greatest(F.lit(F_CASA), K_CASA * anchor)
+    casa_ok = (_count_at_least(last, casa_floor) >= MIN_MONTHS[w]) & _not_weakening(
+        "casa", D_CASA, False, w
+    )
+    adequate = casa_ok | (payment >= F.greatest(F.lit(F_PAY), K_PAY * anchor))
+    weak = (_count_at_least(last, F.lit(DEMIN)) > 0) | (payment >= DEMIN)
+    return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
+
+
+def build_a1_ability(  # pylint: disable=too-many-arguments
+    obs_base: DataFrame,
+    income: DataFrame,
+    liquidity: DataFrame,
+    distress: DataFrame,
+    anchor: DataFrame,
+    model_id: str,
+    log_stats: bool = False,
+) -> DataFrame:
+    """One A1 state per observation-base row, over ``model_id``'s window.
+
+    ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
+    """
+    df = left_join_all(obs_base, [income, liquidity, distress, anchor])
+    amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
+    w = window_months(model_id)
+    df = (
+        df.withColumn("a1_income_level", income_level(amt, w))
+        .withColumn("a1_liquidity_level", liquidity_level(amt, w))
+        .withColumn("a1_distress_flag", F.col("distress_flag") == 1)
+    )
+    df = df.withColumn(
+        "a1_points_total",
+        points_from_level(F.col("a1_income_level"), {"stable": 2, "weak": 1})
+        + points_from_level(F.col("a1_liquidity_level"), {"adequate": 2, "weak": 1}),
+    )
+    unknown = (
+        (F.col("a1_points_total") == 0)
+        & ~F.col("a1_distress_flag")
+        & (F.coalesce(F.col("casa_active"), F.lit(0)) == 0)
+    )
+    df = df.withColumn(
+        "a1_state",
+        _LADDER.state(F.col("a1_points_total"), F.col("a1_distress_flag"), unknown),
+    )
+    out = df.select(
+        *GRAIN,
+        "a1_state",
+        F.when(F.col("a1_state") == _LADDER.unknown, "no_signal")
+        .otherwise("observed")
+        .alias("a1_provenance"),
+        "a1_income_level",
+        "a1_liquidity_level",
+        F.col("a1_points_total").cast("int"),
+        F.col("a1_distress_flag").cast("int"),
+        F.col("liquidity_anchor_amt").cast("double"),
+        F.current_date().alias("computed_at"),
+    )
+    log_distribution(out, "a1_state", "a1_ability", log_stats)
+    return out
+`````
+
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py`
-action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `ae1107d8c7bc7f3ba43d3995459ea55882d3b79066978e873dc471c782c83d51` · new trailing newline: yes
+action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `3951db54fd8faecc98e365ac1cd49a42d73af0e414db6fe0599e8a83b5107585` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3130,15 +3457,16 @@ New:
 
 Spec: ``workplace_mirror/specs/A1_ability_spec.md`` (GRR workbook A1_ability_20261022).
 
-Observation dates are month ends. "The last 3 months" are the observation month and the
-two before it (m1 = the observation month, m2, m3); "the prior 3 months" are m4–m6. The
-builders return the amounts the classifier compares with its thresholds:
+Observation dates are month ends. The window is W calendar months, the observation month
+included (``_common.window_months``: 3 for 60–180, 6 for 180+): m1 = the observation
+month … mW; "the prior window" is m(W+1)–m(2W). The builders return the amounts the
+classifier compares with its thresholds:
 
 * income    — salary received in each month (internal credit or bureau salary,
               the larger);
 * liquidity — CASA average balance in each month, largest single external card payment;
-* activity  — any CASA transaction in the last 3 months (the Unknown gate);
-* distress  — a cheque bounce or direct-debit return in the last 3 months.
+* activity  — any CASA transaction in the window (the Unknown gate);
+* distress  — a cheque bounce or direct-debit return in the window.
 
 Customer-level sources are always read for the whole CIF — all the customer's accounts —
 never for the scored account_id alone (an RL account_id is not a CASA account).
@@ -3156,6 +3484,7 @@ from .._common import (
     parse_yyyymmdd,
     require_columns,
     window_agg,
+    window_months,
 )
 
 # reason_for_excluding values that count as distress. prm_casa_return_events also carries
@@ -3172,19 +3501,21 @@ def _month_index(date: Column) -> Column:
     return F.months_between(obs_month, F.trunc(date, "month")).cast("int") + 1
 
 
-def _by_month(obs: DataFrame, series: DataFrame, value: str, prefix: str) -> DataFrame:
-    """Spread a ``(cif_id, month, value)`` series over ``{prefix}_m1 … _m6`` per
+def _by_month(
+    obs: DataFrame, series: DataFrame, value: str, prefix: str, months: int
+) -> DataFrame:
+    """Spread a ``(cif_id, month, value)`` series over ``{prefix}_m1 … _m{months}`` per
     observation (NULL where the month has no value)."""
     return (
         obs.select(*GRAIN, "cif_id")
         .join(series, on="cif_id")
         .withColumn("_k", _month_index(F.col("month")))
-        .filter(F.col("_k").between(1, 6))
+        .filter(F.col("_k").between(1, months))
         .groupBy(*GRAIN)
         .agg(
             *[
                 F.max(F.when(F.col("_k") == i, F.col(value))).alias(f"{prefix}_m{i}")
-                for i in range(1, 7)
+                for i in range(1, months + 1)
             ]
         )
     )
@@ -3251,9 +3582,10 @@ def build_income_signals(
     wm_salary: DataFrame,
     salary_hist: DataFrame,
     bureau_cif_bridge: DataFrame,
+    model_id: str,
 ) -> DataFrame:
-    """``income_m1 … income_m6``: salary received per month — the larger of the internal
-    credit and the bureau salary (NULL: no salary that month)."""
+    """``income_m1 … income_m{2W}``: salary received per month — the larger of the
+    internal credit and the bureau salary (NULL: no salary that month)."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     monthly = (
         _internal_salary(wm_salary)
@@ -3261,7 +3593,10 @@ def build_income_signals(
         .groupBy("cif_id", "month")
         .agg(F.max("amount").alias("amount"))
     )
-    return left_join_all(obs_base, [_by_month(obs, monthly, "amount", "income")])
+    months = 2 * window_months(model_id)
+    return left_join_all(
+        obs_base, [_by_month(obs, monthly, "amount", "income", months)]
+    )
 
 
 # ── Liquidity and activity ────────────────────────────────────────────────────
@@ -3287,10 +3622,10 @@ def _casa_by_month(wm_casa_bal: DataFrame) -> DataFrame:
 
 
 def _ext_card_payments(
-    obs: DataFrame, labelled_txn: DataFrame, beneficiary_cards: DataFrame
+    obs: DataFrame, labelled_txn: DataFrame, beneficiary_cards: DataFrame, months: int
 ) -> DataFrame:
     """Largest single CASA payment to one of the customer's registered external credit
-    cards in the last 3 months.
+    cards in the window.
 
     ``raw_beneficiary_cards`` is a live snapshot: a card registered after the
     observation date still counts (mild look-ahead, accepted).
@@ -3319,7 +3654,7 @@ def _ext_card_payments(
     )
     src = (
         labelled_txn.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs, 3)))
+            (F.col("tran_date") >= F.lit(lookback_floor(obs, months)))
             & (F.col("in_out_flow") == "outflow")
             & (F.col("product_category") == "CASA")
         )
@@ -3332,13 +3667,13 @@ def _ext_card_payments(
         obs,
         src,
         date_col="tran_date",
-        aggs=[F.max("tran_amt").alias("ext_card_payment_max_3m")],
-        months=3,
+        aggs=[F.max("tran_amt").alias("ext_card_payment_max")],
+        months=months,
     )
 
 
-def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame) -> DataFrame:
-    """Any CASA credit or debit in the last 3 months."""
+def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame, months: int) -> DataFrame:
+    """Any CASA credit or debit in the window."""
     require_columns(
         wm_casa_flow,
         ["cif_id", "week_number", _CASA_IN_COL, _CASA_OUT_COL],
@@ -3355,8 +3690,8 @@ def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame) -> DataFrame:
         obs,
         src,
         date_col="week",
-        aggs=[F.max("_active").alias("casa_active_3m")],
-        months=3,
+        aggs=[F.max("_active").alias("casa_active")],
+        months=months,
     )
 
 
@@ -3366,15 +3701,17 @@ def build_liquidity_signals(
     wm_casa_flow: DataFrame,
     labelled_txn: DataFrame,
     beneficiary_cards: DataFrame,
+    model_id: str,
 ) -> DataFrame:
-    """``casa_m1 … casa_m6``, ``ext_card_payment_max_3m``, ``casa_active_3m``."""
+    """``casa_m1 … casa_m{2W}``, ``ext_card_payment_max``, ``casa_active``."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
+    w = window_months(model_id)
     return left_join_all(
         obs_base,
         [
-            _by_month(obs, _casa_by_month(wm_casa_bal), "balance", "casa"),
-            _ext_card_payments(obs, labelled_txn, beneficiary_cards),
-            _casa_activity(obs, wm_casa_flow),
+            _by_month(obs, _casa_by_month(wm_casa_bal), "balance", "casa", 2 * w),
+            _ext_card_payments(obs, labelled_txn, beneficiary_cards, w),
+            _casa_activity(obs, wm_casa_flow, w),
         ],
     )
 
@@ -3385,10 +3722,11 @@ def build_liquidity_signals(
 def build_distress_signals(
     obs_base: DataFrame,
     bureau_alert: DataFrame,
+    model_id: str,
     payment_order: DataFrame | None = None,
     internal_returns: DataFrame | None = None,
 ) -> DataFrame:
-    """distress_flag: a cheque bounce or direct-debit (DDS) return in the last 3 months,
+    """distress_flag: a cheque bounce or direct-debit (DDS) return in the window,
     from the bureau and from the bank's own records.
 
     * ``bureau_alert`` — bureau-reported bounced cheques, dated by ``extract_date``
@@ -3429,12 +3767,14 @@ def build_distress_signals(
         events,
         date_col="event_date",
         aggs=[F.max(F.lit(1)).alias("distress_flag")],
-        months=3,
+        months=window_months(model_id),
     )
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
 
 
-def build_internal_returns(obs_base: DataFrame, return_events: DataFrame) -> DataFrame:
+def build_internal_returns(
+    obs_base: DataFrame, return_events: DataFrame, model_id: str
+) -> DataFrame:
     """The bank's own returned cheques and DDS returns for the observation base's CIFs, as
     distinct ``(cif_id, event_date, reason)`` from ``prm_casa_return_events`` (all of the
     customer's CASA accounts; the debit and credit legs of a return collapse to one row).
@@ -3447,7 +3787,10 @@ def build_internal_returns(obs_base: DataFrame, return_events: DataFrame) -> Dat
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
     return (
         return_events.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs_base, 3)))
+            (
+                F.col("tran_date")
+                >= F.lit(lookback_floor(obs_base, window_months(model_id)))
+            )
             & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
         )
         .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
@@ -3484,7 +3827,7 @@ __all__ = ["create_b03_check_pipeline", "create_pipeline"]
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b03_check.py`
-action: add · new sha256 `1f0b63d16fe7760cd1ea4d5b0b0c9ff6e27826ab553d810c73071268c6dcf5d8` · new trailing newline: yes
+action: add · new sha256 `42367dedfbdd32015c52ea5c892eaeff86aa8a7a701e850089afaeda95d9b72a` · new trailing newline: yes
 
 New:
 
@@ -3508,17 +3851,18 @@ import logging
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
+from .._common import window_months
 from ..a1_ability.classify import (
     _LADDER,
-    _LAST3,
     D_INC,
     DEMIN,
     F_INC,
     K_INC,
-    N3,
+    MIN_MONTHS,
     _count_at_least,
     _months,
     _not_weakening,
+    _window,
 )
 from ..scoring_engine import points_from_level
 
@@ -3582,13 +3926,13 @@ def _log(name: str, lines: list[str]) -> None:
     LOG.info("\n%s", "\n".join(block))
 
 
-def _income_level(floor: Column, weakening: bool) -> Column:
+def _income_level(floor: Column, weakening: bool, w: int) -> Column:
     """classify.income_level with the threshold and the weakening check as inputs."""
-    last3 = _months("income", _LAST3)
-    stable = _count_at_least(last3, floor) >= N3
+    last = _months("income", _window(w)[0])
+    stable = _count_at_least(last, floor) >= MIN_MONTHS[w]
     if weakening:
-        stable = stable & _not_weakening("income", D_INC, True)
-    weak = _count_at_least(last3, F.lit(DEMIN)) > 0
+        stable = stable & _not_weakening("income", D_INC, True, w)
+    weak = _count_at_least(last, F.lit(DEMIN)) > 0
     return F.when(stable, "stable").when(weak, "weak").otherwise("none")
 
 
@@ -3605,6 +3949,8 @@ def _state(income_level: str) -> Column:
 def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> None:
     """How often 2 × anchor raises the income bar above the flat floor, how often the
     weakening check fires, and the levels and states without each of them."""
+    w = window_months(model_id)
+    last = _window(w)[0]
     anchor = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))
     bar = F.greatest(F.lit(F_INC), K_INC * anchor)
     flat = F.lit(F_INC)
@@ -3612,13 +3958,17 @@ def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> Non
         a1.join(income, ["account_id", "observation_date"])
         .withColumn("bar", bar)
         .withColumn("raised", bar > flat)
-        .withColumn("lvl_engine", _income_level(bar, True))
-        .withColumn("lvl_flat", _income_level(flat, True))
-        .withColumn("lvl_no_weak", _income_level(bar, False))
-        .withColumn("lvl_flat_no_weak", _income_level(flat, False))
-        .withColumn("qual_bar", _count_at_least(_months("income", _LAST3), bar) >= N3)
-        .withColumn("qual_flat", _count_at_least(_months("income", _LAST3), flat) >= N3)
-        .withColumn("weak_ok", _not_weakening("income", D_INC, True))
+        .withColumn("lvl_engine", _income_level(bar, True, w))
+        .withColumn("lvl_flat", _income_level(flat, True, w))
+        .withColumn("lvl_no_weak", _income_level(bar, False, w))
+        .withColumn("lvl_flat_no_weak", _income_level(flat, False, w))
+        .withColumn(
+            "qual_bar", _count_at_least(_months("income", last), bar) >= MIN_MONTHS[w]
+        )
+        .withColumn(
+            "qual_flat", _count_at_least(_months("income", last), flat) >= MIN_MONTHS[w]
+        )
+        .withColumn("weak_ok", _not_weakening("income", D_INC, True, w))
         .withColumn("st_flat", _state("lvl_flat"))
         .withColumn("st_no_weak", _state("lvl_no_weak"))
         .withColumn("st_flat_no_weak", _state("lvl_flat_no_weak"))
@@ -3638,9 +3988,9 @@ def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> Non
         f"model_id={model_id} rows={n} engine-level mismatches={mismatch} (must be 0)",
         f"  bar raised above {F_INC:.0f}: {raised['n']} ({100.0 * raised['n'] / max(n, 1):.2f}%)"
         f"  bar p50/p90/p99 where raised: {raised['q']}",
-        f"  2 of 3 months reach the bar: {df.filter('qual_bar').count()}"
+        f"  {MIN_MONTHS[w]} of {w} months reach the bar: {df.filter('qual_bar').count()}"
         f"  reach the flat floor: {df.filter('qual_flat').count()}",
-        f"  2 of 3 reach the bar but weakening fails: "
+        f"  {MIN_MONTHS[w]} of {w} reach the bar but weakening fails: "
         f"{df.filter(F.col('qual_bar') & ~F.col('weak_ok')).count()}"
         f"  (flat floor: {df.filter(F.col('qual_flat') & ~F.col('weak_ok')).count()})",
     ]
@@ -3783,7 +4133,7 @@ def build_cc_liquidity_anchor(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py`
-action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `e6df43db9dfcf19af5398b6300079a211b7bed4fcfe200694d9dcc35ec394fab` · new trailing newline: yes
+action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `4fdce8bd9e060f5d538c26ab9bd5e3fcbda5d833bd848015e731b219b9edc313` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3987,6 +4337,7 @@ def create_pipeline(
                     "wm_fea_salary_days_since_increment",
                     "stg_aecb_salary_history",
                     "prm_bureau_cif_bridge",
+                    "params:model_id",
                 ],
                 "crx_cc_a1_income_signals",
                 name="build_crx_cc_a1_income_signals",
@@ -3999,13 +4350,14 @@ def create_pipeline(
                     "wm_fea_casa_cc_inflow_outflow",
                     "wm_pri_labelled_transactions",
                     "raw_beneficiary_cards",
+                    "params:model_id",
                 ],
                 "crx_cc_a1_liquidity_signals",
                 name="build_crx_cc_a1_liquidity_signals",
             ),
             node(
                 build_internal_returns,
-                [_OBS, "prm_casa_return_events"],
+                [_OBS, "prm_casa_return_events", "params:model_id"],
                 "crx_cc_a1_internal_returns",
                 name="build_crx_cc_a1_internal_returns",
             ),
@@ -4014,6 +4366,7 @@ def create_pipeline(
                 {
                     "obs_base": _OBS,
                     "bureau_alert": "prm_bureau_alert_enriched",
+                    "model_id": "params:model_id",
                     "internal_returns": "crx_cc_a1_internal_returns",
                 },
                 "crx_cc_a1_distress_signals",
@@ -4033,6 +4386,7 @@ def create_pipeline(
                     "crx_cc_a1_liquidity_signals",
                     "crx_cc_a1_distress_signals",
                     "crx_cc_a1_liquidity_anchor",
+                    "params:model_id",
                     "params:crx_log_stats",
                 ],
                 output,
