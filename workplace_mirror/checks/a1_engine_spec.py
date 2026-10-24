@@ -156,7 +156,7 @@ out = build_a1_ability(
     ),
     build_distress_signals(
         obs,
-        df(rows["alert"], "cif_id long, bureau_pull_date date, bounced_cheque_amount double"),
+        df(rows["alert"], "cif_id long, extract_date date, bounced_cheque_amount double"),
         internal_returns=build_internal_returns(
             obs,
             df(rows["ret"], "cif_id long, tran_date date, reason_for_excluding string"),

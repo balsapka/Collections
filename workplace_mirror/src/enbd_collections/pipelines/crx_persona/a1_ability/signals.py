@@ -267,8 +267,8 @@ def build_distress_signals(
     """distress_flag: a cheque bounce or direct-debit (DDS) return in the last 3 months,
     from the bureau and from the bank's own records.
 
-    * ``bureau_alert`` — bureau-reported bounced cheques, dated by the bureau pull
-      date (the extract date repeats an old bounce in every later extract);
+    * ``bureau_alert`` — bureau-reported bounced cheques, dated by ``extract_date``
+      (the bureau pull date, not the bounce date: a bounce can repeat in later pulls);
     * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet;
     * ``internal_returns`` — the bank's own returned cheques / DDS returns as
       ``(cif_id, event_date)`` from ``build_internal_returns``.
@@ -276,11 +276,11 @@ def build_distress_signals(
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     require_columns(
         bureau_alert,
-        ["cif_id", "bureau_pull_date", "bounced_cheque_amount"],
+        ["cif_id", "extract_date", "bounced_cheque_amount"],
         "prm_bureau_alert_enriched",
     )
     events = bureau_alert.filter(F.col("bounced_cheque_amount") > 0).select(
-        "cif_id", F.to_date("bureau_pull_date").alias("event_date")
+        "cif_id", F.to_date("extract_date").alias("event_date")
     )
     if payment_order is not None:
         require_columns(
