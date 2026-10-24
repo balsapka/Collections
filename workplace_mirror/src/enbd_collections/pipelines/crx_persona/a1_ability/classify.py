@@ -18,7 +18,7 @@ from __future__ import annotations
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, left_join_all, log_distribution, window_months
+from .._common import GRAIN, left_join_all, log_latest_month, window_months
 from ..scoring_engine import StateLadder, points_from_level
 
 MIN_MONTHS = {3: 2, 6: 3}  # months of the window (by its length) that must qualify
@@ -105,9 +105,10 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
     distress: DataFrame,
     anchor: DataFrame,
     model_id: str,
-    log_stats: bool = False,
+    persona_end_date: str,
 ) -> DataFrame:
-    """One A1 state per observation-base row, over ``model_id``'s window.
+    """One A1 state per observation-base row, over ``model_id``'s window; logs the state
+    distribution of the month of ``persona_end_date`` (the latest observation month).
 
     ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
     """
@@ -146,5 +147,5 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
         F.col("liquidity_anchor_amt").cast("double"),
         F.current_date().alias("computed_at"),
     )
-    log_distribution(out, "a1_state", "a1_ability", log_stats)
+    log_latest_month(out, "a1_state", f"a1_ability [{model_id}]", persona_end_date)
     return out

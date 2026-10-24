@@ -31,6 +31,10 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   snapshots, card payments, CASA flows, bureau events), so older history is not shuffled.
   This cuts rows, not necessarily partitions (the WM tables load one `adv_load_date`
   snapshot with the full weekly history); internal returns prune on `event_month`.
+- **State log for the latest month only**, as on the deterioration axis: `build_a1_ability`
+  always logs the `a1_state` distribution of `persona_end_date`'s month
+  (`_common.log_latest_month`, one aggregate job, a warning if it fails). The
+  `crx_log_stats` parameter and `log_distribution` are gone.
 - **`build_distress_signals`** takes `internal_returns` as a required input (it is in PROD
   now); only `payment_order` stays optional.
 - **`a1_ability/README.md`**: the A1 logic in plain terms (sources, windows, the 2-of-3

@@ -95,7 +95,7 @@ def create_pipeline(
                     "crx_cc_a1_distress_signals",
                     "crx_cc_a1_liquidity_anchor",
                     "params:model_id",
-                    "params:crx_log_stats",
+                    "params:crx_persona.persona_end_date",
                 ],
                 output,
                 name="build_crx_cc_a1_ability",

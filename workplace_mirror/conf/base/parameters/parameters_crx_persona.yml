@@ -20,5 +20,3 @@ crx_persona: "${globals:crx_persona}"
 # segment-aware thresholds; same resolver pattern as crx_persona above.
 model_id: "${globals:model_id}"
 
-# Log state distributions (one extra Spark job per axis). Off in production runs.
-crx_log_stats: false

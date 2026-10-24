@@ -197,6 +197,7 @@ def run(model_id):
         ),
         build_cc_liquidity_anchor(o, df(rows["bal"], f"contract_id string, observation_date date, {bcols}"), model_id),
         model_id,
+        PERSONA["persona_end_date"],
     ).collect()
 
 

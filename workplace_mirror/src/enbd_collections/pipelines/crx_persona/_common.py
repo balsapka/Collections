@@ -10,7 +10,8 @@ up customer-level sources by ``cif_id``. The helpers here encode the conventions
   (``pit_latest``), window aggregates read the last N months (``window_agg``);
 * source partition floors follow from the earliest observation month
   (``lookback_floor``);
-* logging is opt-in and costs one job (``log_distribution``).
+* each axis logs its state distribution for the latest observation month only
+  (``log_latest_month``).
 """
 
 from __future__ import annotations
@@ -137,13 +138,24 @@ def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
     return result
 
 
-def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
-    """Log the value distribution of ``col`` (one job) when ``enabled``."""
-    if not enabled:
+def log_latest_month(df: DataFrame, col: str, name: str, persona_end_date: str) -> None:
+    """Log the ``col`` distribution of the latest observation month — the month of
+    ``persona_end_date`` (one aggregate job; the month filter pushes down). A logging
+    failure is a warning, never a failed run."""
+    month = F.trunc(F.lit(str(persona_end_date)), "month")
+    try:
+        rows = (
+            df.filter(F.trunc("observation_date", "month") == month)
+            .groupBy(col)
+            .count()
+            .orderBy(col)
+            .collect()
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        LOG.warning("%s: %s distribution not logged: %s", name, col, exc)
         return
-    rows = df.groupBy(col).count().orderBy(col).collect()
     total = sum(r["count"] for r in rows)
-    LOG.info("%s — %s distribution (n=%d)", name, col, total)
+    LOG.info("%s — %s, month of %s (n=%d)", name, col, persona_end_date, total)
     for r in rows:
         LOG.info(
             "  %-28s %9d  (%5.1f%%)",
