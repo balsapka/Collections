@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..c8e4ed3` · source: 8 added, 9 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..e63a8f9` · source: 8 added, 9 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -135,8 +135,10 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   the bounce date is under investigation).
 - **Income**: the WM-recovered salary is the only internal salary source.
 - **Source floors**: every A1 signal builder filters its sources from the earliest
-  observation's first window month on, before any aggregation (salary and CASA snapshots,
-  card payments, CASA flows, bureau events), so older history is never shuffled.
+  observation's first window month on, before any join or aggregation (salary and CASA
+  snapshots, card payments, CASA flows, bureau events), so older history is not shuffled.
+  This cuts rows, not necessarily partitions (the WM tables load one `adv_load_date`
+  snapshot with the full weekly history); internal returns prune on `event_month`.
 - **`build_distress_signals`** takes `internal_returns` as a required input (it is in PROD
   now); only `payment_order` stays optional.
 - **`a1_ability/README.md`**: the A1 logic in plain terms (sources, windows, the 2-of-3
@@ -3143,7 +3145,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py`
-action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `22660a59a22772ea23c89cde38d1ec69939005041522a4ffdbc0e411e559ed4a` · new trailing newline: yes
+action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `5d831447c71f8f1845efb6ecc1d4714200168074fddbc3aa10150ef12b1811c8` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3835,21 +3837,22 @@ def build_internal_returns(
     """
     require_columns(
         return_events,
-        ["cif_id", "tran_date", "reason_for_excluding"],
+        ["cif_id", "tran_date", "reason_for_excluding", "event_month"],
         "prm_casa_return_events",
     )
     since = lookback_floor(obs_base, window_months(model_id))
-    first = return_events.agg(F.min(F.trunc("tran_date", "month"))).first()[0]
-    if first is None or first.isoformat() > since:
+    first = return_events.agg(F.min("event_month")).first()[0]  # partition column
+    if first is None or first > since:
         raise ValueError(
             f"prm_casa_return_events starts at {first}, but the observations need returns "
             f"from {since}: rerun casa_primary after changing "
             "crx_persona.persona_start_date"
         )
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
+    # since is a month start, so event_month >= since is tran_date >= since, and prunes
     return (
         return_events.filter(
-            (F.col("tran_date") >= F.lit(since))
+            (F.col("event_month") >= F.lit(since))
             & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
         )
         .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
