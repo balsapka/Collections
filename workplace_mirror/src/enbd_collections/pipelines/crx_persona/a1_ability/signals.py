@@ -343,21 +343,22 @@ def build_internal_returns(
     """
     require_columns(
         return_events,
-        ["cif_id", "tran_date", "reason_for_excluding"],
+        ["cif_id", "tran_date", "reason_for_excluding", "event_month"],
         "prm_casa_return_events",
     )
     since = lookback_floor(obs_base, window_months(model_id))
-    first = return_events.agg(F.min(F.trunc("tran_date", "month"))).first()[0]
-    if first is None or first.isoformat() > since:
+    first = return_events.agg(F.min("event_month")).first()[0]  # partition column
+    if first is None or first > since:
         raise ValueError(
             f"prm_casa_return_events starts at {first}, but the observations need returns "
             f"from {since}: rerun casa_primary after changing "
             "crx_persona.persona_start_date"
         )
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
+    # since is a month start, so event_month >= since is tran_date >= since, and prunes
     return (
         return_events.filter(
-            (F.col("tran_date") >= F.lit(since))
+            (F.col("event_month") >= F.lit(since))
             & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
         )
         .join(F.broadcast(cifs), on="cif_id", how="leftsemi")

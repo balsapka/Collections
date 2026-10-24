@@ -149,6 +149,13 @@ df = spark.createDataFrame
 # a return outside the obs CIFs in the 180+ window's first month: the returns table covers
 # every window (build_internal_returns checks that)
 COVER = [(-1, m(6), "CHARGES")]
+ret_schema = "cif_id long, tran_date date, reason_for_excluding string"
+
+
+def returns(r):
+    """prm_casa_return_events rows, with its event_month partition column."""
+    return df(r, ret_schema).withColumn(
+        "event_month", F.date_format(F.trunc("tran_date", "month"), "yyyy-MM-dd"))
 PERSONA = {"persona_start_date": "2026-07-01", "persona_end_date": "2026-07-31"}
 spine_schema = "contract_id string, observation_date date, cif_id long"
 obs = _common.build_cc_obs_base(df(rows["spine"], spine_schema), PERSONA)
@@ -184,7 +191,7 @@ def run(model_id):
             model_id=model_id,
             internal_returns=build_internal_returns(
                 o,
-                df(rows["ret"] + COVER, "cif_id long, tran_date date, reason_for_excluding string"),
+                returns(rows["ret"] + COVER),
                 model_id,
             ),
         ),
@@ -213,12 +220,11 @@ stale = [("A0", date(2026, 6, 30), *[100.0] * 8)]
 assert build_cc_liquidity_anchor(obs, df(stale, f"contract_id string, observation_date date, {bcols}"),
                                  "cc_60_180").count() == 0
 # the debit and credit legs of one return count once
-ret_schema = "cif_id long, tran_date date, reason_for_excluding string"
-assert (build_internal_returns(obs, df(rows["ret"] * 2 + COVER, ret_schema), "cc_60_180").count()
-        == build_internal_returns(obs, df(rows["ret"] + COVER, ret_schema), "cc_60_180").count() == 2)
+assert (build_internal_returns(obs, returns(rows["ret"] * 2 + COVER), "cc_60_180").count()
+        == build_internal_returns(obs, returns(rows["ret"] + COVER), "cc_60_180").count() == 2)
 # a returns table that starts after the first observation window stops the run
 try:
-    build_internal_returns(obs, df(rows["ret"], ret_schema), "cc_180_plus")
+    build_internal_returns(obs, returns(rows["ret"]), "cc_180_plus")
     raise AssertionError("returns coverage guard did not fire")
 except ValueError as e:
     assert "persona_start_date" in str(e)

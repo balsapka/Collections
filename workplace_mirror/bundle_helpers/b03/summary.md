@@ -27,8 +27,10 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   the bounce date is under investigation).
 - **Income**: the WM-recovered salary is the only internal salary source.
 - **Source floors**: every A1 signal builder filters its sources from the earliest
-  observation's first window month on, before any aggregation (salary and CASA snapshots,
-  card payments, CASA flows, bureau events), so older history is never shuffled.
+  observation's first window month on, before any join or aggregation (salary and CASA
+  snapshots, card payments, CASA flows, bureau events), so older history is not shuffled.
+  This cuts rows, not necessarily partitions (the WM tables load one `adv_load_date`
+  snapshot with the full weekly history); internal returns prune on `event_month`.
 - **`build_distress_signals`** takes `internal_returns` as a required input (it is in PROD
   now); only `payment_order` stays optional.
 - **`a1_ability/README.md`**: the A1 logic in plain terms (sources, windows, the 2-of-3
