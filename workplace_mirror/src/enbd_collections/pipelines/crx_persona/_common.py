@@ -162,7 +162,19 @@ def _obs_base(spine: DataFrame, id_col: str) -> DataFrame:
 
 
 def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
-    return _obs_base(cc_spine, "contract_id")
+    """The CC observation base at month ends. Until ``cc_spine`` itself is month-end, each
+    billing-date row moves to its month end; an account's rows in one month become one
+    (the largest ``cif_id`` if they disagree). Remove the shift once the spine is month-end.
+    """
+    month_end = cc_spine.select(
+        "contract_id",
+        F.last_day(F.col("observation_date").cast("date")).alias("observation_date"),
+        "cif_id",
+    )
+    collapsed = month_end.groupBy("contract_id", "observation_date").agg(
+        F.max("cif_id").alias("cif_id")
+    )
+    return _obs_base(collapsed, "contract_id")
 
 
 def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:

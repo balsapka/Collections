@@ -26,10 +26,10 @@ A. Write tmp_validation/a1_v02/a1_v02_snippet.py and a README.md.
    column; one JSON at context.project_path / "tmp_validation/a1_v02/results_<model_id>.json";
    commit and push only tmp_validation/a1_v02/.
    Datasets: crx_cc_obs_base, prm_casa_return_events, wm_fea_casa_eod_avg_balance,
-   crx_cc_a1_ability_b01_check (or the bundle 03 check output).
+   crx_cc_a1_ability_v2.
 
    Tables (DDS = reason "DDS Rejects/Reversal", debit legs only unless stated; obs-base CIFs,
-   last 100 days before the latest observation date):
+   the 3 months up to the latest observation date, a month end):
    u1_amounts (G1/G2)   per CIF: distinct debit amounts, share of debits on the CIF's most
                         common amount, debits per active week. Give p10/p50/p90 of each,
                         and the count of CIFs per band of the "most common amount" share
@@ -40,7 +40,7 @@ A. Write tmp_validation/a1_v02/a1_v02_snippet.py and a README.md.
                         (wm_fea_casa_eod_avg_balance) divided by the debit amount, in bands
                         (null, <0.5, 0.5-1, 1-2, 2+). Count legs per band.
    u4_population (G2)   the share of all CIFs in prm_casa_return_events with any DDS row in
-                        the last 100 days, vs that share among the obs-base CIFs.
+                        those 3 months, vs that share among the obs-base CIFs.
 
 B. Analysis (only when I give you results_cc_60_180.json): for G1-G2 give a verdict
    (CONFIRMED / REJECTED / INCONCLUSIVE), the 3-6 numbers that decide it, and one line on what

@@ -11,7 +11,8 @@ log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (eviden
 ## Ground rules
 
 - **Grain:** one row per `(account_id, observation_date)` from the observation base.
-  Observation dates are **month ends**.
+  Observation dates are **month ends** (CC: until `cc_spine` itself is month-end, the
+  observation base moves each billing-date row to its month end).
 - **Windows are calendar months.** m1 = the observation month, m2 and m3 the two before it:
   "the last 3 months" = m1–m3. "The prior 3 months" = m4–m6 (used to spot a decline).
 - **Customer level.** Salary, CASA, card payments, bounces and returns are read across
