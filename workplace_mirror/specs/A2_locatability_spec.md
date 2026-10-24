@@ -1,10 +1,9 @@
-# A2 — Locatability: methodology (month-end, no T0)
+# A2 — Locatability: methodology
 
-Rewritten 2026-10-24 for bundle 04. It follows the A1 architecture (bundle 03): month-end
+Signed off with the user 2026-10-24 (decisions in §8), for presentation to GRR; details may
+still change after that review. Follows the A1 architecture (bundle 03): month-end
 observation dates, calendar-month windows that include the observation month, no spell / T0.
-The workplace code (`cc_a2_locatability`, `rl_a2_locatability`, the departure signatures) is
-the starting point; §9 lists what changes against it. Items marked **[Qn]** are open
-questions (§10) — the rule shown is the proposal, not yet a decision.
+§9 lists what changes against the workplace code; §10 the data checks still open.
 
 ---
 
@@ -19,174 +18,190 @@ can we reach them?
 └─ no  → why not?  → chase / field visit / agency / write off   (locatability)
 ```
 
-Two independent dimensions (GRR workbook *Axes and States for UC2 — Cards 61-180*, sheet
-"A1, A2, A4"):
+Two independent dimensions plus one override:
 
-- **Location** — where the customer is, from what they *do*: logins, transactions, a
+- **Location** — where the customer is, from what they *do* (logins, spending) and from a
   collector's note that they left the country.
-- **Reachability** — whether calls get through, from DCORE contact outcomes.
+- **Reachability** — whether our calls get through (DCORE contact outcomes).
+- **Deceased** — overrides both.
 
-A location signal never decides reachability and a call outcome never decides location,
-with one exception: a collector recording "left the country" is a location fact. Deceased
-sits above both. One engine serves CC and RL; only the upstream sources differ.
+Both dimensions follow one principle: **the latest evidence wins**. Location never reads a
+call outcome (except the collector's departure note) and reachability never reads location.
 
 ---
 
 ## 2. Population and conventions
 
-- **Grain:** one row per `(account_id, observation_date)` of the obs base
-  (`crx_cc_obs_base`, `crx_rl_obs_base`): month-end dates, persona months only
-  (`crx_persona.persona_start_date` .. `persona_end_date`; in PROD the latest inference
-  month). Every row gets a state; rows without a `cif_id` are kept (customer signals absent).
-- **Window `W`:** `_common.window_months(model_id)` — **3 calendar months at 60–180, 6 at
-  180+**, the observation month and the months before it, up to and including the
-  observation date. Every A2 lookback uses `W` unless stated otherwise.
-- **Customer-level sources** (logins, CASA, demographics) join on `cif_id`.
-- **DCORE scope:** DCORE only holds an account once it is in collections, so its history
-  *is* the collections episode. All events of the account's agreement up to and including
-  the observation date count; no T0 / collections-entry filter **[Q1]**.
-- **Result names** are matched upper-cased and trimmed against the fixed lists in
-  `constants.py`: right-party contact (83), ringing (2), dead line (18), departure (3),
-  deceased (5); refusing / promise to pay / hardship / field visit are carried as flags only.
-- **Call codes:** outbound `OC`, `CB`; inbound `IC`. Administrative notes (`IA`) are never an
-  attempt or a contact.
+- **Grain:** one row per `(account_id, observation_date)` of the observation base
+  (`crx_cc_obs_base`, `crx_rl_obs_base`): month-end dates, persona months only (in PROD the
+  latest inference month). Every row gets a state.
+- **Window `W`:** 3 calendar months at 60–180 DPD, 6 at 180+ — the observation month and the
+  months before it (`_common.window_months`), as on every axis.
+- **Customer level:** location evidence is read across **all accounts of the customer**
+  (`cif_id`): every card and every CASA account, not only the scored account.
+- **DCORE:** DCORE holds an account only while it is in collections, so its history is the
+  collections history. All events up to and including the observation date count; no T0.
+- **Call codes:** outbound `OC`, `CB`; inbound `IC`. Administrative notes (`IA`) never count.
 
 ---
 
-## 3. Location signals
+## 3. Location
 
-| Signal | Definition | Source |
-|---|---|---|
-| `in_country_flag` | the latest login on or before the observation date is in `W` and from the UAE | `prm_digital_login_monthly` (CIF) |
-| `foreign_login_flag` | the latest login on or before the observation date is in `W` and from abroad **[Q4]** | same row |
-| `dcore_departure_flag` | a collector recorded a departure result (left the country, out of country, final exit visa) up to the observation date | DCORE |
-| `travel_flag` | a travel purchase (MCC 3000–3299, 4411, 4511, 4722, or an airline / airport keyword) in the window **[Q2]** | CC: card transactions; RL: CASA debits (CIF) |
-| `last_txn_foreign_flag` | the latest transaction on or before the observation date, within **[Q2]**, was foreign | CC: card transactions; RL: cross-border outflow (FX leakage) |
-| ~~`casa_inflow_stop_gap_d > 180`~~ | proposed **dropped** from location **[Q3]** | — |
+### Evidence
 
-`departure_trail_flag` = any of `foreign_login_flag`, `dcore_departure_flag`, `travel_flag`,
-`last_txn_foreign_flag`.
+| Evidence | Domestic | Foreign | Age limit |
+|---|---|---|---|
+| Login (digital banking) | from the UAE | from abroad | none |
+| Card and CASA spending (all the customer's accounts) | in the UAE, not a travel purchase | abroad | none |
+| Travel purchase (airline, cruise, travel agency) | — | counts as foreign | last 12 months |
+| Collector's note: left the country / out of country / final exit visa | — | foreign, on the note's date | none |
 
-## 4. Reachability signals
+### States
 
-All over DCORE events up to and including the observation date (§2).
+```
+latest foreign  = date of the latest foreign evidence (on or before the observation date)
+latest domestic = date of the latest domestic evidence
 
-| Signal | Definition |
+Skip        latest foreign is later than latest domestic (or there is no domestic evidence)
+In Country  latest domestic is the latest evidence (a tie counts as domestic)
+            AND it falls in W
+Unknown     no evidence, or the latest evidence is domestic but older than W
+```
+
+A trip followed by domestic activity means the customer came back: In Country. A foreign
+latest evidence stays Skip however old it is — accounts sit in collections for years.
+
+`location_unknown_reason`: `no_evidence` · `domestic_before_window`.
+
+---
+
+## 4. Reachability
+
+### Evidence (DCORE, up to the observation date)
+
+| Term | Meaning |
 |---|---|
-| `contact_attempts_n` | distinct dates with an outbound call (`OC` / `CB`) |
-| `last_call_dt` | the latest call event (`OC` / `CB` / `IC`); "fresh" = in `W` |
-| confirmed event | an outbound call with category `SUC`, a right-party result name on any event, or an inbound call |
-| `contact_confirmed_flag` | a confirmed event in `W` **[Q5]** |
-| failed attempt date | an outbound attempt date whose every outbound event is ringing or dead line, with no confirmed event that day |
-| `gone_dark_flag` | the last 3 outbound attempt dates are all failed and the oldest of them is in `W` **[Q5]** |
-| `last_attempt_confirmed_flag` | the latest call date has a confirmed event |
+| confirmed contact | an inbound call, an outbound call with category `SUC`, or a right-party result name on any event |
+| attempt date | a date with at least one outbound call |
+| failed attempt date | an attempt date where every outbound call was ringing / no answer or a dead line, and no contact was confirmed that day |
 
-Diagnostics kept (never change the state): `ringing_dates_n`, `dead_dates_n`, counts behind
-each flag, `ptp_flag`, `hardship_flag`, `refusing_n`, `field_visit_flag`.
+### States
+
+```
+Non-Reachable  the last 3 attempt dates all failed, the oldest of them is in W,
+               and no contact was confirmed after the oldest of them        ("gone dark")
+Reachable      a contact was confirmed in W
+Unknown        otherwise
+```
+
+Non-Reachable is checked first: a fresh run of failed calls outweighs an earlier answered
+call. A customer who only calls in is Reachable without any outbound attempt; the minimum of
+3 attempt dates guards Non-Reachable only.
+
+`reachability_unknown_reason`: `no_dcore_record` · `no_contact_in_window` (calls exist but
+neither rule fires).
 
 ---
 
-## 5. The states
+## 5. Deceased
 
-Asked **in order**; the first "yes" decides.
+`deceased_flag` = any of, at any age up to the observation date:
 
-```
-D   Deceased?        deceased_flag (§6)                                    -> Deceased
+- a DCORE deceased result (DECEASED, DECEASED CLAIMED, DECEASED OR EXPIRED, …) — a relative's
+  claim counts until disproved;
+- CC only: Way4 block code `D` on the latest contract snapshot;
+- `ft_deceased_flag` on the customer's latest demographics row.
 
-Location  (independent of reachability)
-L1  Skip?            departure_trail_flag AND NOT in_country_flag          -> Skip
-L2  In country?      in_country_flag                                       -> In Country
-L3  otherwise                                                              -> Unknown
+`deceased_source` names which source(s) fired.
 
-Reachability
-R0  Evidence?        no fresh call (last_call_dt not in W), or fewer than 3 outbound
-                     attempt dates and no confirmed event in W [Q6]        -> Unknown
-R1  Gone dark?       gone_dark_flag                                        -> Non-Reachable
-R2  Reached?         contact_confirmed_flag                                -> Reachable
-R3  otherwise                                                              -> Unknown
+---
 
-a2_state = "Deceased", or "<location> - <reachability>"
-```
+## 6. Output
 
-`location_state` and `reachability_state` are separate columns (computed for deceased rows
-too). 3 × 3 + 1 = **10 states**; `a2_state_label` carries display names as on A1 / A4.
+| Column | Values |
+|---|---|
+| `location_state` | `skip` · `in_country` · `unknown` |
+| `reachability_state` | `reachable` · `non_reachable` · `unknown` |
+| `deceased_flag` | 0 / 1 |
+| `a2_state` | `deceased`, else `<location>__<reachability>` (10 values) |
+| `a2_state_label` | display name: Deceased · Skip – Non-Reachable · … |
+| diagnostics | latest domestic / foreign evidence dates and source, travel purchase date, last confirmed contact date, last attempt date, attempt dates in W, unknown reasons, `deceased_source` |
+
+The two dimensions are computed for every row, deceased rows included, so either can be used
+alone. Labels follow A1 / A4 (`*_state` lower-case, `*_label` for display).
 
 | Location \ Reachability | Reachable | Non-Reachable | Unknown |
 |---|---|---|---|
 | **In Country** | negotiate | in the UAE but dodging or wrong number: skip-trace the number, field visit | keep calling |
 | **Skip** | abroad but answering: remote settlement, international payment route | left and unreachable: agency / international recovery, legal | signs of leaving, no call evidence: verify departure |
 | **Unknown** | answering, location not evidenced: negotiate, ask | not answering, no location evidence: skip-trace both | data gap — treat on other axes |
-| **Deceased** | — | — | estate / insurance process |
-
-Diagnostic columns: `location_unknown_reason` (no login on record / login older than `W` /
-other), `reachability_unknown_reason` (no DCORE record / no fresh call / too few attempts /
-no pattern).
-
----
-
-## 6. Deceased
-
-`deceased_flag` = any of:
-
-- DCORE: a deceased result name (DECEASED, DECEASED CLAIMED, …) up to the observation date
-  **[Q7]**;
-- Way4 (CC only): block code `D` on `block_code_1` / `block_code_2`, latest contract
-  snapshot in the observation month (`pit_latest`, not an exact-date join);
-- demographics: `ft_deceased_flag = 1` on the latest `feat_demographics_cif` row on or
-  before the observation date (one row per CIF).
+| **Deceased** | estate / insurance process | | |
 
 ---
 
 ## 7. Thresholds
 
-| Threshold | Value | Note |
-|---|---|---|
-| Window `W` | 3 months (60–180), 6 months (180+) | replaces the 90 / 180-day `tau_recent` and `tau_label` |
-| Minimum outbound attempt dates | 3 | flat across segments |
-| Gone dark | last 3 attempt dates all failed | replaces the 2-date dead-line rule and the 3-ringing override **[Q5]** |
-
----
-
-## 8. CC vs RL
-
-| | CC | RL |
-|---|---|---|
-| Base | `crx_cc_obs_base` | `crx_rl_obs_base` |
-| Travel / foreign transaction | card transactions | CASA debits; cross-border outflow |
-| Way4 deceased | yes | — (no equivalent) |
-| DCORE | same rules; RL keeps a partition floor `persona_start − 24 months` (performance) | |
-
----
-
-## 9. What changes against the current code
-
-| Today | Bundle 04 |
+| Threshold | Value |
 |---|---|
-| spine + spell table + departure signature (T0) | obs base; departure-trail columns from a lean shared builder |
-| CC mid-month dates; login month `< trunc(obs)` | month ends; latest login `<= observation_date` |
-| DCORE window `[t0, observation_date)` | all agreement events `<= observation_date` |
-| recency 90 / 180 days | `W` = 3 / 6 calendar months |
-| travel: 3 months before the card block (`t0 + days_to_dpd60`) | **[Q2]** |
-| departure salary stop > 180 days (own raw-regex salary) | dropped **[Q3]** |
-| foreign login: latest ever | latest, in `W` **[Q4]** |
-| `gone_contact_flag`: any dead / ringing event in the last 2 dates (O45) | every event failed on the last 3 dates **[Q5]** |
-| confirmed contact: any since T0, outranks a dead line (O46) | in `W`; gone dark outranks it **[Q5]** |
-| recent avoidance: 3 ringing *events* (O17) | dates, not events |
-| Way4 exact-date join (O15), demographics without PIT (O16) | `pit_latest` |
-| `rpc_rate`, `uns_rate`, `spell_id` | dropped (unused / spell) |
+| Window `W` (domestic evidence, confirmed contact, gone-dark recency) | 3 months (60–180), 6 months (180+) |
+| Travel purchase lookback | 12 months |
+| Gone dark | last 3 attempt dates all failed |
+
+Starting values; tuned on the PROD distribution (the unknown reasons show what each moves).
 
 ---
 
-## 10. Open questions (user decides)
+## 8. Decisions (user, 2026-10-24)
 
-| # | Question | Proposal |
-|---|---|---|
-| Q1 | DCORE scope without T0: does an account keep the same `agreement_id` across collections episodes (cure, then re-entry)? If yes, events of an earlier episode count. | All events `<= observation_date`; Sonnet facts check how many accounts have events before their current episode |
-| Q2 | Travel and foreign-transaction window. Cards are blocked from ~60 DPD, so `W` before the observation date holds almost no card transactions. | Look back 12 calendar months before the observation month, any travel purchase; the latest transaction within those 12 months for "foreign" |
-| Q3 | Salary stop as departure. A salary that stopped is job loss as often as departure, it uses a second salary definition (raw regex vs A1's WM salary) and it duplicates A1. | Drop it from the trail |
-| Q4 | Stale foreign login. Today the latest login ever counts, so one foreign login years ago marks a trail for good. | Only a login in `W` counts; an older foreign login is diagnostics only |
-| Q5 | Reachability rules. Today `gone_contact_flag` fires on *any* dead / ringing event in the last 2 dates (O45); a confirmed contact any time since T0 keeps an account Reachable while every later call hits a dead line (O46); only *ringing* can override it. | One "gone dark" rule (last 3 attempt dates all failed — ringing or dead, oldest in `W`) above "confirmed contact in `W`" |
-| Q6 | Inbound-only customers: someone who only calls in is Unknown until 3 outbound attempts exist. | A confirmed event in `W` skips the 3-attempt minimum |
-| Q7 | "DECEASED CLAIMED" (a relative's claim, unverified) counts as deceased. | Keep (collections treat it as deceased until disproved), or split out a `deceased_claimed` flag |
-| Q8 | In-country evidence is logins only (11.5% of cc_180_plus log in). Domestic CASA activity (ATM / POS in the UAE, CIF level) would add evidence. | Add it if an existing prm / feat dataset carries the country of CASA debits; otherwise leave for later |
-| Q9 | `dcore_observation_spine` and `prm_contract` are joined on `(account_id, observation_date)`; after the move to month ends these dates may not match (O49). | Map account → agreement without the date (or by month); Sonnet facts check the keys |
+| # | Decision |
+|---|---|
+| D-A2-1 | Two independent dimensions + deceased; the latest evidence wins on both. |
+| D-A2-2 | Location evidence is customer level: logins, card and CASA spending on all the customer's accounts. A dedicated location data layer is built from transactions (§10). |
+| D-A2-3 | Latest evidence foreign → Skip at any age; latest domestic → In Country only within `W`. |
+| D-A2-4 | Travel purchase in the last 12 months = foreign evidence; later domestic activity overrides it. Foreign spend counts only as the latest evidence (no share rule). |
+| D-A2-5 | A collector's departure note is foreign evidence on its date; later domestic activity overrides it. |
+| D-A2-6 | Salary stop is not location evidence (it stays an A1 signal). |
+| D-A2-7 | Non-Reachable = last 3 attempt dates failed (ringing or dead line), oldest in `W`, no contact since; Reachable = confirmed contact in `W`; the 3-attempt minimum guards Non-Reachable only. |
+| D-A2-8 | DCORE: all history up to the observation date, no T0 (verified in PROD, §10). |
+| D-A2-9 | Deceased: DCORE note (claims included), Way4 `D`, demographics — any age. |
+| D-A2-10 | Routing flags (promise to pay, hardship, refusing, field visit) leave A2. |
+| D-A2-11 | Output: both dimension columns, `deceased_flag`, and the combined `a2_state` with labels. |
+
+---
+
+## 9. What changes against the workplace code
+
+| Today | New |
+|---|---|
+| spine + spell table + departure signature (T0, 12 passes) | obs base + location feature + DCORE |
+| departure trail = any of travel / last card txn foreign / foreign login / salary stop / DCORE note; UAE login in 90/180 days beats it | latest evidence wins (§3) |
+| travel: 3 months before the card block, scored account only (CC) / raw CASA debits (RL) | 12 months, all the customer's accounts, from the location data layer |
+| login months `< trunc(obs)` (CC) / `<=` (RL) | evidence dated on or before the observation date |
+| DCORE window `[t0, observation_date)` | all events up to the observation date |
+| Reachable: any confirmed contact since T0; overridden only by 3 ringing events (O17, O46) | confirmed contact in `W`; gone dark (ringing or dead) checked first |
+| dead-line rule: *any* failed event in the last 2 dates (O45) | *every* call failed on each of the last 3 dates |
+| 3 outbound attempts needed for any reachability state | only for Non-Reachable |
+| Way4 exact-date join (O15), demographics without PIT (O16), `cif_id` re-attach (O13) | latest snapshot on or before the observation date; obs base |
+| routing flags, `rpc_rate`, `uns_rate`, `spell_id` (O52) | dropped |
+
+---
+
+## 10. Open data checks (workplace Sonnet, before the bundle)
+
+1. **Existing location datasets.** WM and retail.feature_space carry travel / foreign-spend
+   features that an earlier check found unfit; re-check them (`feat_cc_txns_rfs` travel &
+   tours, `feat_fx_leakage` cross-border outflow, WM equivalents): grain, coverage of our
+   customers, whether they flag foreign *location* (not only FX currency) and carry dates.
+2. **Location data layer**, if they don't fit: a primary `prm_customer_location_events`
+   (one row per login / card / CASA transaction carrying a country or travel MCC: `cif_id`,
+   event date, source, domestic / foreign, travel purchase) and a feature table per
+   `cif_id` × month end (latest domestic date, latest foreign date + source, latest travel
+   purchase date). Needs the country / international columns of the card and CASA
+   transaction tables.
+3. **DCORE keys** (O14, O49): columns and date grain of `dcore_observation_spine`
+   (`account_id` or `contract_id`; billing or month-end dates); whether `agreement_id`
+   changes between collections episodes (D-A2-8).
+4. **Way4 / demographics grain** (O15, O16): `prm_contract` snapshot dates; rows per CIF in
+   `feat_demographics_cif` and its date column.
+5. **Login dates** (O50): `month_number` format and whether `last_login_date` is the actual
+   login day.
