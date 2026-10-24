@@ -1,17 +1,35 @@
 """TEMPORARY (mirror bundle 03): old vs new CC A1 states, run in PROD.
 
-``compare_a1_outputs`` logs the ``B03 OUTPUT`` block (aggregates only): the bundle 02
-engine output (``crx_cc_a1_ability_b01_check``, billing-date observations) against the
-new month-end output (``crx_cc_a1_ability_b03_check``). An old row is matched to the new
-row of the same account and month (the month's latest old observation).
+Two log blocks, aggregates only:
+
+* ``compare_a1_outputs`` (``B03 OUTPUT``): the bundle 02 engine output
+  (``crx_cc_a1_ability_b01_check``, billing-date observations) against the new month-end
+  output (``crx_cc_a1_ability_b03_check``). An old row is matched to the new row of the
+  same account and month (the month's latest old observation).
+* ``compare_income_rules`` (``B03 INCOME``): what the 2 × anchor income bar and the
+  income-weakening check do, against a flat AED 3,000 floor and no weakening check.
 
 Removed by the bundle's cleanup.
 """
 
 import logging
 
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
+
+from ..a1_ability.classify import (
+    _LADDER,
+    _LAST3,
+    D_INC,
+    DEMIN,
+    F_INC,
+    K_INC,
+    N3,
+    _count_at_least,
+    _months,
+    _not_weakening,
+)
+from ..scoring_engine import points_from_level
 
 LOG = logging.getLogger(__name__)
 
@@ -64,8 +82,87 @@ def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
         "  old state x new state:",
         *_crosstab(both, "old_state", "new_state"),
     ]
-    LOG.info(
-        "\n%s",
-        "\n".join(["=== B03 OUTPUT START ===", *lines, "=== B03 OUTPUT END ==="]),
-    )
+    _log("OUTPUT", lines)
     both.unpersist()
+
+
+def _log(name: str, lines: list[str]) -> None:
+    block = [f"=== B03 {name} START ===", *lines, f"=== B03 {name} END ==="]
+    LOG.info("\n%s", "\n".join(block))
+
+
+def _income_level(floor: Column, weakening: bool) -> Column:
+    """classify.income_level with the threshold and the weakening check as inputs."""
+    last3 = _months("income", _LAST3)
+    stable = _count_at_least(last3, floor) >= N3
+    if weakening:
+        stable = stable & _not_weakening("income", D_INC, True)
+    weak = _count_at_least(last3, F.lit(DEMIN)) > 0
+    return F.when(stable, "stable").when(weak, "weak").otherwise("none")
+
+
+def _state(income_level: str) -> Column:
+    """The A1 state with ``income_level`` in place of the engine's income level (the
+    unknown gate only holds while the points stay 0)."""
+    points = points_from_level(
+        F.col(income_level), {"stable": 2, "weak": 1}
+    ) + points_from_level(F.col("a1_liquidity_level"), {"adequate": 2, "weak": 1})
+    unknown = (F.col("a1_state") == _LADDER.unknown) & (points == 0)
+    return _LADDER.state(points, F.col("a1_distress_flag") == 1, unknown)
+
+
+def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> None:
+    """How often 2 × anchor raises the income bar above the flat floor, how often the
+    weakening check fires, and the levels and states without each of them."""
+    anchor = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))
+    bar = F.greatest(F.lit(F_INC), K_INC * anchor)
+    flat = F.lit(F_INC)
+    df = (
+        a1.join(income, ["account_id", "observation_date"])
+        .withColumn("bar", bar)
+        .withColumn("raised", bar > flat)
+        .withColumn("lvl_engine", _income_level(bar, True))
+        .withColumn("lvl_flat", _income_level(flat, True))
+        .withColumn("lvl_no_weak", _income_level(bar, False))
+        .withColumn("lvl_flat_no_weak", _income_level(flat, False))
+        .withColumn("qual_bar", _count_at_least(_months("income", _LAST3), bar) >= N3)
+        .withColumn("qual_flat", _count_at_least(_months("income", _LAST3), flat) >= N3)
+        .withColumn("weak_ok", _not_weakening("income", D_INC, True))
+        .withColumn("st_flat", _state("lvl_flat"))
+        .withColumn("st_no_weak", _state("lvl_no_weak"))
+        .withColumn("st_flat_no_weak", _state("lvl_flat_no_weak"))
+        .cache()
+    )
+    n = df.count()
+    raised = (
+        df.filter("raised")
+        .agg(
+            F.count("*").alias("n"),
+            F.expr("percentile_approx(bar, array(0.5, 0.9, 0.99))").alias("q"),
+        )
+        .first()
+    )
+    mismatch = df.filter(F.col("lvl_engine") != F.col("a1_income_level")).count()
+    lines = [
+        f"model_id={model_id} rows={n} engine-level mismatches={mismatch} (must be 0)",
+        f"  bar raised above {F_INC:.0f}: {raised['n']} ({100.0 * raised['n'] / max(n, 1):.2f}%)"
+        f"  bar p50/p90/p99 where raised: {raised['q']}",
+        f"  2 of 3 months reach the bar: {df.filter('qual_bar').count()}"
+        f"  reach the flat floor: {df.filter('qual_flat').count()}",
+        f"  2 of 3 reach the bar but weakening fails: "
+        f"{df.filter(F.col('qual_bar') & ~F.col('weak_ok')).count()}"
+        f"  (flat floor: {df.filter(F.col('qual_flat') & ~F.col('weak_ok')).count()})",
+    ]
+    for name, lvl, st in [
+        ("flat floor", "lvl_flat", "st_flat"),
+        ("no weakening check", "lvl_no_weak", "st_no_weak"),
+        ("flat floor + no weakening check", "lvl_flat_no_weak", "st_flat_no_weak"),
+    ]:
+        lines += [
+            f"  -- {name}: income level engine x variant",
+            *_crosstab(df, "a1_income_level", lvl),
+            f"  -- {name}: state engine x variant",
+            *_crosstab(df, "a1_state", st),
+        ]
+    _log("INCOME", lines)
+    df.unpersist()

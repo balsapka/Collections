@@ -26,7 +26,7 @@ from ..a1_ability import (
     build_liquidity_signals,
 )
 from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
-from .b03_check import compare_a1_outputs
+from .b03_check import compare_a1_outputs, compare_income_rules
 from .nodes import build_cc_liquidity_anchor
 
 _OBS = "crx_cc_obs_base"
@@ -103,7 +103,7 @@ def create_pipeline(
 
 def create_b03_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     """TEMPORARY: observation base + the A1 pipeline writing to
-    crx_cc_a1_ability_b03_check + the log-only comparison node.
+    crx_cc_a1_ability_b03_check + the log-only comparison nodes.
     Remove with b03_check.py and the catalog entries."""
     return (
         create_cc_obs_pipeline()
@@ -119,6 +119,16 @@ def create_b03_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-a
                     ],
                     None,
                     name="compare_crx_cc_a1_b03",
+                ),
+                node(
+                    compare_income_rules,
+                    [
+                        "crx_cc_a1_income_signals",
+                        "crx_cc_a1_ability_b03_check",
+                        "params:model_id",
+                    ],
+                    None,
+                    name="compare_crx_cc_a1_b03_income",
                 ),
             ],
             tags=["crx_persona"],

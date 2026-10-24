@@ -22,4 +22,6 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   rules, the state ladder, known limits).
 - **Check**: the bundle 01/02 check (`b01_check.py`) is replaced by `b03_check.py`, which
   compares the bundle 02 output (`crx_cc_a1_ability_b01_check`) with the new month-end output
-  (`crx_cc_a1_ability_b03_check`), matching each account by month.
+  (`crx_cc_a1_ability_b03_check`), matching each account by month. It also logs how often
+  the 2 × anchor income bar and the income-weakening check fire, and the income levels and
+  states with a flat AED 3,000 floor and without the weakening check.

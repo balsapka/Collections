@@ -14,8 +14,10 @@ kedro run --env=dev --pipeline=casa_primary --params=casa_primary.rebuild_days=4
 kedro run --env=dev --pipeline=crx_cc_a1_ability_b03_check
 ```
 
-Paste back the block from `=== B03 OUTPUT START ===` to `=== B03 OUTPUT END ===`
-(aggregates only, no customer rows). Text is best; otherwise one photo.
+Paste back the two blocks, each from `=== B03 … START ===` to `=== B03 … END ===`:
+`B03 OUTPUT` (old vs new states) and `B03 INCOME` (the 2 × anchor income bar and the
+income-weakening check: how often each fires and the levels / states without them).
+Aggregates only, no customer rows. Text is best; otherwise one photo per block.
 
 **Step 11.** Only after the B03 block has been reviewed: refresh the real output.
 
