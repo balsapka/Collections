@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..6f1de02` · source: 8 added, 7 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..8ecd486` · source: 8 added, 7 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -86,8 +86,10 @@ kedro run --env=dev --pipeline=casa_primary --params=casa_primary.rebuild_days=4
 kedro run --env=dev --pipeline=crx_cc_a1_ability_b03_check
 ```
 
-Paste back the block from `=== B03 OUTPUT START ===` to `=== B03 OUTPUT END ===`
-(aggregates only, no customer rows). Text is best; otherwise one photo.
+Paste back the two blocks, each from `=== B03 … START ===` to `=== B03 … END ===`:
+`B03 OUTPUT` (old vs new states) and `B03 INCOME` (the 2 × anchor income bar and the
+income-weakening check: how often each fires and the levels / states without them).
+Aggregates only, no customer rows. Text is best; otherwise one photo per block.
 
 **Step 11.** Only after the B03 block has been reviewed: refresh the real output.
 
@@ -124,7 +126,9 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   rules, the state ladder, known limits).
 - **Check**: the bundle 01/02 check (`b01_check.py`) is replaced by `b03_check.py`, which
   compares the bundle 02 output (`crx_cc_a1_ability_b01_check`) with the new month-end output
-  (`crx_cc_a1_ability_b03_check`), matching each account by month.
+  (`crx_cc_a1_ability_b03_check`), matching each account by month. It also logs how often
+  the 2 × anchor income bar and the income-weakening check fire, and the income levels and
+  states with a flat AED 3,000 floor and without the weakening check.
 
 ## Instructions for the workplace assistant
 
@@ -3479,25 +3483,43 @@ __all__ = ["create_b03_check_pipeline", "create_pipeline"]
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b03_check.py`
-action: add · new sha256 `c1d9fca214c0fdfd6ae32c7b473f0c43e07b255b6fce715a3db19fdbef4dffa0` · new trailing newline: yes
+action: add · new sha256 `1f0b63d16fe7760cd1ea4d5b0b0c9ff6e27826ab553d810c73071268c6dcf5d8` · new trailing newline: yes
 
 New:
 
 `````python
 """TEMPORARY (mirror bundle 03): old vs new CC A1 states, run in PROD.
 
-``compare_a1_outputs`` logs the ``B03 OUTPUT`` block (aggregates only): the bundle 02
-engine output (``crx_cc_a1_ability_b01_check``, billing-date observations) against the
-new month-end output (``crx_cc_a1_ability_b03_check``). An old row is matched to the new
-row of the same account and month (the month's latest old observation).
+Two log blocks, aggregates only:
+
+* ``compare_a1_outputs`` (``B03 OUTPUT``): the bundle 02 engine output
+  (``crx_cc_a1_ability_b01_check``, billing-date observations) against the new month-end
+  output (``crx_cc_a1_ability_b03_check``). An old row is matched to the new row of the
+  same account and month (the month's latest old observation).
+* ``compare_income_rules`` (``B03 INCOME``): what the 2 × anchor income bar and the
+  income-weakening check do, against a flat AED 3,000 floor and no weakening check.
 
 Removed by the bundle's cleanup.
 """
 
 import logging
 
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
+
+from ..a1_ability.classify import (
+    _LADDER,
+    _LAST3,
+    D_INC,
+    DEMIN,
+    F_INC,
+    K_INC,
+    N3,
+    _count_at_least,
+    _months,
+    _not_weakening,
+)
+from ..scoring_engine import points_from_level
 
 LOG = logging.getLogger(__name__)
 
@@ -3550,11 +3572,90 @@ def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
         "  old state x new state:",
         *_crosstab(both, "old_state", "new_state"),
     ]
-    LOG.info(
-        "\n%s",
-        "\n".join(["=== B03 OUTPUT START ===", *lines, "=== B03 OUTPUT END ==="]),
-    )
+    _log("OUTPUT", lines)
     both.unpersist()
+
+
+def _log(name: str, lines: list[str]) -> None:
+    block = [f"=== B03 {name} START ===", *lines, f"=== B03 {name} END ==="]
+    LOG.info("\n%s", "\n".join(block))
+
+
+def _income_level(floor: Column, weakening: bool) -> Column:
+    """classify.income_level with the threshold and the weakening check as inputs."""
+    last3 = _months("income", _LAST3)
+    stable = _count_at_least(last3, floor) >= N3
+    if weakening:
+        stable = stable & _not_weakening("income", D_INC, True)
+    weak = _count_at_least(last3, F.lit(DEMIN)) > 0
+    return F.when(stable, "stable").when(weak, "weak").otherwise("none")
+
+
+def _state(income_level: str) -> Column:
+    """The A1 state with ``income_level`` in place of the engine's income level (the
+    unknown gate only holds while the points stay 0)."""
+    points = points_from_level(
+        F.col(income_level), {"stable": 2, "weak": 1}
+    ) + points_from_level(F.col("a1_liquidity_level"), {"adequate": 2, "weak": 1})
+    unknown = (F.col("a1_state") == _LADDER.unknown) & (points == 0)
+    return _LADDER.state(points, F.col("a1_distress_flag") == 1, unknown)
+
+
+def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> None:
+    """How often 2 × anchor raises the income bar above the flat floor, how often the
+    weakening check fires, and the levels and states without each of them."""
+    anchor = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))
+    bar = F.greatest(F.lit(F_INC), K_INC * anchor)
+    flat = F.lit(F_INC)
+    df = (
+        a1.join(income, ["account_id", "observation_date"])
+        .withColumn("bar", bar)
+        .withColumn("raised", bar > flat)
+        .withColumn("lvl_engine", _income_level(bar, True))
+        .withColumn("lvl_flat", _income_level(flat, True))
+        .withColumn("lvl_no_weak", _income_level(bar, False))
+        .withColumn("lvl_flat_no_weak", _income_level(flat, False))
+        .withColumn("qual_bar", _count_at_least(_months("income", _LAST3), bar) >= N3)
+        .withColumn("qual_flat", _count_at_least(_months("income", _LAST3), flat) >= N3)
+        .withColumn("weak_ok", _not_weakening("income", D_INC, True))
+        .withColumn("st_flat", _state("lvl_flat"))
+        .withColumn("st_no_weak", _state("lvl_no_weak"))
+        .withColumn("st_flat_no_weak", _state("lvl_flat_no_weak"))
+        .cache()
+    )
+    n = df.count()
+    raised = (
+        df.filter("raised")
+        .agg(
+            F.count("*").alias("n"),
+            F.expr("percentile_approx(bar, array(0.5, 0.9, 0.99))").alias("q"),
+        )
+        .first()
+    )
+    mismatch = df.filter(F.col("lvl_engine") != F.col("a1_income_level")).count()
+    lines = [
+        f"model_id={model_id} rows={n} engine-level mismatches={mismatch} (must be 0)",
+        f"  bar raised above {F_INC:.0f}: {raised['n']} ({100.0 * raised['n'] / max(n, 1):.2f}%)"
+        f"  bar p50/p90/p99 where raised: {raised['q']}",
+        f"  2 of 3 months reach the bar: {df.filter('qual_bar').count()}"
+        f"  reach the flat floor: {df.filter('qual_flat').count()}",
+        f"  2 of 3 reach the bar but weakening fails: "
+        f"{df.filter(F.col('qual_bar') & ~F.col('weak_ok')).count()}"
+        f"  (flat floor: {df.filter(F.col('qual_flat') & ~F.col('weak_ok')).count()})",
+    ]
+    for name, lvl, st in [
+        ("flat floor", "lvl_flat", "st_flat"),
+        ("no weakening check", "lvl_no_weak", "st_no_weak"),
+        ("flat floor + no weakening check", "lvl_flat_no_weak", "st_flat_no_weak"),
+    ]:
+        lines += [
+            f"  -- {name}: income level engine x variant",
+            *_crosstab(df, "a1_income_level", lvl),
+            f"  -- {name}: state engine x variant",
+            *_crosstab(df, "a1_state", st),
+        ]
+    _log("INCOME", lines)
+    df.unpersist()
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py`
@@ -3681,7 +3782,7 @@ def build_cc_liquidity_anchor(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py`
-action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `d35b23f4b1f07fe8163070eeb04797fb2de731a7da5b66284328378b68e81384` · new trailing newline: yes
+action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `e6df43db9dfcf19af5398b6300079a211b7bed4fcfe200694d9dcc35ec394fab` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3866,7 +3967,7 @@ from ..a1_ability import (
     build_liquidity_signals,
 )
 from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
-from .b03_check import compare_a1_outputs
+from .b03_check import compare_a1_outputs, compare_income_rules
 from .nodes import build_cc_liquidity_anchor
 
 _OBS = "crx_cc_obs_base"
@@ -3943,7 +4044,7 @@ def create_pipeline(
 
 def create_b03_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     """TEMPORARY: observation base + the A1 pipeline writing to
-    crx_cc_a1_ability_b03_check + the log-only comparison node.
+    crx_cc_a1_ability_b03_check + the log-only comparison nodes.
     Remove with b03_check.py and the catalog entries."""
     return (
         create_cc_obs_pipeline()
@@ -3959,6 +4060,16 @@ def create_b03_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-a
                     ],
                     None,
                     name="compare_crx_cc_a1_b03",
+                ),
+                node(
+                    compare_income_rules,
+                    [
+                        "crx_cc_a1_income_signals",
+                        "crx_cc_a1_ability_b03_check",
+                        "params:model_id",
+                    ],
+                    None,
+                    name="compare_crx_cc_a1_b03_income",
                 ),
             ],
             tags=["crx_persona"],
