@@ -27,20 +27,25 @@ _RETURN_EVENT_COLUMNS = [
 
 
 def build_return_events(
-    tran_repos: DataFrame, return_reasons: Sequence[str], rebuild_days: int
+    tran_repos: DataFrame,
+    return_reasons: Sequence[str],
+    rebuild_from: str | date | None,
 ) -> DataFrame:
     """Returned CASA transactions (every ``return_reasons`` value, both debit and credit
     legs) for all CIFs, one row per transaction key, partitioned by ``event_month``.
 
-    Incremental: only event months from the month start of (today - ``rebuild_days``)
-    are rebuilt, and the catalog overwrites just those partitions. A reload of the same
-    transaction in a later ``edp_load_date`` keeps the latest load. The first build runs
-    with a ``rebuild_days`` that covers the whole table.
+    Incremental: only event months from ``rebuild_from`` (a date, taken at its month
+    start) are rebuilt, and the catalog overwrites just those partitions. Without it, the
+    run rebuilds the previous and the current month. A reload of the same transaction in
+    a later ``edp_load_date`` keeps the latest load.
     """
     missing = sorted(set(_RETURN_EVENT_COLUMNS) - set(tran_repos.columns))
     if missing:
         raise ValueError(f"comp_financial_tran_repos_dly is missing columns: {missing}")
-    floor = (date.today() - timedelta(days=rebuild_days)).replace(day=1)
+    if rebuild_from:
+        floor = date.fromisoformat(str(rebuild_from)).replace(day=1)
+    else:  # the previous month's start
+        floor = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
     latest_load = Window.partitionBy(*_KEY).orderBy(F.col("edp_load_date").desc())
     return (
         tran_repos.filter(
