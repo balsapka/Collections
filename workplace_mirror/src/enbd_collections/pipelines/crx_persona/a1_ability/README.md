@@ -13,8 +13,14 @@ log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (eviden
 - **Grain:** one row per `(account_id, observation_date)` from the observation base.
   Observation dates are **month ends** (CC: until `cc_spine` itself is month-end, the
   observation base moves each billing-date row to its month end).
-- **Windows are calendar months.** m1 = the observation month, m2 and m3 the two before it:
-  "the last 3 months" = m1–m3. "The prior 3 months" = m4–m6 (used to spot a decline).
+- **Windows are calendar months, by segment** (`_common.window_months`), the observation
+  month included (m1 = the observation month, m2 the one before, …):
+  - **60–180: 3 months** (m1–m3); the prior window m4–m6 (used to spot a decline).
+  - **180+: 6 months** (m1–m6); the prior window m7–m12.
+  - Every count scales with it: **"2 of 3" at 60–180 is "3 of 6" at 180+**
+    (`MIN_MONTHS`), and every "in the window" rule (card payment, distress, CASA activity)
+    reads 6 months at 180+.
+  - The sections below are written for 60–180; read m1–m6 / m7–m12 and 3 of 6 for 180+.
 - **Customer level.** Salary, CASA, card payments, bounces and returns are read across
   **all accounts of the customer's CIF**, never the scored account alone.
 - **Anchor** (the workbook's "minimum due"): what the customer must pay now.
@@ -38,13 +44,13 @@ month **the larger one wins**.
 - **Bureau salary** — `stg_aecb_salary_history`: `subj_salcr_hist_ref_mnth` (MMyyyy) and
   `subj_salcr_hist_tot_sal_amt`, linked to the CIF through `prm_bureau_cif_bridge`.
 
-The result is `income_m1 … income_m6`; NULL = no salary that month from either source.
+The result is `income_m1 … income_m6` (`… m12` at 180+); NULL = no salary that month from either source.
 
 **Step 2: the level** (`income_level`).
 
 - **Threshold** = max(AED 3,000, 2 × anchor).
 - **2 of 3:** each of `income_m1..m3` scores 1 if it is at or above the threshold (NULL
-  scores 0); Stable needs a count ≥ 2 (`N3 = 2`). Any two months — not necessarily
+  scores 0); Stable needs a count ≥ 2 (`MIN_MONTHS`; 3 of 6 at 180+). Any two months — not necessarily
   consecutive.
 - **Not weakening:** the m1–m3 average must be ≥ 75% of the m4–m6 average
   (`D_INC = 0.25`); months without salary count as 0 here. No salary in m4–m6 → nothing to
@@ -65,10 +71,10 @@ below 75% of 5,000 = 3,750 → **Weak**, not Stable. The missing June pulls the 
 
 **Evidence** (`build_liquidity_signals`):
 
-- **CASA balance per month** (`casa_m1 … casa_m6`) — `wm_fea_casa_eod_avg_balance`:
+- **CASA balance per month** (`casa_m1 … casa_m6`, `… m12` at 180+) — `wm_fea_casa_eod_avg_balance`:
   current + savings average balance, taken as the 4-week average on the month's last weekly
   snapshot.
-- **External card payment** (`ext_card_payment_max_3m`) — the largest single CASA outflow
+- **External card payment** (`ext_card_payment_max`) — the largest single CASA outflow
   in m1–m3 (`wm_pri_labelled_transactions`) to a credit card the customer registered as a
   beneficiary (`raw_beneficiary_cards`, card numbers). It shows money paid to other banks'
   cards.
@@ -100,7 +106,7 @@ Points = income points + liquidity points (0–4).
 
 | State | Rule |
 |---|---|
-| `ability_unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active_3m`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
+| `ability_unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
 | `ability_high` | 4 points, no distress |
 | `ability_moderate` | 2–3 points without distress, or 4 points with distress |
 | `ability_low` | everything else: 0–1 points, or 2–3 points with distress |

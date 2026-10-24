@@ -2,15 +2,16 @@
 
 Spec: ``workplace_mirror/specs/A1_ability_spec.md`` (GRR workbook A1_ability_20261022).
 
-Observation dates are month ends. "The last 3 months" are the observation month and the
-two before it (m1 = the observation month, m2, m3); "the prior 3 months" are m4–m6. The
-builders return the amounts the classifier compares with its thresholds:
+Observation dates are month ends. The window is W calendar months, the observation month
+included (``_common.window_months``: 3 for 60–180, 6 for 180+): m1 = the observation
+month … mW; "the prior window" is m(W+1)–m(2W). The builders return the amounts the
+classifier compares with its thresholds:
 
 * income    — salary received in each month (internal credit or bureau salary,
               the larger);
 * liquidity — CASA average balance in each month, largest single external card payment;
-* activity  — any CASA transaction in the last 3 months (the Unknown gate);
-* distress  — a cheque bounce or direct-debit return in the last 3 months.
+* activity  — any CASA transaction in the window (the Unknown gate);
+* distress  — a cheque bounce or direct-debit return in the window.
 
 Customer-level sources are always read for the whole CIF — all the customer's accounts —
 never for the scored account_id alone (an RL account_id is not a CASA account).
@@ -28,6 +29,7 @@ from .._common import (
     parse_yyyymmdd,
     require_columns,
     window_agg,
+    window_months,
 )
 
 # reason_for_excluding values that count as distress. prm_casa_return_events also carries
@@ -44,19 +46,21 @@ def _month_index(date: Column) -> Column:
     return F.months_between(obs_month, F.trunc(date, "month")).cast("int") + 1
 
 
-def _by_month(obs: DataFrame, series: DataFrame, value: str, prefix: str) -> DataFrame:
-    """Spread a ``(cif_id, month, value)`` series over ``{prefix}_m1 … _m6`` per
+def _by_month(
+    obs: DataFrame, series: DataFrame, value: str, prefix: str, months: int
+) -> DataFrame:
+    """Spread a ``(cif_id, month, value)`` series over ``{prefix}_m1 … _m{months}`` per
     observation (NULL where the month has no value)."""
     return (
         obs.select(*GRAIN, "cif_id")
         .join(series, on="cif_id")
         .withColumn("_k", _month_index(F.col("month")))
-        .filter(F.col("_k").between(1, 6))
+        .filter(F.col("_k").between(1, months))
         .groupBy(*GRAIN)
         .agg(
             *[
                 F.max(F.when(F.col("_k") == i, F.col(value))).alias(f"{prefix}_m{i}")
-                for i in range(1, 7)
+                for i in range(1, months + 1)
             ]
         )
     )
@@ -123,9 +127,10 @@ def build_income_signals(
     wm_salary: DataFrame,
     salary_hist: DataFrame,
     bureau_cif_bridge: DataFrame,
+    model_id: str,
 ) -> DataFrame:
-    """``income_m1 … income_m6``: salary received per month — the larger of the internal
-    credit and the bureau salary (NULL: no salary that month)."""
+    """``income_m1 … income_m{2W}``: salary received per month — the larger of the
+    internal credit and the bureau salary (NULL: no salary that month)."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     monthly = (
         _internal_salary(wm_salary)
@@ -133,7 +138,10 @@ def build_income_signals(
         .groupBy("cif_id", "month")
         .agg(F.max("amount").alias("amount"))
     )
-    return left_join_all(obs_base, [_by_month(obs, monthly, "amount", "income")])
+    months = 2 * window_months(model_id)
+    return left_join_all(
+        obs_base, [_by_month(obs, monthly, "amount", "income", months)]
+    )
 
 
 # ── Liquidity and activity ────────────────────────────────────────────────────
@@ -159,10 +167,10 @@ def _casa_by_month(wm_casa_bal: DataFrame) -> DataFrame:
 
 
 def _ext_card_payments(
-    obs: DataFrame, labelled_txn: DataFrame, beneficiary_cards: DataFrame
+    obs: DataFrame, labelled_txn: DataFrame, beneficiary_cards: DataFrame, months: int
 ) -> DataFrame:
     """Largest single CASA payment to one of the customer's registered external credit
-    cards in the last 3 months.
+    cards in the window.
 
     ``raw_beneficiary_cards`` is a live snapshot: a card registered after the
     observation date still counts (mild look-ahead, accepted).
@@ -191,7 +199,7 @@ def _ext_card_payments(
     )
     src = (
         labelled_txn.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs, 3)))
+            (F.col("tran_date") >= F.lit(lookback_floor(obs, months)))
             & (F.col("in_out_flow") == "outflow")
             & (F.col("product_category") == "CASA")
         )
@@ -204,13 +212,13 @@ def _ext_card_payments(
         obs,
         src,
         date_col="tran_date",
-        aggs=[F.max("tran_amt").alias("ext_card_payment_max_3m")],
-        months=3,
+        aggs=[F.max("tran_amt").alias("ext_card_payment_max")],
+        months=months,
     )
 
 
-def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame) -> DataFrame:
-    """Any CASA credit or debit in the last 3 months."""
+def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame, months: int) -> DataFrame:
+    """Any CASA credit or debit in the window."""
     require_columns(
         wm_casa_flow,
         ["cif_id", "week_number", _CASA_IN_COL, _CASA_OUT_COL],
@@ -227,8 +235,8 @@ def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame) -> DataFrame:
         obs,
         src,
         date_col="week",
-        aggs=[F.max("_active").alias("casa_active_3m")],
-        months=3,
+        aggs=[F.max("_active").alias("casa_active")],
+        months=months,
     )
 
 
@@ -238,15 +246,17 @@ def build_liquidity_signals(
     wm_casa_flow: DataFrame,
     labelled_txn: DataFrame,
     beneficiary_cards: DataFrame,
+    model_id: str,
 ) -> DataFrame:
-    """``casa_m1 … casa_m6``, ``ext_card_payment_max_3m``, ``casa_active_3m``."""
+    """``casa_m1 … casa_m{2W}``, ``ext_card_payment_max``, ``casa_active``."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
+    w = window_months(model_id)
     return left_join_all(
         obs_base,
         [
-            _by_month(obs, _casa_by_month(wm_casa_bal), "balance", "casa"),
-            _ext_card_payments(obs, labelled_txn, beneficiary_cards),
-            _casa_activity(obs, wm_casa_flow),
+            _by_month(obs, _casa_by_month(wm_casa_bal), "balance", "casa", 2 * w),
+            _ext_card_payments(obs, labelled_txn, beneficiary_cards, w),
+            _casa_activity(obs, wm_casa_flow, w),
         ],
     )
 
@@ -257,10 +267,11 @@ def build_liquidity_signals(
 def build_distress_signals(
     obs_base: DataFrame,
     bureau_alert: DataFrame,
+    model_id: str,
     payment_order: DataFrame | None = None,
     internal_returns: DataFrame | None = None,
 ) -> DataFrame:
-    """distress_flag: a cheque bounce or direct-debit (DDS) return in the last 3 months,
+    """distress_flag: a cheque bounce or direct-debit (DDS) return in the window,
     from the bureau and from the bank's own records.
 
     * ``bureau_alert`` — bureau-reported bounced cheques, dated by ``extract_date``
@@ -301,12 +312,14 @@ def build_distress_signals(
         events,
         date_col="event_date",
         aggs=[F.max(F.lit(1)).alias("distress_flag")],
-        months=3,
+        months=window_months(model_id),
     )
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
 
 
-def build_internal_returns(obs_base: DataFrame, return_events: DataFrame) -> DataFrame:
+def build_internal_returns(
+    obs_base: DataFrame, return_events: DataFrame, model_id: str
+) -> DataFrame:
     """The bank's own returned cheques and DDS returns for the observation base's CIFs, as
     distinct ``(cif_id, event_date, reason)`` from ``prm_casa_return_events`` (all of the
     customer's CASA accounts; the debit and credit legs of a return collapse to one row).
@@ -319,7 +332,10 @@ def build_internal_returns(obs_base: DataFrame, return_events: DataFrame) -> Dat
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
     return (
         return_events.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs_base, 3)))
+            (
+                F.col("tran_date")
+                >= F.lit(lookback_floor(obs_base, window_months(model_id)))
+            )
             & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
         )
         .join(F.broadcast(cifs), on="cif_id", how="leftsemi")

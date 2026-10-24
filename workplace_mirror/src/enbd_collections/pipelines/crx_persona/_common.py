@@ -22,10 +22,21 @@ from typing import Sequence
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
+from ._dpd_journey.constants import MODEL_ID_SEGMENT
+
 
 LOG = logging.getLogger(__name__)
 
 GRAIN = ("account_id", "observation_date")
+
+# Months every axis looks back, the observation month included; the dry 180+ buckets
+# look further.
+WINDOW_MONTHS = {"60_180": 3, "180_plus": 6}
+
+
+def window_months(model_id: str) -> int:
+    """The lookback window of ``model_id``'s segment, in calendar months."""
+    return WINDOW_MONTHS[MODEL_ID_SEGMENT[model_id]]
 
 
 def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:

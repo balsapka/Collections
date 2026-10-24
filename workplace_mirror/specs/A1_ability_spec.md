@@ -78,10 +78,11 @@ decisions by the user where the workbook and the earlier code disagreed:
 | S2 | Income multiple | Income ≥ max(AED 3,000, **2 × anchor**) | `K_INC = 2` |
 | S3 | Salary month | per-month amount ≥ threshold, Stable = 2 of the last 3 | internal credits recovered per month from the WM salary snapshots (credit date = snapshot − days since credit); bureau salary per month; the larger counts. TODO(sonnet): validate against `feat_payroll_indicator` |
 | S4 | Income weakening | last-3-month average ≥ 75% of the prior 3 | `D_INC = 0.25`, months without salary count as 0 |
-| S5/S6 | Weak income, bureau window | any month ≥ AED 1,000 in the last 3 months (bureau included) | the observation month (a month end) and the 2 months before it |
+| S5/S6 | Weak income, bureau window | any month ≥ AED 1,000 in the last 3 months (bureau included) | the observation month (a month end) and the 2 months before it (6-month window at 180+, S10) |
 | S7 | CASA | ≥ floor in 2 of the last 3 months and not > 50% below the prior 3 | monthly CASA (CA+SA) average from `wm_fea_casa_eod_avg_balance` (4-week average at the month's last weekly snapshot) |
 | S8 | External card payment | one payment ≥ max(AED 500, anchor) / ≥ AED 1,000 for Weak | largest single payment in the last 3 months |
 | S9 | Distress | cheque bounces and DDS returns, bureau **and internal**, across all the customer's accounts | bureau bounced cheques wired; `payment_order` and `internal_returns` slots ready. TODO(sonnet): find the internal returned-cheque / DDS-return source |
+| S10 | Window by segment (user, 2026-10-24) | the workbook's 3-month windows | **60–180: 3 months, 180+: 6 months**, the observation month included, as on every other axis; "2 of 3" becomes **3 of 6** at 180+; the prior window is the 6 months before; card payments, distress and CASA activity read the 6 months | `_common.window_months(model_id)`; `classify.MIN_MONTHS = {3: 2, 6: 3}` |
 
 Every customer-level signal is read across **all accounts of the CIF**. Local check:
 `workplace_mirror/checks/a1_engine_spec.py` — 25 cases built from the workbook rows, all

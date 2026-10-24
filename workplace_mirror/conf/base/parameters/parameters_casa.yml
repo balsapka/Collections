@@ -6,5 +6,5 @@ casa_primary:
   # which ones count as distress is decided in the persona signal layer).
   return_reasons: ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
   # Months kept up to the persona start month (crx_persona.persona_start_date), so the
-  # first observation month has its full lookback (A1 reads m1-m6).
+  # first observation month has its full distress window (the longest: 6 months at 180+).
   history_months: 6

@@ -18,13 +18,13 @@ from __future__ import annotations
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, left_join_all, log_distribution
+from .._common import GRAIN, left_join_all, log_distribution, window_months
 from ..scoring_engine import StateLadder, points_from_level
 
-N3 = 2  # months of the last 3 that must qualify
+MIN_MONTHS = {3: 2, 6: 3}  # months of the window (by its length) that must qualify
 F_INC = 3000.0  # salary floor (internal and bureau), AED
 K_INC = 2.0  # income must also cover this multiple of the anchor
-D_INC = 0.25  # stable income may fall at most this share vs the prior 3 months
+D_INC = 0.25  # stable income may fall at most this share vs the prior window
 F_CASA = 3000.0
 K_CASA = 1.0
 D_CASA = 0.50
@@ -40,7 +40,11 @@ _LADDER = StateLadder(
     high_from_points=4,
     moderate_from_points=2,
 )
-_LAST3, _PRIOR3 = (1, 2, 3), (4, 5, 6)
+
+
+def _window(w: int) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Month indices of the window (m1–mW) and of the prior window (m(W+1)–m(2W))."""
+    return tuple(range(1, w + 1)), tuple(range(w + 1, 2 * w + 1))
 
 
 def _months(prefix: str, months: tuple[int, ...]) -> list[Column]:
@@ -61,33 +65,36 @@ def _mean(cols: list[Column], missing_is_zero: bool) -> Column:
     return F.when(present > 0, total / present)
 
 
-def _not_weakening(prefix: str, max_drop: float, missing_is_zero: bool) -> Column:
-    """The last-3-month average is not more than ``max_drop`` below the prior 3 months
-    (true when there is no prior quarter to compare with)."""
-    recent = _mean(_months(prefix, _LAST3), missing_is_zero)
-    prior = _mean(_months(prefix, _PRIOR3), missing_is_zero)
+def _not_weakening(
+    prefix: str, max_drop: float, missing_is_zero: bool, w: int
+) -> Column:
+    """The window's average is not more than ``max_drop`` below the prior window's (true
+    when there is no prior window to compare with)."""
+    last, prior_months = _window(w)
+    recent = _mean(_months(prefix, last), missing_is_zero)
+    prior = _mean(_months(prefix, prior_months), missing_is_zero)
     return F.coalesce(F.when(prior > 0, recent >= prior * (1 - max_drop)), F.lit(True))
 
 
-def income_level(anchor: Column) -> Column:
-    last3 = _months("income", _LAST3)
+def income_level(anchor: Column, w: int) -> Column:
+    last = _months("income", _window(w)[0])
     floor = F.greatest(F.lit(F_INC), K_INC * anchor)
-    stable = (_count_at_least(last3, floor) >= N3) & _not_weakening(
-        "income", D_INC, True
+    stable = (_count_at_least(last, floor) >= MIN_MONTHS[w]) & _not_weakening(
+        "income", D_INC, True, w
     )
-    weak = _count_at_least(last3, F.lit(DEMIN)) > 0
+    weak = _count_at_least(last, F.lit(DEMIN)) > 0
     return F.when(stable, "stable").when(weak, "weak").otherwise("none")
 
 
-def liquidity_level(anchor: Column) -> Column:
-    last3 = _months("casa", _LAST3)
-    payment = F.coalesce(F.col("ext_card_payment_max_3m"), F.lit(0.0))
+def liquidity_level(anchor: Column, w: int) -> Column:
+    last = _months("casa", _window(w)[0])
+    payment = F.coalesce(F.col("ext_card_payment_max"), F.lit(0.0))
     casa_floor = F.greatest(F.lit(F_CASA), K_CASA * anchor)
-    casa_ok = (_count_at_least(last3, casa_floor) >= N3) & _not_weakening(
-        "casa", D_CASA, False
+    casa_ok = (_count_at_least(last, casa_floor) >= MIN_MONTHS[w]) & _not_weakening(
+        "casa", D_CASA, False, w
     )
     adequate = casa_ok | (payment >= F.greatest(F.lit(F_PAY), K_PAY * anchor))
-    weak = (_count_at_least(last3, F.lit(DEMIN)) > 0) | (payment >= DEMIN)
+    weak = (_count_at_least(last, F.lit(DEMIN)) > 0) | (payment >= DEMIN)
     return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
 
 
@@ -97,17 +104,19 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
     liquidity: DataFrame,
     distress: DataFrame,
     anchor: DataFrame,
+    model_id: str,
     log_stats: bool = False,
 ) -> DataFrame:
-    """One A1 state per observation-base row.
+    """One A1 state per observation-base row, over ``model_id``'s window.
 
     ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
     """
     df = left_join_all(obs_base, [income, liquidity, distress, anchor])
     amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
+    w = window_months(model_id)
     df = (
-        df.withColumn("a1_income_level", income_level(amt))
-        .withColumn("a1_liquidity_level", liquidity_level(amt))
+        df.withColumn("a1_income_level", income_level(amt, w))
+        .withColumn("a1_liquidity_level", liquidity_level(amt, w))
         .withColumn("a1_distress_flag", F.col("distress_flag") == 1)
     )
     df = df.withColumn(
@@ -118,7 +127,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
     unknown = (
         (F.col("a1_points_total") == 0)
         & ~F.col("a1_distress_flag")
-        & (F.coalesce(F.col("casa_active_3m"), F.lit(0)) == 0)
+        & (F.coalesce(F.col("casa_active"), F.lit(0)) == 0)
     )
     df = df.withColumn(
         "a1_state",

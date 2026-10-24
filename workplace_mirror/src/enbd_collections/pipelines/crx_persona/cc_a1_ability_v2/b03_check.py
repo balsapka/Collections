@@ -17,17 +17,18 @@ import logging
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
+from .._common import window_months
 from ..a1_ability.classify import (
     _LADDER,
-    _LAST3,
     D_INC,
     DEMIN,
     F_INC,
     K_INC,
-    N3,
+    MIN_MONTHS,
     _count_at_least,
     _months,
     _not_weakening,
+    _window,
 )
 from ..scoring_engine import points_from_level
 
@@ -91,13 +92,13 @@ def _log(name: str, lines: list[str]) -> None:
     LOG.info("\n%s", "\n".join(block))
 
 
-def _income_level(floor: Column, weakening: bool) -> Column:
+def _income_level(floor: Column, weakening: bool, w: int) -> Column:
     """classify.income_level with the threshold and the weakening check as inputs."""
-    last3 = _months("income", _LAST3)
-    stable = _count_at_least(last3, floor) >= N3
+    last = _months("income", _window(w)[0])
+    stable = _count_at_least(last, floor) >= MIN_MONTHS[w]
     if weakening:
-        stable = stable & _not_weakening("income", D_INC, True)
-    weak = _count_at_least(last3, F.lit(DEMIN)) > 0
+        stable = stable & _not_weakening("income", D_INC, True, w)
+    weak = _count_at_least(last, F.lit(DEMIN)) > 0
     return F.when(stable, "stable").when(weak, "weak").otherwise("none")
 
 
@@ -114,6 +115,8 @@ def _state(income_level: str) -> Column:
 def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> None:
     """How often 2 × anchor raises the income bar above the flat floor, how often the
     weakening check fires, and the levels and states without each of them."""
+    w = window_months(model_id)
+    last = _window(w)[0]
     anchor = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))
     bar = F.greatest(F.lit(F_INC), K_INC * anchor)
     flat = F.lit(F_INC)
@@ -121,13 +124,17 @@ def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> Non
         a1.join(income, ["account_id", "observation_date"])
         .withColumn("bar", bar)
         .withColumn("raised", bar > flat)
-        .withColumn("lvl_engine", _income_level(bar, True))
-        .withColumn("lvl_flat", _income_level(flat, True))
-        .withColumn("lvl_no_weak", _income_level(bar, False))
-        .withColumn("lvl_flat_no_weak", _income_level(flat, False))
-        .withColumn("qual_bar", _count_at_least(_months("income", _LAST3), bar) >= N3)
-        .withColumn("qual_flat", _count_at_least(_months("income", _LAST3), flat) >= N3)
-        .withColumn("weak_ok", _not_weakening("income", D_INC, True))
+        .withColumn("lvl_engine", _income_level(bar, True, w))
+        .withColumn("lvl_flat", _income_level(flat, True, w))
+        .withColumn("lvl_no_weak", _income_level(bar, False, w))
+        .withColumn("lvl_flat_no_weak", _income_level(flat, False, w))
+        .withColumn(
+            "qual_bar", _count_at_least(_months("income", last), bar) >= MIN_MONTHS[w]
+        )
+        .withColumn(
+            "qual_flat", _count_at_least(_months("income", last), flat) >= MIN_MONTHS[w]
+        )
+        .withColumn("weak_ok", _not_weakening("income", D_INC, True, w))
         .withColumn("st_flat", _state("lvl_flat"))
         .withColumn("st_no_weak", _state("lvl_no_weak"))
         .withColumn("st_flat_no_weak", _state("lvl_flat_no_weak"))
@@ -147,9 +154,9 @@ def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> Non
         f"model_id={model_id} rows={n} engine-level mismatches={mismatch} (must be 0)",
         f"  bar raised above {F_INC:.0f}: {raised['n']} ({100.0 * raised['n'] / max(n, 1):.2f}%)"
         f"  bar p50/p90/p99 where raised: {raised['q']}",
-        f"  2 of 3 months reach the bar: {df.filter('qual_bar').count()}"
+        f"  {MIN_MONTHS[w]} of {w} months reach the bar: {df.filter('qual_bar').count()}"
         f"  reach the flat floor: {df.filter('qual_flat').count()}",
-        f"  2 of 3 reach the bar but weakening fails: "
+        f"  {MIN_MONTHS[w]} of {w} reach the bar but weakening fails: "
         f"{df.filter(F.col('qual_bar') & ~F.col('weak_ok')).count()}"
         f"  (flat floor: {df.filter(F.col('qual_flat') & ~F.col('weak_ok')).count()})",
     ]
