@@ -148,12 +148,17 @@ def _obs_base(spine: DataFrame, id_col: str) -> DataFrame:
     """Every spine row with the ``cif_id`` the spine already carries.
 
     Rows without a CIF are kept: customer-level signals are simply absent for them.
+    Observation dates must be month ends; any other date stops the run.
     """
-    return spine.select(
+    base = spine.select(
         F.col(id_col).cast("string").alias("account_id"),
         F.col("observation_date").cast("date"),
         "cif_id",
     ).dropDuplicates(list(GRAIN))
+    mid_month = base.filter(F.col("observation_date") != F.last_day("observation_date"))
+    if mid_month.limit(1).count():
+        raise ValueError("spine observation dates must be month ends")
+    return base
 
 
 def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
