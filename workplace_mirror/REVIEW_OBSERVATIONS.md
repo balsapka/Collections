@@ -11,7 +11,7 @@ but the choice is questionable.
 **Severity:** **H** = feature values are wrong · **M** = wrong in edge cases / silent drift ·
 **L** = docs, naming, hygiene.
 
-Last updated: 2026-10-23 (batches 1–3: cc_spell, cc_full_history, cc_raw_extract,
+Last updated: 2026-10-24 (O45–O52: A2 review for bundle 04); 2026-10-23 (batches 1–3: cc_spell, cc_full_history, cc_raw_extract,
 cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry,
 cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability, cc_a1_ability_v2,
 `_spine_utils`, `stg_rr_portf`, `nodes/utils/config`; batch 5: the RL chain — rl_full_history,
@@ -67,6 +67,14 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O41 | L | confirmed | catalog_crx.yml, model_configs.yml | Config comments drift from code (see list) |
 | O42 | H | data check | cc_a1_ability enrichers (ext card payments) | `date_format(..., "yyyyww")` is not a valid Spark 3 pattern — the node fails unless PROD runs the legacy time parser |
 | O43 | M | confirmed | cc_a1_ability_v2 Node 1 | Spine rows without a resolved CIF are dropped, so those accounts get no A1 state at all |
+| O45 | H | confirmed | cc_a2_locatability Node 3 | `gone_contact_flag` / `not_reachable_flag` fire on *any* dead or ringing event in the last 2 attempt dates, not *all* |
+| O46 | M | design | cc_a2_locatability Node 4 | A confirmed contact any time since T0 keeps an account Reachable while every later call hits a dead line |
+| O47 | M | confirmed | cc_departure_signature Pass A | Travel window is 3 months before the card block (`t0 + days_to_dpd60`), not before T0 as documented |
+| O48 | M | design | cc_departure_signature Pass B | Departure salary stop uses its own raw-regex salary (A1 uses WM salary only) and reads job loss as departure |
+| O49 | H | data check | cc_a2_locatability Node 3/4 | `dcore_observation_spine` and `prm_contract` join on the exact `observation_date`; month-end dates may match nothing |
+| O50 | M | data check | cc_a2_locatability Node 2 | Login PIT compares `month_number` with `trunc(obs, 'month')`; if `month_number` is a month end, the observation month is never included |
+| O51 | M | confirmed | departure Pass J + A2 Node 2 | Foreign login has no age bound, so an old foreign login marks a departure trail for good; `recent_login_but_foreign` can never fire |
+| O52 | L | confirmed | cc_a2_locatability Node 3/4 | `rpc_rate`, `uns_rate` computed and never used by the state; `spell_id` emitted |
 
 ---
 
@@ -600,3 +608,58 @@ base in bundle 5; v1 is removed in bundle 4.
 - Every enricher name imported by `cc_a1_ability_v2` and `rl_a1_ability` exists in
   `cc_a1_ability/enrichers.py` (`enrich_casa_self_transfer_wash_h2` is only mentioned in a
   docstring).
+
+### O45 — Dead-line / gone flags test *any* event, not *all* (H, confirmed)
+
+`cc_a2_locatability/nodes.py:855–874`: both flags need `_last_n_confirmed == 0` and
+`_last_n_dead > 0` (or `_last_n_ringing > 0`) summed over every event of the last 2 attempt
+dates. One ringing call plus one LINE BUSY or NO ANSWER (neither list) sets
+`gone_contact_flag`; the docstring says "all N dead or ringing". **Fix (bundle 04):** classify
+each attempt date as failed only if every outbound event that day is ringing or dead and none
+is confirmed (spec Q5).
+
+### O46 — An old confirmed contact outranks later dead lines (M, design)
+
+`nodes.py:1184–1194`: `contact_confirmed_flag` counts any confirmed event since T0. The only
+override above it is `recent_avoidance_flag`, which needs 3 *ringing* results; a number that
+went dead after a confirmed contact stays Reachable. Spec Q5 proposes one "gone dark" rule
+(ringing or dead) above a confirmed contact in the window.
+
+### O47 — Travel window anchored on the card block, not T0 (M, confirmed)
+
+`cc_departure_signature/nodes.py:722–743`: `travel_mcc_flag_h2` uses `m_from_block` 1–3,
+block = `t0 + days_to_dpd60`. The old A2 spec said "3 months before T0". Moot once the window
+is decided without T0 (spec Q2).
+
+### O48 — Departure salary stop: second salary definition, ambiguous meaning (M, design)
+
+`cc_departure_signature/nodes.py:877–917` detects salary with a narration regex on
+`comp_financial_tran_repos_dly` (A1 decided WM-recovered salary is the only internal salary
+source) and `casa_inflow_stop_gap_d > 180` before the T0 month marks a departure trail. A
+salary stop is job loss as often as departure and is already A1 evidence (spec Q3).
+
+### O49 — Exact-date joins break on month-end dates (H, data check)
+
+`nodes.py:594–605` joins `dcore_observation_spine` on `(account_id, observation_date)`;
+`nodes.py:1205–1213` does the same with `prm_contract`. If either table keeps the old billing
+dates, every contact signal is NULL (reachability all Unknown) or no Way4 code matches.
+Conversely, if `prm_contract` is a month-end snapshot, the move to month ends fixes O15.
+**Check:** the date column and grain of both tables (Sonnet facts, spec Q9).
+
+### O50 — Login month comparison depends on how `month_number` is dated (M, data check)
+
+`nodes.py:405–410` keeps login months `<= trunc(observation_date, 'month')` (RL) or `<` (CC).
+If `month_number` is the month end (`20261031`), RL never includes its observation month and
+CC skips two months. **Fix:** compare `last_login_date <= observation_date` instead.
+
+### O51 — Foreign login has no age bound (M, confirmed)
+
+Pass J (`cc_departure_signature/nodes.py:2000+`) takes the latest login before the
+observation date however old. The same login drives `in_country_flag`, so a foreign latest
+login always yields a trail → Skip, and `location_unknown_reason = recent_login_but_foreign`
+(`nodes.py:1153–1157`) can never fire (spec Q4).
+
+### O52 — Unused contact outputs (L, confirmed)
+
+`rpc_rate` / `uns_rate` (`nodes.py:821–834`) are not read by Node 4; `spell_id` is emitted by
+Node 4. Dropped in bundle 04.
