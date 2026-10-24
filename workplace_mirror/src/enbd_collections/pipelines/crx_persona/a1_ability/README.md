@@ -2,7 +2,8 @@
 
 A1 asks: **can this customer pay?** It looks at what we can see of their money — income,
 liquid balances, failed payments — and gives one state per observation:
-`ability_high`, `ability_moderate`, `ability_low` or `ability_unknown`.
+`a1_state` = `high`, `moderate`, `low` or `unknown`, shown as `a1_state_label` = High,
+Moderate, Low, Unknown.
 
 This page explains the logic in plain terms. The detailed rule table (thresholds, decision
 log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (evidence) and
@@ -108,10 +109,10 @@ Points = income points + liquidity points (0–4).
 
 | State | Rule |
 |---|---|
-| `ability_unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
-| `ability_high` | 4 points, no distress |
-| `ability_moderate` | 2–3 points without distress, or 4 points with distress |
-| `ability_low` | everything else: 0–1 points, or 2–3 points with distress |
+| `unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
+| `high` | 4 points, no distress |
+| `moderate` | 2–3 points without distress, or 4 points with distress |
+| `low` | everything else: 0–1 points, or 2–3 points with distress |
 
 Unknown is checked first. Distress moves a customer exactly one rung down (High →
 Moderate, Moderate → Low).

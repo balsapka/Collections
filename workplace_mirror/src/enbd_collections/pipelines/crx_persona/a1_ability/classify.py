@@ -33,13 +33,19 @@ K_PAY = 1.0
 DEMIN = 1000.0  # smallest amount that counts as any evidence
 
 _LADDER = StateLadder(
-    high="ability_high",
-    moderate="ability_moderate",
-    low="ability_low",
-    unknown="ability_unknown",
+    high="high",
+    moderate="moderate",
+    low="low",
+    unknown="unknown",
     high_from_points=4,
     moderate_from_points=2,
 )
+DISPLAY_NAMES = {
+    "high": "High",
+    "moderate": "Moderate",
+    "low": "Low",
+    "unknown": "Unknown",
+}
 
 
 def _window(w: int) -> tuple[tuple[int, ...], tuple[int, ...]]:
@@ -134,9 +140,11 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
         "a1_state",
         _LADDER.state(F.col("a1_points_total"), F.col("a1_distress_flag"), unknown),
     )
+    labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
     out = df.select(
         *GRAIN,
         "a1_state",
+        labels[F.col("a1_state")].alias("a1_state_label"),
         F.when(F.col("a1_state") == _LADDER.unknown, "no_signal")
         .otherwise("observed")
         .alias("a1_provenance"),

@@ -115,25 +115,25 @@ case("anchor = oldest bucket in OVD_01..06", buckets=[100, 200, 300, 400, 0, 0, 
 case("OVD_07/08 never anchor", buckets=[100, 0, 0, 0, 0, 0, 7000, 9000], anchor=100.0)
 case("no overdue -> flat floors", buckets=[0] * 8, anchor=None)
 # ── State map (section 3) ──
-case("High", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)], state="ability_high")
+case("High", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)], state="high")
 case("High + bounce -> Moderate", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)], bounce=2,
-     state="ability_moderate")
-case("Stable + None -> Moderate", salary=[(1, 5000), (2, 5000)], state="ability_moderate")
+     state="moderate")
+case("Stable + None -> Moderate", salary=[(1, 5000), (2, 5000)], state="moderate")
 case("Stable + Weak + bounce -> Limited", salary=[(1, 5000), (2, 5000)], casa=[(1, 1500)], bounce=1,
-     state="ability_low")
-case("Weak + None -> Limited", salary=[(1, 1500)], state="ability_low")
-case("None + None, CASA active -> Limited", active=True, state="ability_low")
-case("None + None, no CASA activity -> Unknown", active=False, state="ability_unknown")
+     state="low")
+case("Weak + None -> Limited", salary=[(1, 1500)], state="low")
+case("None + None, CASA active -> Limited", active=True, state="low")
+case("None + None, no CASA activity -> Unknown", active=False, state="unknown")
 case("High + internal cheque return -> Moderate", salary=[(1, 5000), (2, 5000)],
-     casa=[(1, 4000), (2, 4000)], internal=(2, "CHEQUE RETURNS"), state="ability_moderate")
+     casa=[(1, 4000), (2, 4000)], internal=(2, "CHEQUE RETURNS"), state="moderate")
 case("internal DDS return counts", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
-     internal=(1, "DDS Rejects/Reversal"), state="ability_moderate")
+     internal=(1, "DDS Rejects/Reversal"), state="moderate")
 case("other internal reasons ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
-     internal=(1, "CHARGES"), state="ability_high")
+     internal=(1, "CHARGES"), state="high")
 case("RETURNS (POS reversals) ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
-     internal=(1, "RETURNS"), state="ability_high")
+     internal=(1, "RETURNS"), state="high")
 case("bounce older than 3 months ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
-     bounce=4, state="ability_high")
+     bounce=4, state="high")
 # ── 180+: 6-month window, 3 of 6 (no anchor) ──
 P180 = dict(model="cc_180_plus")
 case("180+: stable 3 of 6", salary=[(1, 5000), (4, 5000), (6, 5000)], income="stable", **P180)
@@ -142,7 +142,7 @@ case("180+: weakening vs the prior 6", salary=[(k, 4000) for k in range(1, 7)] +
      income="weak", **P180)
 case("180+: casa adequate 3 of 6", casa=[(2, 3500), (4, 3500), (6, 3500)], liquidity="adequate", **P180)
 case("180+: bounce in month 5 counts", salary=[(1, 5000), (2, 5000), (3, 5000)], bounce=5,
-     state="ability_low", **P180)
+     state="low", **P180)
 case("180+: overdue buckets give no anchor", buckets=[100, 200, 0, 0, 0, 0, 0, 0], anchor=None, **P180)
 
 df = spark.createDataFrame

@@ -56,7 +56,12 @@ def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
         .filter(F.col("month").between(F.trunc(F.lit(first), "month"), F.lit(last)))
         .withColumn("_rn", F.row_number().over(latest_in_month))
         .filter(F.col("_rn") == 1)
-        .select("account_id", "month", F.col("a1_state").alias("old_state"))
+        .select(
+            "account_id",
+            "month",
+            # bundle 02 names: ability_high … ability_unknown
+            F.regexp_replace("a1_state", "^ability_", "").alias("old_state"),
+        )
     )
     both = (
         new.withColumn("month", F.trunc("observation_date", "month"))

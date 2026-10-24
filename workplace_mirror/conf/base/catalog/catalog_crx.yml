@@ -398,8 +398,8 @@ crx_rl_obs_base:
 
 # ── CC A1 ability (shared _a1 engine) ───────────────────────────────────────
 # Evidence tables at (account_id, observation_date); the axis is crx_cc_a1_ability_v2
-# until the v1 pipeline is removed. a1_state in {ability_high, ability_moderate,
-# ability_low, ability_unknown}.
+# until the v1 pipeline is removed. a1_state in {high, moderate, low, unknown};
+# a1_state_label in {High, Moderate, Low, Unknown}.
 crx_cc_a1_income_signals:
   type: spark.SparkDataset
   file_format: parquet

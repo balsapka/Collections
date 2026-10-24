@@ -31,6 +31,10 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   snapshots, card payments, CASA flows, bureau events), so older history is not shuffled.
   This cuts rows, not necessarily partitions (the WM tables load one `adv_load_date`
   snapshot with the full weekly history); internal returns prune on `event_month`.
+- **State names**: `a1_state` is `high` / `moderate` / `low` / `unknown` (was
+  `ability_high` …), with the new display column `a1_state_label` = High / Moderate / Low /
+  Unknown (as `det_state_label` on the deterioration axis). The B03 comparison maps the
+  old names, so only real changes count as changed.
 - **State log for the latest month only**, as on the deterioration axis: `build_a1_ability`
   always logs the `a1_state` distribution of `persona_end_date`'s month
   (`_common.log_latest_month`, one aggregate job, a warning if it fails). The
