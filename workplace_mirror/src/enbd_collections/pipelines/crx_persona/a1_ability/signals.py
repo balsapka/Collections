@@ -338,9 +338,8 @@ def build_internal_returns(
     distinct ``(cif_id, event_date, reason)`` from ``prm_casa_return_events`` (all of the
     customer's CASA accounts; the debit and credit legs of a return collapse to one row).
 
-    Stops the run when the table starts after the earliest observation's window: it is
-    built from ``crx_persona.persona_start_date``, which must not be later than the first
-    observation month.
+    Stops the run when the table starts after the earliest observation's window (both
+    follow ``crx_persona.persona_start_date``; the table was built for an older one).
     """
     require_columns(
         return_events,
@@ -352,8 +351,8 @@ def build_internal_returns(
     if first is None or first.isoformat() > since:
         raise ValueError(
             f"prm_casa_return_events starts at {first}, but the observations need returns "
-            f"from {since}: set crx_persona.persona_start_date to the first observation "
-            "month (or earlier) and rerun casa_primary"
+            f"from {since}: rerun casa_primary after changing "
+            "crx_persona.persona_start_date"
         )
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
     return (

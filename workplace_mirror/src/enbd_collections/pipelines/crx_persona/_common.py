@@ -156,24 +156,34 @@ def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
 # ── Observation base ──────────────────────────────────────────────────────────
 
 
-def _obs_base(spine: DataFrame, id_col: str) -> DataFrame:
-    """Every spine row with the ``cif_id`` the spine already carries.
+def _obs_base(spine: DataFrame, id_col: str, crx_persona: dict) -> DataFrame:
+    """The spine rows in the persona months — ``crx_persona.persona_start_date`` to
+    ``persona_end_date``, whole months — with the ``cif_id`` the spine already carries.
 
     Rows without a CIF are kept: customer-level signals are simply absent for them.
     Observation dates must be month ends; any other date stops the run.
     """
-    base = spine.select(
-        F.col(id_col).cast("string").alias("account_id"),
-        F.col("observation_date").cast("date"),
-        "cif_id",
-    ).dropDuplicates(list(GRAIN))
+    month = F.trunc("observation_date", "month")
+    in_persona = month.between(
+        F.trunc(F.lit(str(crx_persona["persona_start_date"])), "month"),
+        F.trunc(F.lit(str(crx_persona["persona_end_date"])), "month"),
+    )
+    base = (
+        spine.select(
+            F.col(id_col).cast("string").alias("account_id"),
+            F.col("observation_date").cast("date"),
+            "cif_id",
+        )
+        .filter(in_persona)
+        .dropDuplicates(list(GRAIN))
+    )
     mid_month = base.filter(F.col("observation_date") != F.last_day("observation_date"))
     if mid_month.limit(1).count():
         raise ValueError("spine observation dates must be month ends")
     return base
 
 
-def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
+def build_cc_obs_base(cc_spine: DataFrame, crx_persona: dict) -> DataFrame:
     """The CC observation base at month ends. Until ``cc_spine`` itself is month-end, each
     billing-date row moves to its month end; an account's rows in one month become one
     (the largest ``cif_id`` if they disagree). Remove the shift once the spine is month-end.
@@ -186,8 +196,8 @@ def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
     collapsed = month_end.groupBy("contract_id", "observation_date").agg(
         F.max("cif_id").alias("cif_id")
     )
-    return _obs_base(collapsed, "contract_id")
+    return _obs_base(collapsed, "contract_id", crx_persona)
 
 
-def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
-    return _obs_base(rl_spine, "account_id")
+def build_rl_obs_base(rl_spine: DataFrame, crx_persona: dict) -> DataFrame:
+    return _obs_base(rl_spine, "account_id", crx_persona)

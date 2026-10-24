@@ -4,8 +4,9 @@ Two log blocks, aggregates only:
 
 * ``compare_a1_outputs`` (``B03 OUTPUT``): the bundle 02 engine output
   (``crx_cc_a1_ability_b01_check``, billing-date observations) against the new month-end
-  output (``crx_cc_a1_ability_b03_check``). An old row is matched to the new row of the
-  same account and month (the month's latest old observation).
+  output (``crx_cc_a1_ability_b03_check``), over the new output's months (the persona
+  months). An old row is matched to the new row of the same account and month (the
+  month's latest old observation).
 * ``compare_income_rules`` (``B03 INCOME``): what the 2 × anchor income bar and the
   income-weakening check do, against a flat AED 3,000 floor and no weakening check.
 
@@ -46,11 +47,13 @@ def _crosstab(df: DataFrame, a: str, b: str) -> list[str]:
 
 def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
     """Old vs new state crosstab, new levels and the latest month's state distribution."""
+    first, last = new.agg(F.min("observation_date"), F.max("observation_date")).first()
     latest_in_month = Window.partitionBy("account_id", "month").orderBy(
         F.col("observation_date").desc()
     )
     old_m = (
         old.withColumn("month", F.trunc("observation_date", "month"))
+        .filter(F.col("month").between(F.trunc(F.lit(first), "month"), F.lit(last)))
         .withColumn("_rn", F.row_number().over(latest_in_month))
         .filter(F.col("_rn") == 1)
         .select("account_id", "month", F.col("a1_state").alias("old_state"))
@@ -71,10 +74,9 @@ def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
     )
     n = both.count()
     changed = both.filter(F.col("old_state") != F.col("new_state")).count()
-    last = new.agg(F.max("observation_date")).first()[0]
     latest = new.filter(F.col("observation_date") == F.lit(last))
     lines = [
-        f"model_id={model_id} rows={n} changed={changed} "
+        f"model_id={model_id} months {first}..{last} rows={n} changed={changed} "
         f"({100.0 * changed / max(n, 1):.2f}%)",
         f"  distress flag: {_counts(both, 'a1_distress_flag')}",
         f"  latest month {last}: {_counts(latest, 'a1_state')}",

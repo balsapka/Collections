@@ -1,8 +1,8 @@
 Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
-Before Step 9, check that `crx_persona.persona_start_date` in `conf/dev/globals_dev.yml`
-is not later than the first observation month in `cc_spine`. The A1 run stops otherwise
-(`prm_casa_return_events` would not reach back far enough); move the date back if so.
+The axis covers the persona months, `crx_persona.persona_start_date` to
+`persona_end_date` in `conf/dev/globals_dev.yml` (dev today: 2026-01 to 2026-08). The B03
+OUTPUT compares those months only. If you change either date, rerun Step 9 too.
 
 **Step 9.** Build `prm_casa_return_events` (6 months before the persona start month
 onwards):

@@ -12,7 +12,9 @@ log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (eviden
 
 - **Grain:** one row per `(account_id, observation_date)` from the observation base.
   Observation dates are **month ends** (CC: until `cc_spine` itself is month-end, the
-  observation base moves each billing-date row to its month end).
+  observation base moves each billing-date row to its month end). Only the persona months
+  are scored, `crx_persona.persona_start_date` to `persona_end_date`; in PROD that is the
+  latest inference month (the run on the 2nd scores the previous month end).
 - **Windows are calendar months, by segment** (`_common.window_months`), the observation
   month included (m1 = the observation month, m2 the one before, …):
   - **60–180: 3 months** (m1–m3); the prior window m4–m6 (used to spot a decline).
@@ -129,6 +131,6 @@ Moderate, Moderate → Low).
   salary can turn Stable into Weak (see the example).
 - **Bureau bounces are dated by the pull date.** A bounce repeated in later reports keeps
   the flag on; when the bounce really happened is under investigation.
-- **Internal returns start at the persona start.** `prm_casa_return_events` keeps 6 months
-  before `crx_persona.persona_start_date`; an observation month before that would miss
-  returns, so the run stops instead (`build_internal_returns`).
+- **Internal returns follow the persona start.** `prm_casa_return_events` keeps the 6
+  months up to `crx_persona.persona_start_date`; after moving that date, rerun
+  `casa_primary` first, or the A1 run stops (`build_internal_returns`).

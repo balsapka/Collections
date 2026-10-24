@@ -7,7 +7,9 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   `pit_latest(max_age_months)`, `lookback_floor`); the CC anchor needs a balance snapshot in
   the observation month. Until `cc_spine` is month-end, `build_cc_obs_base` moves each
   billing-date row to its month end (one row per account and month); any other
-  non-month-end spine date stops the run.
+  non-month-end spine date stops the run. The observation base keeps only the persona
+  months (`crx_persona.persona_start_date` to `persona_end_date`, like the other axes): in
+  PROD that is the latest inference month.
 - **Window by segment**, as on the other axes: 3 months at 60–180, 6 months at 180+
   (`_common.window_months`); "2 of 3" becomes "3 of 6" at 180+, the prior window is the 6
   months before, and card payments, distress and CASA activity read 6 months. The signal

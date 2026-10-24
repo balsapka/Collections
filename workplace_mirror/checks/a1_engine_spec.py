@@ -149,9 +149,13 @@ df = spark.createDataFrame
 # a return outside the obs CIFs in the 180+ window's first month: the returns table covers
 # every window (build_internal_returns checks that)
 COVER = [(-1, m(6), "CHARGES")]
-obs = _common.build_cc_obs_base(
-    df(rows["spine"], "contract_id string, observation_date date, cif_id long")
-)
+PERSONA = {"persona_start_date": "2026-07-01", "persona_end_date": "2026-07-31"}
+spine_schema = "contract_id string, observation_date date, cif_id long"
+obs = _common.build_cc_obs_base(df(rows["spine"], spine_schema), PERSONA)
+# spine rows outside the persona months are dropped
+assert _common.build_cc_obs_base(
+    df(rows["spine"] + [("OUT", date(2026, 6, 15), 1)], spine_schema), PERSONA
+).count() == obs.count()
 bcols = ", ".join(f"overdue_bucket_{i:02d} double" for i in range(1, 9))
 
 
