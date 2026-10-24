@@ -179,6 +179,10 @@ for acct, (name, want) in expect.items():
 # 180+ has no anchor
 assert build_cc_liquidity_anchor(obs, df(rows["bal"], f"contract_id string, observation_date date, {bcols}"),
                                  "cc_180_plus").filter(F.col("liquidity_anchor_amt").isNotNull()).count() == 0
+# a balance snapshot from before the observation month gives no anchor
+stale = [("A0", date(2026, 6, 30), *[100.0] * 8)]
+assert build_cc_liquidity_anchor(obs, df(stale, f"contract_id string, observation_date date, {bcols}"),
+                                 "cc_60_180").count() == 0
 # the debit and credit legs of one return count once
 ret_schema = "cif_id long, tran_date date, reason_for_excluding string"
 assert (build_internal_returns(obs, df(rows["ret"] * 2, ret_schema)).count()

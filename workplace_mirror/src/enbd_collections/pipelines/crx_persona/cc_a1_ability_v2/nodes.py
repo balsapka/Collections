@@ -12,8 +12,8 @@ from .._dpd_journey import MODEL_ID_SEGMENT
 # OVD_k holds the amount k cycles overdue (DPD bucket k+1): OVD_01 1-30 … OVD_06
 # 151-180 DPD. OVD_07 (181-210) and the catch-all OVD_08 (211+) never anchor.
 _OVERDUE_BUCKETS = [f"overdue_bucket_{i:02d}" for i in range(1, 7)]
-# A balance snapshot older than this means the card stopped reporting; no anchor then.
-_BALANCE_MAX_AGE_D = 31
+# No balance snapshot in the observation month means the card stopped reporting; no anchor.
+_BALANCE_MAX_AGE_M = 1
 
 
 def build_cc_liquidity_anchor(
@@ -47,7 +47,7 @@ def build_cc_liquidity_anchor(
         date_col="snapshot_date",
         value_cols=_OVERDUE_BUCKETS,
         inclusive=True,
-        max_age_days=_BALANCE_MAX_AGE_D,
+        max_age_months=_BALANCE_MAX_AGE_M,
     )
     oldest = F.coalesce(
         *[F.when(F.col(c) > 0, F.col(c)) for c in reversed(_OVERDUE_BUCKETS)]

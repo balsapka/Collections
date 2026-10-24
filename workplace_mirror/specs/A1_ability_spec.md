@@ -74,7 +74,7 @@ decisions by the user where the workbook and the earlier code disagreed:
 
 | # | Topic | Decision | Implementation |
 |---|---|---|---|
-| S1 | Anchor (the workbook's "minimum due") | **CC 60–180: the amount in the oldest overdue bucket**, excluding the 181–210 bucket and the 211+ catch-all; **CC 180+: no anchor** (absolute thresholds only); **RL: one EMI**. Missing → flat floors | `build_cc_liquidity_anchor`: oldest non-zero of `overdue_bucket_01..06` on the latest snapshot ≤ 31 days old; NULL at 180+ |
+| S1 | Anchor (the workbook's "minimum due") | **CC 60–180: the amount in the oldest overdue bucket**, excluding the 181–210 bucket and the 211+ catch-all; **CC 180+: no anchor** (absolute thresholds only); **RL: one EMI**. Missing → flat floors | `build_cc_liquidity_anchor`: oldest non-zero of `overdue_bucket_01..06` on the latest snapshot in the observation month; NULL at 180+ |
 | S2 | Income multiple | Income ≥ max(AED 3,000, **2 × anchor**) | `K_INC = 2` |
 | S3 | Salary month | per-month amount ≥ threshold, Stable = 2 of the last 3 | internal credits recovered per month from the WM salary snapshots (credit date = snapshot − days since credit); bureau salary per month; the larger counts. TODO(sonnet): validate against `feat_payroll_indicator` |
 | S4 | Income weakening | last-3-month average ≥ 75% of the prior 3 | `D_INC = 0.25`, months without salary count as 0 |

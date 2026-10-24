@@ -18,8 +18,6 @@ never for the scored account_id alone (an RL account_id is not a CASA account).
 
 from __future__ import annotations
 
-from typing import Sequence
-
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
@@ -29,6 +27,7 @@ from .._common import (
     lookback_floor,
     parse_yyyymmdd,
     require_columns,
+    window_agg,
 )
 
 # reason_for_excluding values that count as distress. prm_casa_return_events also carries
@@ -60,19 +59,6 @@ def _by_month(obs: DataFrame, series: DataFrame, value: str, prefix: str) -> Dat
                 for i in range(1, 7)
             ]
         )
-    )
-
-
-def _last_3_months(
-    obs: DataFrame, src: DataFrame, date_col: str, aggs: Sequence[Column]
-) -> DataFrame:
-    """Aggregate ``src`` rows dated in the last 3 months, per observation."""
-    return (
-        obs.select(*GRAIN, "cif_id")
-        .join(src, on="cif_id")
-        .filter(_month_index(F.col(date_col)).between(1, 3))
-        .groupBy(*GRAIN)
-        .agg(*aggs)
     )
 
 
@@ -205,7 +191,7 @@ def _ext_card_payments(
     )
     src = (
         labelled_txn.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs, 100)))
+            (F.col("tran_date") >= F.lit(lookback_floor(obs, 3)))
             & (F.col("in_out_flow") == "outflow")
             & (F.col("product_category") == "CASA")
         )
@@ -214,8 +200,12 @@ def _ext_card_payments(
             "cif_id", F.col("tran_date").cast("date"), F.col("tran_amt").cast("double")
         )
     )
-    return _last_3_months(
-        obs, src, "tran_date", [F.max("tran_amt").alias("ext_card_payment_max_3m")]
+    return window_agg(
+        obs,
+        src,
+        date_col="tran_date",
+        aggs=[F.max("tran_amt").alias("ext_card_payment_max_3m")],
+        months=3,
     )
 
 
@@ -233,7 +223,13 @@ def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame) -> DataFrame:
         .cast("int")
         .alias("_active"),
     )
-    return _last_3_months(obs, src, "week", [F.max("_active").alias("casa_active_3m")])
+    return window_agg(
+        obs,
+        src,
+        date_col="week",
+        aggs=[F.max("_active").alias("casa_active_3m")],
+        months=3,
+    )
 
 
 def build_liquidity_signals(
@@ -300,8 +296,12 @@ def build_distress_signals(
                 "cif_id", F.to_date("event_date").alias("event_date")
             )
         )
-    hits = _last_3_months(
-        obs, events, "event_date", [F.max(F.lit(1)).alias("distress_flag")]
+    hits = window_agg(
+        obs,
+        events,
+        date_col="event_date",
+        aggs=[F.max(F.lit(1)).alias("distress_flag")],
+        months=3,
     )
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
 
@@ -319,7 +319,7 @@ def build_internal_returns(obs_base: DataFrame, return_events: DataFrame) -> Dat
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
     return (
         return_events.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs_base, 100)))
+            (F.col("tran_date") >= F.lit(lookback_floor(obs_base, 3)))
             & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
         )
         .join(F.broadcast(cifs), on="cif_id", how="leftsemi")

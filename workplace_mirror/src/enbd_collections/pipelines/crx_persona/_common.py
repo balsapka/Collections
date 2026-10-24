@@ -4,10 +4,11 @@ Every axis works at the observation grain ``(account_id, observation_date)`` and
 up customer-level sources by ``cif_id``. The helpers here encode the conventions once:
 
 * missing source columns stop the run (``require_columns``);
-* point-in-time lookups read strictly before the observation date and can be bounded in
-  age (``pit_latest``), window aggregates read ``[start, observation_date)``
-  (``window_agg``);
-* source partition floors follow from the earliest observation date
+* windows are whole calendar months: the observation month (observation dates are month
+  ends) and the months before it;
+* point-in-time lookups read before the observation date and can be bounded in age
+  (``pit_latest``), window aggregates read the last N months (``window_agg``);
+* source partition floors follow from the earliest observation month
   (``lookback_floor``);
 * logging is opt-in and costs one job (``log_distribution``).
 """
@@ -15,7 +16,7 @@ up customer-level sources by ``cif_id``. The helpers here encode the conventions
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date
 from typing import Sequence
 
 from pyspark.sql import Column, DataFrame, Window
@@ -39,8 +40,9 @@ def parse_yyyymmdd(col: str) -> Column:
     return F.to_date(F.col(col).cast("string"), "yyyyMMdd")
 
 
-def _days_before(anchor: Column, days: int) -> Column:
-    return F.date_sub(anchor, days)
+def _window_start(anchor: Column, months: int) -> Column:
+    """First day of the last ``months`` calendar months, the anchor's month included."""
+    return F.add_months(F.trunc(anchor, "month"), 1 - months)
 
 
 def pit_latest(  # pylint: disable=too-many-arguments
@@ -51,15 +53,15 @@ def pit_latest(  # pylint: disable=too-many-arguments
     value_cols: Sequence[str],
     key: str = "cif_id",
     anchor: Column | None = None,
-    max_age_days: int | None = None,
+    max_age_months: int | None = None,
     inclusive: bool = False,
 ) -> DataFrame:
     """Latest ``src`` row dated before each base row's anchor, per ``GRAIN``.
 
     ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
     defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
-    day snapshots). ``max_age_days`` drops rows older than that, so a stale record never
-    stands in for a current one. Ties on the date are broken by the values (descending),
+    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar months
+    (1 = its own month), so a stale record never stands in for a current one. Ties on the date are broken by the values (descending),
     so reruns agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
     """
     anchor = F.col("observation_date") if anchor is None else anchor
@@ -67,8 +69,8 @@ def pit_latest(  # pylint: disable=too-many-arguments
         F.col("_d") <= F.col("_anchor") if inclusive else F.col("_d") < F.col("_anchor")
     )
     cond = before
-    if max_age_days is not None:
-        cond = cond & (F.col("_d") >= _days_before(F.col("_anchor"), max_age_days))
+    if max_age_months is not None:
+        cond = cond & (F.col("_d") >= _window_start(F.col("_anchor"), max_age_months))
     order = [F.col("_d").desc(), *[F.col(c).desc_nulls_last() for c in value_cols]]
     return (
         base.select(*GRAIN, key, anchor.alias("_anchor"))
@@ -88,38 +90,31 @@ def window_agg(  # pylint: disable=too-many-arguments
     *,
     date_col: str,
     aggs: Sequence[Column],
-    days: int | None = None,
-    months: int | None = None,
+    months: int,
     key: str = "cif_id",
 ) -> DataFrame:
-    """Aggregate ``src`` rows dated in a window ending before each observation date.
+    """Aggregate ``src`` rows dated in the last ``months`` calendar months — the
+    observation month and the ``months - 1`` before it, up to the observation date.
 
-    ``days``: ``[obs - days, obs)``. ``months``: whole calendar months
-    ``[trunc(obs) - months, trunc(obs))`` — for month-stamped series.
     ``src`` holds ``key``, ``date_col`` and the columns ``aggs`` read.
     Returns ``GRAIN + aggs`` for base rows with at least one row in the window.
     """
-    if (days is None) == (months is None):
-        raise ValueError("give exactly one of days / months")
     obs = F.col("observation_date")
-    if days is not None:
-        start, end = _days_before(obs, days), obs
-    else:
-        end = F.trunc(obs, "month")
-        start = F.add_months(end, -months)
     return (
         base.select(*GRAIN, key)
         .join(src, on=key)
-        .filter((F.col(date_col) >= start) & (F.col(date_col) < end))
+        .filter(
+            (F.col(date_col) >= _window_start(obs, months)) & (F.col(date_col) <= obs)
+        )
         .groupBy(*GRAIN)
         .agg(*aggs)
     )
 
 
-def lookback_floor(base: DataFrame, days: int) -> str:
-    """ISO date ``days`` before the earliest observation date (partition floor)."""
-    first: date = base.agg(F.min("observation_date")).first()[0]
-    return (first - timedelta(days=days)).isoformat()
+def lookback_floor(base: DataFrame, months: int) -> str:
+    """ISO start of the earliest observation's ``months``-month window (partition floor)."""
+    first: date = base.agg(_window_start(F.min("observation_date"), months)).first()[0]
+    return first.isoformat()
 
 
 def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
