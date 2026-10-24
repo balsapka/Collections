@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..688cccc` · source: 8 added, 10 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..a45b03c` · source: 8 added, 10 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -139,6 +139,10 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   snapshots, card payments, CASA flows, bureau events), so older history is not shuffled.
   This cuts rows, not necessarily partitions (the WM tables load one `adv_load_date`
   snapshot with the full weekly history); internal returns prune on `event_month`.
+- **State names**: `a1_state` is `high` / `moderate` / `low` / `unknown` (was
+  `ability_high` …), with the new display column `a1_state_label` = High / Moderate / Low /
+  Unknown (as `det_state_label` on the deterioration axis). The B03 comparison maps the
+  old names, so only real changes count as changed.
 - **State log for the latest month only**, as on the deterioration axis: `build_a1_ability`
   always logs the `a1_state` distribution of `persona_end_date`'s month
   (`_common.log_latest_month`, one aggregate job, a warning if it fails). The
@@ -211,7 +215,7 @@ prm_casa_return_events:
 `````
 
 ### FILE: `conf/base/catalog/catalog_crx.yml`
-action: replace · base sha256 `21ecdb9785c376dbe6a3f951fcc3dfb4ab468c4804b05e7f00d224ae5cf20835` · base trailing newline: yes · new sha256 `1dee6b155443227926bbb2eb1a9bc273293d1a4ca3f7ae52ec3ba4639e463a81` · new trailing newline: yes
+action: replace · base sha256 `21ecdb9785c376dbe6a3f951fcc3dfb4ab468c4804b05e7f00d224ae5cf20835` · base trailing newline: yes · new sha256 `4c408dd15915e22fca7a712221e45fc8645944e3bc37552271136439a6d430a0` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -1322,8 +1326,8 @@ crx_rl_obs_base:
 
 # ── CC A1 ability (shared _a1 engine) ───────────────────────────────────────
 # Evidence tables at (account_id, observation_date); the axis is crx_cc_a1_ability_v2
-# until the v1 pipeline is removed. a1_state in {ability_high, ability_moderate,
-# ability_low, ability_unknown}.
+# until the v1 pipeline is removed. a1_state in {high, moderate, low, unknown};
+# a1_state_label in {High, Moderate, Low, Unknown}.
 crx_cc_a1_income_signals:
   type: spark.SparkDataset
   file_format: parquet
@@ -2773,7 +2777,7 @@ def build_rl_obs_base(rl_spine: DataFrame, crx_persona: dict) -> DataFrame:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/README.md`
-action: add · new sha256 `ffb5ec289fa4a424b2a31089c600391a4bd1aee7d8daf602c2cca1b058d6295c` · new trailing newline: yes
+action: add · new sha256 `353db05af5db5a50e1172b596fec864884aa50e48a6d0b2ab35dd7c9de067b26` · new trailing newline: yes
 
 New:
 
@@ -2782,7 +2786,8 @@ New:
 
 A1 asks: **can this customer pay?** It looks at what we can see of their money — income,
 liquid balances, failed payments — and gives one state per observation:
-`ability_high`, `ability_moderate`, `ability_low` or `ability_unknown`.
+`a1_state` = `high`, `moderate`, `low` or `unknown`, shown as `a1_state_label` = High,
+Moderate, Low, Unknown.
 
 This page explains the logic in plain terms. The detailed rule table (thresholds, decision
 log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (evidence) and
@@ -2888,10 +2893,10 @@ Points = income points + liquidity points (0–4).
 
 | State | Rule |
 |---|---|
-| `ability_unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
-| `ability_high` | 4 points, no distress |
-| `ability_moderate` | 2–3 points without distress, or 4 points with distress |
-| `ability_low` | everything else: 0–1 points, or 2–3 points with distress |
+| `unknown` | 0 points, no distress **and** no CASA transaction in m1–m3 (`casa_active`, from `wm_fea_casa_cc_inflow_outflow`) — we see nothing, which is not evidence of no ability |
+| `high` | 4 points, no distress |
+| `moderate` | 2–3 points without distress, or 4 points with distress |
+| `low` | everything else: 0–1 points, or 2–3 points with distress |
 
 Unknown is checked first. Distress moves a customer exactly one rung down (High →
 Moderate, Moderate → Low).
@@ -2917,7 +2922,7 @@ Moderate, Moderate → Low).
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py`
-action: replace · base sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · base trailing newline: yes · new sha256 `5dea5b17e9363e5e62e2c565904765c7c3ff887fbd08c9ed84262a48f4e82074` · new trailing newline: yes
+action: replace · base sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · base trailing newline: yes · new sha256 `beb0aaa1956dd5e6280f9a0bf612f397bdbebeca7861a641038c0c1a78547eaa` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3103,13 +3108,19 @@ K_PAY = 1.0
 DEMIN = 1000.0  # smallest amount that counts as any evidence
 
 _LADDER = StateLadder(
-    high="ability_high",
-    moderate="ability_moderate",
-    low="ability_low",
-    unknown="ability_unknown",
+    high="high",
+    moderate="moderate",
+    low="low",
+    unknown="unknown",
     high_from_points=4,
     moderate_from_points=2,
 )
+DISPLAY_NAMES = {
+    "high": "High",
+    "moderate": "Moderate",
+    "low": "Low",
+    "unknown": "Unknown",
+}
 
 
 def _window(w: int) -> tuple[tuple[int, ...], tuple[int, ...]]:
@@ -3204,9 +3215,11 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
         "a1_state",
         _LADDER.state(F.col("a1_points_total"), F.col("a1_distress_flag"), unknown),
     )
+    labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
     out = df.select(
         *GRAIN,
         "a1_state",
+        labels[F.col("a1_state")].alias("a1_state_label"),
         F.when(F.col("a1_state") == _LADDER.unknown, "no_signal")
         .otherwise("observed")
         .alias("a1_provenance"),
@@ -3966,7 +3979,7 @@ __all__ = ["create_b03_check_pipeline", "create_pipeline"]
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b03_check.py`
-action: add · new sha256 `f6ff55633e45f2b7884e61cfbb26469b55ff8c29370354a76e3a02d72598385d` · new trailing newline: yes
+action: add · new sha256 `393e3f90528a39b32d98a76e9c2a4a6a5874d1dacb07c79e0def1c9f931b9cb4` · new trailing newline: yes
 
 New:
 
@@ -4029,7 +4042,12 @@ def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
         .filter(F.col("month").between(F.trunc(F.lit(first), "month"), F.lit(last)))
         .withColumn("_rn", F.row_number().over(latest_in_month))
         .filter(F.col("_rn") == 1)
-        .select("account_id", "month", F.col("a1_state").alias("old_state"))
+        .select(
+            "account_id",
+            "month",
+            # bundle 02 names: ability_high … ability_unknown
+            F.regexp_replace("a1_state", "^ability_", "").alias("old_state"),
+        )
     )
     both = (
         new.withColumn("month", F.trunc("observation_date", "month"))
