@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..8ecd486` · source: 8 added, 7 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..92c605b` · source: 8 added, 7 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -72,11 +72,12 @@ git fetch origin && git checkout feature/persona_redesign_b01 && git pull
 
 Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
-**Step 9.** First full build of `prm_casa_return_events` (scans the whole
-`comp_financial_tran_repos_dly` once; later runs use the default `rebuild_days`):
+**Step 9.** First build of `prm_casa_return_events`, from July 2024 (6 months before the CC
+modelling start, enough for cc_60_180 and cc_180_plus). Later monthly runs leave
+`rebuild_from` unset and rebuild only the previous and the current month:
 
 ```bash
-kedro run --env=dev --pipeline=casa_primary --params=casa_primary.rebuild_days=4000
+kedro run --env=dev --pipeline=casa_primary --params=casa_primary.rebuild_from=2024-07-01
 ```
 
 **Step 10.** Run the check pipeline (observation base + A1 into the temporary
@@ -116,8 +117,8 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   crx_persona): every returned CASA transaction (`CHEQUE RETURNS`, `DDS Rejects/Reversal`,
   `RETURNS`; both debit and credit legs) for all CIFs, one row per
   `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. Incremental: each
-  run rebuilds the event months from (today − `rebuild_days`) and overwrites only those
-  partitions. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
+  run rebuilds the event months from `rebuild_from` (default: the previous month) and
+  overwrites only those partitions. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
 - **Distress** = cheque returns + DDS rejects/reversals in the last 3 months; POS reversals
   (`RETURNS`) no longer count. Bureau bounces stay dated by `extract_date` (the pull date;
   the bounce date is under investigation).
@@ -1610,7 +1611,7 @@ crx_rl_a3_payment_credibility:
 `````
 
 ### FILE: `conf/base/parameters/parameters_casa.yml`
-action: add · new sha256 `6d45da2883c2ec53f2db05ca88ba34405dd690f724ea9e7130d26948bc0c7dce` · new trailing newline: yes
+action: add · new sha256 `853c09505df11c8159580b869bbb19f68a82fa754deebcadbe349f0a723bebd6` · new trailing newline: yes
 
 New:
 
@@ -1622,9 +1623,10 @@ casa_primary:
   # reason_for_excluding values kept in prm_casa_return_events (all return types;
   # which ones count as distress is decided in the persona signal layer).
   return_reasons: ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
-  # Event months rebuilt per run: from the month start of (today - rebuild_days).
-  # Covers late reloads; the first build overrides it with --params.
-  rebuild_days: 45
+  # First event month rebuilt by a run (ISO date, taken at its month start). null = the
+  # previous month, which catches late reloads in the monthly run. The first build sets it
+  # with --params to 6 months before the earliest modelling start (cc: 2024-07-01).
+  rebuild_from: null
 `````
 
 ### FILE: `src/enbd_collections/nodes/primary/casa/__init__.py`
@@ -1637,7 +1639,7 @@ New:
 `````
 
 ### FILE: `src/enbd_collections/nodes/primary/casa/prm_casa.py`
-action: add · new sha256 `cd026c7627bc71b6ce5839e2823f35dcce33e9d2c031c8b723b4bc32f625fef9` · new trailing newline: yes
+action: add · new sha256 `59fed4b90e6273525756b91e9d6f354059b04fc8beb331f600f3c52122b1f092` · new trailing newline: yes
 
 New:
 
@@ -1671,20 +1673,25 @@ _RETURN_EVENT_COLUMNS = [
 
 
 def build_return_events(
-    tran_repos: DataFrame, return_reasons: Sequence[str], rebuild_days: int
+    tran_repos: DataFrame,
+    return_reasons: Sequence[str],
+    rebuild_from: str | date | None,
 ) -> DataFrame:
     """Returned CASA transactions (every ``return_reasons`` value, both debit and credit
     legs) for all CIFs, one row per transaction key, partitioned by ``event_month``.
 
-    Incremental: only event months from the month start of (today - ``rebuild_days``)
-    are rebuilt, and the catalog overwrites just those partitions. A reload of the same
-    transaction in a later ``edp_load_date`` keeps the latest load. The first build runs
-    with a ``rebuild_days`` that covers the whole table.
+    Incremental: only event months from ``rebuild_from`` (a date, taken at its month
+    start) are rebuilt, and the catalog overwrites just those partitions. Without it, the
+    run rebuilds the previous and the current month. A reload of the same transaction in
+    a later ``edp_load_date`` keeps the latest load.
     """
     missing = sorted(set(_RETURN_EVENT_COLUMNS) - set(tran_repos.columns))
     if missing:
         raise ValueError(f"comp_financial_tran_repos_dly is missing columns: {missing}")
-    floor = (date.today() - timedelta(days=rebuild_days)).replace(day=1)
+    if rebuild_from:
+        floor = date.fromisoformat(str(rebuild_from)).replace(day=1)
+    else:  # the previous month's start
+        floor = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
     latest_load = Window.partitionBy(*_KEY).orderBy(F.col("edp_load_date").desc())
     return (
         tran_repos.filter(
@@ -2247,7 +2254,7 @@ New:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/casa/primary.py`
-action: add · new sha256 `a1e790236ff3b8e5c829728aa28698899711011cb1f949a6ed780f5f676e3b45` · new trailing newline: yes
+action: add · new sha256 `047701d7effcd0031af68b3f2c49a96153e68833dbec536d7bb95b2c962a9f20` · new trailing newline: yes
 
 New:
 
@@ -2255,7 +2262,7 @@ New:
 """CASA primary pipeline.
 
 kedro run --pipeline=casa_primary
-First build: kedro run --pipeline=casa_primary --params=casa_primary.rebuild_days=4000
+First build: kedro run --pipeline=casa_primary --params=casa_primary.rebuild_from=2024-07-01
 """
 
 from kedro.pipeline import Pipeline, node
@@ -2271,7 +2278,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 inputs=[
                     "comp_financial_tran_repos_dly",
                     "params:casa_primary.return_reasons",
-                    "params:casa_primary.rebuild_days",
+                    "params:casa_primary.rebuild_from",
                 ],
                 outputs="prm_casa_return_events",
                 name="build_prm_casa_return_events",
