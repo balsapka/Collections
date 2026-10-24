@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..c487385` · source: 8 added, 8 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..769eff9` · source: 8 added, 8 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -72,6 +72,10 @@ git fetch origin && git checkout feature/persona_redesign_b01 && git pull
 
 Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
+Before Step 9, check that `crx_persona.persona_start_date` in `conf/dev/globals_dev.yml`
+is not later than the first observation month in `cc_spine`. The A1 run stops otherwise
+(`prm_casa_return_events` would not reach back far enough); move the date back if so.
+
 **Step 9.** Build `prm_casa_return_events` (6 months before the persona start month
 onwards):
 
@@ -120,12 +124,19 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 - **New primary dataset `prm_casa_return_events`** (pipeline `casa_primary`, outside
   crx_persona): every returned CASA transaction (`CHEQUE RETURNS`, `DDS Rejects/Reversal`,
   `RETURNS`; both debit and credit legs) for all CIFs, one row per
-  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. It covers the 6 months
-  before `crx_persona.persona_start_date` and everything after; each run rebuilds it whole. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
-- **Distress** = cheque returns + DDS rejects/reversals in the last 3 months; POS reversals
+  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. It covers the 6 calendar months up to and including the
+  persona start month (`params:crx_persona.persona_start_date`) and everything after; each
+  run rebuilds it whole. CC A1 reads it instead of `comp_financial_tran_repos_dly`, and stops
+  if it starts after the first observation window.
+- **Distress** = cheque returns + DDS rejects/reversals in the window (3 or 6 months); POS reversals
   (`RETURNS`) no longer count. Bureau bounces stay dated by `extract_date` (the pull date;
   the bounce date is under investigation).
 - **Income**: the WM-recovered salary is the only internal salary source.
+- **Source floors**: every A1 signal builder filters its sources from the earliest
+  observation's first window month on, before any aggregation (salary and CASA snapshots,
+  card payments, CASA flows, bureau events), so older history is never shuffled.
+- **`build_distress_signals`** takes `internal_returns` as a required input (it is in PROD
+  now); only `payment_order` stays optional.
 - **`a1_ability/README.md`**: the A1 logic in plain terms (sources, windows, the 2-of-3
   rules, the state ladder, known limits).
 - **Check**: the bundle 01/02 check (`b01_check.py`) is replaced by `b03_check.py`, which
@@ -1613,7 +1624,7 @@ crx_rl_a3_payment_credibility:
 `````
 
 ### FILE: `conf/base/parameters/parameters_casa.yml`
-action: add · new sha256 `a05212055b4f5d2e67b43392366b5e8a53cbe6ac4d8065f777528741ba7ebab2` · new trailing newline: yes
+action: add · new sha256 `41f42367cddc858416be2b67d71a632c223b41f362d491e1ddb50813bfc6418f` · new trailing newline: yes
 
 New:
 
@@ -1625,8 +1636,9 @@ casa_primary:
   # reason_for_excluding values kept in prm_casa_return_events (all return types;
   # which ones count as distress is decided in the persona signal layer).
   return_reasons: ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
-  # Months kept up to the persona start month (crx_persona.persona_start_date), so the
-  # first observation month has its full distress window (the longest: 6 months at 180+).
+  # Calendar months kept up to and including the persona start month
+  # (crx_persona.persona_start_date), so the first observation month has its full
+  # distress window (the longest: 6 months at 180+).
   history_months: 6
 `````
 
@@ -1640,7 +1652,7 @@ New:
 `````
 
 ### FILE: `src/enbd_collections/nodes/primary/casa/prm_casa.py`
-action: add · new sha256 `040b6a7e808e105a2acf23b6e669610a3df753aef3ce0eeafa729ef332826dd9` · new trailing newline: yes
+action: add · new sha256 `b5a210a9ffbd9087ed1dbbb0c49c57eef619fe5a8e63d9c8d5d71f334ed869f0` · new trailing newline: yes
 
 New:
 
@@ -1673,25 +1685,31 @@ _RETURN_EVENT_COLUMNS = [
 ]
 
 
+def _months_back(day: date, months: int) -> date:
+    """First day of the month ``months`` calendar months before ``day``'s month."""
+    year, month = divmod(day.year * 12 + day.month - 1 - months, 12)
+    return date(year, month + 1, 1)
+
+
 def build_return_events(
     tran_repos: DataFrame,
     return_reasons: Sequence[str],
-    crx_persona: dict,
+    persona_start_date: str,
     history_months: int,
 ) -> DataFrame:
     """Returned CASA transactions (every ``return_reasons`` value, both debit and credit
     legs) for all CIFs, one row per transaction key, partitioned by ``event_month``.
 
-    Covers the ``history_months`` calendar months up to the persona start month, and
-    everything after it; each run rebuilds the whole table. A reload of the same
-    transaction in a later ``edp_load_date`` keeps the latest load.
+    Covers the last ``history_months`` calendar months up to and including the persona
+    start month, and everything after it; each run rebuilds the whole table. A reload of
+    the same transaction in a later ``edp_load_date`` keeps the latest load.
     """
     missing = sorted(set(_RETURN_EVENT_COLUMNS) - set(tran_repos.columns))
     if missing:
         raise ValueError(f"comp_financial_tran_repos_dly is missing columns: {missing}")
-    start = date.fromisoformat(str(crx_persona["persona_start_date"]))
-    y, m = divmod(start.year * 12 + start.month - history_months, 12)
-    floor = date(y, m + 1, 1)
+    floor = _months_back(
+        date.fromisoformat(str(persona_start_date)), history_months - 1
+    )
     latest_load = Window.partitionBy(*_KEY).orderBy(F.col("edp_load_date").desc())
     return (
         tran_repos.filter(
@@ -2254,7 +2272,7 @@ New:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/casa/primary.py`
-action: add · new sha256 `7e05d022b0511e8045c5795f3d006eccee742cd3e4bcfb58712cb1c34b25e7ee` · new trailing newline: yes
+action: add · new sha256 `885c504964e74f0035c623341f97ff914e3ecd5a7a8f6ae10d4925304613223a` · new trailing newline: yes
 
 New:
 
@@ -2277,7 +2295,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 inputs=[
                     "comp_financial_tran_repos_dly",
                     "params:casa_primary.return_reasons",
-                    "params:crx_persona",
+                    "params:crx_persona.persona_start_date",
                     "params:casa_primary.history_months",
                 ],
                 outputs="prm_casa_return_events",
@@ -2289,7 +2307,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
-action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `1f2a5d9f463a8331ebb559313c28517903b9fcefc40eda096c2a0d955d573f74` · new trailing newline: yes
+action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `d372ad9fa03594501127c81261ec7aa634035c1ffd6ad6700f7487af41503fff` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2541,9 +2559,10 @@ def pit_latest(  # pylint: disable=too-many-arguments
 
     ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
     defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
-    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar months
-    (1 = its own month), so a stale record never stands in for a current one. Ties on the date are broken by the values (descending),
-    so reruns agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
+    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar
+    months (1 = its own month), so a stale record never stands in for a current one.
+    Ties on the date are broken by the values (descending), so reruns agree. Returns
+    ``GRAIN + value_cols`` for base rows with a match only.
     """
     anchor = F.col("observation_date") if anchor is None else anchor
     before = (
@@ -2663,7 +2682,7 @@ def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/README.md`
-action: add · new sha256 `f324a402406f3b48d35f9a0ed576e0a3efec7723f0bda1f8b82b3b1ab6125aeb` · new trailing newline: yes
+action: add · new sha256 `397d18ef13d81f2a80164a6c0079baf87b313066a618ea26f7d7e0a0e78122f2` · new trailing newline: yes
 
 New:
 
@@ -2799,6 +2818,9 @@ Moderate, Moderate → Low).
   salary can turn Stable into Weak (see the example).
 - **Bureau bounces are dated by the pull date.** A bounce repeated in later reports keeps
   the flag on; when the bounce really happened is under investigation.
+- **Internal returns start at the persona start.** `prm_casa_return_events` keeps 6 months
+  before `crx_persona.persona_start_date`; an observation month before that would miss
+  returns, so the run stops instead (`build_internal_returns`).
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py`
@@ -3106,7 +3128,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py`
-action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `3951db54fd8faecc98e365ac1cd49a42d73af0e414db6fe0599e8a83b5107585` · new trailing newline: yes
+action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `c771c7346a4a4d07067cb710d57192b1ea81b847c521c985058233c4f376b3e5` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3469,7 +3491,9 @@ classifier compares with its thresholds:
 * distress  — a cheque bounce or direct-debit return in the window.
 
 Customer-level sources are always read for the whole CIF — all the customer's accounts —
-never for the scored account_id alone (an RL account_id is not a CASA account).
+never for the scored account_id alone (an RL account_id is not a CASA account). Each
+builder reads its sources from the earliest observation's first month on
+(``lookback_floor``), so source history before it is never shuffled.
 """
 
 from __future__ import annotations
@@ -3524,8 +3548,9 @@ def _by_month(
 # ── Income ────────────────────────────────────────────────────────────────────
 
 
-def _internal_salary(wm_salary: DataFrame) -> DataFrame:
-    """Salary credits by month, recovered from the weekly WM snapshots.
+def _internal_salary(wm_salary: DataFrame, since: str) -> DataFrame:
+    """Salary credits by month, recovered from the weekly WM snapshots dated ``since`` on
+    (an earlier snapshot cannot see a later credit).
 
     Each snapshot carries the last salary credited and how many days before the snapshot
     it was, so snapshot date minus that gap is the credit date. Several snapshots see
@@ -3544,11 +3569,11 @@ def _internal_salary(wm_salary: DataFrame) -> DataFrame:
         ],
         "wm_fea_salary_days_since_increment",
     )
+    week = parse_yyyymmdd("week_number")
     credit_date = F.date_sub(
-        parse_yyyymmdd("week_number"),
-        F.col("ft_days_since_salary_transaction").cast("int"),
+        week, F.col("ft_days_since_salary_transaction").cast("int")
     )
-    return wm_salary.select(
+    return wm_salary.filter(week >= F.lit(since)).select(
         "cif_id",
         F.trunc(credit_date, "month").alias("month"),
         F.col("ft_last_salary_amount").cast("double").alias("amount"),
@@ -3587,13 +3612,15 @@ def build_income_signals(
     """``income_m1 … income_m{2W}``: salary received per month — the larger of the
     internal credit and the bureau salary (NULL: no salary that month)."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
+    months = 2 * window_months(model_id)
+    since = lookback_floor(obs, months)
     monthly = (
-        _internal_salary(wm_salary)
+        _internal_salary(wm_salary, since)
         .unionByName(_bureau_salary(salary_hist, bureau_cif_bridge))
+        .filter(F.col("month") >= F.lit(since))
         .groupBy("cif_id", "month")
         .agg(F.max("amount").alias("amount"))
     )
-    months = 2 * window_months(model_id)
     return left_join_all(
         obs_base, [_by_month(obs, monthly, "amount", "income", months)]
     )
@@ -3602,9 +3629,9 @@ def build_income_signals(
 # ── Liquidity and activity ────────────────────────────────────────────────────
 
 
-def _casa_by_month(wm_casa_bal: DataFrame) -> DataFrame:
-    """CASA (current + savings) average balance per month: the 4-week average at the
-    month's last weekly snapshot."""
+def _casa_by_month(wm_casa_bal: DataFrame, since: str) -> DataFrame:
+    """CASA (current + savings) average balance per month from ``since`` on: the 4-week
+    average at the month's last weekly snapshot."""
     require_columns(
         wm_casa_bal,
         ["cif_id", "week_number", _CASA_MONTH_COL],
@@ -3615,14 +3642,19 @@ def _casa_by_month(wm_casa_bal: DataFrame) -> DataFrame:
         F.struct(week.alias("w"), F.col(_CASA_MONTH_COL).cast("double").alias("v"))
     )
     return (
-        wm_casa_bal.groupBy("cif_id", F.trunc(week, "month").alias("month"))
+        wm_casa_bal.filter(week >= F.lit(since))
+        .groupBy("cif_id", F.trunc(week, "month").alias("month"))
         .agg(last_in_month.alias("_last"))
         .select("cif_id", "month", F.col("_last.v").alias("balance"))
     )
 
 
-def _ext_card_payments(
-    obs: DataFrame, labelled_txn: DataFrame, beneficiary_cards: DataFrame, months: int
+def _ext_card_payments(  # pylint: disable=too-many-arguments
+    obs: DataFrame,
+    labelled_txn: DataFrame,
+    beneficiary_cards: DataFrame,
+    months: int,
+    since: str,
 ) -> DataFrame:
     """Largest single CASA payment to one of the customer's registered external credit
     cards in the window.
@@ -3654,7 +3686,7 @@ def _ext_card_payments(
     )
     src = (
         labelled_txn.filter(
-            (F.col("tran_date") >= F.lit(lookback_floor(obs, months)))
+            (F.col("tran_date") >= F.lit(since))
             & (F.col("in_out_flow") == "outflow")
             & (F.col("product_category") == "CASA")
         )
@@ -3672,16 +3704,19 @@ def _ext_card_payments(
     )
 
 
-def _casa_activity(obs: DataFrame, wm_casa_flow: DataFrame, months: int) -> DataFrame:
+def _casa_activity(
+    obs: DataFrame, wm_casa_flow: DataFrame, months: int, since: str
+) -> DataFrame:
     """Any CASA credit or debit in the window."""
     require_columns(
         wm_casa_flow,
         ["cif_id", "week_number", _CASA_IN_COL, _CASA_OUT_COL],
         "wm_fea_casa_cc_inflow_outflow",
     )
-    src = wm_casa_flow.select(
+    week = parse_yyyymmdd("week_number")
+    src = wm_casa_flow.filter(week >= F.lit(since)).select(
         "cif_id",
-        parse_yyyymmdd("week_number").alias("week"),
+        week.alias("week"),
         ((F.col(_CASA_IN_COL) > 0) | (F.col(_CASA_OUT_COL) > 0))
         .cast("int")
         .alias("_active"),
@@ -3706,12 +3741,15 @@ def build_liquidity_signals(
     """``casa_m1 … casa_m{2W}``, ``ext_card_payment_max``, ``casa_active``."""
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     w = window_months(model_id)
+    since = lookback_floor(obs, 2 * w)  # the balances' prior window reaches furthest
     return left_join_all(
         obs_base,
         [
-            _by_month(obs, _casa_by_month(wm_casa_bal), "balance", "casa", 2 * w),
-            _ext_card_payments(obs, labelled_txn, beneficiary_cards, w),
-            _casa_activity(obs, wm_casa_flow, w),
+            _by_month(
+                obs, _casa_by_month(wm_casa_bal, since), "balance", "casa", 2 * w
+            ),
+            _ext_card_payments(obs, labelled_txn, beneficiary_cards, w, since),
+            _casa_activity(obs, wm_casa_flow, w, since),
         ],
     )
 
@@ -3722,20 +3760,21 @@ def build_liquidity_signals(
 def build_distress_signals(
     obs_base: DataFrame,
     bureau_alert: DataFrame,
+    internal_returns: DataFrame,
     model_id: str,
     payment_order: DataFrame | None = None,
-    internal_returns: DataFrame | None = None,
 ) -> DataFrame:
     """distress_flag: a cheque bounce or direct-debit (DDS) return in the window,
     from the bureau and from the bank's own records.
 
     * ``bureau_alert`` — bureau-reported bounced cheques, dated by ``extract_date``
       (the bureau pull date, not the bounce date: a bounce can repeat in later pulls);
-    * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet;
     * ``internal_returns`` — the bank's own returned cheques / DDS returns as
-      ``(cif_id, event_date)`` from ``build_internal_returns``.
+      ``(cif_id, event_date)`` from ``build_internal_returns``;
+    * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet.
     """
     obs = obs_base.filter(F.col("cif_id").isNotNull())
+    w = window_months(model_id)
     require_columns(
         bureau_alert,
         ["cif_id", "extract_date", "bounced_cheque_amount"],
@@ -3755,19 +3794,16 @@ def build_distress_signals(
                 "cif_id", F.to_date("return_date").alias("event_date")
             )
         )
-    if internal_returns is not None:
-        require_columns(internal_returns, ["cif_id", "event_date"], "internal_returns")
-        events = events.unionByName(
-            internal_returns.select(
-                "cif_id", F.to_date("event_date").alias("event_date")
-            )
-        )
+    require_columns(internal_returns, ["cif_id", "event_date"], "internal_returns")
+    events = events.unionByName(
+        internal_returns.select("cif_id", F.to_date("event_date").alias("event_date"))
+    )
     hits = window_agg(
         obs,
-        events,
+        events.filter(F.col("event_date") >= F.lit(lookback_floor(obs, w))),
         date_col="event_date",
         aggs=[F.max(F.lit(1)).alias("distress_flag")],
-        months=window_months(model_id),
+        months=w,
     )
     return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
 
@@ -3778,19 +3814,28 @@ def build_internal_returns(
     """The bank's own returned cheques and DDS returns for the observation base's CIFs, as
     distinct ``(cif_id, event_date, reason)`` from ``prm_casa_return_events`` (all of the
     customer's CASA accounts; the debit and credit legs of a return collapse to one row).
+
+    Stops the run when the table starts after the earliest observation's window: it is
+    built from ``crx_persona.persona_start_date``, which must not be later than the first
+    observation month.
     """
     require_columns(
         return_events,
         ["cif_id", "tran_date", "reason_for_excluding"],
         "prm_casa_return_events",
     )
+    since = lookback_floor(obs_base, window_months(model_id))
+    first = return_events.agg(F.min(F.trunc("tran_date", "month"))).first()[0]
+    if first is None or first.isoformat() > since:
+        raise ValueError(
+            f"prm_casa_return_events starts at {first}, but the observations need returns "
+            f"from {since}: set crx_persona.persona_start_date to the first observation "
+            "month (or earlier) and rerun casa_primary"
+        )
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
     return (
         return_events.filter(
-            (
-                F.col("tran_date")
-                >= F.lit(lookback_floor(obs_base, window_months(model_id)))
-            )
+            (F.col("tran_date") >= F.lit(since))
             & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
         )
         .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
@@ -4133,7 +4178,7 @@ def build_cc_liquidity_anchor(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py`
-action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `4fdce8bd9e060f5d538c26ab9bd5e3fcbda5d833bd848015e731b219b9edc313` · new trailing newline: yes
+action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `3ca4e69cd2cb4561c848e5dc1aa00e16c770dac6761f007a7b7339420ddf946b` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -4366,8 +4411,8 @@ def create_pipeline(
                 {
                     "obs_base": _OBS,
                     "bureau_alert": "prm_bureau_alert_enriched",
-                    "model_id": "params:model_id",
                     "internal_returns": "crx_cc_a1_internal_returns",
+                    "model_id": "params:model_id",
                 },
                 "crx_cc_a1_distress_signals",
                 name="build_crx_cc_a1_distress_signals",
