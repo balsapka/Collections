@@ -78,7 +78,7 @@ decisions by the user where the workbook and the earlier code disagreed:
 | S2 | Income multiple | Income ≥ max(AED 3,000, **2 × anchor**) | `K_INC = 2` |
 | S3 | Salary month | per-month amount ≥ threshold, Stable = 2 of the last 3 | internal credits recovered per month from the WM salary snapshots (credit date = snapshot − days since credit); bureau salary per month; the larger counts. TODO(sonnet): validate against `feat_payroll_indicator` |
 | S4 | Income weakening | last-3-month average ≥ 75% of the prior 3 | `D_INC = 0.25`, months without salary count as 0 |
-| S5/S6 | Weak income, bureau window | any month ≥ AED 1,000 in the last 3 months (bureau included) | 3 complete calendar months before the observation month |
+| S5/S6 | Weak income, bureau window | any month ≥ AED 1,000 in the last 3 months (bureau included) | the observation month (a month end) and the 2 months before it |
 | S7 | CASA | ≥ floor in 2 of the last 3 months and not > 50% below the prior 3 | monthly CASA (CA+SA) average from `wm_fea_casa_eod_avg_balance` (4-week average at the month's last weekly snapshot) |
 | S8 | External card payment | one payment ≥ max(AED 500, anchor) / ≥ AED 1,000 for Weak | largest single payment in the last 3 months |
 | S9 | Distress | cheque bounces and DDS returns, bureau **and internal**, across all the customer's accounts | bureau bounced cheques wired; `payment_order` and `internal_returns` slots ready. TODO(sonnet): find the internal returned-cheque / DDS-return source |

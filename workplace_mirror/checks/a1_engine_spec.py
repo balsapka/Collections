@@ -38,12 +38,12 @@ from enbd_collections.pipelines.crx_persona.cc_a1_ability_v2.nodes import (  # n
     build_cc_liquidity_anchor,
 )
 
-OBS = date(2026, 7, 15)  # m1 = Jun, m2 = May, m3 = Apr; prior = Mar, Feb, Jan
+OBS = date(2026, 7, 31)  # m1 = Jul, m2 = Jun, m3 = May; prior = Apr, Mar, Feb
 
 
 def m(k, day=20):
-    """A date in month m_k before OBS."""
-    y, mo = OBS.year, OBS.month - k
+    """A date in month m_k (m1 = the observation month, m0 = the month after)."""
+    y, mo = OBS.year, OBS.month - k + 1
     while mo <= 0:
         mo, y = mo + 12, y - 1
     return date(y, mo, day)
@@ -99,6 +99,7 @@ case("stable needs 2x anchor: 2 x 3000 overdue = 6000", salary=[(1, 5000), (2, 5
 case("weakening > 25% breaks stable", salary=[(1, 4000), (2, 4000), (3, 4000), (4, 9000), (5, 9000), (6, 9000)],
      income="weak")
 case("bureau salary counts", bureau=[(1, 4000), (2, 4000)], income="stable")
+case("salary after the observation month ignored", salary=[(0, 5000), (1, 5000)], income="weak")
 case("bureau older than 3 months ignored", bureau=[(4, 4000), (5, 4000)], income="none")
 # ── Liquidity (rows 17-19) ──
 case("casa adequate 2 of 3 >= 3000", casa=[(1, 3500), (2, 3500), (3, 100)], liquidity="adequate")

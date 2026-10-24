@@ -2,9 +2,9 @@
 
 Spec: ``workplace_mirror/specs/A1_ability_spec.md`` (GRR workbook A1_ability_20261022).
 
-"The last 3 months" are the three complete calendar months before the observation month
-(m1 = the month before, m2, m3); "the prior 3 months" are m4–m6. The builders return the
-amounts the classifier compares with its thresholds:
+Observation dates are month ends. "The last 3 months" are the observation month and the
+two before it (m1 = the observation month, m2, m3); "the prior 3 months" are m4–m6. The
+builders return the amounts the classifier compares with its thresholds:
 
 * income    — salary received in each month (internal credit or bureau salary,
               the larger);
@@ -40,9 +40,9 @@ _CASA_OUT_COL = "ft_outflow_casa_amt_in_last_0_0_weeks_sum"
 
 
 def _month_index(date: Column) -> Column:
-    """1 for the month before the observation month, 2 for the one before, …"""
+    """1 for the observation month, 2 for the one before, …"""
     obs_month = F.trunc(F.col("observation_date"), "month")
-    return F.months_between(obs_month, F.trunc(date, "month")).cast("int")
+    return F.months_between(obs_month, F.trunc(date, "month")).cast("int") + 1
 
 
 def _by_month(obs: DataFrame, series: DataFrame, value: str, prefix: str) -> DataFrame:
@@ -66,7 +66,7 @@ def _by_month(obs: DataFrame, series: DataFrame, value: str, prefix: str) -> Dat
 def _last_3_months(
     obs: DataFrame, src: DataFrame, date_col: str, aggs: Sequence[Column]
 ) -> DataFrame:
-    """Aggregate ``src`` rows dated in the last 3 complete months, per observation."""
+    """Aggregate ``src`` rows dated in the last 3 months, per observation."""
     return (
         obs.select(*GRAIN, "cif_id")
         .join(src, on="cif_id")
