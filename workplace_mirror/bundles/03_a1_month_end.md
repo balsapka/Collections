@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..92c605b` · source: 8 added, 7 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..7d2ff80` · source: 8 added, 7 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -72,12 +72,11 @@ git fetch origin && git checkout feature/persona_redesign_b01 && git pull
 
 Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
-**Step 9.** First build of `prm_casa_return_events`, from July 2024 (6 months before the CC
-modelling start, enough for cc_60_180 and cc_180_plus). Later monthly runs leave
-`rebuild_from` unset and rebuild only the previous and the current month:
+**Step 9.** Build `prm_casa_return_events` (6 months before the persona start month
+onwards):
 
 ```bash
-kedro run --env=dev --pipeline=casa_primary --params=casa_primary.rebuild_from=2024-07-01
+kedro run --env=dev --pipeline=casa_primary
 ```
 
 **Step 10.** Run the check pipeline (observation base + A1 into the temporary
@@ -116,9 +115,8 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 - **New primary dataset `prm_casa_return_events`** (pipeline `casa_primary`, outside
   crx_persona): every returned CASA transaction (`CHEQUE RETURNS`, `DDS Rejects/Reversal`,
   `RETURNS`; both debit and credit legs) for all CIFs, one row per
-  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. Incremental: each
-  run rebuilds the event months from `rebuild_from` (default: the previous month) and
-  overwrites only those partitions. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
+  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. It covers the 6 months
+  before `crx_persona.persona_start_date` and everything after; each run rebuilds it whole. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
 - **Distress** = cheque returns + DDS rejects/reversals in the last 3 months; POS reversals
   (`RETURNS`) no longer count. Bureau bounces stay dated by `extract_date` (the pull date;
   the bounce date is under investigation).
@@ -165,7 +163,7 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 ## Files
 
 ### FILE: `conf/base/catalog/catalog_casa.yml`
-action: add · new sha256 `433e86b959b58cea4554b3e88567ebe835f5a84498336d24791d8d1ca8a57747` · new trailing newline: yes
+action: add · new sha256 `569f563c2264e199ae168b0a6c114cda9e35d2756a0384a00ad6ef1a28a6f59a` · new trailing newline: yes
 
 New:
 
@@ -173,7 +171,6 @@ New:
 # CASA primary datasets (pipeline casa_primary).
 
 # Returned CASA transactions, all CIFs, one row per (tran_id, part_tran_srl_num, tran_date).
-# Incremental: each run overwrites only the event_month partitions it rebuilt.
 prm_casa_return_events:
   type: spark.SparkDataset
   file_format: parquet
@@ -181,7 +178,6 @@ prm_casa_return_events:
   save_args:
     mode: overwrite
     partitionBy: ["event_month"]
-    partitionOverwriteMode: dynamic
   metadata:
     kedro-viz:
       layer: primary
@@ -1611,7 +1607,7 @@ crx_rl_a3_payment_credibility:
 `````
 
 ### FILE: `conf/base/parameters/parameters_casa.yml`
-action: add · new sha256 `853c09505df11c8159580b869bbb19f68a82fa754deebcadbe349f0a723bebd6` · new trailing newline: yes
+action: add · new sha256 `dec3ba6571a92fb95ae99b89ab08de232dfe6516863e546d7082fc5ba6c5a661` · new trailing newline: yes
 
 New:
 
@@ -1623,10 +1619,9 @@ casa_primary:
   # reason_for_excluding values kept in prm_casa_return_events (all return types;
   # which ones count as distress is decided in the persona signal layer).
   return_reasons: ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
-  # First event month rebuilt by a run (ISO date, taken at its month start). null = the
-  # previous month, which catches late reloads in the monthly run. The first build sets it
-  # with --params to 6 months before the earliest modelling start (cc: 2024-07-01).
-  rebuild_from: null
+  # Months kept up to the persona start month (crx_persona.persona_start_date), so the
+  # first observation month has its full lookback (A1 reads m1-m6).
+  history_months: 6
 `````
 
 ### FILE: `src/enbd_collections/nodes/primary/casa/__init__.py`
@@ -1639,7 +1634,7 @@ New:
 `````
 
 ### FILE: `src/enbd_collections/nodes/primary/casa/prm_casa.py`
-action: add · new sha256 `59fed4b90e6273525756b91e9d6f354059b04fc8beb331f600f3c52122b1f092` · new trailing newline: yes
+action: add · new sha256 `040b6a7e808e105a2acf23b6e669610a3df753aef3ce0eeafa729ef332826dd9` · new trailing newline: yes
 
 New:
 
@@ -1648,7 +1643,7 @@ New:
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Sequence
 
 from pyspark.sql import DataFrame, Window
@@ -1675,23 +1670,22 @@ _RETURN_EVENT_COLUMNS = [
 def build_return_events(
     tran_repos: DataFrame,
     return_reasons: Sequence[str],
-    rebuild_from: str | date | None,
+    crx_persona: dict,
+    history_months: int,
 ) -> DataFrame:
     """Returned CASA transactions (every ``return_reasons`` value, both debit and credit
     legs) for all CIFs, one row per transaction key, partitioned by ``event_month``.
 
-    Incremental: only event months from ``rebuild_from`` (a date, taken at its month
-    start) are rebuilt, and the catalog overwrites just those partitions. Without it, the
-    run rebuilds the previous and the current month. A reload of the same transaction in
-    a later ``edp_load_date`` keeps the latest load.
+    Covers the ``history_months`` calendar months up to the persona start month, and
+    everything after it; each run rebuilds the whole table. A reload of the same
+    transaction in a later ``edp_load_date`` keeps the latest load.
     """
     missing = sorted(set(_RETURN_EVENT_COLUMNS) - set(tran_repos.columns))
     if missing:
         raise ValueError(f"comp_financial_tran_repos_dly is missing columns: {missing}")
-    if rebuild_from:
-        floor = date.fromisoformat(str(rebuild_from)).replace(day=1)
-    else:  # the previous month's start
-        floor = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
+    start = date.fromisoformat(str(crx_persona["persona_start_date"]))
+    y, m = divmod(start.year * 12 + start.month - history_months, 12)
+    floor = date(y, m + 1, 1)
     latest_load = Window.partitionBy(*_KEY).orderBy(F.col("edp_load_date").desc())
     return (
         tran_repos.filter(
@@ -2254,15 +2248,14 @@ New:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/casa/primary.py`
-action: add · new sha256 `047701d7effcd0031af68b3f2c49a96153e68833dbec536d7bb95b2c962a9f20` · new trailing newline: yes
+action: add · new sha256 `7e05d022b0511e8045c5795f3d006eccee742cd3e4bcfb58712cb1c34b25e7ee` · new trailing newline: yes
 
 New:
 
 `````python
 """CASA primary pipeline.
 
-kedro run --pipeline=casa_primary
-First build: kedro run --pipeline=casa_primary --params=casa_primary.rebuild_from=2024-07-01
+kedro run --pipeline=casa_primary   (per model_id)
 """
 
 from kedro.pipeline import Pipeline, node
@@ -2278,7 +2271,8 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 inputs=[
                     "comp_financial_tran_repos_dly",
                     "params:casa_primary.return_reasons",
-                    "params:casa_primary.rebuild_from",
+                    "params:crx_persona",
+                    "params:casa_primary.history_months",
                 ],
                 outputs="prm_casa_return_events",
                 name="build_prm_casa_return_events",
