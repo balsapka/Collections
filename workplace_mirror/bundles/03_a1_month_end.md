@@ -1,6 +1,6 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..769eff9` · source: 8 added, 8 replaced, 1 deleted · helpers: 0
+apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..c8e4ed3` · source: 8 added, 9 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -72,9 +72,9 @@ git fetch origin && git checkout feature/persona_redesign_b01 && git pull
 
 Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
-Before Step 9, check that `crx_persona.persona_start_date` in `conf/dev/globals_dev.yml`
-is not later than the first observation month in `cc_spine`. The A1 run stops otherwise
-(`prm_casa_return_events` would not reach back far enough); move the date back if so.
+The axis covers the persona months, `crx_persona.persona_start_date` to
+`persona_end_date` in `conf/dev/globals_dev.yml` (dev today: 2026-01 to 2026-08). The B03
+OUTPUT compares those months only. If you change either date, rerun Step 9 too.
 
 **Step 9.** Build `prm_casa_return_events` (6 months before the persona start month
 onwards):
@@ -115,7 +115,9 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   `pit_latest(max_age_months)`, `lookback_floor`); the CC anchor needs a balance snapshot in
   the observation month. Until `cc_spine` is month-end, `build_cc_obs_base` moves each
   billing-date row to its month end (one row per account and month); any other
-  non-month-end spine date stops the run.
+  non-month-end spine date stops the run. The observation base keeps only the persona
+  months (`crx_persona.persona_start_date` to `persona_end_date`, like the other axes): in
+  PROD that is the latest inference month.
 - **Window by segment**, as on the other axes: 3 months at 60–180, 6 months at 180+
   (`_common.window_months`); "2 of 3" becomes "3 of 6" at 180+, the prior window is the 6
   months before, and card payments, distress and CASA activity read 6 months. The signal
@@ -175,6 +177,7 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 | add | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b03_check.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/nodes.py` |
 | replace | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py` |
+| replace | `src/enbd_collections/pipelines/crx_persona/obs_base/pipeline.py` |
 | delete | `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b01_check.py` |
 
 ## Files
@@ -2307,7 +2310,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
-action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `d372ad9fa03594501127c81261ec7aa634035c1ffd6ad6700f7487af41503fff` · new trailing newline: yes
+action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `8fa4c130837ab7f2175522caa04b130fa27156086ec9d6ed429d864e415539df` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2644,24 +2647,34 @@ def log_distribution(df: DataFrame, col: str, name: str, enabled: bool) -> None:
 # ── Observation base ──────────────────────────────────────────────────────────
 
 
-def _obs_base(spine: DataFrame, id_col: str) -> DataFrame:
-    """Every spine row with the ``cif_id`` the spine already carries.
+def _obs_base(spine: DataFrame, id_col: str, crx_persona: dict) -> DataFrame:
+    """The spine rows in the persona months — ``crx_persona.persona_start_date`` to
+    ``persona_end_date``, whole months — with the ``cif_id`` the spine already carries.
 
     Rows without a CIF are kept: customer-level signals are simply absent for them.
     Observation dates must be month ends; any other date stops the run.
     """
-    base = spine.select(
-        F.col(id_col).cast("string").alias("account_id"),
-        F.col("observation_date").cast("date"),
-        "cif_id",
-    ).dropDuplicates(list(GRAIN))
+    month = F.trunc("observation_date", "month")
+    in_persona = month.between(
+        F.trunc(F.lit(str(crx_persona["persona_start_date"])), "month"),
+        F.trunc(F.lit(str(crx_persona["persona_end_date"])), "month"),
+    )
+    base = (
+        spine.select(
+            F.col(id_col).cast("string").alias("account_id"),
+            F.col("observation_date").cast("date"),
+            "cif_id",
+        )
+        .filter(in_persona)
+        .dropDuplicates(list(GRAIN))
+    )
     mid_month = base.filter(F.col("observation_date") != F.last_day("observation_date"))
     if mid_month.limit(1).count():
         raise ValueError("spine observation dates must be month ends")
     return base
 
 
-def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
+def build_cc_obs_base(cc_spine: DataFrame, crx_persona: dict) -> DataFrame:
     """The CC observation base at month ends. Until ``cc_spine`` itself is month-end, each
     billing-date row moves to its month end; an account's rows in one month become one
     (the largest ``cif_id`` if they disagree). Remove the shift once the spine is month-end.
@@ -2674,15 +2687,15 @@ def build_cc_obs_base(cc_spine: DataFrame) -> DataFrame:
     collapsed = month_end.groupBy("contract_id", "observation_date").agg(
         F.max("cif_id").alias("cif_id")
     )
-    return _obs_base(collapsed, "contract_id")
+    return _obs_base(collapsed, "contract_id", crx_persona)
 
 
-def build_rl_obs_base(rl_spine: DataFrame) -> DataFrame:
-    return _obs_base(rl_spine, "account_id")
+def build_rl_obs_base(rl_spine: DataFrame, crx_persona: dict) -> DataFrame:
+    return _obs_base(rl_spine, "account_id", crx_persona)
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/README.md`
-action: add · new sha256 `397d18ef13d81f2a80164a6c0079baf87b313066a618ea26f7d7e0a0e78122f2` · new trailing newline: yes
+action: add · new sha256 `ffb5ec289fa4a424b2a31089c600391a4bd1aee7d8daf602c2cca1b058d6295c` · new trailing newline: yes
 
 New:
 
@@ -2701,7 +2714,9 @@ log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (eviden
 
 - **Grain:** one row per `(account_id, observation_date)` from the observation base.
   Observation dates are **month ends** (CC: until `cc_spine` itself is month-end, the
-  observation base moves each billing-date row to its month end).
+  observation base moves each billing-date row to its month end). Only the persona months
+  are scored, `crx_persona.persona_start_date` to `persona_end_date`; in PROD that is the
+  latest inference month (the run on the 2nd scores the previous month end).
 - **Windows are calendar months, by segment** (`_common.window_months`), the observation
   month included (m1 = the observation month, m2 the one before, …):
   - **60–180: 3 months** (m1–m3); the prior window m4–m6 (used to spot a decline).
@@ -2818,9 +2833,9 @@ Moderate, Moderate → Low).
   salary can turn Stable into Weak (see the example).
 - **Bureau bounces are dated by the pull date.** A bounce repeated in later reports keeps
   the flag on; when the bounce really happened is under investigation.
-- **Internal returns start at the persona start.** `prm_casa_return_events` keeps 6 months
-  before `crx_persona.persona_start_date`; an observation month before that would miss
-  returns, so the run stops instead (`build_internal_returns`).
+- **Internal returns follow the persona start.** `prm_casa_return_events` keeps the 6
+  months up to `crx_persona.persona_start_date`; after moving that date, rerun
+  `casa_primary` first, or the A1 run stops (`build_internal_returns`).
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py`
@@ -3128,7 +3143,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py`
-action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `c771c7346a4a4d07067cb710d57192b1ea81b847c521c985058233c4f376b3e5` · new trailing newline: yes
+action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `22660a59a22772ea23c89cde38d1ec69939005041522a4ffdbc0e411e559ed4a` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3815,9 +3830,8 @@ def build_internal_returns(
     distinct ``(cif_id, event_date, reason)`` from ``prm_casa_return_events`` (all of the
     customer's CASA accounts; the debit and credit legs of a return collapse to one row).
 
-    Stops the run when the table starts after the earliest observation's window: it is
-    built from ``crx_persona.persona_start_date``, which must not be later than the first
-    observation month.
+    Stops the run when the table starts after the earliest observation's window (both
+    follow ``crx_persona.persona_start_date``; the table was built for an older one).
     """
     require_columns(
         return_events,
@@ -3829,8 +3843,8 @@ def build_internal_returns(
     if first is None or first.isoformat() > since:
         raise ValueError(
             f"prm_casa_return_events starts at {first}, but the observations need returns "
-            f"from {since}: set crx_persona.persona_start_date to the first observation "
-            "month (or earlier) and rerun casa_primary"
+            f"from {since}: rerun casa_primary after changing "
+            "crx_persona.persona_start_date"
         )
     cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
     return (
@@ -3872,7 +3886,7 @@ __all__ = ["create_b03_check_pipeline", "create_pipeline"]
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b03_check.py`
-action: add · new sha256 `42367dedfbdd32015c52ea5c892eaeff86aa8a7a701e850089afaeda95d9b72a` · new trailing newline: yes
+action: add · new sha256 `f6ff55633e45f2b7884e61cfbb26469b55ff8c29370354a76e3a02d72598385d` · new trailing newline: yes
 
 New:
 
@@ -3883,8 +3897,9 @@ Two log blocks, aggregates only:
 
 * ``compare_a1_outputs`` (``B03 OUTPUT``): the bundle 02 engine output
   (``crx_cc_a1_ability_b01_check``, billing-date observations) against the new month-end
-  output (``crx_cc_a1_ability_b03_check``). An old row is matched to the new row of the
-  same account and month (the month's latest old observation).
+  output (``crx_cc_a1_ability_b03_check``), over the new output's months (the persona
+  months). An old row is matched to the new row of the same account and month (the
+  month's latest old observation).
 * ``compare_income_rules`` (``B03 INCOME``): what the 2 × anchor income bar and the
   income-weakening check do, against a flat AED 3,000 floor and no weakening check.
 
@@ -3925,11 +3940,13 @@ def _crosstab(df: DataFrame, a: str, b: str) -> list[str]:
 
 def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
     """Old vs new state crosstab, new levels and the latest month's state distribution."""
+    first, last = new.agg(F.min("observation_date"), F.max("observation_date")).first()
     latest_in_month = Window.partitionBy("account_id", "month").orderBy(
         F.col("observation_date").desc()
     )
     old_m = (
         old.withColumn("month", F.trunc("observation_date", "month"))
+        .filter(F.col("month").between(F.trunc(F.lit(first), "month"), F.lit(last)))
         .withColumn("_rn", F.row_number().over(latest_in_month))
         .filter(F.col("_rn") == 1)
         .select("account_id", "month", F.col("a1_state").alias("old_state"))
@@ -3950,10 +3967,9 @@ def compare_a1_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
     )
     n = both.count()
     changed = both.filter(F.col("old_state") != F.col("new_state")).count()
-    last = new.agg(F.max("observation_date")).first()[0]
     latest = new.filter(F.col("observation_date") == F.lit(last))
     lines = [
-        f"model_id={model_id} rows={n} changed={changed} "
+        f"model_id={model_id} months {first}..{last} rows={n} changed={changed} "
         f"({100.0 * changed / max(n, 1):.2f}%)",
         f"  distress flag: {_counts(both, 'a1_distress_flag')}",
         f"  latest month {last}: {_counts(latest, 'a1_state')}",
@@ -4474,6 +4490,94 @@ def create_b03_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-a
             ],
             tags=["crx_persona"],
         )
+    )
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/obs_base/pipeline.py`
+action: replace · base sha256 `c924e25529b82e01dc2b85ddc07f2c7255c1b281b61281ac3dedd213a0e2ec4c` · base trailing newline: yes · new sha256 `41785d833a8562f497aa024c971ecabd8d9325b6954627914ec459d0760792a2` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""Kedro pipelines building the observation base every persona axis reads.
+
+kedro run --pipeline=crx_cc_obs_base   (cc_60_180 / cc_180_plus)
+kedro run --pipeline=crx_rl_obs_base   (rl_60_180 / rl_180_plus)
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from .._common import build_cc_obs_base, build_rl_obs_base
+
+
+def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    return Pipeline(
+        [
+            node(
+                func=build_cc_obs_base,
+                inputs="cc_spine",
+                outputs="crx_cc_obs_base",
+                name="build_crx_cc_obs_base",
+            )
+        ],
+        tags=["crx_persona", "crx", "obs_base"],
+    )
+
+
+def create_rl_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    return Pipeline(
+        [
+            node(
+                func=build_rl_obs_base,
+                inputs=["rl_spine"],
+                outputs="crx_rl_obs_base",
+                name="build_crx_rl_obs_base",
+            )
+        ],
+        tags=["crx_persona", "crx", "obs_base"],
+    )
+`````
+
+New:
+
+`````python
+"""Kedro pipelines building the observation base every persona axis reads: the spine's
+month-end rows from ``crx_persona.persona_start_date`` to ``persona_end_date``.
+
+kedro run --pipeline=crx_cc_obs_base   (cc_60_180 / cc_180_plus)
+kedro run --pipeline=crx_rl_obs_base   (rl_60_180 / rl_180_plus)
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from .._common import build_cc_obs_base, build_rl_obs_base
+
+
+def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    return Pipeline(
+        [
+            node(
+                func=build_cc_obs_base,
+                inputs=["cc_spine", "params:crx_persona"],
+                outputs="crx_cc_obs_base",
+                name="build_crx_cc_obs_base",
+            )
+        ],
+        tags=["crx_persona", "crx", "obs_base"],
+    )
+
+
+def create_rl_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    return Pipeline(
+        [
+            node(
+                func=build_rl_obs_base,
+                inputs=["rl_spine", "params:crx_persona"],
+                outputs="crx_rl_obs_base",
+                name="build_crx_rl_obs_base",
+            )
+        ],
+        tags=["crx_persona", "crx", "obs_base"],
     )
 `````
 
