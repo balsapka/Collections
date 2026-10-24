@@ -8,6 +8,11 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
   the observation month. Until `cc_spine` is month-end, `build_cc_obs_base` moves each
   billing-date row to its month end (one row per account and month); any other
   non-month-end spine date stops the run.
+- **Window by segment**, as on the other axes: 3 months at 60–180, 6 months at 180+
+  (`_common.window_months`); "2 of 3" becomes "3 of 6" at 180+, the prior window is the 6
+  months before, and card payments, distress and CASA activity read 6 months. The signal
+  and A1 nodes take `params:model_id`; `ext_card_payment_max_3m` / `casa_active_3m` are
+  now `ext_card_payment_max` / `casa_active`. cc_180_plus is not run by this bundle.
 - **New primary dataset `prm_casa_return_events`** (pipeline `casa_primary`, outside
   crx_persona): every returned CASA transaction (`CHEQUE RETURNS`, `DDS Rejects/Reversal`,
   `RETURNS`; both debit and credit legs) for all CIFs, one row per
