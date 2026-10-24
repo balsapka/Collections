@@ -11,9 +11,8 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 - **New primary dataset `prm_casa_return_events`** (pipeline `casa_primary`, outside
   crx_persona): every returned CASA transaction (`CHEQUE RETURNS`, `DDS Rejects/Reversal`,
   `RETURNS`; both debit and credit legs) for all CIFs, one row per
-  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. Incremental: each
-  run rebuilds the event months from `rebuild_from` (default: the previous month) and
-  overwrites only those partitions. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
+  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. It covers the 6 months
+  before `crx_persona.persona_start_date` and everything after; each run rebuilds it whole. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
 - **Distress** = cheque returns + DDS rejects/reversals in the last 3 months; POS reversals
   (`RETURNS`) no longer count. Bureau bounces stay dated by `extract_date` (the pull date;
   the bounce date is under investigation).

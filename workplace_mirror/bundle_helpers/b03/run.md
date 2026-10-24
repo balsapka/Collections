@@ -1,11 +1,10 @@
 Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
-**Step 9.** First build of `prm_casa_return_events`, from July 2024 (6 months before the CC
-modelling start, enough for cc_60_180 and cc_180_plus). Later monthly runs leave
-`rebuild_from` unset and rebuild only the previous and the current month:
+**Step 9.** Build `prm_casa_return_events` (6 months before the persona start month
+onwards):
 
 ```bash
-kedro run --env=dev --pipeline=casa_primary --params=casa_primary.rebuild_from=2024-07-01
+kedro run --env=dev --pipeline=casa_primary
 ```
 
 **Step 10.** Run the check pipeline (observation base + A1 into the temporary

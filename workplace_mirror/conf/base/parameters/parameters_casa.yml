@@ -5,7 +5,6 @@ casa_primary:
   # reason_for_excluding values kept in prm_casa_return_events (all return types;
   # which ones count as distress is decided in the persona signal layer).
   return_reasons: ["CHEQUE RETURNS", "DDS Rejects/Reversal", "RETURNS"]
-  # First event month rebuilt by a run (ISO date, taken at its month start). null = the
-  # previous month, which catches late reloads in the monthly run. The first build sets it
-  # with --params to 6 months before the earliest modelling start (cc: 2024-07-01).
-  rebuild_from: null
+  # Months kept up to the persona start month (crx_persona.persona_start_date), so the
+  # first observation month has its full lookback (A1 reads m1-m6).
+  history_months: 6

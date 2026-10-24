@@ -1,7 +1,6 @@
 # CASA primary datasets (pipeline casa_primary).
 
 # Returned CASA transactions, all CIFs, one row per (tran_id, part_tran_srl_num, tran_date).
-# Incremental: each run overwrites only the event_month partitions it rebuilt.
 prm_casa_return_events:
   type: spark.SparkDataset
   file_format: parquet
@@ -9,7 +8,6 @@ prm_casa_return_events:
   save_args:
     mode: overwrite
     partitionBy: ["event_month"]
-    partitionOverwriteMode: dynamic
   metadata:
     kedro-viz:
       layer: primary

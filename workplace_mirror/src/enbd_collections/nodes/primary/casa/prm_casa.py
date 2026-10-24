@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Sequence
 
 from pyspark.sql import DataFrame, Window
@@ -29,23 +29,22 @@ _RETURN_EVENT_COLUMNS = [
 def build_return_events(
     tran_repos: DataFrame,
     return_reasons: Sequence[str],
-    rebuild_from: str | date | None,
+    crx_persona: dict,
+    history_months: int,
 ) -> DataFrame:
     """Returned CASA transactions (every ``return_reasons`` value, both debit and credit
     legs) for all CIFs, one row per transaction key, partitioned by ``event_month``.
 
-    Incremental: only event months from ``rebuild_from`` (a date, taken at its month
-    start) are rebuilt, and the catalog overwrites just those partitions. Without it, the
-    run rebuilds the previous and the current month. A reload of the same transaction in
-    a later ``edp_load_date`` keeps the latest load.
+    Covers the ``history_months`` calendar months up to the persona start month, and
+    everything after it; each run rebuilds the whole table. A reload of the same
+    transaction in a later ``edp_load_date`` keeps the latest load.
     """
     missing = sorted(set(_RETURN_EVENT_COLUMNS) - set(tran_repos.columns))
     if missing:
         raise ValueError(f"comp_financial_tran_repos_dly is missing columns: {missing}")
-    if rebuild_from:
-        floor = date.fromisoformat(str(rebuild_from)).replace(day=1)
-    else:  # the previous month's start
-        floor = (date.today().replace(day=1) - timedelta(days=1)).replace(day=1)
+    start = date.fromisoformat(str(crx_persona["persona_start_date"]))
+    y, m = divmod(start.year * 12 + start.month - history_months, 12)
+    floor = date(y, m + 1, 1)
     latest_load = Window.partitionBy(*_KEY).orderBy(F.col("edp_load_date").desc())
     return (
         tran_repos.filter(
