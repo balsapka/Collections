@@ -74,8 +74,8 @@ def create_pipeline(
                 {
                     "obs_base": _OBS,
                     "bureau_alert": "prm_bureau_alert_enriched",
-                    "model_id": "params:model_id",
                     "internal_returns": "crx_cc_a1_internal_returns",
+                    "model_id": "params:model_id",
                 },
                 "crx_cc_a1_distress_signals",
                 name="build_crx_cc_a1_distress_signals",

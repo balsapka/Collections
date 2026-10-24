@@ -16,12 +16,19 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 - **New primary dataset `prm_casa_return_events`** (pipeline `casa_primary`, outside
   crx_persona): every returned CASA transaction (`CHEQUE RETURNS`, `DDS Rejects/Reversal`,
   `RETURNS`; both debit and credit legs) for all CIFs, one row per
-  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. It covers the 6 months
-  before `crx_persona.persona_start_date` and everything after; each run rebuilds it whole. CC A1 reads it instead of `comp_financial_tran_repos_dly`.
-- **Distress** = cheque returns + DDS rejects/reversals in the last 3 months; POS reversals
+  `tran_id + part_tran_srl_num + tran_date`, latest `edp_load_date` kept. It covers the 6 calendar months up to and including the
+  persona start month (`params:crx_persona.persona_start_date`) and everything after; each
+  run rebuilds it whole. CC A1 reads it instead of `comp_financial_tran_repos_dly`, and stops
+  if it starts after the first observation window.
+- **Distress** = cheque returns + DDS rejects/reversals in the window (3 or 6 months); POS reversals
   (`RETURNS`) no longer count. Bureau bounces stay dated by `extract_date` (the pull date;
   the bounce date is under investigation).
 - **Income**: the WM-recovered salary is the only internal salary source.
+- **Source floors**: every A1 signal builder filters its sources from the earliest
+  observation's first window month on, before any aggregation (salary and CASA snapshots,
+  card payments, CASA flows, bureau events), so older history is never shuffled.
+- **`build_distress_signals`** takes `internal_returns` as a required input (it is in PROD
+  now); only `payment_order` stays optional.
 - **`a1_ability/README.md`**: the A1 logic in plain terms (sources, windows, the 2-of-3
   rules, the state ladder, known limits).
 - **Check**: the bundle 01/02 check (`b01_check.py`) is replaced by `b03_check.py`, which

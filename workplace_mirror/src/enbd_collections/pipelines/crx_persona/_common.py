@@ -71,9 +71,10 @@ def pit_latest(  # pylint: disable=too-many-arguments
 
     ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
     defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
-    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar months
-    (1 = its own month), so a stale record never stands in for a current one. Ties on the date are broken by the values (descending),
-    so reruns agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
+    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar
+    months (1 = its own month), so a stale record never stands in for a current one.
+    Ties on the date are broken by the values (descending), so reruns agree. Returns
+    ``GRAIN + value_cols`` for base rows with a match only.
     """
     anchor = F.col("observation_date") if anchor is None else anchor
     before = (

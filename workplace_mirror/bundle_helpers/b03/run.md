@@ -1,5 +1,9 @@
 Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
+Before Step 9, check that `crx_persona.persona_start_date` in `conf/dev/globals_dev.yml`
+is not later than the first observation month in `cc_spine`. The A1 run stops otherwise
+(`prm_casa_return_events` would not reach back far enough); move the date back if so.
+
 **Step 9.** Build `prm_casa_return_events` (6 months before the persona start month
 onwards):
 

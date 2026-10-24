@@ -129,3 +129,6 @@ Moderate, Moderate → Low).
   salary can turn Stable into Weak (see the example).
 - **Bureau bounces are dated by the pull date.** A bounce repeated in later reports keeps
   the flag on; when the bounce really happened is under investigation.
+- **Internal returns start at the persona start.** `prm_casa_return_events` keeps 6 months
+  before `crx_persona.persona_start_date`; an observation month before that would miss
+  returns, so the run stops instead (`build_internal_returns`).

@@ -146,6 +146,9 @@ case("180+: bounce in month 5 counts", salary=[(1, 5000), (2, 5000), (3, 5000)],
 case("180+: overdue buckets give no anchor", buckets=[100, 200, 0, 0, 0, 0, 0, 0], anchor=None, **P180)
 
 df = spark.createDataFrame
+# a return outside the obs CIFs in the 180+ window's first month: the returns table covers
+# every window (build_internal_returns checks that)
+COVER = [(-1, m(6), "CHARGES")]
 obs = _common.build_cc_obs_base(
     df(rows["spine"], "contract_id string, observation_date date, cif_id long")
 )
@@ -174,10 +177,10 @@ def run(model_id):
         build_distress_signals(
             o,
             df(rows["alert"], "cif_id long, extract_date date, bounced_cheque_amount double"),
-            model_id,
+            model_id=model_id,
             internal_returns=build_internal_returns(
                 o,
-                df(rows["ret"], "cif_id long, tran_date date, reason_for_excluding string"),
+                df(rows["ret"] + COVER, "cif_id long, tran_date date, reason_for_excluding string"),
                 model_id,
             ),
         ),
@@ -207,7 +210,13 @@ assert build_cc_liquidity_anchor(obs, df(stale, f"contract_id string, observatio
                                  "cc_60_180").count() == 0
 # the debit and credit legs of one return count once
 ret_schema = "cif_id long, tran_date date, reason_for_excluding string"
-assert (build_internal_returns(obs, df(rows["ret"] * 2, ret_schema), "cc_60_180").count()
-        == build_internal_returns(obs, df(rows["ret"], ret_schema), "cc_60_180").count() == 2)
+assert (build_internal_returns(obs, df(rows["ret"] * 2 + COVER, ret_schema), "cc_60_180").count()
+        == build_internal_returns(obs, df(rows["ret"] + COVER, ret_schema), "cc_60_180").count() == 2)
+# a returns table that starts after the first observation window stops the run
+try:
+    build_internal_returns(obs, df(rows["ret"], ret_schema), "cc_180_plus")
+    raise AssertionError("returns coverage guard did not fire")
+except ValueError as e:
+    assert "persona_start_date" in str(e)
 print(f"\n{len(expect) - fails}/{len(expect)} cases pass")
 sys.exit(1 if fails else 0)

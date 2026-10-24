@@ -16,7 +16,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 inputs=[
                     "comp_financial_tran_repos_dly",
                     "params:casa_primary.return_reasons",
-                    "params:crx_persona",
+                    "params:crx_persona.persona_start_date",
                     "params:casa_primary.history_months",
                 ],
                 outputs="prm_casa_return_events",

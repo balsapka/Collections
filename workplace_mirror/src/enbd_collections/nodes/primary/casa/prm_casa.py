@@ -26,25 +26,31 @@ _RETURN_EVENT_COLUMNS = [
 ]
 
 
+def _months_back(day: date, months: int) -> date:
+    """First day of the month ``months`` calendar months before ``day``'s month."""
+    year, month = divmod(day.year * 12 + day.month - 1 - months, 12)
+    return date(year, month + 1, 1)
+
+
 def build_return_events(
     tran_repos: DataFrame,
     return_reasons: Sequence[str],
-    crx_persona: dict,
+    persona_start_date: str,
     history_months: int,
 ) -> DataFrame:
     """Returned CASA transactions (every ``return_reasons`` value, both debit and credit
     legs) for all CIFs, one row per transaction key, partitioned by ``event_month``.
 
-    Covers the ``history_months`` calendar months up to the persona start month, and
-    everything after it; each run rebuilds the whole table. A reload of the same
-    transaction in a later ``edp_load_date`` keeps the latest load.
+    Covers the last ``history_months`` calendar months up to and including the persona
+    start month, and everything after it; each run rebuilds the whole table. A reload of
+    the same transaction in a later ``edp_load_date`` keeps the latest load.
     """
     missing = sorted(set(_RETURN_EVENT_COLUMNS) - set(tran_repos.columns))
     if missing:
         raise ValueError(f"comp_financial_tran_repos_dly is missing columns: {missing}")
-    start = date.fromisoformat(str(crx_persona["persona_start_date"]))
-    y, m = divmod(start.year * 12 + start.month - history_months, 12)
-    floor = date(y, m + 1, 1)
+    floor = _months_back(
+        date.fromisoformat(str(persona_start_date)), history_months - 1
+    )
     latest_load = Window.partitionBy(*_KEY).orderBy(F.col("edp_load_date").desc())
     return (
         tran_repos.filter(
