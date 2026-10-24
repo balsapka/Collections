@@ -535,7 +535,7 @@ VARIANTS = (
     + [(f"RL 61–180\n{p}", None) for p in RL_PRODUCTS] + [("RL 61–180\nall", "rl_60_180")]
     + [(f"RL 180+\n{p}", None) for p in RL_PRODUCTS] + [("RL 180+\nall", "rl_180_plus")]
 )
-VINTAGES = ["charged off < 2 years", "charged off 2+ years"]
+VINTAGES = ["early-stage charge-off\n(< 2 years)", "late-stage charge-off\n(2+ years)"]
 
 
 def _label(cell, text: str) -> None:
@@ -650,7 +650,8 @@ def _vintage(wb: Workbook, scoring_date: str) -> None:
     last_col = 1 + 2 * len(cols)
     r = _title(ws, "Results 180+ by vintage",
                f"Combined state by vintage at 180+ DPD{_on(scoring_date)}. Vintage = charge-off "
-               "age: time since the account was charged off (reached 180+ DPD). Yellow = to "
+               "age: early-stage = charged off less than 2 years ago, late-stage = 2 years or more "
+               "(charge-off = reaching 180+ DPD). Yellow = to "
                "fill; shares are within each vintage.", min(last_col, 11))
     r, first, _ = _count_table(ws, r, "Combined state", A2_STATES, _a2_chip, cols, last_col)
     r, *_ = _count_table(ws, r, "Location", LOC_STATES, _chip, cols, last_col)
