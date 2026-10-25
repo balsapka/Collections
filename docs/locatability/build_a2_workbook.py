@@ -280,9 +280,9 @@ def logic(wb: Workbook) -> None:
     s.note("Not used: online purchases, transfers and remittances (they do not show where the "
            "customer is), and salary (an ability signal).")
     flow("Location", [
-        ("There is foreign evidence, and it is later than any UAE evidence.", "skip"),
-        ("The latest evidence is UAE evidence within the window (on the same day as foreign "
-         "evidence, UAE wins).", "in_country"),
+        ("There is foreign evidence, and it is on or after the date of the latest UAE "
+         "evidence (on the same day, foreign wins).", "skip"),
+        ("The latest evidence is UAE evidence within the window.", "in_country"),
         ("Otherwise: no evidence at all, or the latest UAE evidence is older than the window.",
          "unknown"),
     ])

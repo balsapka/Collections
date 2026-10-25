@@ -62,8 +62,8 @@ call outcome (except the collector's departure note) and reachability never read
 latest foreign  = date of the latest foreign evidence (on or before the observation date)
 latest domestic = date of the latest domestic evidence
 
-Skip        there is foreign evidence, and it is later than any domestic evidence
-In Country  latest domestic is the latest evidence (a tie counts as domestic)
+Skip        there is foreign evidence, dated on or after the latest domestic evidence
+In Country  latest domestic is later than any foreign evidence (on the same day, foreign wins)
             AND it falls in W
 Unknown     no evidence, or the latest evidence is domestic but older than W
 ```
@@ -172,6 +172,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-11 | Output: both dimension columns, `deceased_flag`, and the combined `a2_state` with labels. |
 | D-A2-12 | Results are reported per model variant, RL split by product (Personal Loans, Personal Cash Loans, Auto); 180+ also by charge-off-age vintage (early-stage charge-off < 2 years / late-stage charge-off 2+ years), as on the deterioration axis. Model doc: `docs/locatability/a2_locatability_reference.xlsx`. |
 | D-A2-13 | Spending is location evidence only when in person: card-present shop payments and ATM withdrawals. Online purchases and transfers / remittances abroad are not (user, 2026-10-25). |
+| D-A2-14 | Same-day UAE and foreign evidence: foreign wins (Skip). Evidence is compared by date only, no timestamps (user, 2026-10-25). |
 
 ---
 
@@ -230,12 +231,11 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 1. **Login pipeline fixes** (`digital_login`, shared with every consumer of the login tables):
    - `stg_digital_login`: `is_foreign_login` = 0 for the UAE, 1 for another country, NULL
      when neither `countrylocation` nor `countrycode` is filled (O53); deduplicate on
-     `sessionid` only where it is not NULL (O54); keep the login timestamp `login_ts` next to
-     `login_date` (O55).
-   - `prm_digital_login_monthly`: adds `last_uae_login_date` / `last_uae_login_ts` and
-     `last_foreign_login_date` / `last_foreign_login_ts` (the month's latest login of each kind,
-     O56) and `unknown_country_login_cnt`; the month's last login is ordered by `login_ts`, a
-     UAE login first on a tie (O55). Same grain and existing columns, so current consumers keep
+     `sessionid` only where it is not NULL (O54).
+   - `prm_digital_login_monthly`: adds `last_uae_login_date` and
+     `last_foreign_login_date` (the month's latest login of each kind, O56) and
+     `unknown_country_login_cnt`; on the month's last login day a foreign login is taken first
+     (O55), so the pick is deterministic without timestamps. Same grain and existing columns, so current consumers keep
      working. A2 reads this primary table, never the staging output.
    - Check: per source, rows before / after and the UAE / foreign / unknown-country shares.
 2. **Location data layer**: the CIF × month-end location feature built from primary

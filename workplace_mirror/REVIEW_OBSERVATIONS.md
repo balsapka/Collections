@@ -691,7 +691,8 @@ Spark treats NULLs as equal in `dropDuplicates`: all such logins collapse into o
 `prm_digital_login_monthly.py:46–49` orders by `login_date`, a date (`createdon` is
 truncated to a date in staging, line 163). Several logins on the month's last login day tie
 and `row_number` picks one at random, so `last_login_foreign_flag` can flip between runs. A2's
-rule is that a UAE login wins a same-day tie.
+rule (D-A2-14): on the same day, foreign evidence wins — the fix takes a foreign login first
+on the last login day; no timestamp needed.
 
 ### O56 — The monthly table cannot give the latest UAE login (M, design)
 
