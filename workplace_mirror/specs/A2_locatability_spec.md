@@ -216,13 +216,15 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
      when neither `countrylocation` nor `countrycode` is filled (O53); deduplicate on
      `sessionid` only where it is not NULL (O54); keep the login timestamp `login_ts` next to
      `login_date` (O55).
-   - `prm_digital_login_monthly`: the month's last login ordered by `login_ts`, a UAE login
-     first on a tie (O55); `unknown_country_login_cnt` added. Same grain and existing columns,
-     so current consumers keep working.
+   - `prm_digital_login_monthly`: adds `last_uae_login_date` / `last_uae_login_ts` and
+     `last_foreign_login_date` / `last_foreign_login_ts` (the month's latest login of each kind,
+     O56) and `unknown_country_login_cnt`; the month's last login is ordered by `login_ts`, a
+     UAE login first on a tie (O55). Same grain and existing columns, so current consumers keep
+     working. A2 reads this primary table, never the staging output.
    - Check: per source, rows before / after and the UAE / foreign / unknown-country shares.
-2. **Location data layer**: `prm_customer_location_events` from `stg_digital_login` (event
-   grain, O56) plus the card and CASA sources §10 settles, and the CIF × month-end feature
-   table.
+2. **Location data layer**: the CIF × month-end location feature built from primary
+   datasets only — `prm_digital_login_monthly` (latest UAE / foreign login per month) plus the
+   card and CASA primaries §10 settles (a new `prm_customer_spend_location` if none fits).
 3. **A2 engine** `a2_locatability/` (location, reachability and deceased signals; state
    classification) with thin CC / RL wrappers on the obs base.
 4. **Retire** the old A2 nodes and the departure signatures once nothing else reads them (D1).

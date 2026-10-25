@@ -78,7 +78,7 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O53 | H | confirmed | stg_digital_login | A login with no country (both `countrylocation` and `countrycode` NULL) is flagged foreign |
 | O54 | H | data check | stg_digital_login | `dropDuplicates(["sessionid"])` collapses every login without a sessionid into one row |
 | O55 | M | confirmed | prm_digital_login_monthly | The month's last login is picked by date only; same-day UAE and foreign logins tie at random |
-| O56 | M | design | prm_digital_login_monthly | Monthly grain keeps only the last login; the latest UAE login date is lost when the last one was foreign |
+| O56 | M | design | prm_digital_login_monthly | Keeps only the month's last login; the latest UAE login date is lost when the last one was foreign |
 
 ---
 
@@ -697,7 +697,7 @@ rule is that a UAE login wins a same-day tie.
 
 `prm_digital_login_monthly` keeps the month's last login plus `any_foreign_login_flag`. When
 the last login is foreign, the date of the latest UAE login that month is gone, and logins
-cannot be ordered against card / CASA spending within a month. **For A2:** the location data
-layer reads `stg_digital_login` (event grain) and keeps, per CIF, the latest UAE and latest
-foreign login dates. O50 is confirmed by `month_number` = the month's last day (line 42):
+cannot be ordered against card / CASA spending within a month. **Fix (bundle 04):** add the
+month's latest UAE and latest foreign login (date and timestamp) to the primary table; A2
+reads the primary table only (user, 2026-10-25: no staging outputs downstream). O50 is confirmed by `month_number` = the month's last day (line 42):
 `<= trunc(obs, 'month')` never includes the observation month.
