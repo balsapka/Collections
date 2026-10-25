@@ -32,10 +32,11 @@ from .nodes import build_cc_liquidity_anchor
 _OBS = "crx_cc_obs_base"
 
 
-def create_pipeline(
+def create_pipeline(  # pylint: disable=unused-argument
     output: str = "crx_cc_a1_ability_v2",
-    **kwargs,  # pylint: disable=unused-argument
+    **kwargs,
 ) -> Pipeline:
+    """The CC A1 axis: signal tables, the anchor and the state, written to ``output``."""
     return Pipeline(
         [
             node(

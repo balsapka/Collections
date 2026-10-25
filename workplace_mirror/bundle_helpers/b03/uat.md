@@ -1,4 +1,4 @@
-**Step 6.** `_common` helpers now take months instead of days. Check that no file outside
+**Step 4.** `_common` helpers now take months instead of days. Check that no file outside
 this bundle still calls them — this must print nothing (otherwise stop and send the output
 back):
 

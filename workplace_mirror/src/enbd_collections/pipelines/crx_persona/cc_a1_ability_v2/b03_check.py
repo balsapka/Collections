@@ -119,24 +119,27 @@ def _state(income_level: str) -> Column:
     return _LADDER.state(points, F.col("a1_distress_flag") == 1, unknown)
 
 
-def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> None:
+def compare_income_rules(  # pylint: disable=too-many-locals
+    income: DataFrame, a1: DataFrame, model_id: str
+) -> None:
     """How often 2 × anchor raises the income bar above the flat floor, how often the
     weakening check fires, and the levels and states without each of them."""
     w = window_months(model_id)
     last = _window(w)[0]
     anchor = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))
-    bar = F.greatest(F.lit(F_INC), K_INC * anchor)
+    income_bar = F.greatest(F.lit(F_INC), K_INC * anchor)
     flat = F.lit(F_INC)
     df = (
         a1.join(income, ["account_id", "observation_date"])
-        .withColumn("bar", bar)
-        .withColumn("raised", bar > flat)
-        .withColumn("lvl_engine", _income_level(bar, True, w))
+        .withColumn("bar", income_bar)
+        .withColumn("raised", income_bar > flat)
+        .withColumn("lvl_engine", _income_level(income_bar, True, w))
         .withColumn("lvl_flat", _income_level(flat, True, w))
-        .withColumn("lvl_no_weak", _income_level(bar, False, w))
+        .withColumn("lvl_no_weak", _income_level(income_bar, False, w))
         .withColumn("lvl_flat_no_weak", _income_level(flat, False, w))
         .withColumn(
-            "qual_bar", _count_at_least(_months("income", last), bar) >= MIN_MONTHS[w]
+            "qual_bar",
+            _count_at_least(_months("income", last), income_bar) >= MIN_MONTHS[w],
         )
         .withColumn(
             "qual_flat", _count_at_least(_months("income", last), flat) >= MIN_MONTHS[w]

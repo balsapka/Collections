@@ -3,13 +3,13 @@
     python workplace_mirror/tools/make_bundle.py --base <commit> --slug a1_engine \\
         --title "..." [--head HEAD] [--branch feature/x] [--summary-file f.md] \\
         [--uat-file f.md] [--run-file f.md] [--cleanup-file f.md] [--helper path ...] \\
-        [--accept src/path.py ...] [--message "workplace commit message"] [--existing-branch]
+        [--message "workplace commit message"] [--existing-branch]
 
 Writes workplace_mirror/bundles/NN_<slug>.md:
 
 * source changes: files under workplace_mirror/src/ and conf/ changed between the two
   commits, at their workplace path; replaced / deleted files carry their base version so
-  the workplace side refuses to touch a file that differs from what was photographed;
+  the workplace side can three-way merge a file that has changed there since;
 * helpers (``--helper``, e.g. a PROD check snippet): shipped to the workplace's gitignored
   ``data/input/mirror_bundles/`` — never part of the source, never committed;
 * the exact steps on top (UAT: apply, commit src/ + conf/, push; PROD: pull, run the
@@ -89,18 +89,21 @@ def _file_entry(
     return md
 
 
-def _steps(
+def _steps(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     name: str,
     branch: str,
     existing: bool,
     uat_md: str,
     run_md: str,
-    accept: list[str],
     message: str,
 ) -> list[str]:
+    """The UAT and PROD steps on top of the bundle.
+
+    ``uat_md`` / ``run_md`` number their own steps: UAT steps from 4, PROD steps from
+    6 + the number of UAT steps.
+    """
     md_path = f"{WORK_DIR}/{name}"
     apply = f"python {WORK_DIR}/apply_bundle.py {md_path}"
-    accepts = "".join(f" --accept {a}" for a in accept)
     # One line, no heredoc, no backticks: survives copy-paste into bash or zsh.
     extract = (
         'python -c "import pathlib, re; '
@@ -111,29 +114,18 @@ def _steps(
         "(d / 'apply_bundle.py').write_text(m.group(2) + '\\n', encoding='utf-8'); "
         "print('apply_bundle.py written')\""
     )
-
-    # uat_md / run_md number their own steps, continuing from the fixed ones.
     n_uat = uat_md.count("**Step ")
+    commit = 4 + n_uat
 
     def step(n: int, text: str, cmd: str) -> list[str]:
         return [f"**Step {n}.** {text}", "", "```bash", cmd, "```", ""]
 
-    accept_note = (
-        [
-            "The `--accept` files are known to differ from the bundle's base copy (a",
-            "transcription slip, or an edit made at work that this bundle already contains);",
-            "they are replaced as a whole. Any other **CONFLICT**: stop and send the diff back.",
-            "",
-        ]
-        if accept
-        else ["On a **CONFLICT**: stop and send the printed diff back.", ""]
-    )
     return [
         "## Steps — do these in order, from the workplace repo root",
         "",
         f"The bundle file and the apply script live in `{WORK_DIR}/` (gitignored) and are",
-        f"never committed; only `src/` and `conf/` are (step {6 + n_uat}). Copy each command block",
-        "exactly as it is.",
+        f"never committed; only `src/` and `conf/` are (step {commit}). Copy each command",
+        "block exactly as it is.",
         "",
         "### In UAT",
         "",
@@ -158,30 +150,22 @@ def _steps(
         ),
         *step(
             3,
-            "Write the apply script from the *Apply script* section at the bottom "
-            "(prints `apply_bundle.py written`):",
-            extract,
-        ),
-        *step(
-            4,
-            "Apply — checks every file first, writes, compiles and imports; must end with "
+            "Write the apply script, apply, and list what changed — must end with "
             "`APPLY PASSED`:",
-            f"{apply} --apply{accepts}",
+            f"{extract} && {apply} --apply && git status --short",
         ),
-        *accept_note,
-        *step(
-            5,
-            "Look at what changed (nothing under `data/input/` shows up):",
-            "git status && git diff --stat",
-        ),
+        "A file this repo changed since the bundle's copy (an edit at work, a lint fix) is",
+        "merged, not refused: the apply lists it as `MERGED`. Look at its `git diff` before",
+        "committing.",
+        "",
         *([uat_md.strip(), ""] if uat_md.strip() else []),
         *step(
-            6 + n_uat,
+            commit,
             "Commit the source only, and push:",
             f'git add src conf && git commit -m "{message}" && git push'
             + ("" if existing else f" -u origin {branch}"),
         ),
-        f"**Undo** (before step {6 + n_uat}) — restores every touched file exactly:",
+        f"**Undo** (before step {commit}) — puts every touched file back to the last commit:",
         "",
         "```bash",
         f"{apply} --revert",
@@ -190,7 +174,7 @@ def _steps(
         "### In PROD",
         "",
         *step(
-            7 + n_uat,
+            commit + 1,
             "Get the branch:",
             f"git fetch origin && git checkout {branch} && git pull",
         ),
@@ -221,7 +205,12 @@ def _cleanup(name: str, extra_md: str) -> list[str]:
     ]
 
 
-def build(args: argparse.Namespace) -> pathlib.Path:
+def _read_optional(path: str | None) -> str:
+    return pathlib.Path(path).read_text(encoding="utf-8") if path else ""
+
+
+def build(args: argparse.Namespace) -> pathlib.Path:  # pylint: disable=too-many-locals
+    """Write the bundle .md for ``args`` and return its path."""
     base, head = args.base, args.head
     files = changed_files(base, head)
     if not files:
@@ -229,7 +218,7 @@ def build(args: argparse.Namespace) -> pathlib.Path:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     number = len(list(OUT_DIR.glob("[0-9][0-9]_*.md"))) + 1
     name = f"{number:02d}_{args.slug}.md"
-    read = lambda p: pathlib.Path(p).read_text(encoding="utf-8") if p else ""  # noqa: E731
+    read = _read_optional
     apply_src = APPLY.read_text(encoding="utf-8")
     version = next(
         ln.split("=")[1].strip()
@@ -245,7 +234,7 @@ def build(args: argparse.Namespace) -> pathlib.Path:
         f"# Mirror bundle {number:02d} — {args.title}",
         "",
         f"apply_bundle version: {version} · built {datetime.date.today()} from "
-        f"`{_git('rev-parse', '--short', base).strip()}..{_git('rev-parse', '--short', head).strip()}`"
+        f"`{_short(base)}..{_short(head)}`"
         f" · source: {counts['add']} added, {counts['replace']} replaced, "
         f"{counts['delete']} deleted · helpers: {len(helpers)}",
         "",
@@ -255,7 +244,6 @@ def build(args: argparse.Namespace) -> pathlib.Path:
             args.existing_branch,
             read(args.uat_file),
             read(args.run_file),
-            args.accept or [],
             args.message or f"Mirror bundle {number:02d}: {args.title}",
         ),
         "## What this bundle does",
@@ -265,9 +253,8 @@ def build(args: argparse.Namespace) -> pathlib.Path:
         "## Instructions for the workplace assistant",
         "",
         "1. Do not retype or hand-edit code from this file; `apply_bundle.py` writes it.",
-        "2. `--apply` must print **APPLY PASSED**. On CONFLICT (other than an `--accept`ed",
-        "   file) the workplace file differs from the version this bundle was built from:",
-        "   stop and show the printed diff to the user.",
+        "2. `--apply` must print **APPLY PASSED**. A `MERGED` file differed from the copy",
+        "   this bundle was built from; show the user its `git diff` before committing.",
         "3. `DAMAGED` means the markdown copy was altered — recopy the raw file.",
         "4. If an import fails, run `--revert` and report.",
         f"5. Touch nothing outside the manifest. Never commit `{WORK_DIR}/`.",
@@ -307,7 +294,12 @@ def build(args: argparse.Namespace) -> pathlib.Path:
     return out
 
 
+def _short(commit: str) -> str:
+    return _git("rev-parse", "--short", commit).strip()
+
+
 def main() -> None:
+    """Parse the arguments and build the bundle."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument(
         "--base", required=True, help="commit the workplace files match today"
@@ -328,11 +320,6 @@ def main() -> None:
     )
     ap.add_argument(
         "--helper", action="append", help="file shipped to data/input/mirror_bundles"
-    )
-    ap.add_argument(
-        "--accept",
-        action="append",
-        help="workplace path with a known transcription slip",
     )
     ap.add_argument("--message", default=None, help="workplace commit message")
     ap.add_argument(

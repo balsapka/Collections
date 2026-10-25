@@ -9,6 +9,7 @@ from enbd_collections.nodes.primary.casa.prm_casa import build_return_events
 
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """prm_casa_return_events from comp_financial_tran_repos_dly."""
     return Pipeline(
         [
             node(

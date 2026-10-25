@@ -172,7 +172,7 @@ def _casa_by_month(wm_casa_bal: DataFrame, since: str) -> DataFrame:
     )
 
 
-def _ext_card_payments(  # pylint: disable=too-many-arguments
+def _ext_card_payments(
     obs: DataFrame,
     labelled_txn: DataFrame,
     beneficiary_cards: DataFrame,
@@ -253,7 +253,7 @@ def _casa_activity(
     )
 
 
-def build_liquidity_signals(
+def build_liquidity_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     obs_base: DataFrame,
     wm_casa_bal: DataFrame,
     wm_casa_flow: DataFrame,

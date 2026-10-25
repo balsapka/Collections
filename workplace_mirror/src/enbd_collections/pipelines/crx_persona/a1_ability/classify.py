@@ -83,6 +83,7 @@ def _not_weakening(
 
 
 def income_level(anchor: Column, w: int) -> Column:
+    """stable / weak / none over a ``w``-month window (README section 1)."""
     last = _months("income", _window(w)[0])
     floor = F.greatest(F.lit(F_INC), K_INC * anchor)
     stable = (_count_at_least(last, floor) >= MIN_MONTHS[w]) & _not_weakening(
@@ -93,6 +94,7 @@ def income_level(anchor: Column, w: int) -> Column:
 
 
 def liquidity_level(anchor: Column, w: int) -> Column:
+    """adequate / weak / none over a ``w``-month window (README section 2)."""
     last = _months("casa", _window(w)[0])
     payment = F.coalesce(F.col("ext_card_payment_max"), F.lit(0.0))
     casa_floor = F.greatest(F.lit(F_CASA), K_CASA * anchor)
@@ -104,7 +106,7 @@ def liquidity_level(anchor: Column, w: int) -> Column:
     return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
 
 
-def build_a1_ability(  # pylint: disable=too-many-arguments
+def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     obs_base: DataFrame,
     income: DataFrame,
     liquidity: DataFrame,

@@ -25,7 +25,6 @@ from pyspark.sql import functions as F
 
 from ._dpd_journey.constants import MODEL_ID_SEGMENT
 
-
 LOG = logging.getLogger(__name__)
 
 GRAIN = ("account_id", "observation_date")
@@ -212,4 +211,5 @@ def build_cc_obs_base(cc_spine: DataFrame, crx_persona: dict) -> DataFrame:
 
 
 def build_rl_obs_base(rl_spine: DataFrame, crx_persona: dict) -> DataFrame:
+    """The RL observation base (``rl_spine`` is already month-end)."""
     return _obs_base(rl_spine, "account_id", crx_persona)

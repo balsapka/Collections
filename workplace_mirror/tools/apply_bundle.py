@@ -10,31 +10,39 @@ Run from the workplace repo root:
     python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/<bundle>.md --revert
         -> puts every touched file back the way it was before --apply (uncommitted work only).
 
+When a repo file differs from the copy the bundle was built from (an edit made at work, a
+lint fix, a photo slip), the bundle still applies — it never stops on a difference:
+  * replace: three-way merge (git merge-file) of this repo's file, the bundle's base copy and
+    the bundle's new version. Edits made here survive wherever the bundle did not change the
+    same lines; where both changed the same lines, the bundle's version wins.
+  * delete: the file is deleted (git history keeps it).
+  * add over an existing file: the bundle's version is written.
+Each such file is listed as MERGED; review it with `git diff <path>` before committing.
+
 Safety rules:
-  * every file the bundle replaces or deletes must be byte-identical (line endings aside) to
-    the version the bundle was built from; otherwise nothing is written and the diff is
-    printed. Someone else's edits are never overwritten.
-  * refuses to write on main/master, or when a touched file has uncommitted changes.
+  * refuses to write on main/master, or when a touched file has uncommitted changes, so
+    `git diff` shows exactly what the bundle did and --revert restores HEAD.
   * the bundle carries a SHA-256 for every block, so a damaged copy (rendered instead of raw
     markdown, smart quotes, lost lines) is detected before anything is written.
 
 Options: --no-import skips the import check (e.g. outside the dev container).
-         --accept PATH (repeatable) replaces a conflicting file anyway — only after
-         reading its code diff, and only for a file nobody edited by hand.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import difflib
 import hashlib
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
-APPLY_VERSION = 5
+APPLY_VERSION = 6
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
@@ -56,8 +64,6 @@ def _loose(text: str) -> str:
 
 
 def _strip_docstrings(tree):
-    import ast
-
     for node in ast.walk(tree):
         body = getattr(node, "body", None)
         if (
@@ -75,12 +81,11 @@ def _same_code(path: str, a: str, b: str) -> bool:
     """Same Python code (comments and docstrings aside) or the same YAML content."""
     try:
         if path.endswith(".py"):
-            import ast
-
-            dump = lambda t: ast.dump(_strip_docstrings(ast.parse(t)))  # noqa: E731
-            return dump(a) == dump(b)
+            return ast.dump(_strip_docstrings(ast.parse(a))) == ast.dump(
+                _strip_docstrings(ast.parse(b))
+            )
         if path.endswith((".yml", ".yaml")):
-            import yaml
+            import yaml  # pylint: disable=import-outside-toplevel  # optional
 
             return yaml.safe_load(a) == yaml.safe_load(b)
     except Exception:  # pylint: disable=broad-except
@@ -90,18 +95,18 @@ def _same_code(path: str, a: str, b: str) -> bool:
 
 def _is_new(current: str, e: dict) -> bool:
     """The repo file already holds the bundle's new version (comment noise aside)."""
-    return _loose(current) == _loose(e["new"]) or _same_code(e["path"], current, e["new"])
+    return _loose(current) == _loose(e["new"]) or _same_code(
+        e["path"], current, e["new"]
+    )
 
 
 def _code_text(path: str, text: str) -> str:
     """The text with comments and docstrings removed (Python) or normalised (YAML)."""
     try:
         if path.endswith(".py"):
-            import ast
-
             return ast.unparse(_strip_docstrings(ast.parse(text)))
         if path.endswith((".yml", ".yaml")):
-            import yaml
+            import yaml  # pylint: disable=import-outside-toplevel  # optional
 
             return yaml.safe_dump(yaml.safe_load(text), sort_keys=True)
     except Exception:  # pylint: disable=broad-except
@@ -135,6 +140,27 @@ def _rebase(new: str, base: str, current: str) -> str:
     ).get_opcodes():
         out += cur_l[i1:i2] if tag == "equal" else new_l[j1:j2]
     return "\n".join(out)
+
+
+def _merge3(current: str, base: str, new: str) -> str:
+    """Three-way merge: this repo's edits on top of the bundle's change (git merge-file;
+    on overlapping lines the bundle's version wins). Without git: the bundle's version.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for name, text in (("current", current), ("base", base), ("new", new)):
+            f = pathlib.Path(tmp) / name
+            f.write_text(_norm(text), encoding="utf-8")
+            paths.append(str(f))
+        try:
+            out = subprocess.run(
+                ["git", "merge-file", "-p", "--theirs", *paths],
+                capture_output=True,
+                check=False,
+            )
+        except OSError:
+            return new
+    return out.stdout.decode("utf-8") if out.returncode >= 0 else new
 
 
 def _sha(text: str) -> str:
@@ -193,6 +219,7 @@ def parse_bundle(md: str) -> list[dict]:
 
 
 def verify_bundle(entries: list[dict]) -> list[str]:
+    """Blocks whose content no longer matches the checksum (a damaged copy)."""
     errors = []
     for e in entries:
         for kind in ("base", "new"):
@@ -225,6 +252,7 @@ def _head_version(path: str) -> str | None:
 
 
 def git_problems(entries: list[dict]) -> list[str]:
+    """Reasons to refuse: a protected branch, or uncommitted edits in a touched file."""
     problems = []
     branch = _git("rev-parse", "--abbrev-ref", "HEAD")
     if branch is not None:
@@ -248,17 +276,14 @@ def git_problems(entries: list[dict]) -> list[str]:
 # ── Status ───────────────────────────────────────────────────────────────────
 
 
-ACCEPTED: set[str] = set()  # paths given with --accept
-
-
-def file_status(e: dict) -> str:
-    """One of: todo, done, conflict, accepted."""
+def file_status(e: dict) -> str:  # pylint: disable=too-many-return-statements
+    """One of: todo, done, merge (the repo file differs from the bundle's base copy)."""
     current = _read(pathlib.Path(e["path"]))
     cur_sha = None if current is None else _sha(current)
     if e["action"] == "add":
         if current is None:
             return "todo"
-        return "done" if cur_sha == e["new_sha"] else "conflict"
+        return "done" if cur_sha == e["new_sha"] else "merge"
     if e["action"] == "replace":
         if current is not None and _loose(current) == _loose(e["new"]):
             return "done"
@@ -268,42 +293,21 @@ def file_status(e: dict) -> str:
             return "done"
         if _matches_base(current, e):
             return "todo"
-        return "accepted" if e["path"] in ACCEPTED else "conflict"
+        return "merge"
     # delete
     if current is None:
         return "done"
-    if _matches_base(current, e):
-        return "todo"
-    return "accepted" if e["path"] in ACCEPTED else "conflict"
+    return "todo" if _matches_base(current, e) else "merge"
 
 
-def explain_conflict(e: dict) -> None:
-    current = _read(pathlib.Path(e["path"]))
-    print(f"\n--- CONFLICT: {e['path']} ({e['action']})")
-    if e["action"] == "add":
-        print("    the file already exists with different content; the bundle would add it.")
-        expected, label = e["new"], "bundle (new)"
-    else:
-        expected, label = e["base"], "bundle base (as photographed)"
-        if current is None:
-            print("    the file does not exist in this repo.")
-            return
-    print("    The CODE differs (comments, docstrings, spacing are already ignored).")
-    print("    Code-only diff — bundle's copy (-) vs this repo (+):")
-    diff = list(
-        difflib.unified_diff(
-            _code_text(e["path"], expected).splitlines(),
-            _code_text(e["path"], current or "").splitlines(),
-            fromfile=label,
-            tofile="this repo",
-            lineterm="",
-            n=1,
-        )
-    )
-    for line in diff[:80]:
-        print("    " + line)
-    if len(diff) > 80:
-        print(f"    ... {len(diff) - 80} more diff lines")
+def explain_merge(e: dict) -> None:
+    """One line on what happened to a file that differed from the bundle's copy."""
+    what = {
+        "replace": "merged with this repo's own edits",
+        "delete": "deleted, although it had edits the bundle's copy lacks (git keeps them)",
+        "add": "already existed with other content; replaced by the bundle's version",
+    }[e["action"]]
+    print(f"MERGED {e['path']}: {what} — review: git diff -- {e['path']}")
 
 
 def _comment_only(e: dict) -> bool:
@@ -317,11 +321,11 @@ def _comment_only(e: dict) -> bool:
 
 
 def print_table(entries: list[dict], statuses: list[str]) -> None:
+    """One line per bundle file: its action and status."""
     word = {
         "todo": "will apply",
         "done": "already applied",
-        "conflict": "CONFLICT",
-        "accepted": "CONFLICT, accepted (--accept): will apply",
+        "merge": "will apply — MERGED (differs from the bundle's copy)",
     }
     width = max(len(e["path"]) for e in entries)
     for e, s in zip(entries, statuses):
@@ -345,8 +349,11 @@ def _module_name(path: str) -> str | None:
 
 
 def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
+    """Compile every touched .py file and import its module (plus the registry)."""
     failures = []
-    existing = [e for e in entries if e["action"] != "delete" and e["path"].endswith(".py")]
+    existing = [
+        e for e in entries if e["action"] != "delete" and e["path"].endswith(".py")
+    ]
     for e in existing:
         try:
             compile(_read(pathlib.Path(e["path"])), e["path"], "exec")
@@ -365,6 +372,7 @@ def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
             capture_output=True,
             text=True,
             env=env,
+            check=False,
         )
         if r.returncode != 0:
             last = (r.stderr.strip().splitlines() or ["?"])[-1]
@@ -374,8 +382,6 @@ def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
 
 def _prune_empty_dirs(folder: pathlib.Path) -> None:
     """Remove folders left with nothing but bytecode caches after a delete."""
-    import shutil
-
     while folder != pathlib.Path(".") and folder.is_dir():
         rest = [p for p in folder.iterdir() if p.name != "__pycache__"]
         if rest:
@@ -388,52 +394,56 @@ def _prune_empty_dirs(folder: pathlib.Path) -> None:
 
 
 def cmd_check(entries: list[dict], quiet: bool = False) -> bool:
+    """Dry run: what --apply would do; False only when git refuses."""
     statuses = [file_status(e) for e in entries]
     problems = git_problems(entries)
     if not quiet:
         print_table(entries, statuses)
-    for e, s in zip(entries, statuses):
-        if s in ("conflict", "accepted"):
-            explain_conflict(e)
     for p in problems:
         print("REFUSED: " + p)
-    n_conflict = statuses.count("conflict")
-    ok = n_conflict == 0 and not problems
-    n_todo = statuses.count("todo") + statuses.count("accepted")
     print(
-        f"\n{n_todo} to apply, {statuses.count('done')} already applied, "
-        f"{n_conflict} conflicts"
+        f"\n{statuses.count('todo') + statuses.count('merge')} to apply "
+        f"({statuses.count('merge')} merged), {statuses.count('done')} already applied"
     )
-    print("CHECK PASSED" if ok else "CHECK FAILED — nothing was written")
-    if n_conflict:
-        print(
-            "A conflict means this repo's code differs from the copy the bundle was built\n"
-            "from (above: the code-only diff). If nobody edited that file by hand, the\n"
-            "difference is a transcription slip in the bundle's copy: add\n"
-            "  --accept <path>\n"
-            "to both the --check and the --apply command. Otherwise send the diff back."
-        )
-    return ok
+    print("CHECK FAILED — nothing was written" if problems else "CHECK PASSED")
+    return not problems
 
 
 def cmd_apply(entries: list[dict], do_import: bool) -> bool:
-    if not cmd_check(entries, quiet=True):
+    """Write every file (merging where this repo differs), then verify and import."""
+    if not cmd_check(entries):
         return False
+    merged = []
     for e in entries:
         status = file_status(e)
-        if status not in ("todo", "accepted"):
+        if status == "done":
             continue
         path = pathlib.Path(e["path"])
+        if status == "merge":
+            merged.append(e)
         if e["action"] == "delete":
             path.unlink()
             _prune_empty_dirs(path.parent)
-        else:
-            new = e["new"]
-            if e["action"] == "replace" and status == "todo":
-                new = _rebase(new, e["base"], _read(path))
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(new.encode("utf-8"))
-    bad = [e["path"] for e in entries if file_status(e) != "done"]
+            continue
+        new = e["new"]
+        if e["action"] == "replace":
+            current = _read(path)
+            if status == "todo":
+                new = _rebase(new, e["base"], current)
+            else:
+                new = _merge3(current, e["base"], new)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(new.encode("utf-8"))
+    print()
+    for e in merged:
+        explain_merge(e)
+    # a merged file keeps this repo's own edits, so it need not equal the bundle's version
+    merged_paths = {e["path"] for e in merged if e["action"] == "replace"}
+    bad = [
+        e["path"]
+        for e in entries
+        if e["path"] not in merged_paths and file_status(e) != "done"
+    ]
     failures = [f"not in the expected final state: {p}" for p in bad]
     failures += compile_and_import(entries, do_import)
     for f in failures:
@@ -441,45 +451,35 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
     if failures:
         print("APPLY FAILED — undo with --revert, then send the messages above back")
         return False
-    print(f"{len(entries)} files in their new state, compile OK"
-          + (", imports OK" if do_import else " (imports skipped)"))
-    print("APPLY PASSED — review with `git status` / `git diff`")
+    print(
+        f"{len(entries)} files in their new state, compile OK"
+        + (", imports OK" if do_import else " (imports skipped)")
+    )
+    print(
+        "APPLY PASSED — review with `git status` / `git diff`"
+        + (f" (look closely at the {len(merged)} MERGED files)" if merged else "")
+    )
     return True
 
 
 def cmd_revert(entries: list[dict]) -> bool:
-    skipped = []
+    """Put every touched file back to HEAD (apply refuses to run over uncommitted changes,
+    so HEAD is the state before --apply); files the bundle added are removed."""
     for e in entries:
         path = pathlib.Path(e["path"])
-        current = _read(path)
-        cur_sha = None if current is None else _sha(current)
-        if e["action"] == "add":
-            if cur_sha == e["new_sha"]:
-                path.unlink()
-                for parent in path.parents:
-                    if parent == pathlib.Path(".") or any(parent.iterdir()):
-                        break
-                    parent.rmdir()
-            elif current is not None:
-                skipped.append(e["path"])
-        elif (current is not None and e["new"] is not None and _is_new(current, e)) or (
-            e["action"] == "delete" and current is None
-        ):
-            # restore the committed bytes (the repo's own file, exactly); apply refuses
-            # to run over uncommitted changes, so HEAD is the state before --apply
-            committed = _head_version(e["path"])
-            restore = committed if committed is not None else e["base"]
+        committed = _head_version(e["path"])
+        if committed is not None:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(restore.encode("utf-8"))
-        elif not _matches_base(current, e):
-            skipped.append(e["path"])
-    for p in skipped:
-        print(f"left alone (edited after apply): {p}")
-    print("REVERT DONE" if not skipped else "REVERT PARTIAL — see the files above")
-    return not skipped
+            path.write_bytes(committed.encode("utf-8"))
+        elif path.exists():
+            path.unlink()
+            _prune_empty_dirs(path.parent)
+    print("REVERT DONE — `git status` should show none of the bundle's files")
+    return True
 
 
 def main() -> int:
+    """Parse the arguments, verify the bundle's checksums and run the chosen mode."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("bundle")
     mode = ap.add_mutually_exclusive_group(required=True)
@@ -487,15 +487,15 @@ def main() -> int:
     mode.add_argument("--apply", action="store_true")
     mode.add_argument("--revert", action="store_true")
     ap.add_argument("--no-import", action="store_true")
-    ap.add_argument("--accept", action="append", default=[], metavar="PATH")
     args = ap.parse_args()
-    ACCEPTED.update(args.accept)
 
     md = pathlib.Path(args.bundle).read_text(encoding="utf-8")
     need = re.search(r"apply_bundle version: (\d+)", md)
     if need and int(need.group(1)) > APPLY_VERSION:
-        print(f"This bundle needs apply_bundle.py version {need.group(1)}; you have "
-              f"{APPLY_VERSION}. Redo step 3 of the bundle.")
+        print(
+            f"This bundle needs apply_bundle.py version {need.group(1)}; you have "
+            f"{APPLY_VERSION}. Redo step 3 of the bundle."
+        )
         return 1
     entries = parse_bundle(md)
     if not entries:

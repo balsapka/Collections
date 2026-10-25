@@ -11,6 +11,7 @@ from .._common import build_cc_obs_base, build_rl_obs_base
 
 
 def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """crx_cc_obs_base from cc_spine."""
     return Pipeline(
         [
             node(
@@ -25,6 +26,7 @@ def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 
 
 def create_rl_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """crx_rl_obs_base from rl_spine."""
     return Pipeline(
         [
             node(
