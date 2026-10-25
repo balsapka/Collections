@@ -3,7 +3,7 @@
     python workplace_mirror/tools/make_bundle.py --base <commit> --slug a1_engine \\
         --title "..." [--head HEAD] [--branch feature/x] [--summary-file f.md] \\
         [--uat-file f.md] [--run-file f.md] [--cleanup-file f.md] [--helper path ...] \\
-        [--message "workplace commit message"] [--existing-branch]
+        [--message "workplace commit message"] [--existing-branch] [--exclude src/path/ ...]
 
 Writes workplace_mirror/bundles/NN_<slug>.md:
 
@@ -54,14 +54,18 @@ def _block(text: str, lang: str) -> list[str]:
     return [f"{fence}{lang}", text[:-1] if text.endswith("\n") else text, fence]
 
 
-def changed_files(base: str, head: str) -> list[tuple[str, str]]:
-    """[(action, workplace_path)] for source files changed between base and head."""
+def changed_files(
+    base: str, head: str, exclude: tuple[str, ...] = ()
+) -> list[tuple[str, str]]:
+    """[(action, workplace_path)] for source files changed between base and head, minus
+    the ``exclude`` path prefixes (e.g. transcriptions of files the workplace already has,
+    committed meanwhile by another session)."""
     out = _git("diff", "--no-renames", "--name-status", base, head, "--", MIRROR)
     result = []
     for line in out.splitlines():
         status, path = line.split("\t", 1)
         rel = path[len(MIRROR) :]
-        if rel.startswith(SOURCE_ROOTS):
+        if rel.startswith(SOURCE_ROOTS) and not rel.startswith(exclude):
             result.append(({"A": "add", "M": "replace", "D": "delete"}[status[0]], rel))
     return sorted(result, key=lambda x: (x[0] == "delete", x[1]))
 
@@ -212,7 +216,7 @@ def _read_optional(path: str | None) -> str:
 def build(args: argparse.Namespace) -> pathlib.Path:  # pylint: disable=too-many-locals
     """Write the bundle .md for ``args`` and return its path."""
     base, head = args.base, args.head
-    files = changed_files(base, head)
+    files = changed_files(base, head, tuple(args.exclude or ()))
     if not files:
         raise SystemExit(f"No src/ or conf/ changes between {base} and {head}.")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -322,6 +326,11 @@ def main() -> None:
         "--helper", action="append", help="file shipped to data/input/mirror_bundles"
     )
     ap.add_argument("--message", default=None, help="workplace commit message")
+    ap.add_argument(
+        "--exclude",
+        action="append",
+        help="workplace path prefix to leave out (e.g. another session's transcriptions)",
+    )
     ap.add_argument(
         "--existing-branch",
         action="store_true",

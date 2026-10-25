@@ -1,12 +1,12 @@
 # Mirror bundle 03 — CC A1 on month-end windows, prm_casa_return_events, distress fixes
 
-apply_bundle version: 5 · built 2026-10-24 from `6b30cb2..a45b03c` · source: 8 added, 10 replaced, 1 deleted · helpers: 0
+apply_bundle version: 6 · built 2026-10-25 from `6b30cb2..bfe52a3` · source: 8 added, 10 replaced, 1 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
 The bundle file and the apply script live in `data/input/mirror_bundles/` (gitignored) and are
-never committed; only `src/` and `conf/` are (step 7). Copy each command block
-exactly as it is.
+never committed; only `src/` and `conf/` are (step 5). Copy each command
+block exactly as it is.
 
 ### In UAT
 
@@ -22,27 +22,17 @@ git checkout feature/persona_redesign_b01 && git pull && git status --short
 mkdir -p data/input/mirror_bundles
 ```
 
-**Step 3.** Write the apply script from the *Apply script* section at the bottom (prints `apply_bundle.py written`):
+**Step 3.** Write the apply script, apply, and list what changed — must end with `APPLY PASSED`:
 
 ```bash
-python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '03_a1_month_end.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')"
+python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '03_a1_month_end.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')" && python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/03_a1_month_end.md --apply && git status --short
 ```
 
-**Step 4.** Apply — checks every file first, writes, compiles and imports; must end with `APPLY PASSED`:
+A file this repo changed since the bundle's copy (an edit at work, a lint fix) is
+merged, not refused: the apply lists it as `MERGED`. Look at its `git diff` before
+committing.
 
-```bash
-python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/03_a1_month_end.md --apply
-```
-
-On a **CONFLICT**: stop and send the printed diff back.
-
-**Step 5.** Look at what changed (nothing under `data/input/` shows up):
-
-```bash
-git status && git diff --stat
-```
-
-**Step 6.** `_common` helpers now take months instead of days. Check that no file outside
+**Step 4.** `_common` helpers now take months instead of days. Check that no file outside
 this bundle still calls them — this must print nothing (otherwise stop and send the output
 back):
 
@@ -50,13 +40,13 @@ back):
 grep -rnE "max_age_days|window_agg\(|lookback_floor\(|pit_latest\(" src --include='*.py' | grep -vE "crx_persona/_common.py|crx_persona/a1_ability/|crx_persona/cc_a1_ability_v2/"
 ```
 
-**Step 7.** Commit the source only, and push:
+**Step 5.** Commit the source only, and push:
 
 ```bash
 git add src conf && git commit -m "crx_persona A1: month-end windows by segment, prm_casa_return_events, distress fixes (mirror bundle 03)" && git push
 ```
 
-**Undo** (before step 7) — restores every touched file exactly:
+**Undo** (before step 5) — puts every touched file back to the last commit:
 
 ```bash
 python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/03_a1_month_end.md --revert
@@ -64,7 +54,7 @@ python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/03_a1
 
 ### In PROD
 
-**Step 8.** Get the branch:
+**Step 6.** Get the branch:
 
 ```bash
 git fetch origin && git checkout feature/persona_redesign_b01 && git pull
@@ -74,16 +64,16 @@ Run everything for `cc_60_180` (the `model_id` in `conf/dev/globals_dev.yml`).
 
 The axis covers the persona months, `crx_persona.persona_start_date` to
 `persona_end_date` in `conf/dev/globals_dev.yml` (dev today: 2026-01 to 2026-08). The B03
-OUTPUT compares those months only. If you change either date, rerun Step 9 too.
+OUTPUT compares those months only. If you change either date, rerun Step 7 too.
 
-**Step 9.** Build `prm_casa_return_events` (6 months before the persona start month
+**Step 7.** Build `prm_casa_return_events` (6 months before the persona start month
 onwards):
 
 ```bash
 kedro run --env=dev --pipeline=casa_primary
 ```
 
-**Step 10.** Run the check pipeline (observation base + A1 into the temporary
+**Step 8.** Run the check pipeline (observation base + A1 into the temporary
 `crx_cc_a1_ability_b03_check`, then the comparison):
 
 ```bash
@@ -95,7 +85,7 @@ Paste back the two blocks, each from `=== B03 … START ===` to `=== B03 … END
 income-weakening check: how often each fires and the levels / states without them).
 Aggregates only, no customer rows. Text is best; otherwise one photo per block.
 
-**Step 11.** Only after the B03 block has been reviewed: refresh the real output.
+**Step 9.** Only after the B03 block has been reviewed: refresh the real output.
 
 ```bash
 kedro run --env=dev --pipeline=crx_cc_a1_ability_v2
@@ -160,9 +150,8 @@ under the data-layer rules, and the distress fixes from the PROD validation (Son
 ## Instructions for the workplace assistant
 
 1. Do not retype or hand-edit code from this file; `apply_bundle.py` writes it.
-2. `--apply` must print **APPLY PASSED**. On CONFLICT (other than an `--accept`ed
-   file) the workplace file differs from the version this bundle was built from:
-   stop and show the printed diff to the user.
+2. `--apply` must print **APPLY PASSED**. A `MERGED` file differed from the copy
+   this bundle was built from; show the user its `git diff` before committing.
 3. `DAMAGED` means the markdown copy was altered — recopy the raw file.
 4. If an import fails, run `--revert` and report.
 5. Touch nothing outside the manifest. Never commit `data/input/mirror_bundles/`.
@@ -2345,7 +2334,7 @@ New:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/casa/primary.py`
-action: add · new sha256 `885c504964e74f0035c623341f97ff914e3ecd5a7a8f6ae10d4925304613223a` · new trailing newline: yes
+action: add · new sha256 `c06be986a54a112cc7d5f98240f981fcd6ade9d167ea8df172652f8642edf33e` · new trailing newline: yes
 
 New:
 
@@ -2361,6 +2350,7 @@ from enbd_collections.nodes.primary.casa.prm_casa import build_return_events
 
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """prm_casa_return_events from comp_financial_tran_repos_dly."""
     return Pipeline(
         [
             node(
@@ -2380,7 +2370,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/_common.py`
-action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `608fe1bedfd5a26dc2e789f9a7f06d62bb67aacb071d789a418074b4bac2d62f` · new trailing newline: yes
+action: replace · base sha256 `c9b8cfc76650dba8cafa36b70691c924c3af5783ce4efa3b11628f3020656e91` · base trailing newline: yes · new sha256 `00b6ff7d04506ecb3f1016d52106624eccca773bbaa8ae80f5302e56c305488c` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2586,7 +2576,6 @@ from pyspark.sql import functions as F
 
 from ._dpd_journey.constants import MODEL_ID_SEGMENT
 
-
 LOG = logging.getLogger(__name__)
 
 GRAIN = ("account_id", "observation_date")
@@ -2773,6 +2762,7 @@ def build_cc_obs_base(cc_spine: DataFrame, crx_persona: dict) -> DataFrame:
 
 
 def build_rl_obs_base(rl_spine: DataFrame, crx_persona: dict) -> DataFrame:
+    """The RL observation base (``rl_spine`` is already month-end)."""
     return _obs_base(rl_spine, "account_id", crx_persona)
 `````
 
@@ -2922,7 +2912,7 @@ Moderate, Moderate → Low).
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py`
-action: replace · base sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · base trailing newline: yes · new sha256 `beb0aaa1956dd5e6280f9a0bf612f397bdbebeca7861a641038c0c1a78547eaa` · new trailing newline: yes
+action: replace · base sha256 `537653831b6fe08435661252621aee9642766eb7b10390ed82a44f6bd393a6d3` · base trailing newline: yes · new sha256 `0a9f2836a904a1117151912a9fea0dc0b105d9f721b043f7cd62a424646e8d76` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3158,6 +3148,7 @@ def _not_weakening(
 
 
 def income_level(anchor: Column, w: int) -> Column:
+    """stable / weak / none over a ``w``-month window (README section 1)."""
     last = _months("income", _window(w)[0])
     floor = F.greatest(F.lit(F_INC), K_INC * anchor)
     stable = (_count_at_least(last, floor) >= MIN_MONTHS[w]) & _not_weakening(
@@ -3168,6 +3159,7 @@ def income_level(anchor: Column, w: int) -> Column:
 
 
 def liquidity_level(anchor: Column, w: int) -> Column:
+    """adequate / weak / none over a ``w``-month window (README section 2)."""
     last = _months("casa", _window(w)[0])
     payment = F.coalesce(F.col("ext_card_payment_max"), F.lit(0.0))
     casa_floor = F.greatest(F.lit(F_CASA), K_CASA * anchor)
@@ -3179,7 +3171,7 @@ def liquidity_level(anchor: Column, w: int) -> Column:
     return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
 
 
-def build_a1_ability(  # pylint: disable=too-many-arguments
+def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     obs_base: DataFrame,
     income: DataFrame,
     liquidity: DataFrame,
@@ -3235,7 +3227,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py`
-action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `5d831447c71f8f1845efb6ecc1d4714200168074fddbc3aa10150ef12b1811c8` · new trailing newline: yes
+action: replace · base sha256 `971c756da1d085bda9efe3843620d86005d2beb9af2c403e5c66ae1947838880` · base trailing newline: yes · new sha256 `18fdacb2b998536b9750303a8c423e965c4277586843014003f85c78943f9183` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3756,7 +3748,7 @@ def _casa_by_month(wm_casa_bal: DataFrame, since: str) -> DataFrame:
     )
 
 
-def _ext_card_payments(  # pylint: disable=too-many-arguments
+def _ext_card_payments(
     obs: DataFrame,
     labelled_txn: DataFrame,
     beneficiary_cards: DataFrame,
@@ -3837,7 +3829,7 @@ def _casa_activity(
     )
 
 
-def build_liquidity_signals(
+def build_liquidity_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     obs_base: DataFrame,
     wm_casa_bal: DataFrame,
     wm_casa_flow: DataFrame,
@@ -3979,7 +3971,7 @@ __all__ = ["create_b03_check_pipeline", "create_pipeline"]
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/b03_check.py`
-action: add · new sha256 `393e3f90528a39b32d98a76e9c2a4a6a5874d1dacb07c79e0def1c9f931b9cb4` · new trailing newline: yes
+action: add · new sha256 `0c8d7a9e26f341c9e6c871be3bf9254f261a128c434f1be26195c78027f460aa` · new trailing newline: yes
 
 New:
 
@@ -4105,24 +4097,27 @@ def _state(income_level: str) -> Column:
     return _LADDER.state(points, F.col("a1_distress_flag") == 1, unknown)
 
 
-def compare_income_rules(income: DataFrame, a1: DataFrame, model_id: str) -> None:
+def compare_income_rules(  # pylint: disable=too-many-locals
+    income: DataFrame, a1: DataFrame, model_id: str
+) -> None:
     """How often 2 × anchor raises the income bar above the flat floor, how often the
     weakening check fires, and the levels and states without each of them."""
     w = window_months(model_id)
     last = _window(w)[0]
     anchor = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))
-    bar = F.greatest(F.lit(F_INC), K_INC * anchor)
+    income_bar = F.greatest(F.lit(F_INC), K_INC * anchor)
     flat = F.lit(F_INC)
     df = (
         a1.join(income, ["account_id", "observation_date"])
-        .withColumn("bar", bar)
-        .withColumn("raised", bar > flat)
-        .withColumn("lvl_engine", _income_level(bar, True, w))
+        .withColumn("bar", income_bar)
+        .withColumn("raised", income_bar > flat)
+        .withColumn("lvl_engine", _income_level(income_bar, True, w))
         .withColumn("lvl_flat", _income_level(flat, True, w))
-        .withColumn("lvl_no_weak", _income_level(bar, False, w))
+        .withColumn("lvl_no_weak", _income_level(income_bar, False, w))
         .withColumn("lvl_flat_no_weak", _income_level(flat, False, w))
         .withColumn(
-            "qual_bar", _count_at_least(_months("income", last), bar) >= MIN_MONTHS[w]
+            "qual_bar",
+            _count_at_least(_months("income", last), income_bar) >= MIN_MONTHS[w],
         )
         .withColumn(
             "qual_flat", _count_at_least(_months("income", last), flat) >= MIN_MONTHS[w]
@@ -4292,7 +4287,7 @@ def build_cc_liquidity_anchor(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/cc_a1_ability_v2/pipeline.py`
-action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `b1182348ee131b772d2ca424c95b13f66d23029d73e6d68e07fe9b3b5cf079da` · new trailing newline: yes
+action: replace · base sha256 `f1fa725a5a187561deb0119512119d2f53f3aa7f3ac4574f0664b8e388447654` · base trailing newline: yes · new sha256 `4d176ef1f833d5554c2704bf6b5bfd7013f3107f67508e0f27a49e2af05e390d` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -4483,10 +4478,11 @@ from .nodes import build_cc_liquidity_anchor
 _OBS = "crx_cc_obs_base"
 
 
-def create_pipeline(
+def create_pipeline(  # pylint: disable=unused-argument
     output: str = "crx_cc_a1_ability_v2",
-    **kwargs,  # pylint: disable=unused-argument
+    **kwargs,
 ) -> Pipeline:
+    """The CC A1 axis: signal tables, the anchor and the state, written to ``output``."""
     return Pipeline(
         [
             node(
@@ -4592,7 +4588,7 @@ def create_b03_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-a
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/obs_base/pipeline.py`
-action: replace · base sha256 `c924e25529b82e01dc2b85ddc07f2c7255c1b281b61281ac3dedd213a0e2ec4c` · base trailing newline: yes · new sha256 `41785d833a8562f497aa024c971ecabd8d9325b6954627914ec459d0760792a2` · new trailing newline: yes
+action: replace · base sha256 `c924e25529b82e01dc2b85ddc07f2c7255c1b281b61281ac3dedd213a0e2ec4c` · base trailing newline: yes · new sha256 `f2cf859bf862b6bc539557adb22a3f1a646686fd7d6c7fcebf5da3725e358cd0` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -4652,6 +4648,7 @@ from .._common import build_cc_obs_base, build_rl_obs_base
 
 
 def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """crx_cc_obs_base from cc_spine."""
     return Pipeline(
         [
             node(
@@ -4666,6 +4663,7 @@ def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 
 
 def create_rl_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """crx_rl_obs_base from rl_spine."""
     return Pipeline(
         [
             node(
@@ -4911,31 +4909,39 @@ Run from the workplace repo root:
     python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/<bundle>.md --revert
         -> puts every touched file back the way it was before --apply (uncommitted work only).
 
+When a repo file differs from the copy the bundle was built from (an edit made at work, a
+lint fix, a photo slip), the bundle still applies — it never stops on a difference:
+  * replace: three-way merge (git merge-file) of this repo's file, the bundle's base copy and
+    the bundle's new version. Edits made here survive wherever the bundle did not change the
+    same lines; where both changed the same lines, the bundle's version wins.
+  * delete: the file is deleted (git history keeps it).
+  * add over an existing file: the bundle's version is written.
+Each such file is listed as MERGED; review it with `git diff <path>` before committing.
+
 Safety rules:
-  * every file the bundle replaces or deletes must be byte-identical (line endings aside) to
-    the version the bundle was built from; otherwise nothing is written and the diff is
-    printed. Someone else's edits are never overwritten.
-  * refuses to write on main/master, or when a touched file has uncommitted changes.
+  * refuses to write on main/master, or when a touched file has uncommitted changes, so
+    `git diff` shows exactly what the bundle did and --revert restores HEAD.
   * the bundle carries a SHA-256 for every block, so a damaged copy (rendered instead of raw
     markdown, smart quotes, lost lines) is detected before anything is written.
 
 Options: --no-import skips the import check (e.g. outside the dev container).
-         --accept PATH (repeatable) replaces a conflicting file anyway — only after
-         reading its code diff, and only for a file nobody edited by hand.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import difflib
 import hashlib
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
-APPLY_VERSION = 5
+APPLY_VERSION = 6
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
@@ -4957,8 +4963,6 @@ def _loose(text: str) -> str:
 
 
 def _strip_docstrings(tree):
-    import ast
-
     for node in ast.walk(tree):
         body = getattr(node, "body", None)
         if (
@@ -4976,12 +4980,11 @@ def _same_code(path: str, a: str, b: str) -> bool:
     """Same Python code (comments and docstrings aside) or the same YAML content."""
     try:
         if path.endswith(".py"):
-            import ast
-
-            dump = lambda t: ast.dump(_strip_docstrings(ast.parse(t)))  # noqa: E731
-            return dump(a) == dump(b)
+            return ast.dump(_strip_docstrings(ast.parse(a))) == ast.dump(
+                _strip_docstrings(ast.parse(b))
+            )
         if path.endswith((".yml", ".yaml")):
-            import yaml
+            import yaml  # pylint: disable=import-outside-toplevel  # optional
 
             return yaml.safe_load(a) == yaml.safe_load(b)
     except Exception:  # pylint: disable=broad-except
@@ -4991,18 +4994,18 @@ def _same_code(path: str, a: str, b: str) -> bool:
 
 def _is_new(current: str, e: dict) -> bool:
     """The repo file already holds the bundle's new version (comment noise aside)."""
-    return _loose(current) == _loose(e["new"]) or _same_code(e["path"], current, e["new"])
+    return _loose(current) == _loose(e["new"]) or _same_code(
+        e["path"], current, e["new"]
+    )
 
 
 def _code_text(path: str, text: str) -> str:
     """The text with comments and docstrings removed (Python) or normalised (YAML)."""
     try:
         if path.endswith(".py"):
-            import ast
-
             return ast.unparse(_strip_docstrings(ast.parse(text)))
         if path.endswith((".yml", ".yaml")):
-            import yaml
+            import yaml  # pylint: disable=import-outside-toplevel  # optional
 
             return yaml.safe_dump(yaml.safe_load(text), sort_keys=True)
     except Exception:  # pylint: disable=broad-except
@@ -5036,6 +5039,27 @@ def _rebase(new: str, base: str, current: str) -> str:
     ).get_opcodes():
         out += cur_l[i1:i2] if tag == "equal" else new_l[j1:j2]
     return "\n".join(out)
+
+
+def _merge3(current: str, base: str, new: str) -> str:
+    """Three-way merge: this repo's edits on top of the bundle's change (git merge-file;
+    on overlapping lines the bundle's version wins). Without git: the bundle's version.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for name, text in (("current", current), ("base", base), ("new", new)):
+            f = pathlib.Path(tmp) / name
+            f.write_text(_norm(text), encoding="utf-8")
+            paths.append(str(f))
+        try:
+            out = subprocess.run(
+                ["git", "merge-file", "-p", "--theirs", *paths],
+                capture_output=True,
+                check=False,
+            )
+        except OSError:
+            return new
+    return out.stdout.decode("utf-8") if out.returncode >= 0 else new
 
 
 def _sha(text: str) -> str:
@@ -5094,6 +5118,7 @@ def parse_bundle(md: str) -> list[dict]:
 
 
 def verify_bundle(entries: list[dict]) -> list[str]:
+    """Blocks whose content no longer matches the checksum (a damaged copy)."""
     errors = []
     for e in entries:
         for kind in ("base", "new"):
@@ -5126,6 +5151,7 @@ def _head_version(path: str) -> str | None:
 
 
 def git_problems(entries: list[dict]) -> list[str]:
+    """Reasons to refuse: a protected branch, or uncommitted edits in a touched file."""
     problems = []
     branch = _git("rev-parse", "--abbrev-ref", "HEAD")
     if branch is not None:
@@ -5149,17 +5175,14 @@ def git_problems(entries: list[dict]) -> list[str]:
 # ── Status ───────────────────────────────────────────────────────────────────
 
 
-ACCEPTED: set[str] = set()  # paths given with --accept
-
-
-def file_status(e: dict) -> str:
-    """One of: todo, done, conflict, accepted."""
+def file_status(e: dict) -> str:  # pylint: disable=too-many-return-statements
+    """One of: todo, done, merge (the repo file differs from the bundle's base copy)."""
     current = _read(pathlib.Path(e["path"]))
     cur_sha = None if current is None else _sha(current)
     if e["action"] == "add":
         if current is None:
             return "todo"
-        return "done" if cur_sha == e["new_sha"] else "conflict"
+        return "done" if cur_sha == e["new_sha"] else "merge"
     if e["action"] == "replace":
         if current is not None and _loose(current) == _loose(e["new"]):
             return "done"
@@ -5169,42 +5192,21 @@ def file_status(e: dict) -> str:
             return "done"
         if _matches_base(current, e):
             return "todo"
-        return "accepted" if e["path"] in ACCEPTED else "conflict"
+        return "merge"
     # delete
     if current is None:
         return "done"
-    if _matches_base(current, e):
-        return "todo"
-    return "accepted" if e["path"] in ACCEPTED else "conflict"
+    return "todo" if _matches_base(current, e) else "merge"
 
 
-def explain_conflict(e: dict) -> None:
-    current = _read(pathlib.Path(e["path"]))
-    print(f"\n--- CONFLICT: {e['path']} ({e['action']})")
-    if e["action"] == "add":
-        print("    the file already exists with different content; the bundle would add it.")
-        expected, label = e["new"], "bundle (new)"
-    else:
-        expected, label = e["base"], "bundle base (as photographed)"
-        if current is None:
-            print("    the file does not exist in this repo.")
-            return
-    print("    The CODE differs (comments, docstrings, spacing are already ignored).")
-    print("    Code-only diff — bundle's copy (-) vs this repo (+):")
-    diff = list(
-        difflib.unified_diff(
-            _code_text(e["path"], expected).splitlines(),
-            _code_text(e["path"], current or "").splitlines(),
-            fromfile=label,
-            tofile="this repo",
-            lineterm="",
-            n=1,
-        )
-    )
-    for line in diff[:80]:
-        print("    " + line)
-    if len(diff) > 80:
-        print(f"    ... {len(diff) - 80} more diff lines")
+def explain_merge(e: dict) -> None:
+    """One line on what happened to a file that differed from the bundle's copy."""
+    what = {
+        "replace": "merged with this repo's own edits",
+        "delete": "deleted, although it had edits the bundle's copy lacks (git keeps them)",
+        "add": "already existed with other content; replaced by the bundle's version",
+    }[e["action"]]
+    print(f"MERGED {e['path']}: {what} — review: git diff -- {e['path']}")
 
 
 def _comment_only(e: dict) -> bool:
@@ -5218,11 +5220,11 @@ def _comment_only(e: dict) -> bool:
 
 
 def print_table(entries: list[dict], statuses: list[str]) -> None:
+    """One line per bundle file: its action and status."""
     word = {
         "todo": "will apply",
         "done": "already applied",
-        "conflict": "CONFLICT",
-        "accepted": "CONFLICT, accepted (--accept): will apply",
+        "merge": "will apply — MERGED (differs from the bundle's copy)",
     }
     width = max(len(e["path"]) for e in entries)
     for e, s in zip(entries, statuses):
@@ -5246,8 +5248,11 @@ def _module_name(path: str) -> str | None:
 
 
 def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
+    """Compile every touched .py file and import its module (plus the registry)."""
     failures = []
-    existing = [e for e in entries if e["action"] != "delete" and e["path"].endswith(".py")]
+    existing = [
+        e for e in entries if e["action"] != "delete" and e["path"].endswith(".py")
+    ]
     for e in existing:
         try:
             compile(_read(pathlib.Path(e["path"])), e["path"], "exec")
@@ -5266,6 +5271,7 @@ def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
             capture_output=True,
             text=True,
             env=env,
+            check=False,
         )
         if r.returncode != 0:
             last = (r.stderr.strip().splitlines() or ["?"])[-1]
@@ -5275,8 +5281,6 @@ def compile_and_import(entries: list[dict], do_import: bool) -> list[str]:
 
 def _prune_empty_dirs(folder: pathlib.Path) -> None:
     """Remove folders left with nothing but bytecode caches after a delete."""
-    import shutil
-
     while folder != pathlib.Path(".") and folder.is_dir():
         rest = [p for p in folder.iterdir() if p.name != "__pycache__"]
         if rest:
@@ -5289,52 +5293,56 @@ def _prune_empty_dirs(folder: pathlib.Path) -> None:
 
 
 def cmd_check(entries: list[dict], quiet: bool = False) -> bool:
+    """Dry run: what --apply would do; False only when git refuses."""
     statuses = [file_status(e) for e in entries]
     problems = git_problems(entries)
     if not quiet:
         print_table(entries, statuses)
-    for e, s in zip(entries, statuses):
-        if s in ("conflict", "accepted"):
-            explain_conflict(e)
     for p in problems:
         print("REFUSED: " + p)
-    n_conflict = statuses.count("conflict")
-    ok = n_conflict == 0 and not problems
-    n_todo = statuses.count("todo") + statuses.count("accepted")
     print(
-        f"\n{n_todo} to apply, {statuses.count('done')} already applied, "
-        f"{n_conflict} conflicts"
+        f"\n{statuses.count('todo') + statuses.count('merge')} to apply "
+        f"({statuses.count('merge')} merged), {statuses.count('done')} already applied"
     )
-    print("CHECK PASSED" if ok else "CHECK FAILED — nothing was written")
-    if n_conflict:
-        print(
-            "A conflict means this repo's code differs from the copy the bundle was built\n"
-            "from (above: the code-only diff). If nobody edited that file by hand, the\n"
-            "difference is a transcription slip in the bundle's copy: add\n"
-            "  --accept <path>\n"
-            "to both the --check and the --apply command. Otherwise send the diff back."
-        )
-    return ok
+    print("CHECK FAILED — nothing was written" if problems else "CHECK PASSED")
+    return not problems
 
 
 def cmd_apply(entries: list[dict], do_import: bool) -> bool:
-    if not cmd_check(entries, quiet=True):
+    """Write every file (merging where this repo differs), then verify and import."""
+    if not cmd_check(entries):
         return False
+    merged = []
     for e in entries:
         status = file_status(e)
-        if status not in ("todo", "accepted"):
+        if status == "done":
             continue
         path = pathlib.Path(e["path"])
+        if status == "merge":
+            merged.append(e)
         if e["action"] == "delete":
             path.unlink()
             _prune_empty_dirs(path.parent)
-        else:
-            new = e["new"]
-            if e["action"] == "replace" and status == "todo":
-                new = _rebase(new, e["base"], _read(path))
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(new.encode("utf-8"))
-    bad = [e["path"] for e in entries if file_status(e) != "done"]
+            continue
+        new = e["new"]
+        if e["action"] == "replace":
+            current = _read(path)
+            if status == "todo":
+                new = _rebase(new, e["base"], current)
+            else:
+                new = _merge3(current, e["base"], new)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(new.encode("utf-8"))
+    print()
+    for e in merged:
+        explain_merge(e)
+    # a merged file keeps this repo's own edits, so it need not equal the bundle's version
+    merged_paths = {e["path"] for e in merged if e["action"] == "replace"}
+    bad = [
+        e["path"]
+        for e in entries
+        if e["path"] not in merged_paths and file_status(e) != "done"
+    ]
     failures = [f"not in the expected final state: {p}" for p in bad]
     failures += compile_and_import(entries, do_import)
     for f in failures:
@@ -5342,45 +5350,35 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
     if failures:
         print("APPLY FAILED — undo with --revert, then send the messages above back")
         return False
-    print(f"{len(entries)} files in their new state, compile OK"
-          + (", imports OK" if do_import else " (imports skipped)"))
-    print("APPLY PASSED — review with `git status` / `git diff`")
+    print(
+        f"{len(entries)} files in their new state, compile OK"
+        + (", imports OK" if do_import else " (imports skipped)")
+    )
+    print(
+        "APPLY PASSED — review with `git status` / `git diff`"
+        + (f" (look closely at the {len(merged)} MERGED files)" if merged else "")
+    )
     return True
 
 
 def cmd_revert(entries: list[dict]) -> bool:
-    skipped = []
+    """Put every touched file back to HEAD (apply refuses to run over uncommitted changes,
+    so HEAD is the state before --apply); files the bundle added are removed."""
     for e in entries:
         path = pathlib.Path(e["path"])
-        current = _read(path)
-        cur_sha = None if current is None else _sha(current)
-        if e["action"] == "add":
-            if cur_sha == e["new_sha"]:
-                path.unlink()
-                for parent in path.parents:
-                    if parent == pathlib.Path(".") or any(parent.iterdir()):
-                        break
-                    parent.rmdir()
-            elif current is not None:
-                skipped.append(e["path"])
-        elif (current is not None and e["new"] is not None and _is_new(current, e)) or (
-            e["action"] == "delete" and current is None
-        ):
-            # restore the committed bytes (the repo's own file, exactly); apply refuses
-            # to run over uncommitted changes, so HEAD is the state before --apply
-            committed = _head_version(e["path"])
-            restore = committed if committed is not None else e["base"]
+        committed = _head_version(e["path"])
+        if committed is not None:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(restore.encode("utf-8"))
-        elif not _matches_base(current, e):
-            skipped.append(e["path"])
-    for p in skipped:
-        print(f"left alone (edited after apply): {p}")
-    print("REVERT DONE" if not skipped else "REVERT PARTIAL — see the files above")
-    return not skipped
+            path.write_bytes(committed.encode("utf-8"))
+        elif path.exists():
+            path.unlink()
+            _prune_empty_dirs(path.parent)
+    print("REVERT DONE — `git status` should show none of the bundle's files")
+    return True
 
 
 def main() -> int:
+    """Parse the arguments, verify the bundle's checksums and run the chosen mode."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("bundle")
     mode = ap.add_mutually_exclusive_group(required=True)
@@ -5388,15 +5386,15 @@ def main() -> int:
     mode.add_argument("--apply", action="store_true")
     mode.add_argument("--revert", action="store_true")
     ap.add_argument("--no-import", action="store_true")
-    ap.add_argument("--accept", action="append", default=[], metavar="PATH")
     args = ap.parse_args()
-    ACCEPTED.update(args.accept)
 
     md = pathlib.Path(args.bundle).read_text(encoding="utf-8")
     need = re.search(r"apply_bundle version: (\d+)", md)
     if need and int(need.group(1)) > APPLY_VERSION:
-        print(f"This bundle needs apply_bundle.py version {need.group(1)}; you have "
-              f"{APPLY_VERSION}. Redo step 3 of the bundle.")
+        print(
+            f"This bundle needs apply_bundle.py version {need.group(1)}; you have "
+            f"{APPLY_VERSION}. Redo step 3 of the bundle."
+        )
         return 1
     entries = parse_bundle(md)
     if not entries:
