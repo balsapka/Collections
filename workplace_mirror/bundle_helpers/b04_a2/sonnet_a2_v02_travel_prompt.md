@@ -43,10 +43,9 @@ A. Inventory first (read only; append to README.md, under 50 lines). Credit card
    come from different systems: answer for each separately.
    A1 Credit cards (Way4): prm_transaction (primary, catalog_outputs.yml:429-431, preferred)
       and raw_transaction (raw, catalog_raw_way4.yml:35-38): every column, name, type, what the
-      code or docs say it holds; how prm_transaction is scoped per model_id (CC models: the delinquent spine
-      accounts only; RL models: all cards of the scoped CIFs via the cc_scope pipeline,
-      pipeline_registry.py:219,226) and from which date; how a CC model could get the customer's
-      other cards (a CIF-level scope like cc_scope, or the Way4 raw tables); every key in add_info that the repo parses or documents (the DOMESTIC= flag comes
+      code or docs say it holds; from which date prm_transaction holds transactions (it is model-scoped: CC models the
+      spine cards, RL models all cards of the scoped CIFs via cc_scope — that scope is used as
+      is); every key in add_info that the repo parses or documents (the DOMESTIC= flag comes
       from there, prm_cc.py:375-381) — look for POS entry mode, e-commerce / card-not-present,
       terminal type, ATM indicators; how cash advances (ATM) are marked (MCC 6011, txn type).
    A2 Debit cards / CASA — two candidate routes, answer for both:
@@ -106,10 +105,6 @@ B. PROD snippet: tmp_validation/a2_v02/a2_v02_snippet.py plus README.md with the
                      C3 all purchases (no in-person filter);
                      C4 ATM only.
                    Overlap of C2 and C3 with C1 (if C1 exists): Skip under both / only one.
-                   Scope gap (CC models only): base CIFs holding other credit cards that are not
-                   in this model's prm_transaction (count from the Way4 card / contract data), how
-                   many of those cards had a transaction in the last 3 / 12 months, and the latest
-                   UAE / foreign evidence those cards would add (rows whose state would change).
    t7b_debit_card  for each route from A2 separately — (a) the raw CASA table, (b) the sibling
                    datasets — debit-card / CASA debits in the same 12 months, base CIFs: rows by
                    the channel values (top 50), split home country / abroad by each candidate
@@ -137,8 +132,6 @@ C. After the user commits the results: save tmp_validation/a2_v02/summary.md, un
      known leavers' lags), and how steeply t2 changes around the baseline;
    - whether alternative A or B catches a materially different set (t5);
    - whether the t6 profile looks like leavers (long silence, few answered calls);
-   - credit-card scope (CC models): how much evidence the customer's other cards would add,
-     i.e. whether A2 needs a CIF-level card scope like the RL models' cc_scope;
    - per card source, which option to use: credit cards (t7a) C1 if the field exists and is
      filled, else C2; debit cards (t7b) D1 if the channel values are reliable, else D2; how many
      Skips the "all" option (C3 / D3) would add (likely online foreign shopping);
