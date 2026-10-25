@@ -52,7 +52,7 @@ call outcome (except the collector's departure note) and reachability never read
 | Evidence | Domestic | Foreign | Age limit |
 |---|---|---|---|
 | Login (digital banking) | from the UAE | from abroad | none |
-| Card and CASA spending (all the customer's accounts) | in the UAE, not a travel purchase | abroad | none |
+| In-person card use — a shop payment or ATM withdrawal — on any of the customer's cards and CASA accounts | in the UAE, not a travel purchase | abroad | none |
 | Travel purchase (airline, cruise, travel agency) | — | counts as foreign | last 12 months |
 | Collector's note: left the country / out of country / final exit visa | — | foreign, on the note's date | none |
 
@@ -67,6 +67,10 @@ In Country  latest domestic is the latest evidence (a tie counts as domestic)
             AND it falls in W
 Unknown     no evidence, or the latest evidence is domestic but older than W
 ```
+
+Only in-person card use places the customer: online purchases (a foreign shop can be paid from
+the UAE, a UAE shop from abroad) and transfers or remittances (most expats send money home every
+month) are not location evidence.
 
 A trip followed by domestic activity means the customer came back: In Country. A foreign
 latest evidence stays Skip however old it is — accounts sit in collections for years.
@@ -167,6 +171,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-10 | Routing flags (promise to pay, hardship, refusing, field visit) leave A2. |
 | D-A2-11 | Output: both dimension columns, `deceased_flag`, and the combined `a2_state` with labels. |
 | D-A2-12 | Results are reported per model variant, RL split by product (Personal Loans, Personal Cash Loans, Auto); 180+ also by charge-off-age vintage (early-stage charge-off < 2 years / late-stage charge-off 2+ years), as on the deterioration axis. Model doc: `docs/locatability/a2_locatability_reference.xlsx`. |
+| D-A2-13 | Spending is location evidence only when in person: card-present shop payments and ATM withdrawals. Online purchases and transfers / remittances abroad are not (user, 2026-10-25). |
 
 ---
 

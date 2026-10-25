@@ -229,8 +229,8 @@ def _overview(wb: Workbook, scoring_date: str) -> None:
     r = _key_values(ws, r, [
         ("Scope", "Credit cards (CC) and retail loans (RL: Personal Loans, Personal Cash Loans, "
                   f"Auto) at 61–180 DPD and at 180+ DPD on the scoring date{_on(scoring_date)}."),
-        ("Location", "Where the customer is, from what they do: digital-banking logins, card "
-                     "and current/savings (CASA) spending on all the customer's accounts, travel "
+        ("Location", "Where the customer is, from what they do: digital-banking logins, in-person "
+                     "card use (shop payments, ATM withdrawals) on all the customer's cards and accounts, travel "
                      "purchases, and a collector's note that the customer left the country."),
         ("Reachability", "Whether our calls get through, from the collections contact history "
                          "(DCORE)."),
@@ -338,9 +338,9 @@ def _assignment(wb: Workbook) -> None:
          "(DECEASED, DECEASED CLAIMED, DECEASED OR EXPIRED, …); card block code D on the latest "
          "contract snapshot (cards only); the deceased flag on the customer's latest demographics record.", 44),
         ("Location", "skip", "The latest foreign evidence is later than the latest UAE evidence, or there "
-         "is no UAE evidence. Foreign evidence = a login from abroad, card or CASA spending abroad, a "
+         "is no UAE evidence. Foreign evidence = a login from abroad, a shop payment or ATM withdrawal abroad, a "
          "collector's departure note (any age), or a travel purchase in the last 12 months.", 44),
-        ("Location", "in_country", "The latest evidence is a UAE login or UAE spending (not a travel "
+        ("Location", "in_country", "The latest evidence is a UAE login or a shop payment or ATM withdrawal in the UAE (not a travel "
          "purchase), dated within the window. Same day as foreign evidence: the UAE evidence wins.", 30),
         ("Location", "unknown", "No evidence at all, or the latest evidence is in the UAE but older than "
          "the window.", 30),
@@ -386,7 +386,7 @@ def _assignment(wb: Workbook) -> None:
 
 
 LOC_EXAMPLES = [
-    ("in_country", [(-8, FOREIGN), (-1, DOMESTIC)], "Spent abroad 8 months ago, UAE spending last month."),
+    ("in_country", [(-8, FOREIGN), (-1, DOMESTIC)], "Used the card abroad 8 months ago, in the UAE last month."),
     ("in_country", [(-6, TRAVEL), (-5, FOREIGN), (-1, DOMESTIC)], "Bought a ticket, spent abroad, came back: UAE login last month."),
     ("in_country", [(-4, EXIT), (0, DOMESTIC)], "Collector noted 'left the country'; the customer has since logged in from the UAE."),
     ("skip", [(-3, DOMESTIC), (-1, FOREIGN)], "Latest login is from abroad."),
@@ -395,7 +395,7 @@ LOC_EXAMPLES = [
     ("skip", [(-5, DOMESTIC), (-2, EXIT)], "Collector recorded a final exit visa."),
     ("unknown", [(-5, DOMESTIC)], "Last UAE activity is older than the 3-month window."),
     ("unknown", [(-15, TRAVEL)], "Only a travel purchase older than 12 months: no evidence."),
-    ("unknown", [], "No logins and no card or CASA activity on record."),
+    ("unknown", [], "No logins and no in-person card use on record."),
 ]
 REACH_EXAMPLES = [
     ("reachable", [(-1, ANSWERED)], "Answered last month."),
@@ -467,7 +467,7 @@ def _examples(wb: Workbook) -> None:
         return r + 1
 
     r = _section(ws, r, "Location — the latest evidence decides", last)
-    r = legend(r, [(DOMESTIC, "UAE login / spend"), (FOREIGN, "abroad login / spend"),
+    r = legend(r, [(DOMESTIC, "UAE login / card use"), (FOREIGN, "abroad login / card use"),
                    (TRAVEL, "travel purchase"), (EXIT, "collector: left the country")])
     r = grid_header(r)
     r = rows(r, LOC_EXAMPLES, location)
@@ -491,8 +491,9 @@ def _evidence(wb: Workbook) -> None:
     r = _header(ws, r, ["Evidence", "Used for", "Counts as", "Level", "Age limit", "Source"])
     for row in [
         ("Digital-banking login", "Location", "UAE or foreign, by login country", "Customer", "UAE: window; foreign: none", "Digital-banking login history"),
-        ("Card spending", "Location", "UAE or foreign, by merchant country", "Customer (all cards)", "UAE: window; foreign: none", "Card transactions"),
-        ("CASA spending (debit card, ATM, transfers)", "Location", "UAE or foreign", "Customer (all CASA accounts)", "UAE: window; foreign: none", "CASA transactions"),
+        ("Credit card used in person (shop, ATM)", "Location", "UAE or foreign, by where it was used", "Customer (all cards)", "UAE: window; foreign: none", "Card transactions"),
+        ("Debit card used in person (shop, ATM)", "Location", "UAE or foreign, by where it was used", "Customer (all CASA accounts)", "UAE: window; foreign: none", "CASA transactions"),
+        ("Online purchases, transfers and remittances", "Not used", "—", "—", "—", "Paying a foreign shop online or sending money home does not show where the customer is"),
         ("Travel purchase (airline, cruise, travel agency)", "Location", "Foreign", "Customer", "12 months", "Card and CASA transactions (merchant category)"),
         ("Collector note: left the country / final exit visa", "Location", "Foreign, on the note's date", "Account", "None", "Collections contact history (DCORE)"),
         ("Call outcomes (answered, rang out, dead line)", "Reachability", "Confirmed contact or failed day", "Account", "Window", "Collections contact history (DCORE)"),
@@ -608,9 +609,9 @@ def _results(wb: Workbook, scoring_date: str) -> None:
     r, *_ = _count_table(ws, r, "Reachability (all accounts, deceased included)", REACH_STATES, _chip, columns, last_col)
 
     for title, items, total_label in [
-        ("Why Skip: the latest evidence", ["Login from abroad", "Card spending abroad", "CASA spending abroad",
+        ("Why Skip: the latest evidence", ["Login from abroad", "Credit card used abroad", "Debit card / ATM used abroad",
                                           "Travel purchase", "Collector departure note"], "Skip"),
-        ("Why In Country: the latest evidence", ["UAE login", "UAE card spending", "UAE CASA spending"], "In Country"),
+        ("Why In Country: the latest evidence", ["UAE login", "Credit card used in the UAE", "Debit card / ATM used in the UAE"], "In Country"),
         ("Why Location is Unknown", ["No evidence", "UAE evidence older than the window"], "Location Unknown"),
         ("Why Reachability is Unknown", ["No contact history", "No contact in the window"], "Reachability Unknown"),
     ]:
