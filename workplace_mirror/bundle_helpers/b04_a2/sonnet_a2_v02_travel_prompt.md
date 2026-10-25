@@ -41,16 +41,25 @@ Evidence, per CIF (all the customer's cards and accounts), dated by day:
 
 A. Inventory first (read only; append to README.md, under 50 lines). Credit cards and debit cards
    come from different systems: answer for each separately.
-   A1 Credit cards (Way4): every column of prm_transaction (catalog_outputs.yml:429-431) and
-      raw_transaction (catalog_raw_way4.yml:35-38): name, type, what the code or docs say it
-      holds; every key in add_info that the repo parses or documents (the DOMESTIC= flag comes
+   A1 Credit cards (Way4): prm_transaction (primary, catalog_outputs.yml:429-431, preferred)
+      and raw_transaction (raw, catalog_raw_way4.yml:35-38): every column, name, type, what the
+      code or docs say it holds; whether prm_transaction covers all cards and dates we need; every key in add_info that the repo parses or documents (the DOMESTIC= flag comes
       from there, prm_cc.py:375-381) — look for POS entry mode, e-commerce / card-not-present,
       terminal type, ATM indicators; how cash advances (ATM) are marked (MCC 6011, txn type).
-   A2 Debit cards / CASA (wm_pri_labelled_transactions_indicators_by_week, and
-      comp_financial_tran_repos_dly as a fallback): which rows are debit-card use at all (vs
-      transfers, standing orders, cheques, bill payments, fees), and which channel_desc /
-      channel_tran_type values mean POS, ATM, e-commerce; which country field says where the
-      card was used (mcc_country, home_country_flag, transaction_location, ...).
+   A2 Debit cards / CASA — two candidate routes, answer for both:
+      (a) comp_financial_tran_repos_dly, the raw CASA transaction table (would need a new
+          reusable primary node): which rows are debit-card use at all (vs transfers, standing
+          orders, cheques, bill payments, fees), which columns mark POS / ATM / e-commerce
+          (channel_desc, tran_type, tran_sub_type, tran_particular_code, narration), and which
+          say where the card was used (merchant_country, counter_party_bank_cntry, ...), with
+          their fill rates from the profiles;
+      (b) the sibling-repo feature datasets (wealth_management, retail.feature_space):
+          wm_pri_labelled_transactions_indicators_by_week (channel_desc / channel_tran_type,
+          mcc_country, home_country_flag, mcc_code), fea_casa_cc_international_spend_by_cif and
+          fea_days_since_last_international_case_cc_txns (intl_flag_by_loc /
+          transaction_location): grain, whether a date per transaction or only weekly
+          aggregates survive, how "international" is defined, whether card-present can be told,
+          and whether they cover our customers or only WM's population.
    Quote file:line. Name, per source, the field that marks "card present" and the field that
    marks "abroad", or say NONE FOUND.
 
@@ -94,15 +103,17 @@ B. PROD snippet: tmp_validation/a2_v02/a2_v02_snippet.py plus README.md with the
                      C3 all purchases (no in-person filter);
                      C4 ATM only.
                    Overlap of C2 and C3 with C1 (if C1 exists): Skip under both / only one.
-   t7b_debit_card  debit-card / CASA debits in the same 12 months, base CIFs: rows by the
-                   channel values from A2 (top 50), split home country / abroad by each candidate
+   t7b_debit_card  for each route from A2 separately — (a) the raw CASA table, (b) the sibling
+                   datasets — debit-card / CASA debits in the same 12 months, base CIFs: rows by
+                   the channel values (top 50), split home country / abroad by each candidate
                    country field (and how often those fields disagree); share of rows that are
-                   card use at all. Then for each option, as in t7a:
+                   card use at all; share of base CIFs covered. Then for each option, as in t7a:
                      D1 card-present channels from A2 (POS, ATM);
                      D2 ATM + the in-person merchant categories of C2;
                      D3 all debit-card rows (online included);
                      D4 ATM only.
-                   Overlap of D2 and D3 with D1.
+                   Overlap of D2 and D3 with D1, and, per option, overlap of routes (a) and (b)
+                   (Skip under both / only one).
    t7c_combined    with the chosen credit-card option and the chosen debit-card option, how
                    many base rows get their latest UAE / foreign evidence from credit cards, debit
                    cards, logins or the DCORE note; and how many have card evidence only from one
@@ -122,6 +133,7 @@ C. After the user commits the results: save tmp_validation/a2_v02/summary.md, un
    - per card source, which option to use: credit cards (t7a) C1 if the field exists and is
      filled, else C2; debit cards (t7b) D1 if the channel values are reliable, else D2; how many
      Skips the "all" option (C3 / D3) would add (likely online foreign shopping);
-   - which country field to trust on the debit-card side (t7b), and how much each card source
-     adds to the logins (t7c).
+   - for debit cards, which route to build on — (a) a new primary from the raw CASA table, or
+     (b) the sibling datasets — judged on coverage, card-present and country quality (t7b);
+     which country field to trust; how much each card source adds to the logins (t7c).
 ````
