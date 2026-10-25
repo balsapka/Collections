@@ -72,9 +72,13 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O47 | M | confirmed | cc_departure_signature Pass A | Travel window is 3 months before the card block (`t0 + days_to_dpd60`), not before T0 as documented |
 | O48 | M | design | cc_departure_signature Pass B | Departure salary stop uses its own raw-regex salary (A1 uses WM salary only) and reads job loss as departure |
 | O49 | H | data check | cc_a2_locatability Node 3/4 | `dcore_observation_spine` and `prm_contract` join on the exact `observation_date`; month-end dates may match nothing |
-| O50 | M | data check | cc_a2_locatability Node 2 | Login PIT compares `month_number` with `trunc(obs, 'month')`; if `month_number` is a month end, the observation month is never included |
+| O50 | M | confirmed | cc_a2_locatability Node 2 | Login PIT compares `month_number` with `trunc(obs, 'month')`; if `month_number` is a month end, the observation month is never included |
 | O51 | M | confirmed | departure Pass J + A2 Node 2 | Foreign login has no age bound, so an old foreign login marks a departure trail for good; `recent_login_but_foreign` can never fire |
 | O52 | L | confirmed | cc_a2_locatability Node 3/4 | `rpc_rate`, `uns_rate` computed and never used by the state; `spell_id` emitted |
+| O53 | H | confirmed | stg_digital_login | A login with no country (both `countrylocation` and `countrycode` NULL) is flagged foreign |
+| O54 | H | data check | stg_digital_login | `dropDuplicates(["sessionid"])` collapses every login without a sessionid into one row |
+| O55 | M | confirmed | prm_digital_login_monthly | The month's last login is picked by date only; same-day UAE and foreign logins tie at random |
+| O56 | M | design | prm_digital_login_monthly | Monthly grain keeps only the last login; the latest UAE login date is lost when the last one was foreign |
 
 ---
 
@@ -663,3 +667,37 @@ login always yields a trail → Skip, and `location_unknown_reason = recent_logi
 
 `rpc_rate` / `uns_rate` (`nodes.py:821–834`) are not read by Node 4; `spell_id` is emitted by
 Node 4. Dropped in bundle 04.
+
+### O53 — Logins without a country count as foreign (H, confirmed)
+
+`stg_digital_login.py:107–119`: `is_foreign_login = 0` only when `countrylocation` is
+"United Arab Emirates" or `countrycode` is `AE`; every other row, including both NULL, gets 1.
+The history table may lack `countrycode` (docstring, lines 42–43), so a history login with no
+`countrylocation` is foreign. Under A2's "latest evidence wins" a missing country would mark
+the customer Skip at any age. **Fix (location data layer):** NULL when neither column is
+present; a login with unknown country is not location evidence.
+
+### O54 — Session dedup collapses NULL sessionids (H, data check)
+
+`stg_digital_login.py:101–102` runs `dropDuplicates(["sessionid"])` whenever the column
+exists. `_normalise_source` (line 181) creates it as NULL for a source without `sessionid`, and
+Spark treats NULLs as equal in `dropDuplicates`: all such logins collapse into one row. If
+`loginlog` (history) has no `sessionid`, the whole login history is reduced to a single row.
+**Check:** `sessionid` presence and NULL share per source (A2 v01, t4). **Fix:** dedup on
+`sessionid` only where it is not NULL.
+
+### O55 — Same-day tie in the monthly last login (M, confirmed)
+
+`prm_digital_login_monthly.py:46–49` orders by `login_date`, a date (`createdon` is
+truncated to a date in staging, line 163). Several logins on the month's last login day tie
+and `row_number` picks one at random, so `last_login_foreign_flag` can flip between runs. A2's
+rule is that a UAE login wins a same-day tie.
+
+### O56 — The monthly table cannot give the latest UAE login (M, design)
+
+`prm_digital_login_monthly` keeps the month's last login plus `any_foreign_login_flag`. When
+the last login is foreign, the date of the latest UAE login that month is gone, and logins
+cannot be ordered against card / CASA spending within a month. **For A2:** the location data
+layer reads `stg_digital_login` (event grain) and keeps, per CIF, the latest UAE and latest
+foreign login dates. O50 is confirmed by `month_number` = the month's last day (line 42):
+`<= trunc(obs, 'month')` never includes the observation month.

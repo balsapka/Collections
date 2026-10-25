@@ -220,6 +220,17 @@ The two test modules from the grep (`src/tests/pipelines/crx_persona/schema_regi
 `test_crx_persona.py`) are **deliberately not mirrored**: the user will have the workplace Sonnet
 update them as part of the A1 bundle prompt.
 
+### `digital_login` pipeline (IMG_8372–8384, 2026-10-25)
+
+- `pipelines/digital_login/pipeline.py` — 41 lines.
+- `nodes/staging/digital_login/stg_digital_login.py` — 209 lines.
+- `nodes/primary/digital_login/prm_digital_login_monthly.py` — 85 lines.
+
+All match the screen (line counts, `def` lines), compile, ruff F/E9 clean. Not seen: the
+packages' `__init__.py` files and the catalog entries of the `raw_digital_*` / `stg_` datasets.
+Uncertain glyphs: `×` in "(cif_id × month_number)" (box glyph on screen); separator lengths
+approximate. Args-description column in the staging docstring read as column 40.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

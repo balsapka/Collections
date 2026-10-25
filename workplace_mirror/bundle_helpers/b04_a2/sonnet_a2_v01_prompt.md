@@ -81,7 +81,13 @@ B. PROD snippet: tmp_validation/a2_v01/a2_v01_snippet.py plus README.md with the
                    6 months (0 / 1-2 / 3-5 / 6+); share with an inbound call (IC) in the last
                    3 / 6 months; share whose last 3 call dates were all ringing or dead
                    (every OC/CB event that day on those lists, none confirmed).
-   t4_login        prm_digital_login_monthly: month_number format and day-of-month; lag
+   t4_login        raw_digital_login_data and raw_digital_login_data_history (last 24
+                   months of createdon): whether each has sessionid / countrycode /
+                   countrylocation; NULL share of each; share with both country columns
+                   NULL; rows vs distinct non-NULL sessionid; status value counts.
+                   stg_digital_login: rows by is_foreign_login and by whether both country
+                   columns are NULL (those are flagged foreign today).
+                   prm_digital_login_monthly: month_number format and day-of-month; lag
                    month_number - last_login_date in days (p1/p50/p99, share negative);
                    foreign flag share; country null share. For base CIFs: age of the latest
                    login at the observation date (0-3 m / 3-6 m / 6-12 m / 12+ m / none),
