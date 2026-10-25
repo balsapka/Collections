@@ -39,16 +39,20 @@ Evidence, per CIF (all the customer's cards and accounts), dated by day:
   home_country_flag). Say in README.md exactly which source, column and filter defines each
   evidence type, and where "in person" could not be told apart (then count all and say so).
 
-A. Inventory first (read only; append to README.md, under 40 lines): how a credit-card
-   transaction shows whether the card was present.
-   - Every column of prm_transaction (catalog_outputs.yml:429-431) and raw_transaction
-     (catalog_raw_way4.yml:35-38): name, type, what the code or docs say it holds.
-   - Every key in Way4 add_info that the repo parses or documents (the DOMESTIC= flag comes from
-     there, prm_cc.py:375-381): look for POS entry mode, e-commerce / card-not-present,
-     terminal type, ATM indicators. Quote file:line.
-   - The same for the debit-card / CASA side (wm_pri_labelled_transactions_indicators_by_week:
-     channel_desc / channel_tran_type values that mean POS, ATM, e-commerce).
-   Name the field you will use as "card present" per source, or say NONE FOUND.
+A. Inventory first (read only; append to README.md, under 50 lines). Credit cards and debit cards
+   come from different systems: answer for each separately.
+   A1 Credit cards (Way4): every column of prm_transaction (catalog_outputs.yml:429-431) and
+      raw_transaction (catalog_raw_way4.yml:35-38): name, type, what the code or docs say it
+      holds; every key in add_info that the repo parses or documents (the DOMESTIC= flag comes
+      from there, prm_cc.py:375-381) — look for POS entry mode, e-commerce / card-not-present,
+      terminal type, ATM indicators; how cash advances (ATM) are marked (MCC 6011, txn type).
+   A2 Debit cards / CASA (wm_pri_labelled_transactions_indicators_by_week, and
+      comp_financial_tran_repos_dly as a fallback): which rows are debit-card use at all (vs
+      transfers, standing orders, cheques, bill payments, fees), and which channel_desc /
+      channel_tran_type values mean POS, ATM, e-commerce; which country field says where the
+      card was used (mcc_country, home_country_flag, transaction_location, ...).
+   Quote file:line. Name, per source, the field that marks "card present" and the field that
+   marks "abroad", or say NONE FOUND.
 
 B. PROD snippet: tmp_validation/a2_v02/a2_v02_snippet.py plus README.md with the run steps.
    Rules: catalog.load only (no spark.read, no paths); model_id from
@@ -78,20 +82,31 @@ B. PROD snippet: tmp_validation/a2_v02/a2_v02_snippet.py plus README.md with the
                    in the last 12 months competing by date as foreign evidence); B) any travel
                    purchase in the last 12 months and no UAE evidence in the window. For each, the
                    overlap with L2 (both / only the alternative / only L2).
-   t7_card_present for credit-card and debit-card debits in the 12 months before the observation
-                   date, for base CIFs: value counts (top 50) of each candidate card-present /
-                   channel field from A, split domestic / international; ATM share (MCC 6011
-                   or the ATM channel). Then, for each option below, the number of base rows whose
-                   latest foreign evidence comes from card use, and the rows decided Skip by L1
-                   because of it:
-                     O1 the card-present field from A (if found);
-                     O2 ATM withdrawals + in-person merchant categories only: grocery 5411/5422/
-                        5441/5451/5462/5499, fuel 5541/5542, restaurants 5812/5813/5814,
-                        pharmacy 5912, transport 4111/4121/4131, convenience 5331/5311;
-                     O3 all card debits (no in-person filter);
-                     O4 ATM withdrawals only.
-                   Plus the overlap of O2 and O3 with O1 (if O1 exists): rows Skip under both /
-                   only one.
+   t7a_credit_card credit-card purchases and cash advances in the 12 months before the
+                   observation date, base CIFs: value counts (top 50) of each candidate
+                   card-present / channel field from A1, split domestic / international; ATM
+                   share. Then for each option, the base rows whose latest foreign evidence
+                   comes from credit-card use, and the rows decided Skip by L1 because of it:
+                     C1 the card-present field from A1 (if found);
+                     C2 ATM + in-person merchant categories only: grocery 5411/5422/5441/5451/
+                        5462/5499, fuel 5541/5542, restaurants 5812/5813/5814, pharmacy 5912,
+                        transport 4111/4121/4131, department / convenience 5311/5331;
+                     C3 all purchases (no in-person filter);
+                     C4 ATM only.
+                   Overlap of C2 and C3 with C1 (if C1 exists): Skip under both / only one.
+   t7b_debit_card  debit-card / CASA debits in the same 12 months, base CIFs: rows by the
+                   channel values from A2 (top 50), split home country / abroad by each candidate
+                   country field (and how often those fields disagree); share of rows that are
+                   card use at all. Then for each option, as in t7a:
+                     D1 card-present channels from A2 (POS, ATM);
+                     D2 ATM + the in-person merchant categories of C2;
+                     D3 all debit-card rows (online included);
+                     D4 ATM only.
+                   Overlap of D2 and D3 with D1.
+   t7c_combined    with the chosen credit-card option and the chosen debit-card option, how
+                   many base rows get their latest UAE / foreign evidence from credit cards, debit
+                   cards, logins or the DCORE note; and how many have card evidence only from one
+                   of the two card sources.
    t6_l2_profile   for rows where L2 fires at the baseline: months since the last UAE evidence
                    (1 / 2 / 3 / 4-6 / 7-12 / 12+), and the share with any outbound call answered
                    in the last 3 months in DCORE (a sanity check: a "left" customer answering
@@ -104,6 +119,9 @@ C. After the user commits the results: save tmp_validation/a2_v02/summary.md, un
      known leavers' lags), and how steeply t2 changes around the baseline;
    - whether alternative A or B catches a materially different set (t5);
    - whether the t6 profile looks like leavers (long silence, few answered calls);
-   - which card-present option to use (t7): O1 if the field exists and is filled, else O2; how
-     many Skips O3 would add that O1 / O2 do not (likely online foreign shopping).
+   - per card source, which option to use: credit cards (t7a) C1 if the field exists and is
+     filled, else C2; debit cards (t7b) D1 if the channel values are reliable, else D2; how many
+     Skips the "all" option (C3 / D3) would add (likely online foreign shopping);
+   - which country field to trust on the debit-card side (t7b), and how much each card source
+     adds to the logins (t7c).
 ````
