@@ -50,6 +50,9 @@ A. Inventory (read only). Save tmp_validation/a2_v01/inventory.md, under 100 lin
    5. prm_digital_login_monthly: the node that builds it, its raw source, how month_number,
       last_login_date, last_login_foreign_flag and last_login_country are derived, and
       whether the raw source has one row per login.
+      List every consumer of stg_digital_login and prm_digital_login_monthly in this
+      repo and in the sibling clones (pipeline, node, columns read), and the catalog entries of
+      raw_digital_login_data, raw_digital_login_data_history, raw_digital_user_data.
    6. Results splits: the column that gives the RL product type (Personal Loans, Personal
       Cash Loans, Auto) on rl_spine or its sources, with its value -> product mapping; and
       how the charge-off-age vintage (early-stage < 2 years / late-stage 2+ years) is

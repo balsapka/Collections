@@ -206,3 +206,25 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
    `feat_demographics_cif` and its date column.
 5. **Login dates** (O50): `month_number` format and whether `last_login_date` is the actual
    login day.
+
+---
+
+## 11. Refactor plan (bundle 04, after the §10 checks)
+
+1. **Login pipeline fixes** (`digital_login`, shared with every consumer of the login tables):
+   - `stg_digital_login`: `is_foreign_login` = 0 for the UAE, 1 for another country, NULL
+     when neither `countrylocation` nor `countrycode` is filled (O53); deduplicate on
+     `sessionid` only where it is not NULL (O54); keep the login timestamp `login_ts` next to
+     `login_date` (O55).
+   - `prm_digital_login_monthly`: the month's last login ordered by `login_ts`, a UAE login
+     first on a tie (O55); `unknown_country_login_cnt` added. Same grain and existing columns,
+     so current consumers keep working.
+   - Check: per source, rows before / after and the UAE / foreign / unknown-country shares.
+2. **Location data layer**: `prm_customer_location_events` from `stg_digital_login` (event
+   grain, O56) plus the card and CASA sources §10 settles, and the CIF × month-end feature
+   table.
+3. **A2 engine** `a2_locatability/` (location, reachability and deceased signals; state
+   classification) with thin CC / RL wrappers on the obs base.
+4. **Retire** the old A2 nodes and the departure signatures once nothing else reads them (D1).
+5. **Check pipeline**: old vs new A2 crosstab on temporary catalog entries, removed by the
+   bundle's cleanup.
