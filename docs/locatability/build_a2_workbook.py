@@ -260,46 +260,51 @@ def logic(wb: Workbook) -> None:
 
     s.title("Logic", "What the model computes for each account at the scoring date, and the rules "
                      "that turn it into states. Within a dimension, the first rule that holds decides.")
-    s.section("Location evidence", gap=0)
-    s.header(["Evidence", "What counts", "UAE or foreign", "Counts for"])
-    for ev, what, side, age in [
-        ("Login", "Digital-banking login.", "By login country", "Any date"),
-        ("Card use", "In-person card use (shop payment, ATM withdrawal) on any of the "
-         "customer's cards and accounts.", "By where it was used", "Any date"),
-        ("Travel purchase", "Airline, cruise or travel-agency purchase, any channel.",
-         "Departure signal", "Any date (travel rule)"),
-        ("Collector note", "Customer left the country (final exit visa included).", "Foreign",
-         "Any date"),
-    ]:
-        s.text(1, ev, bold=True)
-        s.text(2, what)
-        s.text(3, side, color=MUTED)
-        s.text(4, age, color=MUTED)
-        _fit(s.ws, s.r, [(what, s.width(2, 2)), (age, s.width(4, 4))])
-        s.r += 1
-    s.note("A ticket is bought weeks before the flight and the customer stays active until then, "
-           "so a ticket is not compared with UAE activity by date: it feeds the travel rule (Location, "
-           "rule 2).")
-    s.section("Features")
-    s.header(["Feature", "Definition", "Dimension"], [1, 2, 1])
-    for feat, definition, dim in [
-        ("Latest UAE evidence", "Most recent date of UAE evidence.", "Location"),
-        ("Latest foreign evidence", "Most recent date of foreign evidence.", "Location"),
-        ("Last travel purchase", "Most recent date of a travel purchase.", "Location"),
-        ("Last contact", "Date of the most recent day the customer answered our call or called us.",
+    s.section("Evidence", gap=0)
+    s.header(["Event", "", "Counts as", "Dimension"], [1, 1, 1, 1])
+    s.merge(1, 2, s.r - 1)
+    for event, counts_as, tone, dim in [
+        ("Login from the UAE", "UAE evidence", "good", "Location"),
+        ("Shop payment or ATM withdrawal in the UAE, in person, on any of the customer's cards "
+         "and accounts", "UAE evidence", "good", "Location"),
+        ("Login from abroad", "Foreign evidence", "bad", "Location"),
+        ("Shop payment or ATM withdrawal abroad, in person", "Foreign evidence", "bad", "Location"),
+        ("Collector note: customer left the country (final exit visa included)",
+         "Foreign evidence", "bad", "Location"),
+        ("Travel purchase (airline, cruise, travel agency), any channel",
+         "Departure signal", "bad", "Location"),
+        ("Customer answered our call, or called us", "Contact", "good", "Reachability"),
+        ("A day we called and every call rang out or hit a dead line", "Failed call day", "bad",
          "Reachability"),
-        ("Last 3 call days", "Outcome of the 3 most recent days we called. A day fails when every "
-         "call rang out or hit a dead line.", "Reachability"),
-        ("Deceased flag", "Collector note of death (claims included), card blocked as deceased, or "
-         "customer record marked deceased.", "Override"),
+        ("Collector note of death (claims included), card blocked as deceased, or customer record "
+         "marked deceased", "Deceased", "deceased", "Override"),
     ]:
-        s.text(1, feat, bold=True)
-        s.text(2, definition, span=2)
-        s.text(4, dim, color=MUTED)
-        _fit(s.ws, s.r, [(definition, s.width(2, 3))])
+        s.text(1, event, span=2, align=MID)
+        fill, ink = TONE[tone]
+        s.text(3, counts_as, bold=True, color=ink, fill=fill, align=MID)
+        s.text(4, dim, color=MUTED, align=MID)
+        _fit(s.ws, s.r, [(event, s.width(1, 2))])
         s.r += 1
-    s.note("Not used: online purchases, transfers and remittances (they do not show where the "
-           "customer is), and salary (an ability signal).")
+    s.note("Every event is dated and counts at any age; the rules decide how recent it must be. "
+           "A ticket is bought weeks before the flight, so it is not compared with UAE activity by "
+           "date: it is used only by the travel rule (Location, rule 2). Ignored: logins with no "
+           "country, online purchases, transfers and remittances, salary.")
+    s.section("Features")
+    s.header(["Feature", "Definition", "", "Dimension"], [1, 1, 1, 1])
+    s.merge(2, 3, s.r - 1)
+    for feat, definition, dim in [
+        ("Latest UAE evidence", "Date of the most recent UAE evidence.", "Location"),
+        ("Latest foreign evidence", "Date of the most recent foreign evidence.", "Location"),
+        ("Last travel purchase", "Date of the most recent departure signal.", "Location"),
+        ("Last contact", "Date of the most recent contact.", "Reachability"),
+        ("Last 3 call days", "The 3 most recent days we called, each failed or not.", "Reachability"),
+        ("Deceased flag", "Any deceased evidence, at any date.", "Override"),
+    ]:
+        s.text(1, feat, bold=True, align=MID)
+        s.text(2, definition, span=2, align=MID)
+        s.text(4, dim, color=MUTED, align=MID)
+        s.ws.row_dimensions[s.r].height = 20
+        s.r += 1
     flow("Location", [
         ("There is foreign evidence, and it is on or after the date of the latest UAE "
          "evidence (on the same day, foreign wins).", "skip"),
