@@ -207,6 +207,17 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 5. **Login dates** (O50): `month_number` format and whether `last_login_date` is the actual
    login day.
 
+### What the v01 inventory settled (2026-10-25, `bundle_helpers/b04_a2/sonnet_a2_v01_inventory.md`)
+
+| Check | Finding | Consequence |
+|---|---|---|
+| 1 Existing location features | retail.feature_space: travel = an MCC category, "foreign" = currency mismatch, no merchant country; earlier verdict "derive from raw MCC". WM has three unscreened CIF × week features (`fea_credit_card_international_transactions_by_cif`, `fea_casa_cc_international_spend_by_cif`, `fea_days_since_last_international_case_cc_txns`), foreign = foreign-currency code, IBAN or `transaction_location` | Weekly, CIF-level candidates; PROD coverage (t5) decides. A foreign IBAN is a remittance, not a location |
+| 2 Transaction sources | Card: Way4 `is_international` = the `DOMESTIC=` flag in `add_info` (no merchant country; `trans_country_code` < 1% filled); `crx_cc_transactions` is a T0-scoped persona extract. CASA: `wm_pri_labelled_transactions_indicators_by_week` has `mcc_country`, `home_country_flag`, channel, MCC. Supplementary-card spend is not separable from the primary | Card side needs a primary of its own (from `prm_transaction` if it carries the flag, else Way4 raw); CASA side reads the WM primary |
+| 3 DCORE keys | `dcore_observation_spine`: `account_id` (O14 resolved, docs stale), `observation_date` = the spine's billing dates, latest agreement per (account, date) | Month-end bases cannot join on the date (O49 confirmed): map account → all its agreements, events up to the observation date (D-A2-8) |
+| 4 Deceased | `prm_contract` = one snapshot per contract per billing date; `D` is not in the documented block-code list but was seen in PROD (T34). `feat_demographics_cif` = one static current row per CIF, uniqueness not enforced | Way4: latest snapshot on or before the observation date. Demographics: max flag per CIF (a death is permanent, so no point-in-time issue) |
+| 5 Login | `month_number` = month end (string); raw is one row per session | O50 confirmed; login fixes as in §11 |
+| 6 Splits | `rl_spine.loan_type` ∈ {Personal, Personal Cash, Auto}; `chargeoff_age_months` on both spines, < 24 = early-stage, else late-stage (`chargeoff_segment`) | Both available on the spine; carried onto the obs base |
+
 ---
 
 ## 11. Refactor plan (bundle 04, after the §10 checks)
