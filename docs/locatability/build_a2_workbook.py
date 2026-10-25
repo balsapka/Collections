@@ -256,15 +256,31 @@ def logic(wb: Workbook) -> None:
 
     s.title("Logic", "What the model computes for each account at the scoring date, and the rules "
                      "that turn it into states. Within a dimension, the first rule that holds decides.")
-    s.section("Features", gap=0)
+    s.section("Location evidence", gap=0)
+    s.header(["Evidence", "What counts", "UAE or foreign", "Counts for"])
+    for ev, what, side, age in [
+        ("Login", "Digital-banking login.", "By login country", "Any date"),
+        ("Card use", "In-person card use (shop payment, ATM withdrawal) on any of the "
+         "customer's cards and accounts.", "By where it was used", "Any date"),
+        ("Travel purchase", "Airline, cruise or travel-agency purchase, dated on the purchase "
+         "day.", "Foreign", "12 months; older ones are ignored"),
+        ("Collector note", "Customer left the country (final exit visa included).", "Foreign",
+         "Any date"),
+    ]:
+        s.text(1, ev, bold=True)
+        s.text(2, what)
+        s.text(3, side, color=MUTED)
+        s.text(4, age, color=MUTED)
+        _fit(s.ws, s.r, [(what, s.width(2, 2)), (age, s.width(4, 4))])
+        s.r += 1
+    s.note("A travel purchase is foreign evidence like any other: it gives Skip unless UAE "
+           "evidence comes after it (the customer came back or never left).")
+    s.section("Features")
     s.header(["Feature", "Definition", "Dimension"], [1, 2, 1])
     for feat, definition, dim in [
-        ("Latest UAE evidence", "Date of the most recent login from the UAE, or in-person card use "
-         "in the UAE (shop payment, ATM withdrawal) on any of the customer's cards and accounts.",
-         "Location"),
-        ("Latest foreign evidence", "Date of the most recent login from abroad, in-person card use "
-         "abroad, travel purchase (airline, cruise, travel agency) in the last 12 months, or "
-         "collector note that the customer left the country.", "Location"),
+        ("Latest UAE evidence", "Most recent date of UAE evidence.", "Location"),
+        ("Latest foreign evidence", "Most recent date of foreign evidence, travel purchases "
+         "included while under 12 months old.", "Location"),
         ("Last contact", "Date of the most recent day the customer answered our call or called us.",
          "Reachability"),
         ("Last 3 call days", "Outcome of the 3 most recent days we called. A day fails when every "
@@ -313,10 +329,12 @@ def logic(wb: Workbook) -> None:
 
 LOC_EXAMPLES = [
     ("in_country", [(-6, ABROAD), (-1, UAE)], "Abroad 6 months ago; card used in the UAE last month."),
+    ("in_country", [(-6, TRAVEL), (-1, UAE)], "Flight bought, then card used in the UAE."),
     ("in_country", [(-4, EXIT), (0, UAE)], "Collector noted a departure; UAE login since."),
     ("skip", [(-3, UAE), (-1, ABROAD)], "Latest login is from abroad."),
     ("skip", [(-8, ABROAD)], "Last seen abroad 8 months ago, nothing since."),
-    ("skip", [(-7, UAE), (-4, TRAVEL)], "Bought a flight 4 months ago, no UAE activity since."),
+    ("skip", [(-7, UAE), (-4, TRAVEL)], "Flight bought 4 months ago, no UAE activity since."),
+    ("unknown", [(-12, TRAVEL)], "Only a flight bought 12 months ago: too old, ignored."),
     ("unknown", [(-5, UAE)], "Last UAE activity is older than the window."),
     ("unknown", [], "No evidence at all."),
 ]
@@ -332,12 +350,12 @@ REACH_EXAMPLES = [
     ("unknown", [(-6, RANG_OUT), (-5, RANG_OUT), (-4, RANG_OUT)], "Failed days, all older than the window."),
     ("unknown", [], "No calls on record."),
 ]
-MONTHS = 9  # timeline length, the scoring month included
+MONTHS = 13  # timeline length, the scoring month included
 
 
 def examples(wb: Workbook) -> None:
     w = WINDOW["61–180 DPD"]
-    s = Sheet(wb.create_sheet("Examples"), [16] + [5.5] * MONTHS + [50])
+    s = Sheet(wb.create_sheet("Examples"), [16] + [5] * MONTHS + [52])
     why = MONTHS + 2
     s.title("Examples (61–180 DPD, 3-month window)",
             "One customer per row, oldest month on the left. The blue columns are the window. "
@@ -348,8 +366,8 @@ def examples(wb: Workbook) -> None:
         col = 2
         for code, text in items:
             fill, ink = TONE[CODE_TONE[code]]
-            s.text(col, f"{code}  {text}", span=2, color=ink, fill=fill, align=CENTER)
-            col += 2
+            s.text(col, f"{code}  {text}", span=3, color=ink, fill=fill, align=CENTER)
+            col += 3
         s.ws.row_dimensions[s.r].height = 20
         s.r += 1
 
