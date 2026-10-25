@@ -23,7 +23,8 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 # --- rules (reference implementation, monthly granularity) ---------------------------------
 WINDOW = {"61–180 DPD": 3, "180+ DPD": 6}  # months, the scoring month included
-TRAVEL_MONTHS = 12
+TRAVEL_GAP = 1  # months: last UAE evidence at most this long after the last ticket
+SILENCE = 1  # months without UAE evidence before the travel rule fires
 GONE_DARK_DAYS = 3
 UAE, ABROAD, TRAVEL, EXIT = "U", "F", "T", "X"
 ANSWERED, CALLED_IN, RANG_OUT, DEAD_LINE = "A", "I", "R", "D"
@@ -34,14 +35,17 @@ def _recent(offset: int, months: int) -> bool:
     return offset > -months
 
 
+def _last(events: list[tuple[int, str]], kinds: tuple[str, ...]) -> int | None:
+    return max((o for o, k in events if k in kinds), default=None)
+
+
 def location(events: list[tuple[int, str]], w: int) -> str:
-    seq = [(o, k) for o, k in events if k != TRAVEL or _recent(o, TRAVEL_MONTHS)]
-    if not seq:
-        return "unknown"
-    offset, kind = seq[-1]
-    if kind != UAE:
+    uae, foreign, travel = _last(events, (UAE,)), _last(events, (ABROAD, EXIT)), _last(events, (TRAVEL,))
+    if foreign is not None and (uae is None or foreign >= uae):
         return "skip"
-    return "in_country" if _recent(offset, w) else "unknown"
+    if travel is not None and (uae is None or (uae <= travel + TRAVEL_GAP and uae <= -SILENCE)):
+        return "skip"
+    return "in_country" if uae is not None and _recent(uae, w) else "unknown"
 
 
 def reachability(calls: list[tuple[int, str]], w: int) -> str:
@@ -210,7 +214,7 @@ def overview(wb: Workbook, scoring: str) -> None:
     s.header(["State", "Dimension", "Meaning"], [1, 1, 2])
     for st, dim, meaning in [
         ("in_country", "Location", "The latest evidence places the customer in the UAE, recently."),
-        ("skip", "Location", "The latest evidence places the customer abroad, however old it is."),
+        ("skip", "Location", "The latest evidence places the customer abroad (however old), or they went silent soon after buying a ticket."),
         ("unknown", "Location", "No evidence, or the latest UAE evidence is older than the window."),
         ("reachable", "Reachability", "We were in contact with the customer recently."),
         ("non_reachable", "Reachability", "The last 3 days we called all failed, with no contact since."),
@@ -262,8 +266,8 @@ def logic(wb: Workbook) -> None:
         ("Login", "Digital-banking login.", "By login country", "Any date"),
         ("Card use", "In-person card use (shop payment, ATM withdrawal) on any of the "
          "customer's cards and accounts.", "By where it was used", "Any date"),
-        ("Travel purchase", "Airline, cruise or travel-agency purchase, dated on the purchase "
-         "day.", "Foreign", "12 months; older ones are ignored"),
+        ("Travel purchase", "Airline, cruise or travel-agency purchase, any channel.",
+         "Departure signal", "Any date (travel rule)"),
         ("Collector note", "Customer left the country (final exit visa included).", "Foreign",
          "Any date"),
     ]:
@@ -273,14 +277,15 @@ def logic(wb: Workbook) -> None:
         s.text(4, age, color=MUTED)
         _fit(s.ws, s.r, [(what, s.width(2, 2)), (age, s.width(4, 4))])
         s.r += 1
-    s.note("A travel purchase is foreign evidence like any other: it gives Skip unless UAE "
-           "evidence comes after it (the customer came back or never left).")
+    s.note("A ticket is bought weeks before the flight and the customer stays active until then, "
+           "so a ticket is not compared with UAE activity by date: it feeds the travel rule (Location, "
+           "rule 2).")
     s.section("Features")
     s.header(["Feature", "Definition", "Dimension"], [1, 2, 1])
     for feat, definition, dim in [
         ("Latest UAE evidence", "Most recent date of UAE evidence.", "Location"),
-        ("Latest foreign evidence", "Most recent date of foreign evidence, travel purchases "
-         "included while under 12 months old.", "Location"),
+        ("Latest foreign evidence", "Most recent date of foreign evidence.", "Location"),
+        ("Last travel purchase", "Most recent date of a travel purchase.", "Location"),
         ("Last contact", "Date of the most recent day the customer answered our call or called us.",
          "Reachability"),
         ("Last 3 call days", "Outcome of the 3 most recent days we called. A day fails when every "
@@ -298,6 +303,8 @@ def logic(wb: Workbook) -> None:
     flow("Location", [
         ("There is foreign evidence, and it is on or after the date of the latest UAE "
          "evidence (on the same day, foreign wins).", "skip"),
+        ("Travel rule: the latest UAE evidence is at most 1 month after the last travel purchase "
+         "(or there is none), and no UAE evidence for at least 1 month since.", "skip"),
         ("The latest evidence is UAE evidence within the window.", "in_country"),
         ("Otherwise: no evidence at all, or the latest UAE evidence is older than the window.",
          "unknown"),
@@ -315,7 +322,10 @@ def logic(wb: Workbook) -> None:
         ("Window", "3 months at 61–180 DPD, 6 months at 180+ DPD (scoring month included).",
          "Same as the other axes; activity is thinner at 180+."),
         ("Foreign evidence", "No age limit.", "No sign of return means still abroad."),
-        ("Travel purchase", "Counts for 12 months.", "An old ticket says little about today."),
+        ("Travel rule: gap", "UAE activity ends at most 1 month after the ticket.",
+         "Tickets are bought days to weeks before the flight."),
+        ("Travel rule: silence", "At least 1 month without UAE evidence.",
+         "Keeps a customer who just bought a ticket and is still active out of Skip."),
         ("Failed call days", "3 in a row.", "Fewer is not a pattern."),
         ("Contacts for Reachable", "1 is enough.", "One recent contact shows they can be reached."),
     ]:
@@ -329,13 +339,13 @@ def logic(wb: Workbook) -> None:
 
 LOC_EXAMPLES = [
     ("in_country", [(-6, ABROAD), (-1, UAE)], "Abroad 6 months ago; card used in the UAE last month."),
-    ("in_country", [(-6, TRAVEL), (-1, UAE)], "Flight bought, then card used in the UAE."),
     ("in_country", [(-4, EXIT), (0, UAE)], "Collector noted a departure; UAE login since."),
+    ("in_country", [(0, TRAVEL), (0, UAE)], "Bought a flight this month and still active: not silent yet."),
+    ("in_country", [(-7, TRAVEL), (-3, UAE), (-1, UAE)], "Flight bought, active for months after: back or never left."),
     ("skip", [(-3, UAE), (-1, ABROAD)], "Latest login is from abroad."),
     ("skip", [(-8, ABROAD)], "Last seen abroad 8 months ago, nothing since."),
-    ("skip", [(-7, UAE), (-4, TRAVEL)], "Flight bought 4 months ago, no UAE activity since."),
-    ("unknown", [(-12, TRAVEL)], "Only a flight bought 12 months ago: too old, ignored."),
-    ("unknown", [(-5, UAE)], "Last UAE activity is older than the window."),
+    ("skip", [(-2, TRAVEL), (-1, UAE)], "Flight bought, UAE activity stopped a month later, silent since."),
+    ("unknown", [(-10, TRAVEL), (-5, UAE)], "Active long after the flight, then quiet beyond the window."),
     ("unknown", [], "No evidence at all."),
 ]
 REACH_EXAMPLES = [

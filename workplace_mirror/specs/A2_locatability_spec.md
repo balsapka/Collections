@@ -53,7 +53,7 @@ call outcome (except the collector's departure note) and reachability never read
 |---|---|---|---|
 | Login (digital banking) | from the UAE | from abroad | none |
 | In-person card use — a shop payment or ATM withdrawal — on any of the customer's cards and CASA accounts | in the UAE, not a travel purchase | abroad | none |
-| Travel purchase (airline, cruise, travel agency) | — | counts as foreign | last 12 months |
+| Travel purchase (airline, cruise, travel agency), any channel | — | not dated evidence: feeds the travel rule below | none |
 | Collector's note: left the country / out of country / final exit visa | — | foreign, on the note's date | none |
 
 ### States
@@ -62,17 +62,32 @@ call outcome (except the collector's departure note) and reachability never read
 latest foreign  = date of the latest foreign evidence (on or before the observation date)
 latest domestic = date of the latest domestic evidence
 
-Skip        there is foreign evidence, dated on or after the latest domestic evidence
-In Country  latest domestic is later than any foreign evidence (on the same day, foreign wins)
-            AND it falls in W
-Unknown     no evidence, or the latest evidence is domestic but older than W
+last travel     = date of the latest travel purchase
+
+L1 Skip        there is foreign evidence, dated on or after the latest domestic evidence
+L2 Skip        travel rule: there is a travel purchase, the latest domestic evidence is no more
+               than 1 month after the last travel purchase (or there is none), and no domestic
+               evidence for at least 1 month before the observation date
+L3 In Country  latest domestic is later than any foreign evidence (on the same day, foreign
+               wins) AND it falls in W
+L4 Unknown     no evidence, or the latest evidence is domestic but older than W
 ```
+
+**Why the travel rule.** A ticket is bought days or weeks before the flight, and the customer
+keeps living normally until then, so UAE activity after the purchase is expected and must not
+cancel it. A leaver who keeps banking from abroad is already caught by foreign evidence (L1);
+the ticket matters for the one who goes silent. The pattern is: UAE activity stops within a
+month of buying a ticket and does not resume. The silence guard keeps a customer who bought a
+ticket last week and is still active out of Skip. It is checked before In Country: active until
+three weeks after a ticket, then quiet for five weeks, reads as gone. A ticket shows intent,
+not location, so it counts whatever the channel (online included).
 
 Only in-person card use places the customer: online purchases (a foreign shop can be paid from
 the UAE, a UAE shop from abroad) and transfers or remittances (most expats send money home every
 month) are not location evidence.
 
-A trip followed by domestic activity means the customer came back: In Country. A foreign
+Domestic activity well after a trip (more than a month after the ticket) means the customer came
+back or never left: In Country. A foreign
 latest evidence stays Skip however old it is — accounts sit in collections for years.
 
 `location_unknown_reason`: `no_evidence` · `domestic_before_window`.
@@ -148,7 +163,8 @@ alone. Labels follow A1 / A4 (`*_state` lower-case, `*_label` for display).
 | Threshold | Value |
 |---|---|
 | Window `W` (domestic evidence, confirmed contact, gone-dark recency) | 3 months (60–180), 6 months (180+) |
-| Travel purchase lookback | 12 months |
+| Travel rule: last UAE evidence at most this long after the last travel purchase | 1 month |
+| Travel rule: silence since the last UAE evidence, at least | 1 month |
 | Gone dark | last 3 attempt dates all failed |
 
 Starting values; tuned on the PROD distribution (the unknown reasons show what each moves).
@@ -162,7 +178,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-1 | Two independent dimensions + deceased; the latest evidence wins on both. |
 | D-A2-2 | Location evidence is customer level: logins, card and CASA spending on all the customer's accounts. A dedicated location data layer is built from transactions (§10). |
 | D-A2-3 | Latest evidence foreign → Skip at any age; latest domestic → In Country only within `W`. |
-| D-A2-4 | Travel purchase in the last 12 months = foreign evidence; later domestic activity overrides it. Foreign spend counts only as the latest evidence (no share rule). |
+| D-A2-4 | Foreign spend counts only as the latest evidence (no share rule). Travel purchases follow D-A2-15. |
 | D-A2-5 | A collector's departure note is foreign evidence on its date; later domestic activity overrides it. |
 | D-A2-6 | Salary stop is not location evidence (it stays an A1 signal). |
 | D-A2-7 | Non-Reachable = last 3 attempt dates failed (ringing or dead line), oldest in `W`, no contact since; Reachable = confirmed contact in `W`; the 3-attempt minimum guards Non-Reachable only. |
@@ -173,6 +189,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-12 | Results are reported per model variant, RL split by product (Personal Loans, Personal Cash Loans, Auto); 180+ also by charge-off-age vintage (early-stage charge-off < 2 years / late-stage charge-off 2+ years), as on the deterioration axis. Model doc: `docs/locatability/a2_locatability_reference.xlsx`. |
 | D-A2-13 | Spending is location evidence only when in person: card-present shop payments and ATM withdrawals. Online purchases and transfers / remittances abroad are not (user, 2026-10-25). |
 | D-A2-14 | Same-day UAE and foreign evidence: foreign wins (Skip). Evidence is compared by date only, no timestamps (user, 2026-10-25). |
+| D-A2-15 | Travel rule (§3 L2): Skip when the last UAE evidence is at most 1 month after the last travel purchase and there has been no UAE evidence for at least 1 month; checked before In Country; any channel; no lookback from the scoring date. Validated in PROD for firing rate and threshold sensitivity (`bundle_helpers/b04_a2/sonnet_a2_v02_travel_prompt.md`) (user, 2026-10-25). |
 
 ---
 
@@ -182,7 +199,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 |---|---|
 | spine + spell table + departure signature (T0, 12 passes) | obs base + location feature + DCORE |
 | departure trail = any of travel / last card txn foreign / foreign login / salary stop / DCORE note; UAE login in 90/180 days beats it | latest evidence wins (§3) |
-| travel: 3 months before the card block, scored account only (CC) / raw CASA debits (RL) | 12 months, all the customer's accounts, from the location data layer |
+| travel: 3 months before the card block, scored account only (CC) / raw CASA debits (RL) | travel rule (D-A2-15), all the customer's accounts, no lookback from the scoring date |
 | login months `< trunc(obs)` (CC) / `<=` (RL) | evidence dated on or before the observation date |
 | DCORE window `[t0, observation_date)` | all events up to the observation date |
 | Reachable: any confirmed contact since T0; overridden only by 3 ringing events (O17, O46) | confirmed contact in `W`; gone dark (ringing or dead) checked first |
