@@ -62,7 +62,7 @@ call outcome (except the collector's departure note) and reachability never read
 latest foreign  = date of the latest foreign evidence (on or before the observation date)
 latest domestic = date of the latest domestic evidence
 
-Skip        latest foreign is later than latest domestic (or there is no domestic evidence)
+Skip        there is foreign evidence, and it is later than any domestic evidence
 In Country  latest domestic is the latest evidence (a tie counts as domestic)
             AND it falls in W
 Unknown     no evidence, or the latest evidence is domestic but older than W
