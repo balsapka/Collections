@@ -347,8 +347,9 @@ def build_internal_returns(
         "prm_casa_return_events",
     )
     since = lookback_floor(obs_base, window_months(model_id))
-    first = return_events.agg(F.min("event_month")).first()[0]  # partition column
-    if first is None or first > since:
+    # partition column: Spark infers its folder values as dates, so compare ISO strings
+    first = return_events.agg(F.min("event_month")).first()[0]
+    if first is None or str(first) > since:
         raise ValueError(
             f"prm_casa_return_events starts at {first}, but the observations need returns "
             f"from {since}: rerun casa_primary after changing "
