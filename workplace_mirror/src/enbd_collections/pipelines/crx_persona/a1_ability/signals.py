@@ -125,22 +125,59 @@ def _bureau_salary(salary_hist: DataFrame, cif_bridge: DataFrame) -> DataFrame:
     )
 
 
-def build_income_signals(
+def _loan_bureau_salary(obs_base: DataFrame, loan_features: DataFrame) -> DataFrame:
+    """RL: the last salary credit reported by each loan's latest bureau pull
+    (``feature_retail_loans``, one row per spine row), dated by the pull month.
+
+    Pulls are rare (most accounts have one), so this rarely falls in the window. It is an
+    extra bureau source until the bureau salary history covers RL customers.
+    """
+    require_columns(
+        loan_features,
+        ["account_id", "aecb_bureau_pull_date", "aecb_last_salary_credit_amount"],
+        "feature_retail_loans",
+    )
+    cifs = (
+        obs_base.filter(F.col("cif_id").isNotNull())
+        .select("account_id", "cif_id")
+        .distinct()
+    )
+    return (
+        loan_features.select(
+            F.col("account_id").cast("string").alias("account_id"),
+            F.trunc(F.to_date("aecb_bureau_pull_date"), "month").alias("month"),
+            F.col("aecb_last_salary_credit_amount").cast("double").alias("amount"),
+        )
+        .filter(F.col("month").isNotNull() & F.col("amount").isNotNull())
+        .join(cifs, on="account_id")
+        .select("cif_id", "month", "amount")
+    )
+
+
+def build_income_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     obs_base: DataFrame,
     wm_salary: DataFrame,
     salary_hist: DataFrame,
     bureau_cif_bridge: DataFrame,
     model_id: str,
+    loan_features: DataFrame | None = None,
 ) -> DataFrame:
     """``income_m1 … income_m{2W}``: salary received per month — the larger of the
-    internal credit and the bureau salary (NULL: no salary that month)."""
+    internal credit and the bureau salary (NULL: no salary that month).
+
+    ``loan_features`` (RL only): ``feature_retail_loans``, whose latest-pull bureau salary
+    joins the bureau salary.
+    """
     obs = obs_base.filter(F.col("cif_id").isNotNull())
     months = 2 * window_months(model_id)
     since = lookback_floor(obs, months)
+    sources = _internal_salary(wm_salary, since).unionByName(
+        _bureau_salary(salary_hist, bureau_cif_bridge)
+    )
+    if loan_features is not None:
+        sources = sources.unionByName(_loan_bureau_salary(obs_base, loan_features))
     monthly = (
-        _internal_salary(wm_salary, since)
-        .unionByName(_bureau_salary(salary_hist, bureau_cif_bridge))
-        .filter(F.col("month") >= F.lit(since))
+        sources.filter(F.col("month") >= F.lit(since))
         .groupBy("cif_id", "month")
         .agg(F.max("amount").alias("amount"))
     )

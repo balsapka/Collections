@@ -7,7 +7,8 @@ Moderate, Low, Unknown.
 
 This page explains the logic in plain terms. The detailed rule table (thresholds, decision
 log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (evidence) and
-`classify.py` (levels and state). CC wraps it in `cc_a1_ability_v2` (the anchor).
+`classify.py` (levels and state). CC wraps it in `cc_a1_ability_v2`, RL in
+`rl_a1_ability_v2`; each wrapper adds its anchor.
 
 ## Ground rules
 
@@ -29,7 +30,8 @@ log) is the GRR workbook `A1_ability_20261022`; the code is `signals.py` (eviden
 - **Anchor** (the workbook's "minimum due"): what the customer must pay now.
   - CC 60–180: the amount in the oldest overdue bucket (`overdue_bucket_01..06`) on the
     latest balance snapshot in the observation month.
-  - CC 180+: none. RL: one EMI.
+  - CC 180+: none. RL: one EMI — `installment_due_amount` on the observation month's
+    `int_loan_master` snapshot.
   - No anchor → the flat floors below apply on their own.
 
 ## 1. Income — Stable (2 points) / Weak (1) / None (0)
@@ -46,6 +48,9 @@ month **the larger one wins**.
     30 July, seen by the 2, 9 and 16 August snapshots, lands in July).
 - **Bureau salary** — `stg_aecb_salary_history`: `subj_salcr_hist_ref_mnth` (MMyyyy) and
   `subj_salcr_hist_tot_sal_amt`, linked to the CIF through `prm_bureau_cif_bridge`.
+  RL also reads `feature_retail_loans`: `aecb_last_salary_credit_amount` of each loan's latest
+  bureau pull, dated by the month of `aecb_bureau_pull_date`. Pulls are rare today (most
+  loans have one), so it seldom falls in the window.
 
 The result is `income_m1 … income_m6` (`… m12` at 180+); NULL = no salary that month from either source.
 

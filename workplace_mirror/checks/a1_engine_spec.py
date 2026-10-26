@@ -37,6 +37,9 @@ from enbd_collections.pipelines.crx_persona.a1_ability import (  # noqa: E402
 from enbd_collections.pipelines.crx_persona.cc_a1_ability_v2.nodes import (  # noqa: E402
     build_cc_liquidity_anchor,
 )
+from enbd_collections.pipelines.crx_persona.rl_a1_ability_v2.nodes import (  # noqa: E402
+    build_rl_liquidity_anchor,
+)
 
 OBS = date(2026, 7, 31)  # m1 = Jul, m2 = Jun, m3 = May; prior = Apr, Mar, Feb
 
@@ -229,5 +232,25 @@ try:
     raise AssertionError("returns coverage guard did not fire")
 except ValueError as e:
     assert "persona_start_date" in str(e)
-print(f"\n{len(expect) - fails}/{len(expect)} cases pass")
+# RL anchor: one EMI on the observation month's int_loan_master snapshot
+loan_schema = "account_id string, observation_date date, installment_due_amount double"
+emi = {r["account_id"]: r["liquidity_anchor_amt"] for r in build_rl_liquidity_anchor(
+    obs, df([("A0", OBS, 2000.0), ("A1", OBS, 0.0), ("A2", date(2026, 6, 30), 1500.0)],
+            loan_schema)).collect()}
+assert emi == {"A0": 2000.0, "A1": None}, emi  # 0 EMI → no anchor; a June snapshot is stale
+# RL: the loan's latest-pull bureau salary is income in its pull month, PIT
+frl_schema = "account_id string, observation_date date, aecb_bureau_pull_date date, aecb_last_salary_credit_amount double"
+frl = df([("A0", OBS, m(2, 10), 6000.0), ("A1", OBS, m(0, 5), 7000.0)], frl_schema)
+inc = {r["account_id"]: r for r in build_income_signals(
+    obs.filter(F.col("account_id").isin("A0", "A1")),
+    df(rows["wmsal"], "cif_id long, week_number int, ft_last_salary_amount double, ft_days_since_salary_transaction int"),
+    df([("X", "012000", 0.0)], "subj_salcr_hist_hdr_file_id string, subj_salcr_hist_ref_mnth string, subj_salcr_hist_tot_sal_amt double"),
+    df([("Y", 0)], "bureau_file_id string, cif_id long"),
+    "cc_60_180",
+    loan_features=frl,
+).collect()}
+assert inc["A0"]["income_m2"] == 6000.0, inc["A0"]
+# a pull after the observation month never counts
+assert 7000.0 not in [inc["A1"][f"income_m{i}"] for i in range(1, 7)], inc["A1"]
+print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ RL anchor and loan salary checks)")
 sys.exit(1 if fails else 0)

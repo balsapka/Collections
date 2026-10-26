@@ -106,6 +106,9 @@ from enbd_collections.pipelines.crx_persona import (
 )
 from enbd_collections.pipelines.crx_persona import rl_a1_ability as crx_rl_a1_ability
 from enbd_collections.pipelines.crx_persona import (
+    rl_a1_ability_v2 as crx_rl_a1_ability_v2,
+)
+from enbd_collections.pipelines.crx_persona import (
     rl_a2_locatability as crx_rl_a2_locatability,
 )
 from enbd_collections.pipelines.crx_persona import (
@@ -244,6 +247,9 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
+        "crx_rl_a1_ability_v2": crx_rl_a1_ability_v2.create_pipeline(),
+        # TEMPORARY (mirror bundle 05 check) — remove with its catalog entry
+        "crx_rl_a1_ability_b05_check": crx_rl_a1_ability_v2.create_b05_check_pipeline(),
         "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
         "crx_rl_a3_payment_credibility": crx_rl_a3_payment_credibility.create_pipeline(),

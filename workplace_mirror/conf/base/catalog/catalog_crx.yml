@@ -594,6 +594,62 @@ crx_rl_a1_ability:
   save_args:
     mode: overwrite
 
+# ── RL A1 ability (shared _a1 engine) ───────────────────────────────────────
+# Evidence tables at (account_id, observation_date); the axis is crx_rl_a1_ability_v2
+# until the waterfall (crx_rl_a1_ability) is removed. a1_state in {high, moderate, low,
+# unknown}; a1_state_label in {High, Moderate, Low, Unknown}.
+crx_rl_a1_income_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_income_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_liquidity_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_liquidity_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_distress_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_distress_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_internal_returns:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_internal_returns"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_liquidity_anchor:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_liquidity_anchor"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_ability_v2:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_v2"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (mirror bundle 05 check): the engine's RL output, kept apart from
+# crx_rl_a1_ability_v2 so it can be compared with the waterfall. Remove the entry, the
+# crx_rl_a1_ability_b05_check pipeline and its HDFS folder after the check.
+crx_rl_a1_ability_b05_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_b05_check"
+  save_args:
+    mode: overwrite
+
 # ── RL Departure Signature (RL-A2-2) ───────────────────────────────────────
 
 # Node 1: travel MCC hits from comp_financial_tran_repos_dly H2 window.
