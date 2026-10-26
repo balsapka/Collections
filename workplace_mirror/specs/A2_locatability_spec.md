@@ -42,6 +42,11 @@ call outcome (except the collector's departure note) and reachability never read
 - **DCORE:** DCORE holds an account only while it is in collections, so its history is the
   collections history. All events up to and including the observation date count; no T0.
 - **Call codes:** outbound `OC`, `CB`; inbound `IC`. Administrative notes (`IA`) never count.
+- **Mid-month inputs:** until `cc_spine` moves to month ends, `cc_spine`,
+  `dcore_observation_spine` and `prm_contract` carry billing dates in PROD (user,
+  2026-10-26). A2 never joins them to the base on the date: DCORE events and Way4 snapshots
+  are taken on or before the observation date (a month end), the account → agreement map
+  ignores the date, and the CC obs base already moves billing dates to month end.
 
 ---
 
@@ -246,7 +251,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 
 | Check | Finding (cc_60_180 / rl_60_180, latest month) | Consequence |
 |---|---|---|
-| 3 DCORE keys | One agreement per account in both; join on account 99.92% / 100% | D-A2-8 holds: account → agreement, all events up to the observation date. The "exact date" join rate is doubtful (O49), checked in v02 Part 0 |
+| 3 DCORE keys | One agreement per account in both; join on account 99.92% / 100% | D-A2-8 holds: account → agreement, all events up to the observation date. The DCORE spine is still on billing dates (user), so the 99.92% "exact" join must have compared months (v02 Part 0 confirms) |
 | DCORE outcomes | The result-name lists cover ~48% / ~42% of event volume; `LEFT_MSG`, `CALL CONNECTED`, `Skip - Under Tracing` and RL legal / repossession codes are on none | Open: which list each joins (user) |
 | Reach preview | ~95% have 6+ outbound dates in 3 months; last 3 dates all failed 38.9% / 19.0%; inbound 12.5% / 16.3% (3 m) | Non-Reachable baseline differs by product; no threshold change |
 | 4 Deceased | RL has no `prm_contract`; demographics 0.13% deceased (CC) | RL deceased = DCORE + demographics |

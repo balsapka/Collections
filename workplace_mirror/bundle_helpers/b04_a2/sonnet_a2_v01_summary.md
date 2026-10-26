@@ -138,9 +138,10 @@ of `rl_60_180`, not a rounding error.
 
 - **t1 / t6 "exact date" joins of 99.92% / 100%.** The v01 inventory found
   `dcore_observation_spine` and `prm_contract` on billing dates, and the CC obs base is on
-  month ends, so an exact-date join should mostly fail (O49). Exact = same month = account-only
-  suggests the snippet compared months, or `cc_spine` is already month-end in PROD. The
-  day-of-month distributions asked for in t1 / t6 settle it.
+  month ends, so an exact-date join should mostly fail (O49). The user confirmed (2026-10-26)
+  that `cc_spine` and the DCORE inputs are still on mid-month billing dates in PROD, so
+  exact = same month = account-only means the snippet compared months, not days. Part 0
+  confirms how it joined; the engine never joins these on the date anyway.
 - **Missing from the summary although asked:** t4 `stg_digital_login` rows by
   `is_foreign_login` and by both-country-NULL (the O53 number: the 20.8% / 21.6% foreign share
   may be mostly missing countries), and NULL `sessionid` share per raw source; t5 coverage of

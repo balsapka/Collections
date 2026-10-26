@@ -248,6 +248,10 @@ The user could not move photos; a chat session transcribed 5 screen photos into
   data), **Auto restructured since 2025-12** (the current history table has no Auto loans;
   a new table is recommended), and 531 loans whose predecessor is missing; 7 loans match through
   a two-step chain. Relevant to RL history-based features (A1 RL, A4) for Auto.
+- Handoff 2 (`pics/claude_code_handoff_2.md`, 1 photo): A1 v02 DDS summary →
+  `bundle_helpers/b03/sonnet_v02_summary.md` (G1 confirmed); the v02 prompt is removed.
+- User, 2026-10-26: `cc_spine` and the DCORE inputs are still on mid-month billing dates in
+  PROD (the month-end change is not rerun yet); A2 spec §2 and the v02 prompt say so.
 
 ## Review findings
 

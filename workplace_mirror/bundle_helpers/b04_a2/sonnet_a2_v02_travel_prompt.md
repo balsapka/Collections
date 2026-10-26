@@ -17,8 +17,8 @@ validation snippet, the user runs it in PROD. Change no pipeline code.
    "## Part 0 — follow-ups" to tmp_validation/a2_v01/summary.md (under 50 lines, CC and RL
    side by side, numbers only as they are in the JSONs; write NOT IN JSON when absent):
    - t1: the day-of-month distribution of dcore_observation_spine.observation_date, and
-     exactly how the snippet's "exact" join compared dates (the CC obs base is on month ends;
-     an exact match of 99.92% means either month-end spine dates or a month comparison);
+     exactly how the snippet's "exact" join compared dates (the CC obs base is on month ends,
+     the DCORE spine on billing dates, so 99.92% points to a month comparison);
    - t2: the top 50 result_name values on none of the lists, each with action_code,
      result_category and share of events; and for CALL CONNECTED, LEFT_MSG, Result Not Found,
      Follow up, E mail Sent, "Skip - Under Tracing/Traced", RPO case *, Vehicle Repossesed /
@@ -32,6 +32,11 @@ validation snippet, the user runs it in PROD. Change no pipeline code.
      block code D counts (block_code_1 / block_code_2);
    - re-run t6 only for rl_60_180 (the demographics sub-table) and add its deceased count.
    Commit and push that summary before writing the v02 snippet.
+
+Dates. The obs bases are on month ends. In PROD cc_spine, dcore_observation_spine and
+prm_contract are still on mid-month billing dates (they move to month ends later). Never join
+them to the base on the date: take events / snapshots dated on or before the observation date,
+or move the date to its month end (last_day) first, and say which in README.md.
 
 The location rules (checked in order; dates on or before the observation date):
   L1 Skip        there is foreign evidence dated on or after the latest UAE evidence
