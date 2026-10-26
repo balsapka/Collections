@@ -293,7 +293,7 @@ of" stay in the signal layer. Monthly features also absorb the mid-month source 
 `crx_cc_a1_internal_returns` disappears (the distress node reads two features). RL A1 reuses
 every CIF-level feature; it adds an EMI feature from its loan primary.
 
-**A2 (bundle 05) layered from the start:**
+**A2 (its refactor bundle, next free number) layered from the start:**
 
 | Layer | Dataset | Built from |
 |---|---|---|
@@ -308,7 +308,7 @@ every CIF-level feature; it adds an EMI feature from its loan primary.
 **Decided (user, 2026-10-26):** `prm_bureau_salary_history` goes into the bureau primary
 pipeline now (photos: REQUESTS R5). Our monthly features may be built from the WM feature
 tables (we do not own them; they are our source). **Open (user), before A1 is concluded:** the
-A1 relayering ships as its own bundle after bundle 05?
+A1 relayering ships as its own bundle (the CC finish bundle)? — RL A1 shipped first as bundle 05 (user, 2026-10-26).
 
 ### First primary: `prm_casa_return_events` (bundle 03)
 
