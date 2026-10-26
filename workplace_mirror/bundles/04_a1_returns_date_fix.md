@@ -55,13 +55,7 @@ git fetch origin && git checkout feature/persona_redesign_b01 && git pull
 Same `model_id` (`cc_60_180`) and persona dates as bundle 03. `prm_casa_return_events` is
 already built (bundle 03 Step 7), so it is not rerun.
 
-**Step 6.** Get the branch:
-
-```bash
-git fetch && git checkout feature/persona_redesign_b01 && git pull
-```
-
-**Step 7.** Rerun the bundle 03 check pipeline:
+**Step 6.** Rerun the bundle 03 check pipeline:
 
 ```bash
 kedro run --env=dev --pipeline=crx_cc_a1_ability_b03_check
@@ -1395,6 +1389,8 @@ Copy this to the workplace assistant in UAT once the bundle's PROD checks are do
 
 ````text
 Clean up after mirror bundle 04_a1_returns_date_fix.md, on the bundle's branch.
+This bundle adds no temporary pipeline or catalog entry. The bundle 03 check
+(`crx_cc_a1_ability_b03_check`) stays until bundle 03's own cleanup prompt.
 - Delete the folder data/input/mirror_bundles/ (bundle file, apply script):
   rm -rf data/input/mirror_bundles
 - Run `git status`: only the files named above may have changed, nothing under
