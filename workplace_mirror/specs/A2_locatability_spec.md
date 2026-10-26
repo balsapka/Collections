@@ -108,6 +108,9 @@ latest evidence stays Skip however old it is — accounts sit in collections for
 | confirmed contact | an inbound call, an outbound call with category `SUC`, or a right-party result name on any event |
 | attempt date | a date with at least one outbound call |
 | failed attempt date | an attempt date where every outbound call was ringing / no answer or a dead line, and no contact was confirmed that day |
+| not an attempt | dropped before the date logic: RL legal / repossession codes (`RPO case *`, `Vehicle Repossesed/Under Auction`, `Legal notice Sent`) and admin codes (`Result Not Found`, `Follow up`, `E mail Sent`) (D-A2-17) |
+
+Outcomes off the lists (D-A2-17): `LEFT_MSG` = ringing / no answer (failed); `CALL CONNECTED` without category `SUC` = an attempt that is neither failed nor a contact (it breaks a gone-dark run); `Skip - Under Tracing/Traced` = diagnostic column only, evidence on neither dimension.
 
 ### States
 
@@ -196,6 +199,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-14 | Same-day UAE and foreign evidence: foreign wins (Skip). Evidence is compared by date only, no timestamps (user, 2026-10-25). |
 | D-A2-15 | Travel rule (§3 L2): Skip when the last UAE evidence is at most 1 month after the last travel purchase and there has been no UAE evidence for at least 1 month; checked before In Country; any channel; no lookback from the scoring date. Validated in PROD for firing rate and threshold sensitivity (`bundle_helpers/b04_a2/sonnet_a2_v02_travel_prompt.md`) (user, 2026-10-25). |
 | D-A2-16 | Credit-card evidence reads the model's scoped cards as they are (`prm_transaction`): CC models the spine cards, RL models all cards of the scoped CIFs. No extra CIF-level card scope for CC models (user, 2026-10-25). |
+| D-A2-17 | DCORE outcomes off the lists: `LEFT_MSG` = failed attempt; `CALL CONNECTED` (not `SUC`) = neutral attempt (breaks gone dark, not a contact); `Skip - Under Tracing/Traced` = diagnostic only (a collector status, not a call, mostly domestic skips, and "Traced" means found); RL legal / repossession and admin codes (`Result Not Found`, `Follow up`, `E mail Sent`) dropped (user, 2026-10-26). |
 
 ---
 
@@ -252,7 +256,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | Check | Finding (cc_60_180 / rl_60_180, latest month) | Consequence |
 |---|---|---|
 | 3 DCORE keys | One agreement per account in both; join on account 99.92% / 100% | D-A2-8 holds: account → agreement, all events up to the observation date. The DCORE spine is still on billing dates (user), so the 99.92% "exact" join must have compared months (v02 Part 0 confirms) |
-| DCORE outcomes | The result-name lists cover ~48% / ~42% of event volume; `LEFT_MSG`, `CALL CONNECTED`, `Skip - Under Tracing` and RL legal / repossession codes are on none | Open: which list each joins (user) |
+| DCORE outcomes | The result-name lists cover ~48% / ~42% of event volume; `LEFT_MSG`, `CALL CONNECTED`, `Skip - Under Tracing` and RL legal / repossession codes are on none | Decided D-A2-17 (user, 2026-10-26) |
 | Reach preview | ~95% have 6+ outbound dates in 3 months; last 3 dates all failed 38.9% / 19.0%; inbound 12.5% / 16.3% (3 m) | Non-Reachable baseline differs by product; no threshold change |
 | 4 Deceased | RL has no `prm_contract`; demographics 0.13% deceased (CC) | RL deceased = DCORE + demographics |
 | 5 Login | `month_number` month end, `last_login_date` the real day; 12-month coverage 75% / 82%; history carries `sessionid` | O50 confirmed; O54 fix unchanged; foreign share (≈21%) awaits the O53 split |

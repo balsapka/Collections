@@ -124,8 +124,9 @@ of `rl_60_180`, not a rounding error.
   not usable as is. v02 t7b decides the debit-card route and the country field.
 - **t2 list coverage (~48% CC / ~42% RL of event volume)** is low, and unmatched codes change
   states: an attempt date with only unlisted outcomes is neither failed nor a contact, so it
-  breaks a gone-dark run. Open for the user (codes from t2; action code and category per code
-  from Part 0):
+  breaks a gone-dark run. **Decided (user, 2026-10-26, D-A2-17):** LEFT_MSG = failed;
+  CALL CONNECTED (not SUC) = neutral attempt; Skip - Under Tracing = diagnostic only;
+  legal / repossession and admin codes dropped. The questions were:
   - `LEFT_MSG` (voicemail / message left): a failed attempt (no answer)?
   - `CALL CONNECTED`: a confirmed contact when its category is not `SUC`?
   - `Skip - Under Tracing/Traced` (~1.5% CC, ~0.3% RL): a collector skip-trace status, not
