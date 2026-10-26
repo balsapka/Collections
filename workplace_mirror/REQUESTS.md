@@ -29,3 +29,9 @@ Photograph in full, with the editor breadcrumb visible:
 - the salary-history part of `src/enbd_collections/pipelines/bureau/staging.py` (lines ~40–60)
   and of the primary models file if a `BureauSalary…` model exists
   (`data_engineering/primary/models/bureau.py`)
+
+## R6 — retail loan pipelines (for RL A1 on the engine, user 2026-10-26)
+
+Photograph with the breadcrumb visible: the node building `int_loan_master` (its
+`monthly_emi_due` / `total_paid` / `emi_*_flag` derivation and the tolerance parameters), its
+pipeline file and catalog entry, and the `feat_loan_emi` node + catalog entry (reference only).

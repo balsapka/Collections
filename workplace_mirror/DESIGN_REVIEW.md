@@ -216,8 +216,13 @@ The CC month-end output is in PROD (bundle 03 Step 9 matched the check). A1 is c
 | c | **RL bundle**: RL wrapper on the engine (EMI anchor via a loan feature, the same CIF features), delete the RL waterfall (`rl_a1_ability/` + `crx_rl_a1_group_*`) | decisions below | distribution + crosstab vs the RL waterfall |
 | d | v03 for rl_60_180, then the A1 final report (CC + RL) for GRR | c | — |
 
-Open for RL (user): the EMI source (`int_loan_master.installment_due_amount` is intermediate →
-a feature from the loan primary); whether `feature_retail_loans`' AECB salary (an application-time
+RL anchor (user, 2026-10-26): `int_loan_master` is the month-end loan snapshot built on the
+loan primary, so the RL anchor node reads it directly (obs base + one dataset):
+`monthly_emi_due` (= `installment_due_amount`) on the observation month's snapshot; missing or
+0 → flat floors. Its payment columns (`total_paid`, `emi_paid/missed/partial_flag`) and
+`feat_loan_emi` (missed / partial / paid counts, discipline rate, coverage ratio per 1/3/6/12 M)
+describe payment behaviour, not ability: they stay out of A1 (A3 territory); the waterfall's
+EMI-coverage arms go. Open for RL (user): whether `feature_retail_loans`' AECB salary (an application-time
 value) still adds anything once the monthly bureau salary covers every CIF; rl_180_plus now or
 later (cc_180_plus is skipped for now). Bundle numbers: the next free one when built — A2's
 refactor waits on v02, so A1's bundles may come first.
