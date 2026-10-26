@@ -71,8 +71,12 @@ behaves as documented (1 distinct pull date/account, p50=p90=max=1).
   is a stale restatement.
 - **B3 is the best available model, not a clean split.** Same / rise / fall are each under 0.5%
   of all transitions and only 37.6% of repeats keep the amount, so most repeats change amount.
-  The rule for a *falling* amount (a part repayment?) and for a bounce that clears and comes back
-  decides how many of those are new events.
+  What the amount means (one cheque, or the total open bounced amount on the contract type) is
+  **not documented**; only "an identical repeat is a restatement" is well supported. A falling
+  amount could be a part settlement or a new, smaller bounce — the data cannot tell. Open (user,
+  2026-10-26): ask GRR / the AECB data dictionary what the amount is; meanwhile the neutral rule
+  is "any amount change = new event, identical repeat = same event"; the Sonnet can size it
+  (w7 variant) against "first report + rises only".
 - **Pulls are near-daily for the book and irregular per customer** (68% of per-CIF gaps under
   a month), so a key missing from one pull is not a clearance.
 - **Where it goes.** A primary `prm_bureau_bounce_events` (one row per bounce event, built from
