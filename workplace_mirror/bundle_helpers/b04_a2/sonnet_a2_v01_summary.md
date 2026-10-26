@@ -1,6 +1,6 @@
 # A2 v01 — PROD summary (cc_60_180 + rl_60_180, 2026-10-26)
 
-Part C of `sonnet_a2_v01_prompt.md`, written by the workplace Sonnet from
+Part C of the v01 prompt (removed after it ran), written by the workplace Sonnet from
 `tmp_validation/a2_v01/results_{cc,rl}_60_180.json`. Transcribed from photos by a chat session
 (`pics/claude_code_handoff.md`, 2026-10-26), so single digits may be misread. The review and
 the follow-ups are at the end.
