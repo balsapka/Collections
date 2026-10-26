@@ -225,7 +225,10 @@ describe payment behaviour, not ability: they stay out of A1 (A3 territory); the
 EMI-coverage arms go. Decided (user, 2026-10-26): `feature_retail_loans` carries the latest
 bureau pull on or before each spine row's observation date (not only the pre-disbursement
 pull), so RL keeps `aecb_last_salary_credit_amount` (dated by `aecb_bureau_pull_date`) as an
-extra bureau salary source until GRR's bureau salary fix lands; then RL relies on the bureau
+extra bureau salary source until GRR's bureau salary fix lands. It is dated by the pull month
+and merged into the bureau salary series (larger value per month). Pulls are rare today (most
+accounts have one), so it seldom falls in the window — expected, not a defect; it grows as the
+source is refreshed more often; then RL relies on the bureau
 source tables and pipeline only. rl_60_180 first, rl_180_plus later (as cc_180_plus). Bundle numbers: the next free one when built — A2's
 refactor waits on v02, so A1's bundles may come first.
 
