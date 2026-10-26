@@ -212,7 +212,7 @@ The CC month-end output is in PROD (bundle 03 Step 9 matched the check). A1 is c
 | Step | What | Needs | PROD check |
 |---|---|---|---|
 | a | GRR initial results: why each state fires, what information is missing (`bundle_helpers/a1_final/sonnet_a1_v03_grr_prompt.md`, cc_60_180) → results note | the Sonnet run | — |
-| b | **CC finish bundle**: `prm_bureau_salary_history` + `prm_beneficiary_cards`, the monthly features (§7), signals on obs base + features; rename `cc_a1_ability_v2` → `cc_a1_ability`, `crx_cc_a1_ability_v2` → `crx_cc_a1_ability`; delete CC v1 (`cc_a1_ability/` and its `crx_cc_a1_group_*` entries); Sonnet updates the 2 tests | R5 photos | new vs the current `crx_cc_a1_ability_v2` (kept as a temporary baseline): 0 changed rows expected |
+| b | **CC finish bundle**: `prm_bureau_salary_history` + `prm_beneficiary_cards`, the monthly features (§7), signals on obs base + features; rename `cc_a1_ability_v2` → `cc_a1_ability`, `crx_cc_a1_ability_v2` → `crx_cc_a1_ability`; delete CC v1 (`cc_a1_ability/` and its `crx_cc_a1_group_*` entries); Sonnet updates the 2 tests | R5 photos | new vs the current `crx_cc_a1_ability_v2` (kept as a temporary baseline): changes only on rows whose bureau distress moves (first-report dating cuts bureau flags ~23%) |
 | c | **RL bundle**: RL wrapper on the engine (EMI anchor via a loan feature, the same CIF features), delete the RL waterfall (`rl_a1_ability/` + `crx_rl_a1_group_*`) | decisions below | distribution + crosstab vs the RL waterfall |
 | d | v03 for rl_60_180, then the A1 final report (CC + RL) for GRR | c | — |
 
@@ -279,13 +279,14 @@ of" stay in the signal layer. Monthly features also absorb the mid-month source 
 | Layer | Dataset | Built from | Holds |
 |---|---|---|---|
 | primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history`, `prm_bureau_cif_bridge` | `cif_id`, salary month, amount. None exists today: the bureau primary pipeline (`pipelines/bureau/primary.py:17-55`) builds the bridge, alert, credit score, consolidated summary, court case and payment order, but salary stops at staging. Added there with the same `_join_cif_bridge` (`prm_bureau.py:218-247`) |
+| primary (new) | `prm_bureau_bounce_events` | `stg_aecb_alert` | one row per bureau bounce: key `(cif_id, CONTRACT_TYPE, ALERT_DESC)`, dated by its first bounced extract (and again when the amount rises); repeats of the same amount dropped (bureau v01) |
 | primary (new) | `prm_beneficiary_cards` | `raw_beneficiary_cards` | `cif_id`, registered card number |
 | feature | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` | WM-recovered salary per month |
 | feature | `feat_cif_bureau_salary_monthly` | `prm_bureau_salary_history` | bureau salary per month |
 | feature | `feat_cif_casa_monthly` | `wm_fea_casa_eod_avg_balance`, `wm_fea_casa_cc_inflow_outflow` | month's balance (4-week average, last snapshot), any inflow / outflow |
 | feature | `feat_cif_ext_card_payment_monthly` | `wm_pri_labelled_transactions`, `prm_beneficiary_cards` | largest single payment to a registered card |
 | feature | `feat_cif_returns_monthly` | `prm_casa_return_events` | return events per reason (cheque, DDS, POS reversal) |
-| feature | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` | bounced-cheque rows / amount by extract month |
+| feature | `feat_cif_bureau_bounces_monthly` | `prm_bureau_bounce_events` | bureau bounce events per month |
 | feature | `feat_cc_balance_month_end` | `prm_balance` | overdue buckets 01–08 on the month's latest snapshot, per contract |
 | signals | income / liquidity / distress / anchor | obs base + the features above | windows, thresholds, reason list, larger-of |
 

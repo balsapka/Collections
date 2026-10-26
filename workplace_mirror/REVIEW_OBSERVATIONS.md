@@ -80,8 +80,9 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O55 | M | confirmed | prm_digital_login_monthly | The month's last login is picked by date only; same-day UAE and foreign logins tie at random |
 | O56 | M | design | prm_digital_login_monthly | Keeps only the month's last login; the latest UAE login date is lost when the last one was foreign |
 | O57 | H | fixed (bundle 04) | a1_ability/signals.py | `prm_casa_return_events` coverage guard compares a date with a string |
-| O58 | M | confirmed | prm_bureau_alert_enriched | `DT_OF_RETURN` is renamed, then dropped by the model projection |
+| O58 | M | closed (bureau v01) | prm_bureau_alert_enriched | `DT_OF_RETURN` is renamed, then dropped by the model projection |
 | O59 | H | data check | cc_raw_extract / prm_cc | `is_international` (Way4 `DOMESTIC=N`) is 1 on 96% of card transactions in PROD |
+| O60 | L | confirmed | feature_retail_loans | `aecb_direct_debit_returns_6m` is declared but missing from the PROD table |
 
 ---
 
@@ -738,3 +739,14 @@ network). It feeds `cc_departure_signature` (`foreign_txn_share_h2`, `last_txn_f
 most CC accounts with card use likely carry a departure trail today. **Check:** A2 v02 Part A /
 t7a (raw `DOMESTIC=` values by currency, MCC, cash advance). **Fix:** the new A2 reads the
 card-abroad field v02 confirms; the old A2 retires with bundle 05.
+
+**O58 closed (bureau v01, 2026-10-26):** `DT_OF_RETURN` moves with `EXTRACT_DT` on 99.65% of
+repeated bounces (median 2 days before it), so it is "the latest registration as of this pull",
+not the bounce date. Exposing it would not fix stale bounces; A1 dates bureau bounces by the
+first report of each bounce instead (DESIGN_REVIEW, A1 finish plan).
+
+### O60 — `aecb_direct_debit_returns_6m` missing in PROD (L, confirmed)
+
+Declared in `feat_loan_application_risk.py` (bureau v01 inventory A.4) but NOT FOUND on the real
+`feature_retail_loans` table for `rl_60_180` (bureau v01 w8). The RL waterfall had already
+dropped it (RL-A1-14) and the new A1 does not read it; the declaration is dead.
