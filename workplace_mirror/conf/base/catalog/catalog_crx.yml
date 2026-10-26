@@ -442,24 +442,6 @@ crx_cc_a1_ability_v2:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 03 check): the bundle 02 A1 output (b01_check, the
-# baseline) and the new month-end A1 output (b03_check), kept apart from
-# crx_cc_a1_ability_v2 so the two can be compared. Remove both entries, the
-# crx_cc_a1_ability_b03_check pipeline and their HDFS folders after the check.
-crx_cc_a1_ability_b01_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b01_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_a1_ability_b03_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b03_check"
-  save_args:
-    mode: overwrite
-
 # ── A3 Payment Credibility (T27) ────────────────────────────────────────────
 # Grain: (account_id, spell_id). observation_date = coalesce(spell_end, current_date()).
 # a3_state_v1 ∈ {payment_credibility_high, payment_credibility_moderate,
