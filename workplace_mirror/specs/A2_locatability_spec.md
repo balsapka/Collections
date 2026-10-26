@@ -244,7 +244,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 
 ---
 
-## 11. Refactor plan (bundle 04, after the §10 checks)
+## 11. Refactor plan (bundle 05, after the §10 checks)
 
 1. **Login pipeline fixes** (`digital_login`, shared with every consumer of the login tables):
    - `stg_digital_login`: `is_foreign_login` = 0 for the UAE, 1 for another country, NULL

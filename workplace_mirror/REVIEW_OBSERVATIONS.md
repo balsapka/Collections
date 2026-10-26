@@ -11,7 +11,7 @@ but the choice is questionable.
 **Severity:** **H** = feature values are wrong · **M** = wrong in edge cases / silent drift ·
 **L** = docs, naming, hygiene.
 
-Last updated: 2026-10-24 (O45–O52: A2 review for bundle 04); 2026-10-23 (batches 1–3: cc_spell, cc_full_history, cc_raw_extract,
+Last updated: 2026-10-24 (O45–O52: A2 review for bundle 05); 2026-10-23 (batches 1–3: cc_spell, cc_full_history, cc_raw_extract,
 cc_payment_trajectory, cc_utilisation, cc_departure_signature, pipeline_registry,
 cc_a4_deterioration + `_dpd_journey` engine, cc_a2_locatability, cc_a1_ability_v2,
 `_spine_utils`, `stg_rr_portf`, `nodes/utils/config`; batch 5: the RL chain — rl_full_history,
@@ -618,7 +618,7 @@ base in bundle 5; v1 is removed in bundle 4.
 `cc_a2_locatability/nodes.py:855–874`: both flags need `_last_n_confirmed == 0` and
 `_last_n_dead > 0` (or `_last_n_ringing > 0`) summed over every event of the last 2 attempt
 dates. One ringing call plus one LINE BUSY or NO ANSWER (neither list) sets
-`gone_contact_flag`; the docstring says "all N dead or ringing". **Fix (bundle 04):** classify
+`gone_contact_flag`; the docstring says "all N dead or ringing". **Fix (bundle 05):** classify
 each attempt date as failed only if every outbound event that day is ringing or dead and none
 is confirmed (spec Q5).
 
@@ -666,7 +666,7 @@ login always yields a trail → Skip, and `location_unknown_reason = recent_logi
 ### O52 — Unused contact outputs (L, confirmed)
 
 `rpc_rate` / `uns_rate` (`nodes.py:821–834`) are not read by Node 4; `spell_id` is emitted by
-Node 4. Dropped in bundle 04.
+Node 4. Dropped in bundle 05.
 
 ### O53 — Logins without a country count as foreign (H, confirmed)
 
@@ -698,7 +698,7 @@ on the last login day; no timestamp needed.
 
 `prm_digital_login_monthly` keeps the month's last login plus `any_foreign_login_flag`. When
 the last login is foreign, the date of the latest UAE login that month is gone, and logins
-cannot be ordered against card / CASA spending within a month. **Fix (bundle 04):** add the
+cannot be ordered against card / CASA spending within a month. **Fix (bundle 05):** add the
 month's latest UAE and latest foreign login (date and timestamp) to the primary table; A2
 reads the primary table only (user, 2026-10-25: no staging outputs downstream). O50 is confirmed by `month_number` = the month's last day (line 42):
 `<= trunc(obs, 'month')` never includes the observation month.
