@@ -225,6 +225,10 @@ update them as part of the A1 bundle prompt.
 - `pipelines/digital_login/pipeline.py` — 41 lines.
 - `nodes/staging/digital_login/stg_digital_login.py` — 209 lines.
 - `nodes/primary/digital_login/prm_digital_login_monthly.py` — 85 lines.
+- Catalog entries (IMG_8390–8392, 2026-10-26): the three `raw_digital_*` Hive queries,
+  `stg_digital_login` and `prm_digital_login_monthly` — recorded in
+  `bundle_helpers/b04_a2/sonnet_a2_v01_inventory.md` (not mirrored: the catalog YAMLs are
+  only partly photographed).
 
 All match the screen (line counts, `def` lines), compile, ruff F/E9 clean. Not seen: the
 packages' `__init__.py` files and the catalog entries of the `raw_digital_*` / `stg_` datasets.

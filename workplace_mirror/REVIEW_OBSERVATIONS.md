@@ -702,3 +702,23 @@ cannot be ordered against card / CASA spending within a month. **Fix (bundle 04)
 month's latest UAE and latest foreign login (date and timestamp) to the primary table; A2
 reads the primary table only (user, 2026-10-25: no staging outputs downstream). O50 is confirmed by `month_number` = the month's last day (line 42):
 `<= trunc(obs, 'month')` never includes the observation month.
+
+### O57 — Bundle 03 coverage guard compares a date with a string (H, fixed in bundle 04)
+
+`a1_ability/signals.py:351` (`build_internal_returns`): `prm_casa_return_events` is written
+partitioned by `event_month` (`yyyy-MM-dd` string, `prm_casa.py:65-67`); on read Spark infers
+the folder values as `DateType`, while `lookback_floor` returns an ISO string. PROD
+(2026-10-26, `crx_cc_a1_ability_b03_check`): `TypeError: '>' not supported between instances
+of 'datetime.date' and 'str'`. Fix: `str(first) > since`. The `event_month >= since` column
+filter was unaffected (Spark casts the literal).
+
+### O58 — `prm_bureau_alert_enriched` drops the bureau return date (M, confirmed by Sonnet)
+
+`prm_bureau.py:95-146` (`build_alert_enriched`) renames `DT_OF_RETURN` → `return_date` and
+`CONTRACT_STATUS_DT` → `contract_status_date` (`_ALERT_RENAMES`, lines 105-106), but the
+`BureauAlertEnriched` model (`data_engineering/primary/models/bureau.py:844`) has no such
+fields, so the final projection silently drops both. A1 therefore can only date bureau
+bounces by `extract_date`. Whether `DT_OF_RETURN` is worth exposing depends on bureau v01
+(1,399 distinct values over ~801K bounced rows looks like a batch stamp, too). Separately,
+`prm_bureau_payment_order` carries its own `return_date` and is already an optional A1 input
+(`signals.py:311-320`), not yet in PROD.

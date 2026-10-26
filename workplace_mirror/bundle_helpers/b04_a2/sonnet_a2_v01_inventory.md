@@ -142,3 +142,28 @@ separate monthly aggregates joined back (62-68, 71). Confirms `cc_a2_locatabilit
   `domain_and_decisions.md:116` S5). CC-only floor-date blind spot saturates `cc_180_plus` `gt2y`
   to "unknown" (T43); RL has no equivalent (`rl_history_floor_date: None`). Shared engine:
   `_dpd_journey` package used by both CC and RL A4 (`RESULTS.md:31`).
+
+## Login catalog entries (photos IMG_8390–8392, 2026-10-26)
+
+- `raw_digital_login_data` (`catalog_raw_digital.yml`, `SparkHiveSQLDataset`, overwrite):
+  `SELECT * FROM ${globals:aacoe_prefix}cl_omb_group_reports.login_data_ebi`.
+- `raw_digital_login_data_history`: `SELECT * FROM ${globals:aacoe_prefix}tdv_omb_uae_ebi.loginlog`.
+- `raw_digital_user_data`: `SELECT * FROM ${globals:aacoe_prefix}tdv_pdm_uae_ebi.users`.
+- `stg_digital_login` (`catalog_outputs.yml`, `*spark_de`):
+  `${_project.hdfs_path}/${globals:model_id}/${globals:folders.stg}/digital/digital_login`.
+- `prm_digital_login_monthly` (`catalog_outputs.yml`, `*spark_de`):
+  `${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/digital/digital_login_monthly`.
+
+Both login outputs are model_id-namespaced plain parquet (no `partitionBy`), so bundle 04's
+new columns on `prm_digital_login_monthly` need no catalog change.
+
+## Part B status (Sonnet, 2026-10-26, IMG_8401)
+
+`tmp_validation/a2_v01/` already holds `inventory.md`, `a2_v01_snippet.py`, `README.md`,
+`results_cc_60_180.json` and a draft `summary.md` (two known issues, one re-run outstanding).
+The Sonnet found that t4 profiled only `prm_digital_login_monthly`; it added a
+`_profile_raw_login_source` helper (24 months on `createdon`, CIF-scoped via the same party →
+CIF map as `stg_digital_login.py`) for both raw tables plus a `stg_digital_login` profile,
+each wrapped so a failure keeps the rest of t4. The t4 JSON now nests the monthly profile
+under its own key. Needed: re-run for `cc_60_180` and `rl_60_180`, push both JSONs, then
+part C.
