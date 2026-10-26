@@ -205,6 +205,23 @@ separately so each change in numbers has one cause.
 | 6 | Delete T0-only packages (`cc_raw_extract`, `cc_payment_trajectory`, `cc_utilisation`, `rl_a4_spine`, departure passes) | imports |
 | 7 | Delete spell tables — after A3 has moved off them | — |
 
+### A1 finish plan (user, 2026-10-26)
+
+The CC month-end output is in PROD (bundle 03 Step 9 matched the check). A1 is concluded after:
+
+| Step | What | Needs | PROD check |
+|---|---|---|---|
+| a | GRR initial results: why each state fires, what information is missing (`bundle_helpers/a1_final/sonnet_a1_v03_grr_prompt.md`, cc_60_180) → results note | the Sonnet run | — |
+| b | **CC finish bundle**: `prm_bureau_salary_history` + `prm_beneficiary_cards`, the monthly features (§7), signals on obs base + features; rename `cc_a1_ability_v2` → `cc_a1_ability`, `crx_cc_a1_ability_v2` → `crx_cc_a1_ability`; delete CC v1 (`cc_a1_ability/` and its `crx_cc_a1_group_*` entries); Sonnet updates the 2 tests | R5 photos | new vs the current `crx_cc_a1_ability_v2` (kept as a temporary baseline): 0 changed rows expected |
+| c | **RL bundle**: RL wrapper on the engine (EMI anchor via a loan feature, the same CIF features), delete the RL waterfall (`rl_a1_ability/` + `crx_rl_a1_group_*`) | decisions below | distribution + crosstab vs the RL waterfall |
+| d | v03 for rl_60_180, then the A1 final report (CC + RL) for GRR | c | — |
+
+Open for RL (user): the EMI source (`int_loan_master.installment_due_amount` is intermediate →
+a feature from the loan primary); whether `feature_retail_loans`' AECB salary (an application-time
+value) still adds anything once the monthly bureau salary covers every CIF; rl_180_plus now or
+later (cc_180_plus is skipped for now). Bundle numbers: the next free one when built — A2's
+refactor waits on v02, so A1's bundles may come first.
+
 ## 7. Data layers (decided 2026-10-23)
 
 Persona pipelines read **primary and feature datasets only**. A raw source is read once,
