@@ -227,7 +227,7 @@ update them as part of the A1 bundle prompt.
 - `nodes/primary/digital_login/prm_digital_login_monthly.py` — 85 lines.
 - Catalog entries (IMG_8390–8392, 2026-10-26): the three `raw_digital_*` Hive queries,
   `stg_digital_login` and `prm_digital_login_monthly` — recorded in
-  `bundle_helpers/b04_a2/sonnet_a2_v01_inventory.md` (not mirrored: the catalog YAMLs are
+  `bundle_helpers/b04_a2/a2_v01_inventory_results.md` (not mirrored: the catalog YAMLs are
   only partly photographed).
 
 All match the screen (line counts, `def` lines), compile, ruff F/E9 clean. Not seen: the
@@ -242,7 +242,7 @@ The user could not move photos; a chat session transcribed 5 screen photos into
 
 - A1: B03 OUTPUT + B03 INCOME → `bundle_helpers/b03/b03_check_results.md` (sums check out).
 - A2: v01 `summary.md` (t1–t7, cc_60_180 + rl_60_180) →
-  `bundle_helpers/b04_a2/sonnet_a2_v01_summary.md`, with the review; O59.
+  `bundle_helpers/b04_a2/a2_v01_results.md`, with the review; O59.
 - Context only (Teams, DE on RL restructure predecessor matching, cf. T18 succession link):
   unmatched restructurings are Home → Personal cross-family ones, those before 2018-01 (no
   data), **Auto restructured since 2025-12** (the current history table has no Auto loans;

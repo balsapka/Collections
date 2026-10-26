@@ -240,7 +240,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 5. **Login dates** (O50): `month_number` format and whether `last_login_date` is the actual
    login day.
 
-### What the v01 inventory settled (2026-10-25, `bundle_helpers/b04_a2/sonnet_a2_v01_inventory.md`)
+### What the v01 inventory settled (2026-10-25, `bundle_helpers/b04_a2/a2_v01_inventory_results.md`)
 
 | Check | Finding | Consequence |
 |---|---|---|
@@ -251,7 +251,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | 5 Login | `month_number` = month end (string); raw is one row per session | O50 confirmed; login fixes as in §11 |
 | 6 Splits | `rl_spine.loan_type` ∈ {Personal, Personal Cash, Auto}; `chargeoff_age_months` on both spines, < 24 = early-stage, else late-stage (`chargeoff_segment`) | Both available on the spine; carried onto the obs base |
 
-### What the v01 PROD run showed (2026-10-26, `bundle_helpers/b04_a2/sonnet_a2_v01_summary.md`)
+### What the v01 PROD run showed (2026-10-26, `bundle_helpers/b04_a2/a2_v01_results.md`)
 
 | Check | Finding (cc_60_180 / rl_60_180, latest month) | Consequence |
 |---|---|---|
