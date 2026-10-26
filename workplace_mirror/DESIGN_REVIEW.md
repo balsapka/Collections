@@ -251,7 +251,7 @@ of" stay in the signal layer. Monthly features also absorb the mid-month source 
 
 | Layer | Dataset | Built from | Holds |
 |---|---|---|---|
-| primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history`, `prm_bureau_cif_bridge` | `cif_id`, salary month, amount (until GRR's bureau primary lands) |
+| primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history`, `prm_bureau_cif_bridge` | `cif_id`, salary month, amount. None exists today: the bureau primary pipeline (`pipelines/bureau/primary.py:17-55`) builds the bridge, alert, credit score, consolidated summary, court case and payment order, but salary stops at staging. Added there with the same `_join_cif_bridge` (`prm_bureau.py:218-247`) |
 | primary (new) | `prm_beneficiary_cards` | `raw_beneficiary_cards` | `cif_id`, registered card number |
 | feature | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` | WM-recovered salary per month |
 | feature | `feat_cif_bureau_salary_monthly` | `prm_bureau_salary_history` | bureau salary per month |
@@ -277,8 +277,8 @@ every CIF-level feature; it adds an EMI feature from its loan primary.
 | signals | reachability | obs base + `dcore_prm_followup_outcomes` + `prm_dcore_account_agreements` (code lists stay here) |
 | signals | deceased | obs base + `dcore_prm_followup_outcomes`, `prm_contract`, `prm_demographics` (not `feat_demographics_cif`) |
 
-**Open (user):** (1) a thin `prm_bureau_salary_history` now, or wait for GRR's bureau feed
-(until then the income node keeps reading staging); (2) feature nodes that reshape WM
+**Open (user):** (1) add `prm_bureau_salary_history` to the bureau primary pipeline now
+(needs photos of `prm_bureau.py` and `pipelines/bureau/primary.py`), or wait for GRR's feed; (2) feature nodes that reshape WM
 features count as single-layer; (3) the A1 relayering ships as its own bundle after bundle 05.
 
 ### First primary: `prm_casa_return_events` (bundle 03)
