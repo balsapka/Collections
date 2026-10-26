@@ -22,7 +22,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 ],
                 outputs="prm_casa_return_events",
                 name="build_prm_casa_return_events",
+                tags=["casa", "primary"],
             )
         ],
-        tags=["casa", "primary"],
     )

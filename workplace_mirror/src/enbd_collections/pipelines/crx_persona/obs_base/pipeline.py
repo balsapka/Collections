@@ -19,9 +19,9 @@ def create_cc_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 inputs=["cc_spine", "params:crx_persona"],
                 outputs="crx_cc_obs_base",
                 name="build_crx_cc_obs_base",
+                tags=["crx_persona", "crx", "obs_base"],
             )
         ],
-        tags=["crx_persona", "crx", "obs_base"],
     )
 
 
@@ -34,7 +34,7 @@ def create_rl_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 inputs=["rl_spine", "params:crx_persona"],
                 outputs="crx_rl_obs_base",
                 name="build_crx_rl_obs_base",
+                tags=["crx_persona", "crx", "obs_base"],
             )
         ],
-        tags=["crx_persona", "crx", "obs_base"],
     )

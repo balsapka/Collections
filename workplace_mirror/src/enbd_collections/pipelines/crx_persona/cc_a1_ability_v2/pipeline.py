@@ -37,23 +37,25 @@ def create_pipeline(  # pylint: disable=unused-argument
     **kwargs,
 ) -> Pipeline:
     """The CC A1 axis: signal tables, the anchor and the state, written to ``output``."""
+    tags = ["crx_persona", "crx", "a1", "ability", "persona_axis"]
     return Pipeline(
         [
             node(
-                build_income_signals,
-                [
+                func=build_income_signals,
+                inputs=[
                     _OBS,
                     "wm_fea_salary_days_since_increment",
                     "stg_aecb_salary_history",
                     "prm_bureau_cif_bridge",
                     "params:model_id",
                 ],
-                "crx_cc_a1_income_signals",
+                outputs="crx_cc_a1_income_signals",
                 name="build_crx_cc_a1_income_signals",
+                tags=tags,
             ),
             node(
-                build_liquidity_signals,
-                [
+                func=build_liquidity_signals,
+                inputs=[
                     _OBS,
                     "wm_fea_casa_eod_avg_balance",
                     "wm_fea_casa_cc_inflow_outflow",
@@ -61,35 +63,39 @@ def create_pipeline(  # pylint: disable=unused-argument
                     "raw_beneficiary_cards",
                     "params:model_id",
                 ],
-                "crx_cc_a1_liquidity_signals",
+                outputs="crx_cc_a1_liquidity_signals",
                 name="build_crx_cc_a1_liquidity_signals",
+                tags=tags,
             ),
             node(
-                build_internal_returns,
-                [_OBS, "prm_casa_return_events", "params:model_id"],
-                "crx_cc_a1_internal_returns",
+                func=build_internal_returns,
+                inputs=[_OBS, "prm_casa_return_events", "params:model_id"],
+                outputs="crx_cc_a1_internal_returns",
                 name="build_crx_cc_a1_internal_returns",
+                tags=tags,
             ),
             node(
-                build_distress_signals,
-                {
+                func=build_distress_signals,
+                inputs={
                     "obs_base": _OBS,
                     "bureau_alert": "prm_bureau_alert_enriched",
                     "internal_returns": "crx_cc_a1_internal_returns",
                     "model_id": "params:model_id",
                 },
-                "crx_cc_a1_distress_signals",
+                outputs="crx_cc_a1_distress_signals",
                 name="build_crx_cc_a1_distress_signals",
+                tags=tags,
             ),
             node(
-                build_cc_liquidity_anchor,
-                [_OBS, "prm_balance", "params:model_id"],
-                "crx_cc_a1_liquidity_anchor",
+                func=build_cc_liquidity_anchor,
+                inputs=[_OBS, "prm_balance", "params:model_id"],
+                outputs="crx_cc_a1_liquidity_anchor",
                 name="build_crx_cc_a1_liquidity_anchor",
+                tags=tags,
             ),
             node(
-                build_a1_ability,
-                [
+                func=build_a1_ability,
+                inputs=[
                     _OBS,
                     "crx_cc_a1_income_signals",
                     "crx_cc_a1_liquidity_signals",
@@ -98,11 +104,11 @@ def create_pipeline(  # pylint: disable=unused-argument
                     "params:model_id",
                     "params:crx_persona.persona_end_date",
                 ],
-                output,
+                outputs=output,
                 name="build_crx_cc_a1_ability",
+                tags=tags,
             ),
         ],
-        tags=["crx_persona", "crx", "a1", "ability", "persona_axis"],
     )
 
 
@@ -116,26 +122,27 @@ def create_b03_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-a
         + Pipeline(
             [
                 node(
-                    compare_a1_outputs,
-                    [
+                    func=compare_a1_outputs,
+                    inputs=[
                         "crx_cc_a1_ability_b01_check",
                         "crx_cc_a1_ability_b03_check",
                         "params:model_id",
                     ],
-                    None,
+                    outputs=None,
                     name="compare_crx_cc_a1_b03",
+                    tags=["crx_persona"],
                 ),
                 node(
-                    compare_income_rules,
-                    [
+                    func=compare_income_rules,
+                    inputs=[
                         "crx_cc_a1_income_signals",
                         "crx_cc_a1_ability_b03_check",
                         "params:model_id",
                     ],
-                    None,
+                    outputs=None,
                     name="compare_crx_cc_a1_b03_income",
+                    tags=["crx_persona"],
                 ),
             ],
-            tags=["crx_persona"],
         )
     )

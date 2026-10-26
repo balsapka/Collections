@@ -229,6 +229,58 @@ pipelines alike.
   the GRR bureau feed is the planned coverage fix.
 - **Enforced by a test** (Sonnet): no `crx_` node takes a `raw_` / `stg_` / `comp_` input.
 
+### One layer per node (user, 2026-10-26) — proposal, decisions open
+
+A node reads **one layer**: primary nodes read raw / staging, feature nodes read primary
+(or reshape a WM feature we do not own), persona signal nodes read the obs base plus feature
+datasets. Every `node()` spells out `func=`, `inputs=`, `outputs=`, `name=`, `tags=`.
+Feature tables are `cif_id` (or account) × month end, all customers from a parameter floor,
+raw values only (every reason, both salary sources): thresholds, reason lists and "larger
+of" stay in the signal layer. Monthly features also absorb the mid-month source dates.
+
+**A1 today** — the mixed nodes:
+
+| Node | Reads today | Layers mixed |
+|---|---|---|
+| `build_crx_cc_a1_income_signals` | `wm_fea_salary_days_since_increment`, `stg_aecb_salary_history`, `prm_bureau_cif_bridge` | feature + staging + primary |
+| `build_crx_cc_a1_liquidity_signals` | `wm_fea_casa_eod_avg_balance`, `wm_fea_casa_cc_inflow_outflow`, `wm_pri_labelled_transactions`, `raw_beneficiary_cards` | feature + primary + raw |
+| `build_crx_cc_a1_internal_returns` → `…_distress_signals` | `prm_casa_return_events`; `prm_bureau_alert_enriched` + the persona `crx_cc_a1_internal_returns` | primary (+ persona) |
+| `build_crx_cc_a1_liquidity_anchor` | `prm_balance` (billing-date snapshots) | primary |
+
+**A1 layered** (same logic, so the check is an exact old-vs-new match):
+
+| Layer | Dataset | Built from | Holds |
+|---|---|---|---|
+| primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history`, `prm_bureau_cif_bridge` | `cif_id`, salary month, amount (until GRR's bureau primary lands) |
+| primary (new) | `prm_beneficiary_cards` | `raw_beneficiary_cards` | `cif_id`, registered card number |
+| feature | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` | WM-recovered salary per month |
+| feature | `feat_cif_bureau_salary_monthly` | `prm_bureau_salary_history` | bureau salary per month |
+| feature | `feat_cif_casa_monthly` | `wm_fea_casa_eod_avg_balance`, `wm_fea_casa_cc_inflow_outflow` | month's balance (4-week average, last snapshot), any inflow / outflow |
+| feature | `feat_cif_ext_card_payment_monthly` | `wm_pri_labelled_transactions`, `prm_beneficiary_cards` | largest single payment to a registered card |
+| feature | `feat_cif_returns_monthly` | `prm_casa_return_events` | return events per reason (cheque, DDS, POS reversal) |
+| feature | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` | bounced-cheque rows / amount by extract month |
+| feature | `feat_cc_balance_month_end` | `prm_balance` | overdue buckets 01–08 on the month's latest snapshot, per contract |
+| signals | income / liquidity / distress / anchor | obs base + the features above | windows, thresholds, reason list, larger-of |
+
+`crx_cc_a1_internal_returns` disappears (the distress node reads two features). RL A1 reuses
+every CIF-level feature; it adds an EMI feature from its loan primary.
+
+**A2 (bundle 05) layered from the start:**
+
+| Layer | Dataset | Built from |
+|---|---|---|
+| primary (fix) | `prm_digital_login_monthly` | staging login (O53–O56) |
+| primary (new) | `prm_dcore_account_agreements` | the DCORE agreement source (today only in the staging `dcore_observation_spine`) — account → agreement, no dates |
+| primary (v02 decides) | card / CASA spend primary | `prm_transaction`; raw CASA or the WM datasets |
+| feature | `feat_cif_location_monthly` | login + card + CASA primaries: latest UAE / foreign evidence date + source, latest travel purchase |
+| signals | location | obs base + `feat_cif_location_monthly` |
+| signals | reachability | obs base + `dcore_prm_followup_outcomes` + `prm_dcore_account_agreements` (code lists stay here) |
+| signals | deceased | obs base + `dcore_prm_followup_outcomes`, `prm_contract`, `prm_demographics` (not `feat_demographics_cif`) |
+
+**Open (user):** (1) a thin `prm_bureau_salary_history` now, or wait for GRR's bureau feed
+(until then the income node keeps reading staging); (2) feature nodes that reshape WM
+features count as single-layer; (3) the A1 relayering ships as its own bundle after bundle 05.
+
 ### First primary: `prm_casa_return_events` (bundle 03)
 
 Its own pipeline outside `crx_persona`, built from `comp_financial_tran_repos_dly`:
