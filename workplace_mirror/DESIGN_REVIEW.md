@@ -279,7 +279,7 @@ of" stay in the signal layer. Monthly features also absorb the mid-month source 
 | Layer | Dataset | Built from | Holds |
 |---|---|---|---|
 | primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history`, `prm_bureau_cif_bridge` | `cif_id`, salary month, amount. None exists today: the bureau primary pipeline (`pipelines/bureau/primary.py:17-55`) builds the bridge, alert, credit score, consolidated summary, court case and payment order, but salary stops at staging. Added there with the same `_join_cif_bridge` (`prm_bureau.py:218-247`) |
-| primary (new) | `prm_bureau_bounce_events` | `stg_aecb_alert` | one row per bureau bounce: key `(cif_id, CONTRACT_TYPE, ALERT_DESC)`, dated by its first bounced extract (and again when the amount rises); repeats of the same amount dropped (bureau v01) |
+| primary (new) | `prm_bureau_bounce_events` | `stg_aecb_alert` | one row per bureau bounce: key `(cif_id, CONTRACT_TYPE, ALERT_DESC)`, a new event whenever the key's bounced amount differs from its previous bounced pull (first report, rise or fall) or follows a non-bounced row; identical consecutive repeats dropped (user, 2026-10-26, until GRR confirms what the amount means) |
 | primary (new) | `prm_beneficiary_cards` | `raw_beneficiary_cards` | `cif_id`, registered card number |
 | feature | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` | WM-recovered salary per month |
 | feature | `feat_cif_bureau_salary_monthly` | `prm_bureau_salary_history` | bureau salary per month |

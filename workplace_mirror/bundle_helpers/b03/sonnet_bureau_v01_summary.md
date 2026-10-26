@@ -74,9 +74,10 @@ behaves as documented (1 distinct pull date/account, p50=p90=max=1).
   What the amount means (one cheque, or the total open bounced amount on the contract type) is
   **not documented**; only "an identical repeat is a restatement" is well supported. A falling
   amount could be a part settlement or a new, smaller bounce — the data cannot tell. Open (user,
-  2026-10-26): ask GRR / the AECB data dictionary what the amount is; meanwhile the neutral rule
-  is "any amount change = new event, identical repeat = same event"; the Sonnet can size it
-  (w7 variant) against "first report + rises only".
+  2026-10-26): ask GRR / the AECB data dictionary what the amount is.
+  **Decided (user, 2026-10-26), until GRR answers:** any amount change (rise or fall) is a new
+  bounce, an identical consecutive repeat is the same bounce; a bounced row after a non-bounced
+  one is new; a key missing from a pull is not a clearance.
 - **Pulls are near-daily for the book and irregular per customer** (68% of per-CIF gaps under
   a month), so a key missing from one pull is not a clearance.
 - **Where it goes.** A primary `prm_bureau_bounce_events` (one row per bounce event, built from
