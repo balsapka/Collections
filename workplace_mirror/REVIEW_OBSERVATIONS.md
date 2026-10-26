@@ -79,6 +79,9 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O54 | H | data check | stg_digital_login | `dropDuplicates(["sessionid"])` collapses every login without a sessionid into one row |
 | O55 | M | confirmed | prm_digital_login_monthly | The month's last login is picked by date only; same-day UAE and foreign logins tie at random |
 | O56 | M | design | prm_digital_login_monthly | Keeps only the month's last login; the latest UAE login date is lost when the last one was foreign |
+| O57 | H | fixed (bundle 04) | a1_ability/signals.py | `prm_casa_return_events` coverage guard compares a date with a string |
+| O58 | M | confirmed | prm_bureau_alert_enriched | `DT_OF_RETURN` is renamed, then dropped by the model projection |
+| O59 | H | data check | cc_raw_extract / prm_cc | `is_international` (Way4 `DOMESTIC=N`) is 1 on 96% of card transactions in PROD |
 
 ---
 
@@ -722,3 +725,16 @@ bounces by `extract_date`. Whether `DT_OF_RETURN` is worth exposing depends on b
 (1,399 distinct values over ~801K bounced rows looks like a batch stamp, too). Separately,
 `prm_bureau_payment_order` carries its own `return_date` and is already an optional A1 input
 (`signals.py:311-320`), not yet in PROD.
+
+### O59 — `is_international` flags 96% of card transactions (H, data check)
+
+`cc_raw_extract/nodes.py:104–112` sets `is_international = 1` when `add_info` matches
+`DOMESTIC=N` (the comment says it replicates `prm_cc.build_transaction`). PROD (A2 v01 t5,
+cc_60_180, 2026-10-26): 96.35% of `crx_cc_transactions` rows are international, against 28.3%
+with a travel MCC on the same table. Either the polarity is inverted, the regex also matches
+another key ending in `DOMESTIC=`, or the flag means something else (e.g. the acquiring
+network). It feeds `cc_departure_signature` (`foreign_txn_share_h2`, `last_txn_foreign_flag`,
+`nodes.py:657–769`) and so the old A2's `departure_trail_flag` (`cc_a2_locatability/nodes.py:1083–1085`):
+most CC accounts with card use likely carry a departure trail today. **Check:** A2 v02 Part A /
+t7a (raw `DOMESTIC=` values by currency, MCC, cash advance). **Fix:** the new A2 reads the
+card-abroad field v02 confirms; the old A2 retires with bundle 05.

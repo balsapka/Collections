@@ -242,6 +242,17 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | 5 Login | `month_number` = month end (string); raw is one row per session | O50 confirmed; login fixes as in §11 |
 | 6 Splits | `rl_spine.loan_type` ∈ {Personal, Personal Cash, Auto}; `chargeoff_age_months` on both spines, < 24 = early-stage, else late-stage (`chargeoff_segment`) | Both available on the spine; carried onto the obs base |
 
+### What the v01 PROD run showed (2026-10-26, `bundle_helpers/b04_a2/sonnet_a2_v01_summary.md`)
+
+| Check | Finding (cc_60_180 / rl_60_180, latest month) | Consequence |
+|---|---|---|
+| 3 DCORE keys | One agreement per account in both; join on account 99.92% / 100% | D-A2-8 holds: account → agreement, all events up to the observation date. The "exact date" join rate is doubtful (O49), checked in v02 Part 0 |
+| DCORE outcomes | The result-name lists cover ~48% / ~42% of event volume; `LEFT_MSG`, `CALL CONNECTED`, `Skip - Under Tracing` and RL legal / repossession codes are on none | Open: which list each joins (user) |
+| Reach preview | ~95% have 6+ outbound dates in 3 months; last 3 dates all failed 38.9% / 19.0%; inbound 12.5% / 16.3% (3 m) | Non-Reachable baseline differs by product; no threshold change |
+| 4 Deceased | RL has no `prm_contract`; demographics 0.13% deceased (CC) | RL deceased = DCORE + demographics |
+| 5 Login | `month_number` month end, `last_login_date` the real day; 12-month coverage 75% / 82%; history carries `sessionid` | O50 confirmed; O54 fix unchanged; foreign share (≈21%) awaits the O53 split |
+| 1–2 Location sources | `feat_fx_leakage` foreign = currency / cross-border transfers; CASA foreign shares rest on an unconfirmed heuristic; Way4 `is_international` = 96% (O59) | `feat_fx_leakage` is not evidence (D-A2-13); card and CASA "abroad" fields decided in v02 |
+
 ---
 
 ## 11. Refactor plan (bundle 05, after the §10 checks)

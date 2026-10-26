@@ -4,13 +4,34 @@ Give this to the workplace Sonnet in UAT after it has finished A2 v01 (it reuses
 findings). Same flow (Sonnet writes, you run in PROD, Sonnet analyses), folder
 `tmp_validation/a2_v02/`. Run for `cc_60_180` and `rl_60_180`; add `cc_180_plus` and
 `rl_180_plus` if the run time allows (switch `model_id` in `globals_dev.yml`). Paste back
-`summary.md` (part C).
+the Part 0 section of `tmp_validation/a2_v01/summary.md` first, then `summary.md` (part C).
 
 ````text
 Task: measure how often the proposed A2 travel rule fires in PROD, how sensitive it is to its two
 thresholds, and how it compares with alternatives; and find out how to tell in-person credit-card
 use from online use, comparing the options. You work in UAT with no data: you write a
 validation snippet, the user runs it in PROD. Change no pipeline code.
+
+0. First, finish A2 v01 (no PROD run except the last item). From
+   tmp_validation/a2_v01/results_cc_60_180.json and results_rl_60_180.json, append a section
+   "## Part 0 — follow-ups" to tmp_validation/a2_v01/summary.md (under 50 lines, CC and RL
+   side by side, numbers only as they are in the JSONs; write NOT IN JSON when absent):
+   - t1: the day-of-month distribution of dcore_observation_spine.observation_date, and
+     exactly how the snippet's "exact" join compared dates (the CC obs base is on month ends;
+     an exact match of 99.92% means either month-end spine dates or a month comparison);
+   - t2: the top 50 result_name values on none of the lists, each with action_code,
+     result_category and share of events; and for CALL CONNECTED, LEFT_MSG, Result Not Found,
+     Follow up, E mail Sent, "Skip - Under Tracing/Traced", RPO case *, Vehicle Repossesed /
+     Under Auction, Legal notice Sent: their (action_code, result_category) counts;
+   - t4: stg_digital_login rows by is_foreign_login x (both country columns NULL); per raw
+     source, the NULL sessionid share, and rows vs distinct non-NULL sessionid;
+   - t5: per source, the share of base CIFs with any row in 12 months, with a foreign row and
+     with a travel row, including prm_transaction and the WM CIF features if they were run
+     (say which were not);
+   - t6: prm_contract day-of-month of its date column and how the exact join compared dates;
+     block code D counts (block_code_1 / block_code_2);
+   - re-run t6 only for rl_60_180 (the demographics sub-table) and add its deceased count.
+   Commit and push that summary before writing the v02 snippet.
 
 The location rules (checked in order; dates on or before the observation date):
   L1 Skip        there is foreign evidence dated on or after the latest UAE evidence
@@ -48,6 +69,9 @@ A. Inventory first (read only; append to README.md, under 50 lines). Credit card
       is); every key in add_info that the repo parses or documents (the DOMESTIC= flag comes
       from there, prm_cc.py:375-381) — look for POS entry mode, e-commerce / card-not-present,
       terminal type, ATM indicators; how cash advances (ATM) are marked (MCC 6011, txn type).
+      is_international is 1 on 96% of crx_cc_transactions rows in PROD (v01 t5) — far above
+      the 28% travel-MCC share — so its meaning is in doubt: list every add_info key that
+      contains DOMESTIC, and what the code or docs say each holds.
    A2 Debit cards / CASA — two candidate routes, answer for both:
       (a) comp_financial_tran_repos_dly, the raw CASA transaction table (would need a new
           reusable primary node): which rows are debit-card use at all (vs transfers, standing
@@ -96,7 +120,10 @@ B. PROD snippet: tmp_validation/a2_v02/a2_v02_snippet.py plus README.md with the
    t7a_credit_card credit-card purchases and cash advances in the 12 months before the
                    observation date, base CIFs: value counts (top 50) of each candidate
                    card-present / channel field from A1, split domestic / international; ATM
-                   share. Then for each option, the base rows whose latest foreign evidence
+                   share. First the domestic flag itself: rows by the raw DOMESTIC= value
+                   (Y / N / other / absent, per add_info key from A1) x transaction currency
+                   (AED / other / NULL), and x (MCC 6011 / travel MCC / other); verdict on
+                   which value means "abroad" before any option uses it. Then for each option, the base rows whose latest foreign evidence
                    comes from credit-card use, and the rows decided Skip by L1 because of it:
                      C1 the card-present field from A1 (if found);
                      C2 ATM + in-person merchant categories only: grocery 5411/5422/5441/5451/

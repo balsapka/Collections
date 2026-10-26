@@ -235,6 +235,20 @@ packages' `__init__.py` files and the catalog entries of the `raw_digital_*` / `
 Uncertain glyphs: `×` in "(cif_id × month_number)" (box glyph on screen); separator lengths
 approximate. Args-description column in the staging docstring read as column 40.
 
+### PROD results handoff (2026-10-26, no photos)
+
+The user could not move photos; a chat session transcribed 5 screen photos into
+`pics/claude_code_handoff.md` (OCR quality). No code was on them. Filed as:
+
+- A1: B03 OUTPUT + B03 INCOME → `bundle_helpers/b03/b03_check_results.md` (sums check out).
+- A2: v01 `summary.md` (t1–t7, cc_60_180 + rl_60_180) →
+  `bundle_helpers/b04_a2/sonnet_a2_v01_summary.md`, with the review; O59.
+- Context only (Teams, DE on RL restructure predecessor matching, cf. T18 succession link):
+  unmatched restructurings are Home → Personal cross-family ones, those before 2018-01 (no
+  data), **Auto restructured since 2025-12** (the current history table has no Auto loans;
+  a new table is recommended), and 531 loans whose predecessor is missing; 7 loans match through
+  a two-step chain. Relevant to RL history-based features (A1 RL, A4) for Auto.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
