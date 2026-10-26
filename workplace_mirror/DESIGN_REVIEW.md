@@ -222,9 +222,9 @@ loan primary, so the RL anchor node reads it directly (obs base + one dataset):
 0 → flat floors. Its payment columns (`total_paid`, `emi_paid/missed/partial_flag`) and
 `feat_loan_emi` (missed / partial / paid counts, discipline rate, coverage ratio per 1/3/6/12 M)
 describe payment behaviour, not ability: they stay out of A1 (A3 territory); the waterfall's
-EMI-coverage arms go. Open for RL (user): whether `feature_retail_loans`' AECB salary (an application-time
-value) still adds anything once the monthly bureau salary covers every CIF; rl_180_plus now or
-later (cc_180_plus is skipped for now). Bundle numbers: the next free one when built — A2's
+EMI-coverage arms go. Decided (user, 2026-10-26): `feature_retail_loans`' application-time
+AECB salary is dropped (the monthly bureau salary covers every CIF); rl_60_180 first,
+rl_180_plus later (as cc_180_plus). Bundle numbers: the next free one when built — A2's
 refactor waits on v02, so A1's bundles may come first.
 
 ## 7. Data layers (decided 2026-10-23)
