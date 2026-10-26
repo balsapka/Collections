@@ -16,3 +16,16 @@ grep -rnE "crx_cc_departure_signature|crx_cc_payment_trajectory|crx_cc_utilisati
 ```
 
 Empty output means nothing outside the persona code reads them.
+
+## R5 — bureau primary pipeline (for `prm_bureau_salary_history`, user 2026-10-26)
+
+Photograph in full, with the editor breadcrumb visible:
+
+- `src/enbd_collections/nodes/primary/bureau/prm_bureau.py` (the whole file: `_join_cif_bridge`,
+  `build_cif_bridge`, the payment-order / court-case builders and the models they project to)
+- `src/enbd_collections/pipelines/bureau/primary.py`
+- the `prm_bureau_*` entries of `conf/base/catalog/catalog_outputs.yml` (lines ~479–501) and
+  the `stg_aecb_salary_history` entry (~140)
+- the salary-history part of `src/enbd_collections/pipelines/bureau/staging.py` (lines ~40–60)
+  and of the primary models file if a `BureauSalary…` model exists
+  (`data_engineering/primary/models/bureau.py`)

@@ -277,8 +277,8 @@ every CIF-level feature; it adds an EMI feature from its loan primary.
 | signals | reachability | obs base + `dcore_prm_followup_outcomes` + `prm_dcore_account_agreements` (code lists stay here) |
 | signals | deceased | obs base + `dcore_prm_followup_outcomes`, `prm_contract`, `prm_demographics` (not `feat_demographics_cif`) |
 
-**Open (user):** (1) add `prm_bureau_salary_history` to the bureau primary pipeline now
-(needs photos of `prm_bureau.py` and `pipelines/bureau/primary.py`), or wait for GRR's feed; (2) feature nodes that reshape WM
+**Decided (user, 2026-10-26):** `prm_bureau_salary_history` goes into the bureau primary
+pipeline now (photos: REQUESTS R5). **Open (user):** (2) feature nodes that reshape WM
 features count as single-layer; (3) the A1 relayering ships as its own bundle after bundle 05.
 
 ### First primary: `prm_casa_return_events` (bundle 03)
