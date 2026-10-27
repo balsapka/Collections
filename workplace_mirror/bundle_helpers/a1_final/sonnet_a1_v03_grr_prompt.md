@@ -71,29 +71,25 @@ B. Tables:
                   bureau salary month, both, neither; the median age in months of the latest
                   salary per source; how often the 2 x anchor bar (not the 3000 floor) is what
                   W1 / W3 rows miss.
-   v2b_salary_timing  (user, 2026-10-27: an employer may pay a few days early, e.g. before a
-                  weekend, so one month gets two salary credits and the next none). The engine
-                  keeps the larger credit per calendar month and counts months, so a shift looks
-                  like a missing month: it can fail the weakening check, and two salaries in m3
-                  with none in m2 count as 1 of 3. From _internal_salary over 24 months, base
-                  CIFs, distinct (cif_id, credit date, amount): credits by day of month (1-5 /
-                  6-24 / 25-31); share of CIF-months with 2+ credits >= 1000, and of those the
-                  share whose next month has none; the gap in days between consecutive credits
-                  (0-6 / 7-19 / 20-24 / 25-35 / 36+). Recovery check first: each weekly snapshot
-                  gives one credit date (week_number - ft_days_since_salary_transaction); for
-                  consecutive snapshots with the same ft_last_salary_amount, how often the derived
-                  dates differ (0 / 1-3 / 4+ days); and the share of CIF-weeks where the amount
-                  and the date change although the gap to the previous snapshot is under 7 days
-                  (two credits inside one week: the earlier one is invisible). Then, for every
-                  row, the income level
-                  under two alternatives (crosstab engine level x alternative):
-                    (a) count salary credits instead of months: Stable = at least 2 internal
-                        credits >= the threshold in the window (3 at 180+), a bureau month >=
-                        the threshold counting as one credit when that month has no internal
-                        one; weakening on window totals (sum of distinct credits, or the bureau
-                        amount when larger) vs the prior window;
-                    (c) as (a), but two credits less than 20 days apart count as one (a bonus or
-                        allowance paid next to the salary is not a second salary).
+   v2b_salary_timing  ft_last_salary_amount is WM's monthly total of salary-flagged credits
+                  (bonus, incentive, overtime and commission included), dated to the first of the
+                  month and forward-filled weekly (bundle_helpers/a1_final/wm_salary_feature_logic.md
+                  in the mirror; your own reading of wealth_management income.py:17 / :1204 /
+                  :1308). An employer that pays early puts two salaries in one month and none in
+                  the next (user, 2026-10-27: confirmed in the data). From _internal_salary over
+                  24 months, base CIFs, one value per CIF-month:
+                  - history depth: earliest and latest salary month per CIF (p10/p50/p90 of the
+                    number of salary months), and whether months older than ~4 months before each
+                    weekly snapshot are present at all (the WM run looks back ~3 months);
+                  - "double" months: total >= 1.8x the CIF's median monthly total; of those, the
+                    share whose next month (or previous) has no salary (early-pay pattern) vs
+                    both neighbours present (bonus pattern);
+                  - whether our catalog can load WM's monthly primary pri_salary_from_casa_txns
+                    (month_sum, salary_count): its catalog entry, or NOT FOUND and where you looked;
+                  - for every row, the income level under (1) the window-total rule: Stable =
+                    salary received in the window >= 2 x the threshold (3 x at 180+) and the
+                    window total not more than 25% below the prior window's; crosstab engine
+                    level x (1), split by whether the window holds a double month.
    v2c_eos        end-of-service (EOS / EOSB) payments. The user confirmed that
                   wm_fea_salary_days_since_increment does not count EOS as salary, so only the
                   bureau sources can carry it. Base CIFs, 24 months: share with a bureau salary
@@ -132,8 +128,8 @@ C. After the user commits the results: read results_cc_60_180.json and save
    1. the state distribution, one line;
    2. per state (High, Moderate, Low, Unknown): the share, the rule path that produces most of
       it (v1 / v6), and the 2-3 numbers that explain it;
-   3. Salary timing (v2b): how often an early payment empties a month, and how many rows
-      alternatives (a) / (c) move between levels (and states); EOS (v2c): how often a bureau month
+   3. Salary timing (v2b): history depth, how often a month doubles (early pay vs bonus), and
+      how many rows the window-total rule (1) moves between levels (and states); EOS (v2c): how often a bureau month
       looks like an EOS spike, and where the EOSB-noted rows end up.
    4. "What information is missing": income (v2: the N1-N4 split, internal vs bureau
       coverage), liquidity (v3: no CASA vs low balance), and what the GRR bureau salary feed
