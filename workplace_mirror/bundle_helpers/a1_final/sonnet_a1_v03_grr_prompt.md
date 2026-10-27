@@ -70,6 +70,16 @@ B. Tables:
                   bureau salary month, both, neither; the median age in months of the latest
                   salary per source; how often the 2 x anchor bar (not the 3000 floor) is what
                   W1 / W3 rows miss.
+   v2b_salary_timing  (user, 2026-10-27: an employer may pay a few days early, e.g. before a
+                  weekend, so one month gets two salary credits and the next none). The engine
+                  keeps the larger credit per calendar month, so such a shift looks like a missing
+                  month and can fail the weakening check. From _internal_salary over 24 months,
+                  base CIFs, distinct (cif_id, credit date, amount): credits by day of month
+                  (1-5 / 6-24 / 25-31); share of CIF-months with 2+ credits >= 1000, and of
+                  those the share whose next month has none; then, for the W1 and W2 rows, how
+                  many would be Stable if (a) each month's internal income were the sum of its
+                  distinct credits, or (b) a credit in a month's last 5 days moved to the next
+                  month when that month has none.
    v3_liquidity_why rows by liquidity level and reason:
                     none   L1 no CASA balance row for the CIF in the 12 months (no CASA with us);
                               L2 CASA rows but every month in m1-m3 < 1000 or missing
@@ -99,12 +109,14 @@ C. After the user commits the results: read results_cc_60_180.json and save
    1. the state distribution, one line;
    2. per state (High, Moderate, Low, Unknown): the share, the rule path that produces most of
       it (v1 / v6), and the 2-3 numbers that explain it;
-   3. "What information is missing": income (v2: the N1-N4 split, internal vs bureau
+   3. Salary timing (v2b): how often an early payment empties a month, and how many rows
+      options (a) / (b) would make Stable.
+   4. "What information is missing": income (v2: the N1-N4 split, internal vs bureau
       coverage), liquidity (v3: no CASA vs low balance), and what the GRR bureau salary feed
       would change (rows in N1/N2-N4 whose CIF has a bureau pull but no bureau salary);
-   4. distress: sources and their overlap (v4);
-   5. the anchor's effect (v7) and month-to-month stability (v8);
-   6. the recomputation check (mismatch count).
+   5. distress: sources and their overlap (v4);
+   6. the anchor's effect (v7) and month-to-month stability (v8);
+   7. the recomputation check (mismatch count).
    No code proposals; numbers from the JSON only. Commit and push.
 
 D. RL (rl_60_180), and the activity gate for both. The same snippet must run for RL: pick the
