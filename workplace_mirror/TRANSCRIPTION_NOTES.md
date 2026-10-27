@@ -253,6 +253,13 @@ The user could not move photos; a chat session transcribed 5 screen photos into
 - User, 2026-10-26: `cc_spine` and the DCORE inputs are still on mid-month billing dates in
   PROD (the month-end change is not rerun yet); A2 spec §2 and the v02 prompt say so.
 
+### Handoff 6 (2026-10-27, photos 13–26, no full files)
+
+Catalog format, `_ALERT_RENAMES`, `_join_cif_bridge`, `BureauSalaryHistory`, `BureauAlertEnriched`,
+the A1 consumers grep (R7) and the repo layout (R8) → `bundle_helpers/a1_final/workplace_reference.md`
+(partial files, so not under `src/`). The bureau salary model documents `reference_month` as
+YYYYMM while the CC v1 code reads the staging column as MMYYYY: checked in A1 v03 (v2).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

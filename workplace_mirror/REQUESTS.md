@@ -15,27 +15,17 @@ request unblocks.
 
 ## A1 — CC finish bundle (relayer + rename + delete v1, S12 salary rule, bureau bounces)
 
-### R5 — bureau, three snippets (blocks `prm_bureau_salary_history`, `prm_bureau_bounce_events`)
+### R5 — bureau, what is still missing (the rest arrived 2026-10-27, `bundle_helpers/a1_final/workplace_reference.md`)
 
-- `nodes/primary/bureau/prm_bureau.py`: `_ALERT_RENAMES` (~95–110), `_join_cif_bridge`
-  (~218–247) and one builder that calls it (e.g. the payment-order one);
-- `data_engineering/primary/models/bureau.py`: the `BureauAlertEnriched` class only (~844);
-- `pipelines/bureau/primary.py`: the `node(...)` block of that same builder;
-- `catalog_outputs.yml`: the anchors at the top, one `prm_bureau_*` entry, `feat_demographics_cif`.
+- `nodes/primary/bureau/prm_bureau.py`: `build_primary_dataframe` (its def or import) and one
+  Tier B builder that uses it with `_join_cif_bridge` (e.g. the credit-score one, ~180–210);
+- `pipelines/bureau/primary.py`: that builder's `node(...)` block;
+- the salary-history node of `pipelines/bureau/staging.py` (the `stg_aecb_salary_history` column
+  names: provider number, transfer count, `EDP_LOAD_DATE`).
 
-### R7 — who reads the A1 outputs (before v1 and the RL waterfall are deleted)
+### R8 — still missing (the layout arrived 2026-10-27)
 
-```bash
-grep -rnE "crx_cc_a1_|crx_rl_a1_|cc_a1_ability|rl_a1_ability" src conf | grep -vE "pipelines/crx_persona/(cc|rl)_a1_ability(_v2)?/"
-```
-
-### R8 — layer conventions (where new primary / feature nodes and catalog entries go)
-
-```bash
-find src/enbd_collections -maxdepth 3 -type d -not -path "*/__pycache__*" | sort && ls conf/base/catalog conf/base/parameters
-```
-
-Plus the `node(...)` block that builds `feat_demographics_cif` (its pipeline file), and the
+The `node(...)` block that builds `feat_demographics_cif` (its pipeline file), and the
 `raw_beneficiary_cards` catalog entry (for `prm_beneficiary_cards`).
 
 ## A2 — the refactor bundle (login fixes, location layer, engine, reachability, deceased)

@@ -67,6 +67,10 @@ B. Tables:
                               threshold
                     stable by source of the qualifying months: internal only / bureau only /
                               both
+                  First, the bureau month format: stg_aecb_salary_history.subj_salcr_hist_ref_mnth
+                  parsed as MMyyyy (what the engine does) vs yyyyMM (the DE model
+                  BureauSalaryHistory documents reference_month as YYYYMM): NULL share of each
+                  parse, and 10 distinct raw values (they are month codes, not customer data).
                   Also: share of base CIFs with any internal salary month in 24 months, any
                   bureau salary month, both, neither; the median age in months of the latest
                   salary per source; how often the 2 x anchor bar (not the 3000 floor) is what

@@ -212,7 +212,7 @@ The CC month-end output is in PROD (bundle 03 Step 9 matched the check). A1 is c
 | Step | What | Needs | PROD check |
 |---|---|---|---|
 | a | GRR initial results: why each state fires, what information is missing (`bundle_helpers/a1_final/sonnet_a1_v03_grr_prompt.md`, cc_60_180) → results note | the Sonnet run | — |
-| b | **CC finish bundle** (+ spec S12 salary-credit count, S13 EOS exclusion, sized by v03): `prm_bureau_salary_history` + `prm_beneficiary_cards`, the monthly features (§7), signals on obs base + features; rename `cc_a1_ability_v2` → `cc_a1_ability`, `crx_cc_a1_ability_v2` → `crx_cc_a1_ability`; delete CC v1 (`cc_a1_ability/` and its `crx_cc_a1_group_*` entries); Sonnet updates the 2 tests | R5 photos | new vs the current `crx_cc_a1_ability_v2` (kept as a temporary baseline): changes only on rows whose bureau distress moves (first-report dating cuts bureau flags ~23%) |
+| b | **CC finish bundle** (+ spec S12 window-total salary, S13 bureau EOS spikes if any, sized by v03): `prm_bureau_salary_history` + `prm_beneficiary_cards`, the monthly features (§7), signals on obs base + features; rename `cc_a1_ability_v2` → `cc_a1_ability`, `crx_cc_a1_ability_v2` → `crx_cc_a1_ability`; delete CC v1 (`cc_a1_ability/` and its `crx_cc_a1_group_*` entries); Sonnet updates the 2 tests | R5 photos | new vs the current `crx_cc_a1_ability_v2` (kept as a temporary baseline): changes only on rows whose bureau distress moves (first-report dating cuts bureau flags ~23%) |
 | c | **RL bundle**: RL wrapper on the engine (EMI anchor via a loan feature, the same CIF features), delete the RL waterfall (`rl_a1_ability/` + `crx_rl_a1_group_*`) | decisions below | distribution + crosstab vs the RL waterfall |
 | d | v03 for rl_60_180, then the A1 final report (CC + RL) for GRR | c | — |
 
@@ -278,17 +278,23 @@ of" stay in the signal layer. Monthly features also absorb the mid-month source 
 
 | Layer | Dataset | Built from | Holds |
 |---|---|---|---|
-| primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history`, `prm_bureau_cif_bridge` | `cif_id`, salary month, amount. None exists today: the bureau primary pipeline (`pipelines/bureau/primary.py:17-55`) builds the bridge, alert, credit score, consolidated summary, court case and payment order, but salary stops at staging. Added there with the same `_join_cif_bridge` (`prm_bureau.py:218-247`) |
-| primary (new) | `prm_bureau_bounce_events` | `stg_aecb_alert` | one row per bureau bounce: key `(cif_id, CONTRACT_TYPE, ALERT_DESC)`, a new event whenever the key's bounced amount differs from its previous bounced pull (first report, rise or fall) or follows a non-bounced row; identical consecutive repeats dropped (user, 2026-10-26, until GRR confirms what the amount means) |
+| primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history` | the DE's own model `BureauSalaryHistory` (`models/bureau.py:465`, never built): `bureau_file_id`, `reference_month`, `provider_no`, `edp_load_date`, `total_salary_amount`, `transfer_count`, …; no `cif_id` (as the other Tier B primaries before the bridge). Built in the bureau primary pipeline like the other Tier B tables (`build_primary_dataframe`) |
+| feature (not a primary) | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` (has `cif_id`, `contract_type`, `alert_description`, `bounced_cheque_amount`, `extract_date`) | bureau bounce events per CIF × month: per key `(cif_id, contract_type, alert_description)`, a new event whenever the bounced amount differs from the key's previous bounced pull or follows a non-bounced row; identical consecutive repeats dropped (user, until GRR confirms the amount) — no staging read needed |
 | primary (new) | `prm_beneficiary_cards` | `raw_beneficiary_cards` | `cif_id`, registered card number |
 | feature | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` | WM-recovered salary per month |
-| feature | `feat_cif_bureau_salary_monthly` | `prm_bureau_salary_history` | bureau salary per month |
+| feature | `feat_cif_bureau_salary_monthly` | `prm_bureau_salary_history` + `prm_bureau_cif_bridge` (join on `bureau_file_id` × `edp_load_date`, as `_join_cif_bridge`) | bureau salary per CIF × month (largest reported total across providers and pulls) |
 | feature | `feat_cif_casa_monthly` | `wm_fea_casa_eod_avg_balance`, `wm_fea_casa_cc_inflow_outflow` | month's balance (4-week average, last snapshot), any inflow / outflow |
 | feature | `feat_cif_ext_card_payment_monthly` | `wm_pri_labelled_transactions`, `prm_beneficiary_cards` | largest single payment to a registered card |
 | feature | `feat_cif_returns_monthly` | `prm_casa_return_events` | return events per reason (cheque, DDS, POS reversal) |
-| feature | `feat_cif_bureau_bounces_monthly` | `prm_bureau_bounce_events` | bureau bounce events per month |
 | feature | `feat_cc_balance_month_end` | `prm_balance` | overdue buckets 01–08 on the month's latest snapshot, per contract |
 | signals | income / liquidity / distress / anchor | obs base + the features above | windows, thresholds, reason list, larger-of |
+
+Placement (R8, handoff 6): nodes in `nodes/primary/bureau/`, `nodes/features/{bureau,casa}/`,
+pipelines in `pipelines/bureau/` (primary / features) and `pipelines/casa/`; catalog entries
+`<<: *spark_de` with `folders.prm` / `folders.feat` paths (`bundle_helpers/a1_final/workplace_reference.md`).
+`catalog_outputs.yml` is not mirrored, so the bundle puts the new entries in our own catalog files
+(`catalog_casa.yml`, a new `catalog_bureau.yml`). R7: nothing outside the A1 packages reads the CC
+v1 / RL waterfall outputs (registry, tests and docstrings only).
 
 `crx_cc_a1_internal_returns` disappears (the distress node reads two features). RL A1 reuses
 every CIF-level feature; it adds an EMI feature from its loan primary.
