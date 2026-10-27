@@ -15,17 +15,13 @@ request unblocks.
 
 ## A1 — CC finish bundle (relayer + rename + delete v1, S12 salary rule, bureau bounces)
 
-### R5 — bureau pipeline (blocks `prm_bureau_salary_history`, `prm_bureau_bounce_events`)
+### R5 — bureau, three snippets (blocks `prm_bureau_salary_history`, `prm_bureau_bounce_events`)
 
-- `src/enbd_collections/nodes/primary/bureau/prm_bureau.py` — the whole file (`_join_cif_bridge`,
-  `build_cif_bridge`, `build_alert_enriched`, `_ALERT_RENAMES`, the payment-order / court-case
-  builders);
-- `src/enbd_collections/pipelines/bureau/primary.py` and `pipelines/bureau/staging.py` (the
-  salary-history and `stg_aecb_alert` nodes);
-- `data_engineering/primary/models/bureau.py`: `BureauAlertEnriched` and any salary model;
-- `conf/base/catalog/catalog_outputs.yml` — only three snippets (the format for new entries):
-  the YAML anchors at the top (`_spark_de` and the like), one `prm_bureau_*` entry (e.g.
-  `prm_bureau_payment_order`, ~479–501) and `feat_demographics_cif` (~1127–1129).
+- `nodes/primary/bureau/prm_bureau.py`: `_ALERT_RENAMES` (~95–110), `_join_cif_bridge`
+  (~218–247) and one builder that calls it (e.g. the payment-order one);
+- `data_engineering/primary/models/bureau.py`: the `BureauAlertEnriched` class only (~844);
+- `pipelines/bureau/primary.py`: the `node(...)` block of that same builder;
+- `catalog_outputs.yml`: the anchors at the top, one `prm_bureau_*` entry, `feat_demographics_cif`.
 
 ### R7 — who reads the A1 outputs (before v1 and the RL waterfall are deleted)
 
@@ -39,36 +35,26 @@ grep -rnE "crx_cc_a1_|crx_rl_a1_|cc_a1_ability|rl_a1_ability" src conf | grep -v
 find src/enbd_collections -maxdepth 3 -type d -not -path "*/__pycache__*" | sort && ls conf/base/catalog conf/base/parameters
 ```
 
-Plus one existing feature node as the style reference: `feat_demographics_cif.py` and its
-pipeline file, and the `raw_beneficiary_cards` and `wm_pri_labelled_transactions` catalog
-entries (for `prm_beneficiary_cards`).
-
-### R6 — retail loan pipeline (low priority: RL A1 already ships with `installment_due_amount`)
-
-The node building `int_loan_master` (`monthly_emi_due` / `total_paid` / `emi_*_flag`, the
-tolerance parameters) and its pipeline file; `feat_loan_emi` for reference (A3).
+Plus the `node(...)` block that builds `feat_demographics_cif` (its pipeline file), and the
+`raw_beneficiary_cards` catalog entry (for `prm_beneficiary_cards`).
 
 ## A2 — the refactor bundle (login fixes, location layer, engine, reachability, deceased)
 
-### R9 — DCORE (blocks reachability and `prm_dcore_account_agreements`)
+### R9 — DCORE, one file + one entry (blocks `prm_dcore_account_agreements`)
 
-- `pipelines/dcore/*.py` (staging + primary pipeline files);
-- `nodes/staging/dcore/stg_dcore_observation_spine.py`, `stg_dcore_scope_agreements.py`;
-- `nodes/primary/dcore/prm_dcore.py` (`build_followup_outcomes`, ~217–257);
-- the raw DCORE catalog file (not `catalog_outputs.yml`) — in particular the raw table that maps
-  an agreement to its account / contract.
+`nodes/staging/dcore/stg_dcore_observation_spine.py` (~24–92: where `agreement_id` comes from and
+how it joins the spine), and the raw catalog entry of the DCORE table it reads for that.
 
-### R10 — deceased sources
+### R10 — deceased, two output selects
 
-- `pipelines/credit_card_way4/primary.py` and `nodes/primary/.../prm_cc.py` `build_contract`
-  (~473–521, block codes);
-- `prm_demographics.py` (the `deceased_flag`, ~91).
+The final `select` of `prm_cc.build_contract` (~473–521: the block-code column names) and of
+`prm_demographics.py` (~85–95: key and `deceased_flag`).
 
-### R11 — card spend (location evidence; v02 picks the fields)
+### R11 — card spend, after v02
 
-`prm_cc.py` `build_transaction` (~330–420, including the `DOMESTIC=` parse ~375–381).
+The final `select` of `prm_cc.build_transaction` and the `DOMESTIC=` parse (~375–381).
 
-### R12 — CASA spend sources (v02 picks the route; the entries are small, send both now)
+### R12 — CASA spend source, after v02 (only the entry of the route v02 picks)
 
 The catalog entries of `wm_pri_labelled_transactions_indicators_by_week`
 (`catalog_casa_plus_ftr.yml`) and `comp_financial_tran_repos_dly`.
@@ -83,7 +69,5 @@ grep -rnE "crx_cc_departure_signature|crx_cc_payment_trajectory|crx_cc_utilisati
 
 Empty output means nothing outside the persona code reads them.
 
-### R13 — results splits on the obs base
-
-`spine_builders.py`: where `cc_spine` / `rl_spine` get `loan_type` (~56–64, 136) and
-`chargeoff_age_months` (CC ~309–342, RL ~72–94).
+(R13 dropped: the v01 inventory already gives `rl_spine.loan_type` and
+`chargeoff_age_months` on both spines.)
