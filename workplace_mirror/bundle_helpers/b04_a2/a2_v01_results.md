@@ -164,7 +164,7 @@ Source: the "Part 0 — follow-ups" section the Sonnet appended to `tmp_validati
 | t2 off-list codes | CALL CONNECTED CC 82,437 / RL 17,120 (OC); LEFT_MSG CC 33.3K / RL 8.7K; Result Not Found CC 211.5K / RL 34.2K; Follow up CC 122.2K / RL 48.4K; E mail Sent CC 89.0K / RL 25.9K; Skip - Under Tracing CC 13.4K / RL 0.7K; Skip - Traced CC 5.4K; RL legal / repossession codes ~2.6K; `result_category` not captured |
 | t4 logins (RL) | raw: NULL `sessionid` 0%, 964,684 rows all distinct; history: NULL 0.08%, 407,510 rows vs 300,487 distinct sessionids; `stg_digital_login` foreign 186,162 vs 1,046,782 (15.1%), both countries NULL 245 rows; CC not captured |
 | t5 12-month coverage (any / foreign / travel) | `feat_fx_leakage` CC 99.93 / 36.21 / 0%, RL 99.84 / 55.53 / 0%; `crx_cc_transactions` CC 99.97 / 96.35 / 28.32%; `comp_financial_tran_repos_dly` CC 65.27 / 50.71 / 10.65%, RL 100 / 70.39 / 19.77%; `feat_cc_txns_rfs` path not found; `prm_transaction` and the WM CIF features not run |
-| RL demographics | not captured (the coupled try/except hid it); the fixed snippet needs a t6 re-run for `rl_60_180` |
+| RL demographics | not captured (the coupled try/except hid it); dropped (user, 2026-10-27): the A2 bundle's check run gives the RL deceased share |
 
 ### Review
 
@@ -186,5 +186,5 @@ Source: the "Part 0 — follow-ups" section the Sonnet appended to `tmp_validati
    and `comp_financial_tran_repos_dly` 50.7% CC / 70.4% RL. In both, "foreign" probably means
    something other than "used abroad". v02 has to define foreign per source before any card or
    CASA evidence enters the engine.
-6. **Still open:** the RL demographics t6 re-run, and `prm_transaction` and the WM CIF
+6. **Still open:** `prm_transaction` and the WM CIF
    features in t5 (v02 covers them).
