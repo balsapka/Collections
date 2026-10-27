@@ -44,7 +44,8 @@ A. Write tmp_validation/a1_v03/a1_v03_snippet.py and README.md (run steps).
    _bureau_salary, _casa_by_month and the distress reason list). Check: your recomputed
    income / liquidity level and state equal the output's on every row (log the mismatch
    count; it must be 0).
-   Datasets: crx_cc_a1_ability_v2, crx_cc_obs_base, crx_cc_a1_income_signals,
+   Datasets (add dcore_prm_followup_outcomes and the DCORE account -> agreement map for v2c):
+   crx_cc_a1_ability_v2, crx_cc_obs_base, crx_cc_a1_income_signals,
    crx_cc_a1_liquidity_signals, crx_cc_a1_distress_signals, crx_cc_a1_internal_returns,
    crx_cc_a1_liquidity_anchor, wm_fea_salary_days_since_increment, stg_aecb_salary_history,
    prm_bureau_cif_bridge, prm_bureau_alert_enriched, wm_fea_casa_eod_avg_balance.
@@ -87,6 +88,17 @@ B. Tables:
                         amount when larger) vs the prior window;
                     (c) as (a), but two credits less than 20 days apart count as one (a bonus or
                         allowance paid next to the salary is not a second salary).
+   v2c_eos        end-of-service (EOS / EOSB) payments. The engine has no EOS rule; the old RL
+                  code flagged a salary credit > 3x the customer's median monthly salary (months
+                  7-24 back) with the last salary <= 90 days before the reference date. First
+                  (part A): how wm_fea_salary_days_since_increment decides that a credit is a
+                  salary (source, codes / narration, whether a bonus or EOS can be the "last
+                  salary"), quoting file:line. Then, base CIFs, from _internal_salary over 24
+                  months: share with a recovered credit > 3x their median credit of the 12 months
+                  before it; of those, the share with no further credit afterwards; how many rows
+                  have such a credit in the window, and their income level / state. Also DCORE
+                  result names mentioning EOSB (EXPECTING EOSB, RECEIVED EOSB, KSA/EOSB, ...):
+                  base rows with one in 24 months, by A1 state.
    v3_liquidity_why rows by liquidity level and reason:
                     none   L1 no CASA balance row for the CIF in the 12 months (no CASA with us);
                               L2 CASA rows but every month in m1-m3 < 1000 or missing
@@ -117,7 +129,8 @@ C. After the user commits the results: read results_cc_60_180.json and save
    2. per state (High, Moderate, Low, Unknown): the share, the rule path that produces most of
       it (v1 / v6), and the 2-3 numbers that explain it;
    3. Salary timing (v2b): how often an early payment empties a month, and how many rows
-      alternatives (a) / (c) move between levels (and states).
+      alternatives (a) / (c) move between levels (and states); EOS (v2c): how often an EOS-like
+      credit counts as salary, and where those rows end up.
    4. "What information is missing": income (v2: the N1-N4 split, internal vs bureau
       coverage), liquidity (v3: no CASA vs low balance), and what the GRR bureau salary feed
       would change (rows in N1/N2-N4 whose CIF has a bureau pull but no bureau salary);
