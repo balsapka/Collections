@@ -23,8 +23,9 @@ request unblocks.
 - `src/enbd_collections/pipelines/bureau/primary.py` and `pipelines/bureau/staging.py` (the
   salary-history and `stg_aecb_alert` nodes);
 - `data_engineering/primary/models/bureau.py`: `BureauAlertEnriched` and any salary model;
-- `conf/base/catalog/catalog_outputs.yml`: the `stg_aecb_*` (~124–166) and `prm_bureau_*`
-  (~479–501) entries.
+- `conf/base/catalog/catalog_outputs.yml` — only three snippets (the format for new entries):
+  the YAML anchors at the top (`_spark_de` and the like), one `prm_bureau_*` entry (e.g.
+  `prm_bureau_payment_order`, ~479–501) and `feat_demographics_cif` (~1127–1129).
 
 ### R7 — who reads the A1 outputs (before v1 and the RL waterfall are deleted)
 
@@ -45,7 +46,7 @@ entries (for `prm_beneficiary_cards`).
 ### R6 — retail loan pipeline (low priority: RL A1 already ships with `installment_due_amount`)
 
 The node building `int_loan_master` (`monthly_emi_due` / `total_paid` / `emi_*_flag`, the
-tolerance parameters), its pipeline file and catalog entry; `feat_loan_emi` for reference (A3).
+tolerance parameters) and its pipeline file; `feat_loan_emi` for reference (A3).
 
 ## A2 — the refactor bundle (login fixes, location layer, engine, reachability, deceased)
 
@@ -54,19 +55,18 @@ tolerance parameters), its pipeline file and catalog entry; `feat_loan_emi` for 
 - `pipelines/dcore/*.py` (staging + primary pipeline files);
 - `nodes/staging/dcore/stg_dcore_observation_spine.py`, `stg_dcore_scope_agreements.py`;
 - `nodes/primary/dcore/prm_dcore.py` (`build_followup_outcomes`, ~217–257);
-- the `dcore_*` entries in `catalog_outputs.yml` and the raw DCORE catalog file — in particular
-  the raw table that maps an agreement to its account / contract.
+- the raw DCORE catalog file (not `catalog_outputs.yml`) — in particular the raw table that maps
+  an agreement to its account / contract.
 
 ### R10 — deceased sources
 
 - `pipelines/credit_card_way4/primary.py` and `nodes/primary/.../prm_cc.py` `build_contract`
-  (~473–521, block codes) + the `prm_contract` catalog entry;
-- `prm_demographics.py` (the `deceased_flag`, ~91) + the `prm_demographics` catalog entry.
+  (~473–521, block codes);
+- `prm_demographics.py` (the `deceased_flag`, ~91).
 
 ### R11 — card spend (location evidence; v02 picks the fields)
 
-`prm_cc.py` `build_transaction` (~330–420, including the `DOMESTIC=` parse ~375–381) + the
-`prm_transaction` catalog entry.
+`prm_cc.py` `build_transaction` (~330–420, including the `DOMESTIC=` parse ~375–381).
 
 ### R12 — CASA spend sources (v02 picks the route; the entries are small, send both now)
 
@@ -86,4 +86,4 @@ Empty output means nothing outside the persona code reads them.
 ### R13 — results splits on the obs base
 
 `spine_builders.py`: where `cc_spine` / `rl_spine` get `loan_type` (~56–64, 136) and
-`chargeoff_age_months` (CC ~309–342, RL ~72–94), and the `cc_spine` / `rl_spine` catalog entries.
+`chargeoff_age_months` (CC ~309–342, RL ~72–94).
