@@ -79,7 +79,13 @@ B. Tables:
                   CIFs, distinct (cif_id, credit date, amount): credits by day of month (1-5 /
                   6-24 / 25-31); share of CIF-months with 2+ credits >= 1000, and of those the
                   share whose next month has none; the gap in days between consecutive credits
-                  (0-6 / 7-19 / 20-24 / 25-35 / 36+). Then, for every row, the income level
+                  (0-6 / 7-19 / 20-24 / 25-35 / 36+). Recovery check first: each weekly snapshot
+                  gives one credit date (week_number - ft_days_since_salary_transaction); for
+                  consecutive snapshots with the same ft_last_salary_amount, how often the derived
+                  dates differ (0 / 1-3 / 4+ days); and the share of CIF-weeks where the amount
+                  and the date change although the gap to the previous snapshot is under 7 days
+                  (two credits inside one week: the earlier one is invisible). Then, for every
+                  row, the income level
                   under two alternatives (crosstab engine level x alternative):
                     (a) count salary credits instead of months: Stable = at least 2 internal
                         credits >= the threshold in the window (3 at 180+), a bureau month >=
