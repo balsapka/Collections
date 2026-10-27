@@ -7,6 +7,12 @@ Done requests are removed; their results are logged in `TRANSCRIPTION_NOTES.md`.
 The A1 test modules (`src/tests/pipelines/crx_persona/schema_registry.py`,
 `test_crx_persona.py`) are left to the workplace Sonnet, via the A1 bundle prompt.
 
+## Quickest route (UAT Sonnet 5.5, 2026-10-27)
+
+Give the UAT Sonnet `bundle_helpers/requests/sonnet_snippets_prompt.md`: it copies R4, R5, R8,
+R9, R10 and R11 verbatim into one file, `tmp_validation/mirror_requests/snippets.md`, which you
+then photograph or transcribe once. The items below stay as the reference list.
+
 ## How to send these
 
 Photos (breadcrumb visible) or a transcription `.md` in `pics/`, as before. For shell output,
