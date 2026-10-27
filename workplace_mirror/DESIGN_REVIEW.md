@@ -212,7 +212,7 @@ The CC month-end output is in PROD (bundle 03 Step 9 matched the check). A1 is c
 | Step | What | Needs | PROD check |
 |---|---|---|---|
 | a | GRR initial results: why each state fires, what information is missing (`bundle_helpers/a1_final/sonnet_a1_v03_grr_prompt.md`, cc_60_180) → results note | the Sonnet run | — |
-| b | **CC finish bundle**: `prm_bureau_salary_history` + `prm_beneficiary_cards`, the monthly features (§7), signals on obs base + features; rename `cc_a1_ability_v2` → `cc_a1_ability`, `crx_cc_a1_ability_v2` → `crx_cc_a1_ability`; delete CC v1 (`cc_a1_ability/` and its `crx_cc_a1_group_*` entries); Sonnet updates the 2 tests | R5 photos | new vs the current `crx_cc_a1_ability_v2` (kept as a temporary baseline): changes only on rows whose bureau distress moves (first-report dating cuts bureau flags ~23%) |
+| b | **CC finish bundle** (+ spec S12 salary-credit count, S13 EOS exclusion, sized by v03): `prm_bureau_salary_history` + `prm_beneficiary_cards`, the monthly features (§7), signals on obs base + features; rename `cc_a1_ability_v2` → `cc_a1_ability`, `crx_cc_a1_ability_v2` → `crx_cc_a1_ability`; delete CC v1 (`cc_a1_ability/` and its `crx_cc_a1_group_*` entries); Sonnet updates the 2 tests | R5 photos | new vs the current `crx_cc_a1_ability_v2` (kept as a temporary baseline): changes only on rows whose bureau distress moves (first-report dating cuts bureau flags ~23%) |
 | c | **RL bundle**: RL wrapper on the engine (EMI anchor via a loan feature, the same CIF features), delete the RL waterfall (`rl_a1_ability/` + `crx_rl_a1_group_*`) | decisions below | distribution + crosstab vs the RL waterfall |
 | d | v03 for rl_60_180, then the A1 final report (CC + RL) for GRR | c | — |
 
