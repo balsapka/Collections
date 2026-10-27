@@ -83,6 +83,7 @@ decisions by the user where the workbook and the earlier code disagreed:
 | S8 | External card payment | one payment ≥ max(AED 500, anchor) / ≥ AED 1,000 for Weak | largest single payment in the last 3 months |
 | S9 | Distress | cheque bounces and DDS returns, bureau **and internal**, across all the customer's accounts | bureau bounced cheques wired; `payment_order` and `internal_returns` slots ready. TODO(sonnet): find the internal returned-cheque / DDS-return source |
 | S10 | Window by segment (user, 2026-10-24) | the workbook's 3-month windows | **60–180: 3 months, 180+: 6 months**, the observation month included, as on every other axis; "2 of 3" becomes **3 of 6** at 180+; the prior window is the 6 months before; card payments, distress and CASA activity read the 6 months | `_common.window_months(model_id)`; `classify.MIN_MONTHS = {3: 2, 6: 3}` |
+| S11 | Unknown gate (user, 2026-10-27) | the *Signal* row (no CASA transaction) and the *Unknown* state text ("no CASA balance or transaction, no external card payment") disagree | the Signal row: Unknown = 0 points, no distress and no CASA transaction in the window; a CASA balance or an external card payment under the Weak floors does not rule it out | `classify.build_a1_ability` (`casa_active`) |
 
 Every customer-level signal is read across **all accounts of the CIF**. Local check:
 `workplace_mirror/checks/a1_engine_spec.py` — 25 cases built from the workbook rows, all
