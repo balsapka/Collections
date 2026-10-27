@@ -508,7 +508,8 @@ src/enbd_collections/pipeline_registry.py:253:        "crx_rl_departure_signatur
   spine is then inner-joined with `cc_spine` on (cif, contract, `observation_date`), so it
   carries `cc_spine`'s mid-month dates, and the highest `agreement_id` is kept per contract
   and date. `prm_dcore_account_agreements` = the same bridge without dates. The RL DCORE
-  source is not in the snippets (Part 0 shows an RL DCORE spine on month ends) → R9b.
+  source is not in the snippets, and not needed: the map is read off each model's own
+  `dcore_observation_spine` (distinct account × agreement), which exists for RL too.
 - **R10, deceased.** Block codes are `ContractSnapshot` fields on `prm_contract`
   (`block_code_1`, `block_code_2`, `block_code_2_date`); A2 Part 0: `D` only ever appears in
   `block_code_2`. Demographics: `cust_num → cif_id`, `cust_deceased_flg → deceased_flag` in

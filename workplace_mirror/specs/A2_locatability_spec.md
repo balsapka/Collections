@@ -267,7 +267,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | Check | Finding | Consequence |
 |---|---|---|
 | Dates | CC DCORE and `prm_contract` on day 9, RL DCORE on month ends; exact = same month = account-only join rates, so the snippet's base had the spine's own dates | Nothing changes: the engine never joins these on the date |
-| DCORE bridge (R9) | CC spine: `col_trn_agreement.iagreementseqno` → `agreement_id`, `szlegacyagreementno` = `spine_contracts_way4.personal_account` → contract; inner join on `cc_spine` (its dates); highest `agreement_id` kept | `prm_dcore_account_agreements` = this bridge without dates; the RL route is still open (R9b) |
+| DCORE bridge (R9) | CC spine: `col_trn_agreement.iagreementseqno` → `agreement_id`, `szlegacyagreementno` = `spine_contracts_way4.personal_account` → contract; inner join on `cc_spine` (its dates); highest `agreement_id` kept | `prm_dcore_account_agreements` = distinct (`account_id`, `agreement_id`) of the model's own `dcore_observation_spine` (CC and RL alike; one agreement per account, v01), so how RL builds its spine does not matter |
 | Way4 deceased | `D` only in `block_code_2` (232 CC rows) | D-A2-9 Way4 arm = `block_code_2 = 'D'` on the latest snapshot on or before the observation date |
 | Logins | RL: no-country rows 245 (0.02%); NULL `sessionid` 0.08%; history 26% duplicate sessionids | O53 / O54 fixes stay but move numbers little; the ~15% foreign login share is mostly real |
 | Card / CASA foreign | `prm_transaction` uses the same `DOMESTIC=` parse as `crx_cc_transactions` (96% foreign, O59); `comp_financial_tran_repos_dly` "foreign" 51% CC / 70% RL | v02 must define foreign per source before card or CASA evidence enters the engine |
