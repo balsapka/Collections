@@ -151,3 +151,40 @@ of `rl_60_180`, not a rounding error.
 
 All of these are already in the JSONs except RL demographics (a t6-only re-run). The v02
 prompt now opens with a Part 0 that appends them to `tmp_validation/a2_v01/summary.md`.
+
+## Part 0 — follow-ups (PROD, 2026-10-27)
+
+Source: the "Part 0 — follow-ups" section the Sonnet appended to `tmp_validation/a2_v01/summary.md`
+(uncommitted at work when photographed), from `pics/claude_code_handoff_8.md`. OCR quality.
+
+| Item | Result |
+|---|---|
+| t1 / t6 dates | Day-of-month peaks: CC DCORE day 9 (21,607), CC `prm_contract` day 9 (107,062), RL DCORE day 31 (9,021). Exact / same-month / account-only join rates are identical: DCORE CC 99.92%, RL 100%; `prm_contract` CC 100%, RL path does not exist (Way4 / CC only) |
+| Way4 block `D` | never in `block_code_1`; in `block_code_2` with H 149, G 35, P 24, J 13, none 11 → **232** (CC) |
+| t2 off-list codes | CALL CONNECTED CC 82,437 / RL 17,120 (OC); LEFT_MSG CC 33.3K / RL 8.7K; Result Not Found CC 211.5K / RL 34.2K; Follow up CC 122.2K / RL 48.4K; E mail Sent CC 89.0K / RL 25.9K; Skip - Under Tracing CC 13.4K / RL 0.7K; Skip - Traced CC 5.4K; RL legal / repossession codes ~2.6K; `result_category` not captured |
+| t4 logins (RL) | raw: NULL `sessionid` 0%, 964,684 rows all distinct; history: NULL 0.08%, 407,510 rows vs 300,487 distinct sessionids; `stg_digital_login` foreign 186,162 vs 1,046,782 (15.1%), both countries NULL 245 rows; CC not captured |
+| t5 12-month coverage (any / foreign / travel) | `feat_fx_leakage` CC 99.93 / 36.21 / 0%, RL 99.84 / 55.53 / 0%; `crx_cc_transactions` CC 99.97 / 96.35 / 28.32%; `comp_financial_tran_repos_dly` CC 65.27 / 50.71 / 10.65%, RL 100 / 70.39 / 19.77%; `feat_cc_txns_rfs` path not found; `prm_transaction` and the WM CIF features not run |
+| RL demographics | not captured (the coupled try/except hid it); the fixed snippet needs a t6 re-run for `rl_60_180` |
+
+### Review
+
+1. **Dates.** CC DCORE and `prm_contract` sit on day 9, so an exact-date join with a
+   month-end base cannot give 99.92%: the snippet's base must have carried the same mid-month
+   dates (most likely `cc_spine`), not `crx_cc_obs_base`. That does not matter for the engine,
+   which never joins these on the date (spec §2). RL DCORE is on month ends.
+2. **Way4 deceased = `block_code_2 = 'D'`**, whatever `block_code_1` is: 232 CC rows (the
+   row grain is not stated). This settles the column for D-A2-9.
+3. **t2:** the volumes back D-A2-17. The admin codes (Result Not Found, Follow up, E mail Sent)
+   are ~420K CC events, which is why list coverage looked low; they are dropped.
+4. **O53 is small and O54 is not the dedup problem we feared.** Only 245 RL login rows have no
+   country, so the 15.1% foreign share is mostly real (or VPN). NULL `sessionid` is 0.08%, so
+   collapsing NULLs barely matters; the history table, though, has 26% duplicate sessionids, so
+   the dedup itself is needed. The O53 / O54 fixes stay in the refactor bundle, but their effect
+   on the numbers will be small.
+5. **Foreign shares are too high to use as they are:** `crx_cc_transactions` 96.35% of CIFs
+   with a foreign row (O59: `prm_cc.build_transaction` has the same `DOMESTIC=` parse, handoff 9),
+   and `comp_financial_tran_repos_dly` 50.7% CC / 70.4% RL. In both, "foreign" probably means
+   something other than "used abroad". v02 has to define foreign per source before any card or
+   CASA evidence enters the engine.
+6. **Still open:** the RL demographics t6 re-run, and `prm_transaction` and the WM CIF
+   features in t5 (v02 covers them).

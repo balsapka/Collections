@@ -262,6 +262,17 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | 5 Login | `month_number` month end, `last_login_date` the real day; 12-month coverage 75% / 82%; history carries `sessionid` | O50 confirmed; O54 fix unchanged; foreign share (≈21%) awaits the O53 split |
 | 1–2 Location sources | `feat_fx_leakage` foreign = currency / cross-border transfers; CASA foreign shares rest on an unconfirmed heuristic; Way4 `is_international` = 96% (O59) | `feat_fx_leakage` is not evidence (D-A2-13); card and CASA "abroad" fields decided in v02 |
 
+### What v01 Part 0 and the snippets added (2026-10-27, `a2_v01_results.md` Part 0, handoff 9)
+
+| Check | Finding | Consequence |
+|---|---|---|
+| Dates | CC DCORE and `prm_contract` on day 9, RL DCORE on month ends; exact = same month = account-only join rates, so the snippet's base had the spine's own dates | Nothing changes: the engine never joins these on the date |
+| DCORE bridge (R9) | CC spine: `col_trn_agreement.iagreementseqno` → `agreement_id`, `szlegacyagreementno` = `spine_contracts_way4.personal_account` → contract; inner join on `cc_spine` (its dates); highest `agreement_id` kept | `prm_dcore_account_agreements` = this bridge without dates; the RL route is still open (R9b) |
+| Way4 deceased | `D` only in `block_code_2` (232 CC rows) | D-A2-9 Way4 arm = `block_code_2 = 'D'` on the latest snapshot on or before the observation date |
+| Logins | RL: no-country rows 245 (0.02%); NULL `sessionid` 0.08%; history 26% duplicate sessionids | O53 / O54 fixes stay but move numbers little; the ~15% foreign login share is mostly real |
+| Card / CASA foreign | `prm_transaction` uses the same `DOMESTIC=` parse as `crx_cc_transactions` (96% foreign, O59); `comp_financial_tran_repos_dly` "foreign" 51% CC / 70% RL | v02 must define foreign per source before card or CASA evidence enters the engine |
+| Demographics | `deceased_flag` projected through `CustomerGroupingXref` (O61); RL t6 re-run pending | Check the model's fields (R10b) |
+
 ---
 
 ## 11. Refactor plan (the A2 bundle — next free number, 06+ — after the §10 checks)
