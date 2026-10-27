@@ -191,7 +191,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-6 | Salary stop is not location evidence (it stays an A1 signal). |
 | D-A2-7 | Non-Reachable = last 3 attempt dates failed (ringing or dead line), oldest in `W`, no contact since; Reachable = confirmed contact in `W`; the 3-attempt minimum guards Non-Reachable only. |
 | D-A2-8 | DCORE: all history up to the observation date, no T0 (verified in PROD, §10). |
-| D-A2-9 | Deceased: DCORE note (claims included), Way4 `D`, demographics — any age. |
+| D-A2-9 | Deceased: DCORE note (claims included), Way4 `D`, demographics — any age. RL: DCORE + demographics only; the Way4 arm needs `prm_contract` run under the RL model, left out for now (user, 2026-10-27). |
 | D-A2-10 | Routing flags (promise to pay, hardship, refusing, field visit) leave A2. |
 | D-A2-11 | Output: both dimension columns, `deceased_flag`, and the combined `a2_state` with labels. |
 | D-A2-12 | Results are reported per model variant, RL split by product (Personal Loans, Personal Cash Loans, Auto); 180+ also by charge-off-age vintage (early-stage charge-off < 2 years / late-stage charge-off 2+ years), as on the deterioration axis. Model doc: `docs/locatability/a2_locatability_reference.xlsx`. |
