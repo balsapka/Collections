@@ -271,7 +271,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | Way4 deceased | `D` only in `block_code_2` (232 CC rows) | D-A2-9 Way4 arm = `block_code_2 = 'D'` on the latest snapshot on or before the observation date |
 | Logins | RL: no-country rows 245 (0.02%); NULL `sessionid` 0.08%; history 26% duplicate sessionids | O53 / O54 fixes stay but move numbers little; the ~15% foreign login share is mostly real |
 | Card / CASA foreign | `prm_transaction` uses the same `DOMESTIC=` parse as `crx_cc_transactions` (96% foreign, O59); `comp_financial_tran_repos_dly` "foreign" 51% CC / 70% RL | v02 must define foreign per source before card or CASA evidence enters the engine |
-| Demographics | `deceased_flag` projected through `CustomerGroupingXref` (O61); RL t6 re-run pending | Check the model's fields (R10b) |
+| Demographics | The pipeline works (user; the mirror copy is outdated, O61 closed); RL t6 re-run pending | D-A2-9 reads `feat_demographics_cif` as planned |
 
 ---
 

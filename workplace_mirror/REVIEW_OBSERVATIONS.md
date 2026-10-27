@@ -83,7 +83,7 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O58 | M | closed (bureau v01) | prm_bureau_alert_enriched | `DT_OF_RETURN` is renamed, then dropped by the model projection |
 | O59 | H | data check | cc_raw_extract / prm_cc | `is_international` (Way4 `DOMESTIC=N`) is 1 on 96% of card transactions in PROD |
 | O60 | L | confirmed | feature_retail_loans | `aecb_direct_debit_returns_6m` is declared but missing from the PROD table |
-| O61 | M | data check | prm_demographics | `build_customer_individual` projects through `CustomerGroupingXref`, which may drop `deceased_flag` |
+| O61 | M | closed | prm_demographics | `build_customer_individual` projects through `CustomerGroupingXref`, which may drop `deceased_flag` |
 | O62 | L | confirmed | data_engineering models / bureau | `BureauSalaryHistory.reference_month` documented as YYYYMM; staging says MMYYYY |
 
 ---
@@ -756,7 +756,10 @@ Declared in `feat_loan_application_risk.py` (bureau v01 inventory A.4) but NOT F
 `feature_retail_loans` table for `rl_60_180` (bureau v01 w8). The RL waterfall had already
 dropped it (RL-A1-14) and the new A1 does not read it; the declaration is dead.
 
-### O61 — Deceased flag may be dropped by the wrong model (M, data check)
+### O61 — Deceased flag may be dropped by the wrong model (M, closed)
+
+**Closed (user, 2026-10-27):** the demographics pipeline works; the mirror copy is outdated and
+that path no longer uses this table. No check needed.
 
 `prm_demographics.py:146–150`: `build_customer_individual` renames `cust_deceased_flg` to
 `deceased_flag` (`_CUSTOMER_INDIVIDUAL_RENAMES`, `:83–94`) and then returns

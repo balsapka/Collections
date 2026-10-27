@@ -512,7 +512,8 @@ src/enbd_collections/pipeline_registry.py:253:        "crx_rl_departure_signatur
 - **R10, deceased.** Block codes are `ContractSnapshot` fields on `prm_contract`
   (`block_code_1`, `block_code_2`, `block_code_2_date`); A2 Part 0: `D` only ever appears in
   `block_code_2`. Demographics: `cust_num → cif_id`, `cust_deceased_flg → deceased_flag` in
-  `build_customer_individual`, which projects through the `CustomerGroupingXref` model (O61).
+  `build_customer_individual`. The mirror copy of the demographics pipeline is outdated; the
+  real one works and no longer uses that table (user, O61 closed).
 - **R11.** `prm_cc.build_transaction` parses `DOMESTIC=(.)` from `add_info` exactly as
   `cc_raw_extract` does (`N` → international, anything else, missing included → domestic).
   The comment above it talks about `trans_country_code`, which the code does not read. So O59

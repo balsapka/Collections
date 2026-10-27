@@ -22,11 +22,6 @@ Part 0 found an RL DCORE spine on month ends. Wanted: the node that builds it (i
 function and its `node(...)` block), i.e. how an RL `account_id` maps to a DCORE
 `agreement_id`.
 
-### R10b — the `CustomerGroupingXref` field list (O61)
-
-The fields of `CustomerGroupingXref` in `src/data_engineering/primary/models/` (does it declare
-`deceased_flag`?), and the input datasets of the node that builds `int_customer_demographics`.
-
 ### R12 — CASA spend source, after v02 (only the entry of the route v02 picks)
 
 The catalog entries of `wm_pri_labelled_transactions_indicators_by_week`
