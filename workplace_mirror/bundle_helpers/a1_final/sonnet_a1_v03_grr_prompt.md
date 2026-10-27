@@ -57,6 +57,20 @@ A. Write tmp_validation/a1_v03/a1_v03_snippet.py and README.md (run steps).
 B. Tables:
    v1_states      state counts and shares; the decision table: income level x liquidity level
                   x distress flag -> state, with counts (every non-empty cell).
+   v0_bureau      the bureau pipeline was written by an earlier model and never validated (user,
+                  2026-10-27): treat its docstrings and pydantic models as unverified. Check the
+                  three bureau inputs A1 reads, base CIFs only:
+                  - prm_bureau_cif_bridge: rows per (bureau_file_id, edp_load_date) and distinct
+                    cif_id per bureau_file_id (1 / 2 / 3+), distinct bureau_file_id per cif_id;
+                    share of base CIFs present in the bridge; how cif_id is derived (part A, file:line);
+                  - stg_aecb_salary_history: subj_salcr_hist_ref_mnth parsed as MMyyyy (what the
+                    engine does) vs yyyyMM (the DE model documents YYYYMM): NULL share of each, and
+                    10 distinct raw values (month codes only); rows per (file id, month) across
+                    EDP_LOAD_DATE and per provider; the column list (part A);
+                  - prm_bureau_alert_enriched: share of base CIFs with any row; rows per
+                    (alert_process_id, edp_load_date); null shares of cif_id, contract_type,
+                    alert_description, bounced_cheque_amount, extract_date.
+                  Verdict per input: usable as is / usable with a named fix / not usable.
    v2_income_why  rows by income level and reason:
                     none   N1 no salary month from either source in the 24 months up to the
                               observation date; N2 the latest salary month is m4-m6;
@@ -67,10 +81,6 @@ B. Tables:
                               threshold
                     stable by source of the qualifying months: internal only / bureau only /
                               both
-                  First, the bureau month format: stg_aecb_salary_history.subj_salcr_hist_ref_mnth
-                  parsed as MMyyyy (what the engine does) vs yyyyMM (the DE model
-                  BureauSalaryHistory documents reference_month as YYYYMM): NULL share of each
-                  parse, and 10 distinct raw values (they are month codes, not customer data).
                   Also: share of base CIFs with any internal salary month in 24 months, any
                   bureau salary month, both, neither; the median age in months of the latest
                   salary per source; how often the 2 x anchor bar (not the 3000 floor) is what
@@ -129,6 +139,7 @@ B. Tables:
 
 C. After the user commits the results: read results_cc_60_180.json and save
    tmp_validation/a1_v03/summary.md, under 90 lines, written for a business reader (GRR):
+   0. the bureau inputs (v0): one verdict line each;
    1. the state distribution, one line;
    2. per state (High, Moderate, Low, Unknown): the share, the rule path that produces most of
       it (v1 / v6), and the 2-3 numbers that explain it;

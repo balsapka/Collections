@@ -15,13 +15,13 @@ request unblocks.
 
 ## A1 — CC finish bundle (relayer + rename + delete v1, S12 salary rule, bureau bounces)
 
-### R5 — bureau, what is still missing (the rest arrived 2026-10-27, `bundle_helpers/a1_final/workplace_reference.md`)
+### R5 — bureau, what is still missing
 
-- `nodes/primary/bureau/prm_bureau.py`: `build_primary_dataframe` (its def or import) and one
-  Tier B builder that uses it with `_join_cif_bridge` (e.g. the credit-score one, ~180–210);
-- `pipelines/bureau/primary.py`: that builder's `node(...)` block;
-- the salary-history node of `pipelines/bureau/staging.py` (the `stg_aecb_salary_history` column
-  names: provider number, transfer count, `EDP_LOAD_DATE`).
+The bureau pipeline is unvalidated (written by an earlier model — user, 2026-10-27), so
+`prm_bureau_salary_history` is written as our own explicit node (named columns, `require_columns`,
+no silent model projection) and does not copy `build_primary_dataframe`. Only needed: the
+salary-history node of `pipelines/bureau/staging.py` (the `stg_aecb_salary_history` column names).
+The rest arrived 2026-10-27 (`bundle_helpers/a1_final/workplace_reference.md`).
 
 ### R8 — still missing (the layout arrived 2026-10-27)
 

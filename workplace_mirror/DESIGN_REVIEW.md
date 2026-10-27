@@ -278,7 +278,7 @@ of" stay in the signal layer. Monthly features also absorb the mid-month source 
 
 | Layer | Dataset | Built from | Holds |
 |---|---|---|---|
-| primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history` | the DE's own model `BureauSalaryHistory` (`models/bureau.py:465`, never built): `bureau_file_id`, `reference_month`, `provider_no`, `edp_load_date`, `total_salary_amount`, `transfer_count`, …; no `cif_id` (as the other Tier B primaries before the bridge). Built in the bureau primary pipeline like the other Tier B tables (`build_primary_dataframe`) |
+| primary (new) | `prm_bureau_salary_history` | `stg_aecb_salary_history` | our own explicit node in the bureau primary pipeline: file id, salary month, provider, `edp_load_date`, total salary (the DE's unbuilt `BureauSalaryHistory` model is a naming guide only — the bureau pipeline is unvalidated, user 2026-10-27); named columns, `require_columns`, no model projection; bureau inputs checked first in A1 v03 (v0) |
 | feature (not a primary) | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` (has `cif_id`, `contract_type`, `alert_description`, `bounced_cheque_amount`, `extract_date`) | bureau bounce events per CIF × month: per key `(cif_id, contract_type, alert_description)`, a new event whenever the bounced amount differs from the key's previous bounced pull or follows a non-bounced row; identical consecutive repeats dropped (user, until GRR confirms the amount) — no staging read needed |
 | primary (new) | `prm_beneficiary_cards` | `raw_beneficiary_cards` | `cif_id`, registered card number |
 | feature | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` | WM-recovered salary per month |
