@@ -5,7 +5,8 @@ Give this to the workplace Sonnet in UAT. It reads the real CC A1 output
 before the rename. Same flow as v01 / v02 (Sonnet writes, you run in PROD, Sonnet analyses),
 folder `tmp_validation/a1_v03/`. Run for `cc_60_180` and, once bundle 05 Step 8 has written
 `crx_rl_a1_ability_v2`, for `rl_60_180` (`model_id` in `conf/dev/globals_dev.yml`). Paste back
-`summary.md` (part C). Part D adds two RL-only hypotheses (bundle 05 check: RL is 89.5% Low).
+`summary.md` (part C). Part D tests whether the activity gate fires on administrative records (CC and RL) and
+whether RL's DDS rejects are failed EMI collections (bundle 05 check: RL is 89.5% Low).
 
 ````text
 Task: explain, with PROD aggregates, why the CC A1 ability states fire at the rates they do —
@@ -106,30 +107,43 @@ C. After the user commits the results: read results_cc_60_180.json and save
    6. the recomputation check (mismatch count).
    No code proposals; numbers from the JSON only. Commit and push.
 
-D. RL (rl_60_180). The same snippet must run for RL: pick the dataset names by model_id
-   (crx_rl_a1_ability_v2, crx_rl_obs_base, crx_rl_a1_income_signals, crx_rl_a1_liquidity_signals,
-   crx_rl_a1_distress_signals, crx_rl_a1_internal_returns, crx_rl_a1_liquidity_anchor), the
-   anchor is one EMI (int_loan_master.installment_due_amount), and income also reads
-   feature_retail_loans (aecb_last_salary_credit_amount dated by aecb_bureau_pull_date).
-   Results for RL: latest month 2026-08-31, n=3,985: low 89.5%, unknown 9.1%, moderate 1.4%,
+D. RL (rl_60_180), and the activity gate for both. The same snippet must run for RL: pick the
+   dataset names by model_id (crx_rl_a1_ability_v2, crx_rl_obs_base, crx_rl_a1_income_signals,
+   crx_rl_a1_liquidity_signals, crx_rl_a1_distress_signals, crx_rl_a1_internal_returns,
+   crx_rl_a1_liquidity_anchor); the anchor is one EMI (int_loan_master.installment_due_amount),
+   and income also reads feature_retail_loans (aecb_last_salary_credit_amount dated by
+   aecb_bureau_pull_date).
+   RL results (latest month 2026-08-31, n=3,985): low 89.5%, unknown 9.1%, moderate 1.4%,
    high 1; 0-point rows 88.9%, distress 19.8%. At least ~14K rows (all months) are Low only
-   because casa_active = 1. Test:
-   H-RL1  The CASA movement is the loan's own servicing: in the window, the CIF's CASA outflows
-          are (almost) only the EMI debit (an outflow within 5% of the loan's EMI, or a
-          product_category / narration-free category marking a loan repayment in
-          wm_pri_labelled_transactions), and the inflows only top it up.
-   H-RL2  The DDS rejects are failed EMI collections: the DDS debit leg amount is within 5% of
-          the loan's EMI (prm_casa_return_events amounts vs int_loan_master).
-   Extra tables (RL only; part A first lists the columns of wm_pri_labelled_transactions and
-   prm_casa_return_events that carry the amount, direction and category, quoting file:line):
-   v9_casa_active  rows with 0 points, no distress, casa_active = 1: share whose window
-                   outflows are all EMI-like; share with any non-EMI outflow; share with any
-                   inflow that is not a same-week top-up of the EMI; p50 count of non-EMI
-                   outflows. Same split for 0-point rows with distress.
-   v10_dds_emi     distress rows from internal DDS: share whose DDS debit legs are all
-                   EMI-like; share with any non-EMI DDS; the same for cheque returns.
-   In summary.md add, for RL only, a verdict per hypothesis (CONFIRMED / REJECTED /
-   INCONCLUSIVE) with the 3-5 numbers that decide it, and how many Low rows would become
-   Unknown if EMI-like flows and EMI-like DDS did not count (state that as a number, not a
-   proposal).
+   because casa_active = 1 (CC: unknown 62.7%, low 36.2%).
+   Facts from the user (2026-10-27): wm_fea_casa_cc_inflow_outflow's CC outflow (and maybe
+   inflow) amounts include administrative records (e.g. fees) that are not real transactions;
+   its CASA inflow / outflow amounts do not include the loan account itself. A1 reads only the
+   CASA columns (ft_inflow_casa_amt_in_last_0_0_weeks_sum, ft_outflow_casa_amt_in_last_0_0_weeks_sum).
+   Test, for cc_60_180 and rl_60_180:
+   H-A    casa_active fires on administrative records: for many 0-point rows the window's only
+          CASA movements are fees, charges, interest, system postings or reversals, not
+          customer-initiated transactions (salary or other credits, cash, ATM, POS, transfers,
+          bill payments, cheques).
+   H-RL2  (RL) The DDS rejects are failed EMI collections: the DDS debit leg amount is within 5%
+          of the loan's EMI (prm_casa_return_events amounts vs int_loan_master).
+   Part A first: from code / profiles, how wm_fea_casa_cc_inflow_outflow's CASA columns are
+   built (source table, filters, which transaction types they sum) and which columns of
+   wm_pri_labelled_transactions and of comp_financial_tran_repos_dly tell a customer-initiated
+   transaction from an administrative one (tran_type, tran_sub_type, tran_particular_code,
+   reason_for_excluding, product_category, ...), with their top values; quote file:line.
+   (Reading comp_financial_tran_repos_dly is fine in this validation, filtered to base CIFs and
+   the window.)
+   Extra tables:
+   v9_activity    rows with 0 points, no distress and casa_active = 1, per model_id: share whose
+                  window CASA transactions are all administrative; share with any
+                  customer-initiated one; top 15 transaction types of the administrative-only
+                  rows; and the share of WM weeks with flow > 0 that have no customer-initiated
+                  transaction that week. Same split for unknown rows (casa_active = 0) as a
+                  control (share with a customer-initiated transaction the WM flag missed).
+   v10_dds_emi    (RL) distress rows from internal DDS: share whose DDS debit legs are all
+                  EMI-like; share with any non-EMI DDS; the same for cheque returns.
+   In summary.md add a verdict per hypothesis (CONFIRMED / REJECTED / INCONCLUSIVE) with the
+   3-5 numbers that decide it, per model_id, and how many Low rows would become Unknown if only
+   customer-initiated transactions counted (a number, not a proposal).
 ````
