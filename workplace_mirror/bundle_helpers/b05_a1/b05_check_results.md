@@ -60,10 +60,13 @@ differing (the waterfall ran on the spell spine, the engine on the persona obs b
 3. **Suspicious — Low mostly means "CASA moved, nothing qualifies".** 21,090 rows have 0
    points; only 2,206 are unknown, so at least ~14K rows are Low only because of CASA activity
    (`casa_active`) and up to 4,707 because of distress. Two hypotheses make that circular:
-   - **H-A** (replaces H-RL1, user 2026-10-27: the CASA flows exclude the loan account, and the
-     WM inflow / outflow amounts carry administrative records such as fees): `casa_active`
-     fires on fees / charges / system postings, not customer-initiated transactions — for CC
-     too;
+   - **H-RL1:** the CASA movement is the loan's own servicing — the EMI repayment from the
+     CASA account to the loan account is a CASA outflow (user, 2026-10-27; the loan account's
+     own flows are not in the CASA columns) — so `casa_active` restates that the loan is being
+     serviced;
+   - **H-A** (CC and RL; user: the WM inflow / outflow amounts carry administrative records
+     such as fees): `casa_active` fires on fees / charges / system postings, not
+     customer-initiated transactions;
    - **H-RL2:** the DDS rejects are failed EMI collections, so distress restates the
      delinquency the model is predicting.
    Both go to the Sonnet (A1 v03, RL part) before the RL results reach GRR.
@@ -72,6 +75,6 @@ differing (the waterfall ran on the spell spine, the engine on the persona obs b
    loan; it grows once the source refreshes more often.
 
 **Next:** Step 8 (`kedro run --env=dev --pipeline=crx_rl_a1_ability_v2`) is safe — a new
-dataset nothing reads yet — then bundle 05's cleanup prompt. A1 v03 part D tests H-A (CC and RL) /
+dataset nothing reads yet — then bundle 05's cleanup prompt. A1 v03 part D tests H-A (CC and RL), H-RL1 /
 H-RL2; a confirmed hypothesis is a rule change for the user to decide (e.g. only customer-initiated
 transactions count for `casa_active`; EMI-collection DDS excluded from distress).

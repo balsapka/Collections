@@ -118,13 +118,17 @@ D. RL (rl_60_180), and the activity gate for both. The same snippet must run for
    because casa_active = 1 (CC: unknown 62.7%, low 36.2%).
    Facts from the user (2026-10-27): wm_fea_casa_cc_inflow_outflow's CC outflow (and maybe
    inflow) amounts include administrative records (e.g. fees) that are not real transactions;
-   its CASA inflow / outflow amounts do not include the loan account itself. A1 reads only the
+   its CASA inflow / outflow amounts do not include the loan account itself, but the EMI
+   repayment (money from the CASA account to the loan account) is a CASA outflow. A1 reads only the
    CASA columns (ft_inflow_casa_amt_in_last_0_0_weeks_sum, ft_outflow_casa_amt_in_last_0_0_weeks_sum).
    Test, for cc_60_180 and rl_60_180:
    H-A    casa_active fires on administrative records: for many 0-point rows the window's only
           CASA movements are fees, charges, interest, system postings or reversals, not
           customer-initiated transactions (salary or other credits, cash, ATM, POS, transfers,
           bill payments, cheques).
+   H-RL1  (RL) casa_active fires on loan servicing: the window's only customer-side CASA
+          movements are the EMI repayment to the loan account (an outflow to the loan account,
+          or within 5% of the loan's EMI) and inflows that only top it up.
    H-RL2  (RL) The DDS rejects are failed EMI collections: the DDS debit leg amount is within 5%
           of the loan's EMI (prm_casa_return_events amounts vs int_loan_master).
    Part A first: from code / profiles, how wm_fea_casa_cc_inflow_outflow's CASA columns are
@@ -141,9 +145,12 @@ D. RL (rl_60_180), and the activity gate for both. The same snippet must run for
                   rows; and the share of WM weeks with flow > 0 that have no customer-initiated
                   transaction that week. Same split for unknown rows (casa_active = 0) as a
                   control (share with a customer-initiated transaction the WM flag missed).
+                  RL: of the rows with a customer-initiated transaction, the share whose only
+                  ones are EMI repayments to the loan account (plus same-week top-ups).
    v10_dds_emi    (RL) distress rows from internal DDS: share whose DDS debit legs are all
                   EMI-like; share with any non-EMI DDS; the same for cheque returns.
    In summary.md add a verdict per hypothesis (CONFIRMED / REJECTED / INCONCLUSIVE) with the
    3-5 numbers that decide it, per model_id, and how many Low rows would become Unknown if only
-   customer-initiated transactions counted (a number, not a proposal).
+   customer-initiated transactions counted, and (RL) if EMI repayments did not count either
+   (numbers, not proposals).
 ````
