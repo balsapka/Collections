@@ -260,6 +260,15 @@ the A1 consumers grep (R7) and the repo layout (R8) → `bundle_helpers/a1_final
 (partial files, so not under `src/`). The bureau salary model documents `reference_month` as
 YYYYMM while the CC v1 code reads the staging column as MMYYYY: checked in A1 v03 (v2).
 
+### Handoffs 7–9 (2026-10-27, photos 27–37, no full files)
+
+- Handoff 7: A1 v03 `summary.md` (CC only, from the first prompt version) →
+  `bundle_helpers/a1_final/a1_v03_results.md`; the missing parts go to `sonnet_a1_v03b_prompt.md`.
+- Handoff 8: A2 v01 "Part 0 — follow-ups" → `bundle_helpers/b04_a2/a2_v01_results.md` and A2
+  spec §10.
+- Handoff 9: the gathered snippets (R4, R5, R8–R11) → `bundle_helpers/a1_final/workplace_reference.md`
+  ("Handoff 9" and "What handoff 9 settles"); O59 updated, O61–O62 new; D1 answered (R4).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

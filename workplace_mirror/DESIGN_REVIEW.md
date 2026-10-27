@@ -1,6 +1,6 @@
 # crx_persona — design review and refactor proposal
 
-Status: **D2–D6 decided 2026-10-23 (§6); D1 waits for the R4 grep.** Nothing is changed yet.
+Status: **D2–D6 decided 2026-10-23 (§6); D1 answered by the R4 grep (2026-10-27): no consumers outside the persona code.** Nothing is changed yet.
 Scope: every persona axis in the mirror except A3 (DE-owned). Builds on the findings
 O1–O41 in `REVIEW_OBSERVATIONS.md`.
 
@@ -147,7 +147,8 @@ separately so each change in numbers has one cause.
 
 - **D1** — Do any models, reports or notebooks read `crx_cc_departure_signature` columns other
   than the 4 A2 uses, or `crx_cc_payment_trajectory` / `crx_cc_utilisation_features`? A grep
-  for this is in `REQUESTS.md` (R4).
+  for this is in `REQUESTS.md` (R4). **Answered (R4, 2026-10-27):** only `pipeline_registry.py`
+  names them outside `crx_persona/`; they retire with their persona consumers.
 - **D2** — Input policy: required sources fail loud; only not-yet-materialised sources are
   optional (recommended), or keep silent NULL stubs.
 - **D3** — Strip ticket history out of docstrings into `RESULTS*.md` (recommended).

@@ -1,8 +1,8 @@
-# Workplace reference snippets (handoff 6, 2026-10-27)
+# Workplace reference snippets (handoffs 6 and 9, 2026-10-27)
 
 Transcribed by a chat session from photos 13–26 (`pics/claude_code_handoff_6.md`), OCR quality;
 `▯` = a glyph the photo could not render. Partial files, so they live here and not under `src/`.
-They answer REQUESTS R5 (partly), R7 and R8 (partly).
+They answer REQUESTS R4, R5, R7–R11.
 
 ## Catalog entry format (`conf/base/catalog/catalog_outputs.yml`)
 
@@ -216,3 +216,308 @@ dcore, demographics, digital_login, retail_loans, …). Catalogs: `catalog_casa.
 `catalog_casa_plus_ftr.yml`, `catalog_crx.yml`, `catalog_modelling.yml`, `catalog_outputs.yml`,
 `catalog_raw_{aecb,dcore,demographics,digital,dpl,retail_feature_space,way4}.yml`. Parameters:
 `parameters{,_bureau,_casa,_crx_persona,_demographics,_loan,_training,_model_input*}.yml`.
+
+
+# Handoff 9 — the gathered snippets (R4, R5, R8–R11), 2026-10-27
+
+From `tmp_validation/mirror_requests/snippets.md` at work (photos 30–37,
+`pics/claude_code_handoff_9.md`), OCR quality; indentation inside the code blocks is
+approximate. The headings are the request numbers.
+
+## Snippet R5
+
+`src/enbd_collections/pipelines/bureau/staging.py` lines 47-53
+
+```
+            node(
+                func=stg_aecb_salary_history.build,
+                inputs="sa_ops_aecb_sub_sal_cr_hist",
+                outputs="stg_aecb_salary_history",
+                name="stage_aecb_salary_history",
+            ),
+            # --- Secondary tables (6 functions) ---
+```
+
+`src/enbd_collections/nodes/staging/bureau/stg_aecb_salary_history.py` lines 28-41
+
+```
+_SELECT_COLS = [
+    # — Grain Keys —
+    "subj_salcr_hist_hdr_file_id",  # Bureau file UUID
+    "subj_salcr_hist_ref_mnth",  # Reference month in MMYYYY format (e.g. "072023" = Jul 2023)
+    "subj_salcrdt_prvdr_no",  # Provider organization number
+    "EDP_LOAD_DATE",  # EDP ingestion/load timestamp — NOT a bureau pull date; see T35/RL-A1-26
+    # — Salary Details —
+    "subj_salcr_hist_tot_sal_amt",  # Total salary amount
+    "subj_salcr_hist_trnsfr_cnt",  # Salary transfer count
+    "subj_salcrdt_lst_upd_dt",  # Last update date
+]
+
+
+def build(raw_df: DataFrame) -> DataFrame:
+```
+
+`src/enbd_collections/nodes/staging/bureau/stg_aecb_salary_history.py` lines 42-57 omitted, 58-64 below
+
+```
+# … lines 42-57 omitted
+    df = raw_df.select(*_SELECT_COLS)
+
+    # Type conversions
+    df = df.withColumn("EDP_LOAD_DATE", F.col("EDP_LOAD_DATE").cast(DateType()))
+
+    # Repartition for downstream joins
+    return df.repartition("subj_salcr_hist_hdr_file_id")
+```
+
+## Snippet R8
+
+`src/enbd_collections/pipelines/demographics/features.py` lines 24-29
+
+```
+            node(
+                func=feat_demographics_cif.build,
+                inputs=["int_customer_demographics", "params:feat_demographics"],
+                outputs="feat_demographics_cif",
+                name="build_feat_demographics_cif",
+            ),
+```
+
+`conf/base/catalog/catalog_raw_digital.yml` lines 73-79
+
+```
+raw_beneficiary_cards:
+  type: enbd_collections.datasets.spark_hive_sql_dataset.SparkHiveSQLDataset
+  query: "SELECT instrument_number, instrument_type, institution_name FROM AI_TDV_OMB_UAE_EBI.BENEFICIARY WHERE edp_activeind='Y' AND instrument_type='CARD_NUMBER'"
+  database: "AI_TDV_OMB_UAE_EBI"
+  table: "BENEFICIARY"
+  write_mode: "overwrite"
+```
+
+## Snippet R9
+
+`src/enbd_collections/nodes/staging/dcore/stg_dcore_observation_spine.py` lines 24-92
+
+```
+def build(
+    col_trn_agreement: DataFrame,
+    cc_spine: DataFrame,
+    spine_contracts_way4: DataFrame,
+) -> DataFrame:
+    """Build DCORE observation spine at grain (agreement_id × observation_date).
+
+    Join 1: bridge (iagreementseqno, cif_id, szlegacyagreementno aliased as
+    personal_account) inner-joins spine_contracts_way4 on personal_account,
+    bringing in contract_id (LongType) and observation_date.
+
+    Join 2: result inner-joins cc_spine on (cif_id, contract_id, observation_date)
+    to restrict to in-scope agreements and valid observation dates.
+
+    Args:
+        col_trn_agreement: Raw DCORE agreement table; iagreementseqno is the PK.
+        cc_spine: Way4 CC model spine; used as scope and date filter.
+        spine_contracts_way4: Way4 contract spine with personal_account linking
+            DCORE agreements to Way4 contracts.
+
+    Returns:
+        DataFrame at grain (agreement_id × observation_date) with columns:
+            agreement_id  LongType  — DCORE agreement PK (= iagreementseqno)
+            cif_id        STRING    — bank 8-digit CIF
+            account_id    LongType  — Way4 contract PK (= contract_id / contract_idt)
+            observation_date DateType — from cc_spine
+    """
+    bridge = col_trn_agreement.select(
+        F.col("iagreementseqno").cast(LongType()).alias("agreement_id"),
+        F.col("szcustomerid").alias("cif_id"),
+        F.col("szlegacyagreementno").alias("personal_account"),
+    )
+
+    spine_contracts_bridge = spine_contracts_way4.select(
+        F.col("contract_idt").cast(LongType()).alias("contract_id"),
+        F.col("personal_account"),
+        F.col("observation_date"),
+    )
+
+    cc_spine_bridge = cc_spine.select(
+        "cif_id",
+        F.col("contract_id").cast(LongType()),
+        "observation_date",
+    )
+
+    # Few accounts have more than 1 agreement_id in dcore - takes latest agreement
+    _window = Window.partitionBy("contract_id", "observation_date").orderBy(
+        F.col("agreement_id").desc()
+    )
+
+    return (
+        bridge.join(
+            F.broadcast(spine_contracts_bridge), on="personal_account", how="inner"
+        )
+        .join(
+            F.broadcast(cc_spine_bridge),
+            on=["cif_id", "contract_id", "observation_date"],
+            how="inner",
+        )
+        .withColumn("_rn", F.row_number().over(_window))
+        .filter(F.col("_rn") == 1)
+        .drop("_rn")
+        .select(
+            "agreement_id",
+            "cif_id",
+            F.col("contract_id").alias("account_id"),
+            "observation_date",
+        )
+    )
+```
+
+`conf/base/catalog/catalog_raw_dcore.yml` lines 109-114
+
+```
+col_trn_agreement:
+  type: enbd_collections.datasets.spark_hive_sql_dataset.SparkHiveSQLDataset
+  query: "SELECT * FROM ${globals:aacoe_prefix}tdv_dcorecapex_group_collections.col_trn_agreement"
+  database: "${globals:aacoe_prefix}tdv_dcorecapex_group_collections"
+  table: "col_trn_agreement"
+  write_mode: "overwrite"
+```
+
+## Snippet R10
+
+Note: build_contract has no explicit select; it ends in build_primary_dataframe(df, ContractSnapshot, _CONTRACT_RENAMES).
+Block-code columns (block_code_1, block_code_2, block_code_2_date) are not renamed; they are projected via the ContractSnapshot schema.
+
+`src/enbd_collections/nodes/primary/cc_way4/prm_cc.py` lines 513-521
+
+```
+    df = df.withColumn(
+        "dlq_bucket_from_hist",
+        F.when(
+            F.col("dlq_hist").isNotNull() & (F.length(F.col("dlq_hist")) > 0),
+            F.substring(F.col("dlq_hist"), 1, 1).cast("int"),
+        ).otherwise(F.lit(0)),
+    )
+
+    return build_primary_dataframe(df, ContractSnapshot, _CONTRACT_RENAMES)
+```
+
+`src/data_engineering/primary/models/flows.py` lines 568-575
+
+```
+    block_code_1: Optional[str] = Field(
+        default=None,
+        description="Primary block code (reason for account restriction/block).",
+    )
+    block_code_2: Optional[str] = Field(
+        default=None,
+        description="Secondary block code. Used with block_code_1 for full block reason.",
+    )
+```
+
+`src/data_engineering/primary/models/flows.py` lines 659-664
+
+```
+    block_code_2_date: Optional[date] = Field(
+        default=None,
+        description="Date block code 2 (W = B2 collector at 61 DPD) was applied "
+        "(from BLOCK_CODE_ACC2_% attr_date_from). "
+        "Enables 'days since collections entry' feature. Way4 only.",
+    )
+```
+
+Deceased: node build_customer_individual (key col cust_num -> cif_id; cust_deceased_flg -> deceased_flag)
+
+`src/enbd_collections/nodes/primary/demographics/prm_demographics.py` lines 83-94
+
+```
+_CUSTOMER_INDIVIDUAL_RENAMES = {
+    "cust_num": "cif_id",
+    "cust_dob_doi": "date_of_birth",
+    "cust_gender_cd": "gender",
+    "cust_nat_ctry_cd": "nationality_code",
+    "cust_resi_ctry_cd": "residential_status",
+    "cust_resi_start_dt": "residence_start_date",
+    "cust_marr_stat_cd": "marital_status",
+    "cust_deceased_flg": "deceased_flag",
+    "entity_cd": "bank_entity",
+    # "group_xref_id": "group_id",
+}
+```
+
+`src/enbd_collections/nodes/primary/demographics/prm_demographics.py` lines 146-150
+
+```
+    return build_primary_dataframe(
+        stg_customer_individual,
+        CustomerGroupingXref,
+        _CUSTOMER_INDIVIDUAL_RENAMES,
+    )
+```
+
+## Snippet R11
+
+`src/enbd_collections/nodes/primary/cc_way4/prm_cc.py` lines 375-386
+
+```
+    # Derive is_international: NULL/empty trans_country_code → domestic (0)
+    df = df.withColumn(
+        "is_international", F.regexp_extract(F.col("add_info"), r"DOMESTIC=(.)", 1)
+    )
+    df = df.withColumn(
+        "is_international", F.when(F.col("is_international") == "N", 1).otherwise(0)
+    )
+
+    # Derive direction: Debit: -1, Credit: 1
+    df = df.withColumn("direction", F.when(F.col("amount") < 0, -1).otherwise(1))
+
+    return build_primary_dataframe(df, CreditCardTransaction, _TRANSACTION_RENAMES)
+```
+
+## Snippet R4
+
+Output of the grep (run from repo root; only src/enbd_collections/pipeline_registry.py matches,
+i.e. registry import/registration of the persona pipelines, no other consumers):
+
+```
+src/enbd_collections/pipeline_registry.py:75:    cc_payment_trajectory as crx_cc_payment_trajectory,
+src/enbd_collections/pipeline_registry.py:118:    rl_departure_signature as crx_rl_departure_signature,
+src/enbd_collections/pipeline_registry.py:235:        "crx_cc_payment_trajectory": crx_cc_payment_trajectory.create_pipeline(),
+src/enbd_collections/pipeline_registry.py:236:        "crx_cc_utilisation_features": crx_cc_utilisation.create_pipeline(),
+src/enbd_collections/pipeline_registry.py:237:        "crx_cc_departure_signature": crx_cc_departure.create_pipeline(),
+src/enbd_collections/pipeline_registry.py:253:        "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
+```
+
+
+## What handoff 9 settles
+
+- **R5, bureau salary.** `stg_aecb_salary_history` keeps seven columns: file id, reference
+  month (**MMYYYY**, `"072023"`), provider number, `EDP_LOAD_DATE` (cast to date; "not a
+  bureau pull date"), total amount, transfer count, last-update date. The grain is file ×
+  month × provider × load date. `prm_bureau_salary_history` (CC finish bundle) parses the
+  month as `MMyyyy` (what the engine already does; the DE model's "YYYYMM" is wrong), keeps
+  each (file, month, provider)'s latest load, and sums providers per file × month. It carries
+  no `cif_id`; the feature joins `prm_bureau_cif_bridge`.
+- **R8.** `feat_demographics_cif` = `feat_demographics_cif.build(int_customer_demographics,
+  params:feat_demographics)` in `pipelines/demographics/features.py`.
+  `raw_beneficiary_cards` (`catalog_raw_digital.yml`) is a lookup from card number to
+  institution (`instrument_number`, `instrument_type`, `institution_name` from
+  `AI_TDV_OMB_UAE_EBI.BENEFICIARY`, active `CARD_NUMBER` rows). It has no customer key, so
+  `prm_beneficiary_cards` is a lookup table, not a CIF table.
+- **R9, DCORE.** The DCORE spine is **CC only**. Its `agreement_id` is
+  `col_trn_agreement.iagreementseqno`, `cif_id` is `szcustomerid`, and
+  `szlegacyagreementno` = `spine_contracts_way4.personal_account` gives `contract_idt`. The
+  spine is then inner-joined with `cc_spine` on (cif, contract, `observation_date`), so it
+  carries `cc_spine`'s mid-month dates, and the highest `agreement_id` is kept per contract
+  and date. `prm_dcore_account_agreements` = the same bridge without dates. The RL DCORE
+  source is not in the snippets (Part 0 shows an RL DCORE spine on month ends) → R9b.
+- **R10, deceased.** Block codes are `ContractSnapshot` fields on `prm_contract`
+  (`block_code_1`, `block_code_2`, `block_code_2_date`); A2 Part 0: `D` only ever appears in
+  `block_code_2`. Demographics: `cust_num → cif_id`, `cust_deceased_flg → deceased_flag` in
+  `build_customer_individual`, which projects through the `CustomerGroupingXref` model (O61).
+- **R11.** `prm_cc.build_transaction` parses `DOMESTIC=(.)` from `add_info` exactly as
+  `cc_raw_extract` does (`N` → international, anything else, missing included → domestic).
+  The comment above it talks about `trans_country_code`, which the code does not read. So O59
+  applies to `prm_transaction` too.
+- **R4 → D1.** Outside `crx_persona/` and `catalog_crx.yml`, only `pipeline_registry.py`
+  names the departure / payment-trajectory / utilisation pipelines (imports and
+  registration), and `crx_cc_departure_pass` appears nowhere. Nothing else reads them: they
+  can go when their persona consumers do.

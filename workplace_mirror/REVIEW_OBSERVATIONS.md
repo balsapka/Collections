@@ -83,6 +83,8 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O58 | M | closed (bureau v01) | prm_bureau_alert_enriched | `DT_OF_RETURN` is renamed, then dropped by the model projection |
 | O59 | H | data check | cc_raw_extract / prm_cc | `is_international` (Way4 `DOMESTIC=N`) is 1 on 96% of card transactions in PROD |
 | O60 | L | confirmed | feature_retail_loans | `aecb_direct_debit_returns_6m` is declared but missing from the PROD table |
+| O61 | M | data check | prm_demographics | `build_customer_individual` projects through `CustomerGroupingXref`, which may drop `deceased_flag` |
+| O62 | L | confirmed | data_engineering models / bureau | `BureauSalaryHistory.reference_month` documented as YYYYMM; staging says MMYYYY |
 
 ---
 
@@ -739,6 +741,9 @@ network). It feeds `cc_departure_signature` (`foreign_txn_share_h2`, `last_txn_f
 most CC accounts with card use likely carry a departure trail today. **Check:** A2 v02 Part A /
 t7a (raw `DOMESTIC=` values by currency, MCC, cash advance). **Fix:** the new A2 reads the
 card-abroad field v02 confirms; the old A2 retires with bundle 05.
+**Update (handoff 9, 2026-10-27):** `prm_cc.build_transaction` (`prm_cc.py:375–386`) has the
+same parse, so `prm_transaction` inherits it; its comment mentions `trans_country_code`, which
+the code does not read.
 
 **O58 closed (bureau v01, 2026-10-26):** `DT_OF_RETURN` moves with `EXTRACT_DT` on 99.65% of
 repeated bounces (median 2 days before it), so it is "the latest registration as of this pull",
@@ -750,3 +755,21 @@ first report of each bounce instead (DESIGN_REVIEW, A1 finish plan).
 Declared in `feat_loan_application_risk.py` (bureau v01 inventory A.4) but NOT FOUND on the real
 `feature_retail_loans` table for `rl_60_180` (bureau v01 w8). The RL waterfall had already
 dropped it (RL-A1-14) and the new A1 does not read it; the declaration is dead.
+
+### O61 — Deceased flag may be dropped by the wrong model (M, data check)
+
+`prm_demographics.py:146–150`: `build_customer_individual` renames `cust_deceased_flg` to
+`deceased_flag` (`_CUSTOMER_INDIVIDUAL_RENAMES`, `:83–94`) and then returns
+`build_primary_dataframe(stg_customer_individual, CustomerGroupingXref, …)`. That model's name
+says group cross-reference, not customer individual. If it does not declare `deceased_flag` /
+`date_of_birth`, the projection drops them silently. A2's deceased rule reads
+`feat_demographics_cif` (from `int_customer_demographics`), so the effect depends on which of
+these feeds that table. **Check:** the A2 refactor reads the model's field list (one snippet), or
+the RL t6 re-run shows `ft_deceased_flag` populated.
+
+### O62 — Bureau salary month format documented two ways (L, confirmed)
+
+`stg_aecb_salary_history.py:28–41` documents `subj_salcr_hist_ref_mnth` as MMYYYY (`"072023"`);
+the `BureauSalaryHistory` model documents `reference_month` as YYYYMM. The A1 engine parses
+MMyyyy, which matches staging. The bureau pipeline is unvalidated, so A1 v03b's v0 funnel
+confirms this on the data. `prm_bureau_salary_history` (CC finish bundle) parses MMyyyy.
