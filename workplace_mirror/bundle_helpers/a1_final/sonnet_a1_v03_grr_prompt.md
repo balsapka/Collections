@@ -72,14 +72,21 @@ B. Tables:
                   W1 / W3 rows miss.
    v2b_salary_timing  (user, 2026-10-27: an employer may pay a few days early, e.g. before a
                   weekend, so one month gets two salary credits and the next none). The engine
-                  keeps the larger credit per calendar month, so such a shift looks like a missing
-                  month and can fail the weakening check. From _internal_salary over 24 months,
-                  base CIFs, distinct (cif_id, credit date, amount): credits by day of month
-                  (1-5 / 6-24 / 25-31); share of CIF-months with 2+ credits >= 1000, and of
-                  those the share whose next month has none; then, for the W1 and W2 rows, how
-                  many would be Stable if (a) each month's internal income were the sum of its
-                  distinct credits, or (b) a credit in a month's last 5 days moved to the next
-                  month when that month has none.
+                  keeps the larger credit per calendar month and counts months, so a shift looks
+                  like a missing month: it can fail the weakening check, and two salaries in m3
+                  with none in m2 count as 1 of 3. From _internal_salary over 24 months, base
+                  CIFs, distinct (cif_id, credit date, amount): credits by day of month (1-5 /
+                  6-24 / 25-31); share of CIF-months with 2+ credits >= 1000, and of those the
+                  share whose next month has none; the gap in days between consecutive credits
+                  (0-6 / 7-19 / 20-24 / 25-35 / 36+). Then, for every row, the income level
+                  under two alternatives (crosstab engine level x alternative):
+                    (a) count salary credits instead of months: Stable = at least 2 internal
+                        credits >= the threshold in the window (3 at 180+), a bureau month >=
+                        the threshold counting as one credit when that month has no internal
+                        one; weakening on window totals (sum of distinct credits, or the bureau
+                        amount when larger) vs the prior window;
+                    (c) as (a), but two credits less than 20 days apart count as one (a bonus or
+                        allowance paid next to the salary is not a second salary).
    v3_liquidity_why rows by liquidity level and reason:
                     none   L1 no CASA balance row for the CIF in the 12 months (no CASA with us);
                               L2 CASA rows but every month in m1-m3 < 1000 or missing
@@ -110,7 +117,7 @@ C. After the user commits the results: read results_cc_60_180.json and save
    2. per state (High, Moderate, Low, Unknown): the share, the rule path that produces most of
       it (v1 / v6), and the 2-3 numbers that explain it;
    3. Salary timing (v2b): how often an early payment empties a month, and how many rows
-      options (a) / (b) would make Stable.
+      alternatives (a) / (c) move between levels (and states).
    4. "What information is missing": income (v2: the N1-N4 split, internal vs bureau
       coverage), liquidity (v3: no CASA vs low balance), and what the GRR bureau salary feed
       would change (rows in N1/N2-N4 whose CIF has a bureau pull but no bureau salary);
