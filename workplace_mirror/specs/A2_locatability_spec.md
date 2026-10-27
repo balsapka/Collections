@@ -71,7 +71,7 @@ last travel     = date of the latest travel purchase
 
 L1 Skip        there is foreign evidence, dated on or after the latest domestic evidence
 L2 Skip        travel rule: there is a travel purchase, the latest domestic evidence is no more
-               than 1 month after the last travel purchase (or there is none), and no domestic
+               than 3 months after the last travel purchase (or there is none), and no domestic
                evidence for at least 1 month before the observation date
 L3 In Country  latest domestic is later than any foreign evidence (on the same day, foreign
                wins) AND it falls in W
@@ -81,8 +81,8 @@ L4 Unknown     no evidence, or the latest evidence is domestic but older than W
 **Why the travel rule.** A ticket is bought days or weeks before the flight, and the customer
 keeps living normally until then, so UAE activity after the purchase is expected and must not
 cancel it. A leaver who keeps banking from abroad is already caught by foreign evidence (L1);
-the ticket matters for the one who goes silent. The pattern is: UAE activity stops within a
-month of buying a ticket and does not resume. The silence guard keeps a customer who bought a
+the ticket matters for the one who goes silent. The pattern is: UAE activity stops within three
+months of buying a ticket and does not resume. The silence guard keeps a customer who bought a
 ticket last week and is still active out of Skip. It is checked before In Country: active until
 three weeks after a ticket, then quiet for five weeks, reads as gone. A ticket shows intent,
 not location, so it counts whatever the channel (online included).
@@ -91,7 +91,7 @@ Only in-person card use places the customer: online purchases (a foreign shop ca
 the UAE, a UAE shop from abroad) and transfers or remittances (most expats send money home every
 month) are not location evidence.
 
-Domestic activity well after a trip (more than a month after the ticket) means the customer came
+Domestic activity well after a trip (more than 3 months after the ticket) means the customer came
 back or never left: In Country. A foreign
 latest evidence stays Skip however old it is — accounts sit in collections for years.
 
@@ -171,8 +171,8 @@ alone. Labels follow A1 / A4 (`*_state` lower-case, `*_label` for display).
 | Threshold | Value |
 |---|---|
 | Window `W` (domestic evidence, confirmed contact, gone-dark recency) | 3 months (60–180), 6 months (180+) |
-| Travel rule: last UAE evidence at most this long after the last travel purchase | 1 month |
-| Travel rule: silence since the last UAE evidence, at least | 1 month |
+| Travel rule: last UAE evidence at most this long after the last travel purchase | 3 months (v02: covers 82% CC / 84% RL of known leavers' lags, ~5% of stayers') |
+| Travel rule: silence since the last UAE evidence, at least | 1 month (catches recent leavers; overrides In Country for ~128 CC / 17 RL rows) |
 | Gone dark | last 3 attempt dates all failed |
 
 Starting values; tuned on the PROD distribution (the unknown reasons show what each moves).
@@ -200,6 +200,7 @@ Starting values; tuned on the PROD distribution (the unknown reasons show what e
 | D-A2-15 | Travel rule (§3 L2): Skip when the last UAE evidence is at most 1 month after the last travel purchase and there has been no UAE evidence for at least 1 month; checked before In Country; any channel; no lookback from the scoring date. Validated in PROD for firing rate and threshold sensitivity (`bundle_helpers/b04_a2/sonnet_a2_v02_travel_prompt.md`) (user, 2026-10-25). |
 | D-A2-16 | Credit-card evidence reads the model's scoped cards as they are (`prm_transaction`): CC models the spine cards, RL models all cards of the scoped CIFs. No extra CIF-level card scope for CC models (user, 2026-10-25). |
 | D-A2-17 | DCORE outcomes off the lists: `LEFT_MSG` = failed attempt; `CALL CONNECTED` (not `SUC`) = neutral attempt (breaks gone dark, not a contact); `Skip - Under Tracing/Traced` = diagnostic only (a collector status, not a call, mostly domestic skips, and "Traced" means found); RL legal / repossession and admin codes (`Result Not Found`, `Follow up`, `E mail Sent`) dropped (user, 2026-10-26). |
+| D-A2-18 | After v02 (`bundle_helpers/b04_a2/a2_v02_results.md`): travel rule GAP = 3 months, SILENCE stays 1 month — a customer silent for 5 weeks after a ticket is Skip, even if active in W; a returning traveller goes back to In Country on the next month's run. Credit-card in-person evidence = C2: ATM / cash advances and the in-person MCCs (grocery 5411/5422/5441/5451/5462/5499, fuel 5541/5542, restaurants 5812/5813/5814, pharmacy 5912, transport 4111/4121/4131, department / convenience 5311/5331) on `prm_transaction`; abroad = `is_international` (Way4 `DOMESTIC=N`, a foreign merchant, online included — O59) (user, 2026-10-27). |
 
 ---
 
