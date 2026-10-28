@@ -11,3 +11,16 @@ prm_casa_return_events:
   metadata:
     kedro-viz:
       layer: primary
+
+# Debit-card rows that can place a customer (in-person POS / ATM withdrawals, travel
+# purchases), all CIFs, one row per (tran_id, part_tran_srl_num, tran_date).
+prm_casa_card_transactions:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/casa/card_transactions"
+  save_args:
+    mode: overwrite
+    partitionBy: ["event_month"]
+  metadata:
+    kedro-viz:
+      layer: primary

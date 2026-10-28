@@ -1,0 +1,24 @@
+# Location inputs of the A2 axis (pipeline location_features).
+
+# Account → DCORE agreement map of the model's collections scope (no dates).
+prm_dcore_account_agreements:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/dcore/account_agreements"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: primary
+
+# Location evidence per (cif_id, month_end): latest UAE / foreign evidence + source,
+# latest travel purchase.
+feat_cif_location_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/location/cif_location_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature

@@ -1,5 +1,6 @@
-"""T12 — A2 Locatability axis v1 (3-state, DCORE-degraded)."""
+"""CC A2 locatability axis (location × reachability) on the shared ``a2_locatability``
+engine."""
 
-from .pipeline import create_pipeline
+from .pipeline import create_b06_check_pipeline, create_pipeline
 
-__all__ = ["create_pipeline"]
+__all__ = ["create_b06_check_pipeline", "create_pipeline"]

@@ -14,9 +14,7 @@
 
 crx_persona: "${globals:crx_persona}"
 
-# Segment id for the currently-running model variant (cc_60_180 / cc_180_plus /
-# rl_60_180 / rl_180_plus). Additive key (R18) — used by cc_a2_locatability and
-# rl_a2_locatability (Node 4, T29/RL-A2-3 design, promoted 2026-10-22) to select
-# segment-aware thresholds; same resolver pattern as crx_persona above.
+# Segment id of the running model variant (cc_60_180 / cc_180_plus / rl_60_180 /
+# rl_180_plus): selects the axes' window length (_common.window_months).
 model_id: "${globals:model_id}"
 

@@ -5,11 +5,13 @@ and resolves partyid → cif_id via the PDM users table.
 
 Output grain: one row per login session (deduplicated on sessionid — the tables are
 partitioned by edp_load_date and the same session can appear in multiple partitions).
+Logins without a sessionid are kept one row each.
 
 Schema:
     cif_id          (str)        — bank CIF number
     login_date      (date)       — date of login
-    is_foreign_login (int 0/1)   — 1 if login originated outside UAE
+    is_foreign_login (int 0/1)   — 1 if login originated outside UAE; NULL when the
+                                   login carries no country
     countrylocation (str, null)  — country name from login record
     countrycode     (str, null)  — ISO country code from login record
     login_interface (str, null)  — login channel (channel column)
@@ -24,7 +26,7 @@ from pyspark.sql import functions as F
 LOG = logging.getLogger(__name__)
 
 
-def build(
+def build(  # pylint: disable=too-many-locals
     raw_digital_login_data: DataFrame,
     raw_digital_login_data_history: DataFrame,
     raw_digital_user_data: DataFrame,
@@ -98,8 +100,14 @@ def build(
     # ── Dedup on sessionid ────────────────────────────────────────────────────
     # Both tables are partitioned by edp_load_date; the same sessionid can appear
     # in multiple partitions. Drop to one row per session before deriving features.
+    # dropDuplicates treats NULLs as equal, so rows without a sessionid bypass it.
     if "sessionid" in {c.lower() for c in logins.columns}:
-        logins = logins.dropDuplicates(["sessionid"])
+        has_session = F.col("sessionid").isNotNull()
+        logins = (
+            logins.filter(has_session)
+            .dropDuplicates(["sessionid"])
+            .unionByName(logins.filter(~has_session))
+        )
 
     # ── Derive is_foreign_login ───────────────────────────────────────────────
     # UAE match: UPPER(REGEXP_REPLACE(countrylocation, whitespace, '')) = 'UNITEDARABEMIRATES'
@@ -112,10 +120,14 @@ def build(
         F.upper(F.col("countrycode")) == F.lit("AE")
     )
     uae_cond = uae_by_name | uae_by_code
+    # A login without any country is no location evidence: NULL, not foreign.
+    has_country = (F.trim(F.coalesce(F.col("countrylocation"), F.lit(""))) != "") | (
+        F.trim(F.coalesce(F.col("countrycode"), F.lit(""))) != ""
+    )
 
     logins = logins.withColumn(
         "is_foreign_login",
-        F.when(uae_cond, F.lit(0)).otherwise(F.lit(1)).cast("int"),
+        F.when(uae_cond, F.lit(0)).when(has_country, F.lit(1)).cast("int"),
     )
 
     # ── Resolve partyid → cif_id via PDM users (inner join drops unresolved) ──

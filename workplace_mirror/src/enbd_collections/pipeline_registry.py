@@ -118,6 +118,7 @@ from enbd_collections.pipelines.crx_persona import (
     rl_departure_signature as crx_rl_departure_signature,
 )
 from enbd_collections.pipelines import digital_login as dl
+from enbd_collections.pipelines.location import pipeline as location_features
 
 
 def register_pipelines() -> dict[str, Pipeline]:
@@ -237,6 +238,10 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_departure_signature": crx_cc_departure.create_pipeline(),
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
+        # TEMPORARY (mirror bundle 06): A2 check; removed by the bundle's cleanup.
+        "crx_cc_a2_locatability_b06_check": (
+            crx_cc_a2_locatability.create_b06_check_pipeline()
+        ),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
         "crx_cc_a1_ability_v2": crx_cc_a1_ability_v2.create_pipeline(),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
@@ -252,9 +257,14 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a1_ability_b05_check": crx_rl_a1_ability_v2.create_b05_check_pipeline(),
         "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
+        # TEMPORARY (mirror bundle 06): A2 check; removed by the bundle's cleanup.
+        "crx_rl_a2_locatability_b06_check": (
+            crx_rl_a2_locatability.create_b06_check_pipeline()
+        ),
         "crx_rl_a3_payment_credibility": crx_rl_a3_payment_credibility.create_pipeline(),
         # -- Digital login (OMB) --------------------------------------------
         "digital_login": dl.create_pipeline(),
+        "location_features": location_features.create_pipeline(),
         # -- Default ---------------------------------------------------------
         "__default__": cc_way4.create_pipeline(),
         "rerun": model_input.create_features_pipeline()

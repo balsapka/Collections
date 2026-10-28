@@ -241,40 +241,39 @@ crx_cc_departure_signature:
   save_args:
     mode: overwrite
 
-# ── A2 Locatability (T12, Node 4 promoted from T29 2026-10-22) ──────────────
-# Inputs: cc_spine (model_id-scoped), crx_cc_departure_signature (T06),
-#         crx_cc_spell_table (T03b), prm_digital_login_monthly,
-#         dcore_prm_followup_outcomes, dcore_stg_scope_agreements,
-#         params:model_id, prm_contract, prm_client, feat_demographics_cif
-# Output: crx_cc_a2_locatability (ships the A2 persona axis)
-#
-# Grain: (account_id, observation_date) — obs-anchored, matches cc_spine.
-# Location x reachability 2D axis (T29 design, promoted — see RESULTS.md
-# 2026-10-22): location_state ∈ {Skip, In Country, Unknown}; reachability_state
-# ∈ {Reachable, Non-Reachable, Unknown}; a2_state = "Deceased" or
-# "<location_state> - <reachability_state>". deceased_flag_v2 (OR of DCORE/Way4/
-# demographics corroboration, T34) drives the Deceased pre-guard. T12's original
-# 7-state waterfall (deceased/non_cooperative/reachable/avoiding/skip/gone/unknown)
-# is retired.
+# ── CC A2 Locatability (shared a2_locatability engine) ─────────────────────────
+# Inputs: crx_cc_obs_base, feat_cif_location_monthly, dcore_prm_followup_outcomes,
+#         prm_dcore_account_agreements, prm_contract, prm_client, feat_demographics_cif.
+# Grain: (account_id, observation_date), month ends, persona months.
+# location_state ∈ {skip, in_country, unknown}; reachability_state ∈ {reachable,
+# non_reachable, unknown}; a2_state = "deceased" or "<location>__<reachability>".
+# Spec: workplace_mirror/specs/A2_locatability_spec.md.
 
-crx_cc_a2_base:
+crx_cc_a2_location_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_base"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_location_signals"
   save_args:
     mode: overwrite
 
-crx_cc_a2_login_presence:
+crx_cc_a2_dcore_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_login_presence"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_dcore_signals"
   save_args:
     mode: overwrite
 
-crx_cc_a2_contact_signals:
+crx_cc_a2_way4_deceased:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_contact_signals"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_way4_deceased"
+  save_args:
+    mode: overwrite
+
+crx_cc_a2_demographics_deceased:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_demographics_deceased"
   save_args:
     mode: overwrite
 
@@ -282,6 +281,14 @@ crx_cc_a2_locatability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_locatability"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (mirror bundle 06): the A2 check output; removed by the bundle's cleanup.
+crx_cc_a2_locatability_b06_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_locatability_b06_check"
   save_args:
     mode: overwrite
 
@@ -671,7 +678,7 @@ crx_rl_depart_foreign_signals:
     mode: overwrite
 
 # Shipped RL departure signature — all 4 departure-trail signals at obs-date grain.
-# Grain: (account_id, observation_date). Consumed by crx_rl_a2_locatability Node 1.
+# Grain: (account_id, observation_date). Consumed by the RL A1 waterfall.
 # travel_mcc_flag_h2/foreign_login_flag coalesced to 0; casa_inflow_stop_gap_d may be NULL.
 crx_rl_departure_signature:
   type: spark.SparkDataset
@@ -680,48 +687,54 @@ crx_rl_departure_signature:
   save_args:
     mode: overwrite
 
-# ── RL A2 Locatability Axis (RL-A2-1) ───────────────────────────────────────
+# ── RL A2 Locatability (shared a2_locatability engine) ─────────────────────────
+# Inputs: crx_rl_obs_base, feat_cif_location_monthly, dcore_prm_followup_outcomes,
+#         prm_dcore_account_agreements, prm_contract, prm_client, feat_demographics_cif.
+# Grain: (account_id, observation_date), month ends, persona months.
+# location_state ∈ {skip, in_country, unknown}; reachability_state ∈ {reachable,
+# non_reachable, unknown}; a2_state = "deceased" or "<location>__<reachability>".
+# Spec: workplace_mirror/specs/A2_locatability_spec.md.
 
-# Node 1: spine + departure signals (from crx_rl_departure_signature).
-# Grain: (account_id, observation_date). Left-join on (account_id, observation_date).
-# Schema matches crx_cc_a2_base departure-trail columns.
-crx_rl_a2_base:
+crx_rl_a2_location_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_base"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_location_signals"
   save_args:
     mode: overwrite
 
-# Node 2: obs-date-anchored digital login presence.
-# obs_month_end=True — RL observation dates are month-end.
-# Schema matches crx_cc_a2_login_presence.
-crx_rl_a2_login_presence:
+crx_rl_a2_dcore_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_login_presence"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_dcore_signals"
   save_args:
     mode: overwrite
 
-# Node 3: DCORE contact signals (RL-D5 spine, 24m floor filter).
-# Schema matches crx_cc_a2_contact_signals.
-crx_rl_a2_contact_signals:
+crx_rl_a2_way4_deceased:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_contact_signals"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_way4_deceased"
   save_args:
     mode: overwrite
 
-# Node 4: shipped A2 locatability axis. Grain: (account_id, observation_date).
-# Location x reachability 2D axis (RL-A2-3 design, promoted 2026-10-22 — see
-# RESULTS_RL.md): location_state ∈ {Skip, In Country, Unknown}; reachability_state
-# ∈ {Reachable, Non-Reachable, Unknown}; a2_state = "Deceased" or
-# "<location_state> - <reachability_state>". RL-A2-1's original 7-state waterfall
-# is retired. Produced by build_a2_locatability (CC function imported directly —
-# domain-agnostic); RL supplies no prm_contract/prm_client (no Way4 equivalent).
+crx_rl_a2_demographics_deceased:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_demographics_deceased"
+  save_args:
+    mode: overwrite
+
 crx_rl_a2_locatability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_locatability"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (mirror bundle 06): the A2 check output; removed by the bundle's cleanup.
+crx_rl_a2_locatability_b06_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_locatability_b06_check"
   save_args:
     mode: overwrite
 

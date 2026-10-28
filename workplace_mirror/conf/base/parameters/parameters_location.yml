@@ -1,0 +1,7 @@
+##################################################
+# LOCATION FEATURES (pipeline location_features)
+##################################################
+location_features:
+  # Calendar months of login, credit-card and DCORE evidence read up to and including
+  # the persona start month (prm_casa_card_transactions keeps its own history).
+  history_months: 36

@@ -9,3 +9,7 @@ casa_primary:
   # (crx_persona.persona_start_date), so the first observation month has its full
   # distress window (the longest: 6 months at 180+).
   history_months: 6
+  # Calendar months of debit-card rows kept in prm_casa_card_transactions up to and
+  # including the persona start month (location evidence has no age limit; the raw
+  # table holds about three years).
+  card_history_months: 36
