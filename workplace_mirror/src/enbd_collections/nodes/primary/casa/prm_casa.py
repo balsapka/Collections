@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date
 
-from enbd_collections.nodes.utils.location import is_travel
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
+
+from enbd_collections.nodes.utils.location import is_travel
 
 _KEY = ["tran_id", "part_tran_srl_num", "tran_date"]
 _RETURN_EVENT_COLUMNS = [
