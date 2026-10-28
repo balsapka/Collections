@@ -23,6 +23,8 @@ from pyspark.sql import functions as F
 
 from enbd_collections.nodes.utils.location import is_uae
 
+from .._common import window_months
+
 LOG = logging.getLogger(__name__)
 
 
@@ -60,47 +62,60 @@ def _snake(col: str) -> F.Column:
 
 
 def compare_a2_outputs(old: DataFrame, new: DataFrame, model_id: str) -> None:
-    """Old vs new location, reachability and deceased in the latest month; new shares
-    per month."""
+    """Old vs new in the latest month; new shares per month.
+
+    The PROD old output may still carry the earlier single-state schema
+    (``a2_state_v1``) instead of ``location_state`` / ``reachability_state``; the old
+    side is compared on whichever it has.
+    """
     latest_new = _latest_month(new)
     month = latest_new.agg(F.trunc(F.max("observation_date"), "month")).first()[0]
     in_month = Window.partitionBy("account_id").orderBy(
         F.col("observation_date").desc()
     )
+    two_dim = "location_state" in old.columns
+    old_cols = (
+        [
+            _snake("location_state").alias("old_location"),
+            _snake("reachability_state").alias("old_reachability"),
+        ]
+        if two_dim
+        else [_snake("a2_state_v1").alias("old_state")]
+    )
     old_m = (
         old.filter(F.trunc("observation_date", "month") == F.lit(month))
         .withColumn("_rn", F.row_number().over(in_month))
         .filter(F.col("_rn") == 1)
-        .select(
-            F.col("account_id").cast("string").alias("account_id"),
-            _snake("location_state").alias("old_location"),
-            _snake("reachability_state").alias("old_reachability"),
-            F.col("deceased_flag_v2").cast("int").alias("old_deceased"),
-        )
+        .select(F.col("account_id").cast("string").alias("account_id"), *old_cols)
+        .withColumn("_old", F.lit(1))
     )
     both = latest_new.join(old_m, on="account_id", how="full")
+    matched = both.filter(F.col("a2_state").isNotNull())
+    if two_dim:
+        compare = [
+            "location old x new:",
+            *_table(matched, "old_location", "location_state"),
+            "reachability old x new:",
+            *_table(matched, "old_reachability", "reachability_state"),
+        ]
+    else:
+        compare = [
+            "old a2_state_v1:",
+            *_table(old_m, "old_state"),
+            "old a2_state_v1 x new location:",
+            *_table(matched, "old_state", "location_state"),
+            "old a2_state_v1 x new reachability:",
+            *_table(matched, "old_state", "reachability_state"),
+        ]
     lines = [
         (
             f"month {month}: new rows {latest_new.count()}, old rows {old_m.count()}, "
-            f"new only {both.filter(F.col('old_location').isNull()).count()}, "
+            f"new only {both.filter(F.col('_old').isNull()).count()}, "
             f"old only {both.filter(F.col('a2_state').isNull()).count()}"
         ),
         "new a2_state:",
         *_table(latest_new, "a2_state"),
-        "location old x new:",
-        *_table(
-            both.filter(F.col("a2_state").isNotNull()), "old_location", "location_state"
-        ),
-        "reachability old x new:",
-        *_table(
-            both.filter(F.col("a2_state").isNotNull()),
-            "old_reachability",
-            "reachability_state",
-        ),
-        "deceased old x new:",
-        *_table(
-            both.filter(F.col("a2_state").isNotNull()), "old_deceased", "deceased_flag"
-        ),
+        *compare,
         "new location_state by month:",
         *_table(
             new.withColumn("month", F.trunc("observation_date", "month")),
@@ -150,6 +165,24 @@ def describe_a2_rules(new: DataFrame, model_id: str) -> None:
         ),
         "reachability_state x reason:",
         *_table(df, "reachability_state", "reachability_unknown_reason"),
+        "reachability_state x last contact (in W / before W / never):",
+        *_table(
+            df.withColumn(
+                "last_contact",
+                F.when(F.col("last_contact_date").isNull(), "never")
+                .when(
+                    F.col("last_contact_date")
+                    >= F.add_months(
+                        F.trunc("observation_date", "month"),
+                        1 - window_months(model_id),
+                    ),
+                    "in_W",
+                )
+                .otherwise("before_W"),
+            ),
+            "reachability_state",
+            "last_contact",
+        ),
         "call days in the window:",
         *_table(
             df.withColumn(
