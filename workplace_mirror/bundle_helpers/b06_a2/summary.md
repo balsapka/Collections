@@ -27,8 +27,10 @@ datasets, plus a temporary check against the old A2.
   (`deceased` or `<location>__<reachability>`), `a2_state_label`, both dimensions,
   `deceased_flag` / `deceased_source` and diagnostics. RL reads Way4 too.
 - **Old A2 retired**: `cc_a2_locatability/` and `rl_a2_locatability/` become thin wrappers
-  (same pipeline and output names); their `nodes.py` / `constants.py` and the
-  `crx_*_a2_base` / `_login_presence` / `_contact_signals` catalog entries are deleted. The
+  (same pipeline and output names); the `crx_*_a2_base` / `_login_presence` /
+  `_contact_signals` catalog entries are deleted. Their old `nodes.py` / `constants.py` stay
+  as they are, unused by A2: the A3 credibility code imports `cc_a2_locatability.constants`
+  (the first apply of this bundle failed on it). The
   departure signatures stay until the A1 finish bundle (the A1 waterfall / v1 read them).
 - **Check** (`a2_locatability/b06_check.py`, pipelines `crx_cc_a2_locatability_b06_check`,
   `crx_rl_a2_locatability_b06_check`): old vs new crosstabs, rules and sources, debit rows by

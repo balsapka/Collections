@@ -776,3 +776,13 @@ the RL t6 re-run shows `ft_deceased_flag` populated.
 the `BureauSalaryHistory` model documents `reference_month` as YYYYMM. The A1 engine parses
 MMyyyy, which matches staging. The bureau pipeline is unvalidated, so A1 v03b's v0 funnel
 confirms this on the data. `prm_bureau_salary_history` (CC finish bundle) parses MMyyyy.
+
+### O63 — A3 credibility imports the old A2 constants (M, confirmed by the bundle 06 apply)
+
+Applying bundle 06 in UAT (2026-10-28) failed the import check:
+`ModuleNotFoundError: No module named 'enbd_collections.pipelines.crx_persona.cc_a2_locatability.constants'`.
+Nothing in the mirror imports it, so the importer is the DE-owned, untranscribed A3 credibility code
+(`cc_a3_payment_credibility` / `rl_a3_payment_credibility`); the file's PTP, retain-PTP and
+payment-confirmed lists are A3 vocabulary. **Fix (bundle 06, rebuilt):** `cc_a2_locatability/constants.py`
+and both old `nodes.py` stay in place (no longer used by A2) until A3 takes its own copy of the lists;
+delete them then.
