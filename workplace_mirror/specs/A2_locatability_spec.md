@@ -4,8 +4,8 @@ Signed off with the user (decisions in §8, latest 2026-10-27), for presentation
 still change after that review. Same architecture as A1: month-end observation dates,
 calendar-month windows that include the observation month, no spell / T0.
 
-**Status:** the logic is final apart from the debit-card in-person filter, which waits on
-A2 v03 (§10). Then the refactor bundle (§11), its PROD check, and the final report.
+**Status:** the logic is final (debit-card rule set after v03, D-A2-19). Built as mirror bundle 06
+(§11); next its PROD check, then the final report.
 
 ---
 
@@ -174,7 +174,7 @@ Both dimensions are computed on every row, deceased included, so each can be use
 | D-A2-16 | Credit cards: the model's scoped cards in `prm_transaction` as they are (CC: spine cards; RL: all cards of the scoped CIFs). |
 | D-A2-17 | DCORE off-list outcomes: `LEFT_MSG` failed; `CALL CONNECTED` (not `SUC`) neutral; `Skip - Under Tracing/Traced` diagnostic only; RL legal / repossession and admin codes ignored. |
 | D-A2-18 | After v02: travel GAP 3 months, SILENCE 1 month. Credit-card in-person = option C2 (§10). |
-| D-A2-19 | Debit cards / CASA are evidence, from the raw CASA table via a new primary; the in-person filter is set after v03 (pending). |
+| D-A2-19 | Debit cards / CASA are evidence, from the raw CASA table via a new primary, with the v03 rule as recommended (user, 2026-10-28): POS Machine / Offline debits, ATM withdrawals placed by the narration country; no re-run. |
 
 ---
 
@@ -204,7 +204,7 @@ Expect a large old-vs-new move on CC Skip: a correction of O59, not a regression
 |---|---|---|
 | Logins | `prm_digital_login_monthly` (fixed in §11) | `last_uae_login_date`, `last_foreign_login_date`; no country = ignored |
 | Credit cards | `prm_transaction` | **C2:** cash advances (`txn_category` cash) or MCC grocery 5411/5422/5441/5451/5462/5499, fuel 5541/5542, restaurants 5812/5813/5814, pharmacy 5912, transport 4111/4121/4131, department / convenience 5311/5331. Abroad = `is_international = 1` (Way4 `DOMESTIC=N`: a foreign merchant, online included — hence the MCC filter). No card-present field exists in Way4 |
-| Debit cards / CASA | `comp_financial_tran_repos_dly` → new `prm_casa_card_transactions` | candidate: `channel_desc` ∈ {Point of Sale, ATM Transactions}, `merchant_type_desc` ∈ {Offline, Machine}, debits only, remote MCCs excluded; `merchant_country` = the place (NULL = no evidence; ATM rows carry none). **Final filter after v03** |
+| Debit cards / CASA | `comp_financial_tran_repos_dly` → `prm_casa_card_transactions` | POS: `channel_desc` = Point of Sale, `merchant_type_desc` ∈ {Machine, Offline}; ATM: ATM Transactions with `tran_particular_code_desc` ∈ {DR ATM TRANSACTION, UAE SWITCH WDL}. Debits only; reason not in CHARGES / FEES / REVERSAL / CANCELLED / RETURNS / CHEQUE RETURNS / DDS Rejects/Reversal / Status Deleted in Finacle (NULL / '' / NA = none); remote MCCs 5815–5818, 4814, 4816, 4899, 5964–5969, 5734, 7372 excluded. Place: POS `merchant_country`; ATM the narration's country code (`:XX#` or trailing ` XX`), else `counter_party_bank_cntry`; UAE spellings normalised. Date `value_date` (else `tran_date`); dedup on the key; CIF 13339117 dropped. Online / NULL-type POS rows count only as travel purchases |
 | Travel purchases | both card sources, any channel | MCC 3000–3299, 4411, 4511, 4722 or the travel keywords |
 | Departure note, calls | `dcore_prm_followup_outcomes` via `prm_dcore_account_agreements` (distinct account × agreement of each model's `dcore_observation_spine`) | events on or before the observation date |
 | Deceased | DCORE, `prm_contract`, `feat_demographics_cif` | §5 |
@@ -214,10 +214,9 @@ Expect a large old-vs-new move on CC Skip: a correction of O59, not a regression
 (Private / Priority / Premium Banking only, channel NULL on half the rows), `crx_cc_transactions`
 (T0-scoped extract), Way4 `TRANS_LOCATION` (empty on most rows).
 
-**Open — A2 v03** (`bundle_helpers/b04_a2/sonnet_a2_v03_casa_card_prompt.md`): what
-`merchant_type_desc = Offline` means, other card-present fields, ATM location, UAE spellings of
-`merchant_country`, reversals and reloads, the event date, the lookback, a login plausibility
-check, and the size of Way4 rows without a `DOMESTIC=` key (counted as domestic).
+**A2 v03** (2026-10-28, `bundle_helpers/b04_a2/a2_v03_results.md`): settled the debit rule above; Way4 rows without a
+`DOMESTIC=` key are fees / IPP (negligible); credit-card evidence uses purchase / cash debits only (payment credits carry
+`is_international`). FTR row-handling reference: `bundle_helpers/ftr_transaction_handling.md`.
 
 Evidence trail: `bundle_helpers/b04_a2/a2_v01_inventory_results.md`, `a2_v01_results.md`,
 `a2_v02_results.md`; findings O45–O56, O59, O61 in `REVIEW_OBSERVATIONS.md`.
@@ -236,7 +235,8 @@ Evidence trail: `bundle_helpers/b04_a2/a2_v01_inventory_results.md`, `a2_v01_res
 3. **Location feature:** CIF × month end — latest UAE / foreign date and source, last travel
    purchase — from primary datasets only.
 4. **Engine** `a2_locatability/` (location, reachability, deceased, classification) with thin
-   CC / RL wrappers on the obs base; `loan_type` and `chargeoff_age_months` onto the obs base.
+   CC / RL wrappers on the obs base. Result splits are read in the check from the spines (the obs base is
+   left unchanged, so A1 is not touched).
 5. **Retire** the old A2 nodes; the departure signatures go once the RL A1 waterfall that reads
    `crx_rl_departure_signature` is deleted (A1 finish bundle).
 6. **Check pipeline:** old vs new crosstab, the state distribution by rule and source, and the
