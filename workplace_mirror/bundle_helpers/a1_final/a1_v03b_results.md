@@ -3,7 +3,7 @@
 `tmp_validation/a1_v03/summary.md`, the later full version (sections 0-9, "rerun 2026-10-28, all tables
 ran, 0 errors"); supersedes the first 84 lines filed in `a1_v03_results.md`. Transcribed from photos
 (`pics/claude_code_handoff_12.md`, photos 53-62), OCR quality; line numbers are the editor's. Filed by
-the A2 session, **not reviewed yet** (A1 session: review, then write the GRR results note).
+the A2 session; reviewed 2026-10-28 (end of file).
 
 ````
 1   # A1 Ability — why the states fire at these rates
@@ -295,3 +295,59 @@ the A2 session, **not reviewed yet** (A1 session: review, then write the GRR res
 - Line 168-170: `## 5. Anchor and stability` follows directly after line 169 with no blank line in between, as shown.
 - Lines 193-205 and 233-240: `tran_dc`, `tran_particular_code(_desc)` and the counts for the comp rows (DDS Rejects/Reversal 100,418 of 167,579, etc.) are dense; check them against the source.
 - Lines 250-280 (section 9) cross-reference `ftr_transaction_handling.md` (handoff 11); the FTR numbers there (6,260 of 15,040; 7,095 of 7,171; 99.7%) match handoff 11's text.
+
+## Review (A1, 2026-10-28)
+
+**Settled**
+
+- **The engine is right; the inputs are not.** There were 0 recompute mismatches on CC (128,927 rows)
+  and RL (23,731 rows), and the mix is stable over 8 months. Every open item below is about an input.
+- **S12 (window-total rule) is small and safe:** CC Low→Moderate 21, Moderate→High 8; RL 2. Nothing
+  moves down. It ships as decided.
+- **S13, bureau EOS: dropped.** Bureau history is too thin to find spikes (CC 3 EOS-like months, RL 10;
+  1 row in the window). No rule is needed today; it comes back only if GRR's bureau feed is dense
+  enough.
+- **H-A (fees as activity): rejected.** Administrative-only rows are 5.1% of the CC 0-point Low rows and
+  0.2% of RL. Fees are not what keeps the gate open.
+- **H-RL2 (DDS = EMI collections): rejected.** 99% of DDS reject legs are not EMI-sized; they are
+  third-party direct debits. DDS stays distress.
+- **Bureau salary months parse as MMyyyy** (O62 confirmed). The salary table is usable as is: one
+  load per (file, month), and max vs sum across providers changes 0 / 2 CIF-months.
+- **Bureau bounce repeats** are 35% (CC) / 43% (RL) of bureau-only flags. This confirms the decided
+  "identical repeats are the same bounce" rule.
+
+**Defects (fixed in the CC finish bundle)**
+
+1. **O64: internal salary is dated one month early** for every customer, because `week_number`
+   (`yyyyMM0W`) is parsed as a date. Today `income_m1` is never filled. Fixing it moves CC Low→Moderate
+   80 and Moderate→High 20 (with S12: 101 / 28); RL 32 / 6 (41 / 8). No Unknown row moves. WM's exact
+   decode is needed (R13).
+2. **O65: the bureau CIF bridge reaches 0.6% (CC) / 3.4% (RL) of customers.** Bureau salary is cut
+   off by the join, not by scarcity. It caps any bureau salary feed GRR delivers, so it must be fixed
+   before that feed can help. The upper bound on what bureau salary could reach is the "pull gap":
+   86% of CC rows and 39% of RL rows have no income, an alert row and no bureau salary.
+
+**Decisions for the user**
+
+- **D-A1-a, the activity gate (S11 `casa_active`).** The gate today is any CASA inflow or outflow in
+  the WM weekly flows, with no filter on type. H-RL1 is confirmed: on RL, 66% of the 0-point Low rows
+  have a debit to the loan account, and 1,391 of 2,121 (65.6%) have only EMI repayments and same-week
+  top-ups. On CC, 23.4% have only self-transfers (and the "SELF" reason also holds own-card
+  repayments). If the gate counted only customer-initiated money movement — no own-loan instalment
+  recovery (`INSTL_RECOVERY-PL/AL`, debits to the customer's loan account), no self-transfer wash
+  (`tran_type` SELF pairs), no fees or interest:
+  - CC Low→Unknown between 1,058 and 2,171 (15–31% of Low);
+  - RL Low 89.5% → about 45–60% (1,196–1,791 rows to Unknown).
+  This needs a CASA activity feature from the raw CASA table (a primary beside
+  `prm_casa_return_events`), because the WM flows cannot separate the types.
+- **D-A1-b, the bureau bridge (O65).** Either fix the link now (a Sonnet investigation: which field
+  ties an AECB file to a CIF — Emirates ID, the inquiry / request table, `contract_link` keys), or ship
+  the finish bundle on the current bridge and fix it with GRR's bureau feed. Either way the engine is
+  ready.
+- **D-A1-c, DCORE EOSB results** (EOS expected or received: 292 CC rows, 175 RL; mostly Low with no
+  liquidity). Ignore, keep as a diagnostic column, or treat as a liquidity signal.
+
+**Open, not blocking:** the RL Unknown control (63.5% of RL Unknown rows have a customer-initiated
+CASA transaction although the WM flag is 0) is unexplained. It is moot if D-A1-a moves the gate to
+the raw table. Neither the effect of DDS pairs on the 1,712 CC / 672 RL Low rows with distress, nor
+the count of salary files the bridge cannot reach, was measured.

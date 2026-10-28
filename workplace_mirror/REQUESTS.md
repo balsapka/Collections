@@ -13,9 +13,10 @@ The A1 test modules (`src/tests/pipelines/crx_persona/schema_registry.py`,
 Ask the UAT Sonnet to copy the items verbatim into `tmp_validation/mirror_requests/snippets.md`
 (as before), then photograph or transcribe that file. Ordered by what each request unblocks.
 
-## A2 — the refactor bundle
+## A1 — the CC finish bundle
 
-### R12 — CASA spend source, after v02 (only the entry of the route v02 picks)
+### R13 — how WM decodes `week_number` (O64)
 
-The catalog entries of `wm_pri_labelled_transactions_indicators_by_week`
-(`catalog_casa_plus_ftr.yml`) and `comp_financial_tran_repos_dly`.
+`week_number` is `yyyyMM0W` (week 01–04 of the month). Wanted: the function in `wealth_management`
+that turns it into a date (the one `ft_days_since_salary_transaction` is counted to), with file:line,
+and the snippet A1 v03b used for "WM's decode" (`tmp_validation/a1_v03/`).
