@@ -1,5 +1,9 @@
 # A1 Ability — initial results
 
+> **On hold (user, 2026-10-28): not for GRR.** Pre-fix numbers. The report to GRR is written from the
+> final pipeline (CC finish bundle) with the metrics in `workplace_mirror/DESIGN_REVIEW.md`,
+> "A1 final report: metrics". Kept as a working draft.
+
 **Scope:** collections customers at 60–180 days past due, credit cards (`cc_60_180`, 19,292 accounts)
 and retail loans (`rl_60_180`, 3,985 accounts), as of 31 August 2026. The numbers come from the
 production run, recomputed independently: 0 differences on 152,658 account-months.
@@ -74,8 +78,8 @@ loan Low 86–92%.
 | Median age of the last salary, bank / bureau | 8 / 12 months | 7 / 15 months |
 | Customers with salary from: bank only · bureau only · both · neither | 46.9 · 0.06 · 0.12 · 53.0% | 28.8 · 7.9 · 45.5 · 17.8% |
 
-The salary stopped months before the account reached 60 days past due, which fits job loss or a
-salary moved to another bank.
+"Older than the window" means no salary in the observation month and the 2 months before it (3 at
+60–180 days past due, 6 at 180+); it says nothing about when the customer became delinquent.
 
 **Liquidity is missing because balances are low, not for lack of a relationship:** 97.2% of card
 accounts and 90.9% of loan accounts have no liquidity points. Of these, 11,721 card / 2,841 loan

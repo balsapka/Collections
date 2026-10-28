@@ -241,6 +241,30 @@ source is refreshed more often; then RL relies on the bureau
 source tables and pipeline only. rl_60_180 first, rl_180_plus later (as cc_180_plus). Bundle numbers: the next free one when built — A2's
 refactor waits on v02, so A1's bundles may come first.
 
+### A1 final report: metrics (user, 2026-10-28)
+
+The report to GRR is written only from the final pipeline (after the CC finish bundle), never from
+pre-fix numbers. The finish bundle's check pipeline (and the RL run) logs every table below, per
+`model_id` (cc / rl 60–180; 180+ when built), latest observation month, accounts and CIFs, RL also by
+product. Every split is MECE and sums to the base. "Window" = `W` (3 months at 60–180, 6 at 180+, the
+observation month included); never phrase it as a DPD date. "Ever" = all history the source holds:
+log each source's earliest month next to it.
+
+| # | Table | Categories (each row in exactly one) |
+|---|---|---|
+| M1 | State distribution | high · moderate · low · unknown; and the 8-month range |
+| M2 | Internal salary history | never had a salary with us · had one, none in `W` (split by months since the last salary) · salary in `W` |
+| M3 | Bureau | no bureau record · record, not linked to a file · linked, never any bureau salary · bureau salary ever, none in `W` · bureau salary in `W` (written only after the O65 link fix) |
+| M4 | Income source in `W` | internal only · bureau only · both · neither; income level stable / weak / none |
+| M5 | CASA relationship | no CASA with us · CASA dormant in `W` (no customer-initiated movement) · CASA active |
+| M6 | Liquidity | max monthly balance in `W`: none / < 1,000 / 1,000–3,000 / ≥ 3,000 (and ≥ the anchor); external card payment yes / no; level adequate / weak / none |
+| M7 | Unknown, why | no CASA with us (unknown by design) · dormant CASA |
+| M8 | Low, why | 0 points + active CASA, no distress · 0 points + distress · 1 point · 2–3 points pulled down by distress |
+| M9 | Moderate / High, how | the income × liquidity × distress combination |
+| M10 | Distress | none · cheque only · DDS only · bureau only · overlaps; bureau repeats dropped |
+| M11 | Diagnostics | EOSB note in `W`; anchor present, p10/p50/p90, and how often it raises a floor |
+| M12 | Change vs the current output | old × new state crosstab, and which change moved each row (salary dating, S12, gate, bureau) |
+
 ## 7. Data layers (decided 2026-10-23)
 
 Persona pipelines read **primary and feature datasets only**. A raw source is read once,
