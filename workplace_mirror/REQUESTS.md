@@ -20,3 +20,9 @@ Ask the UAT Sonnet to copy the items verbatim into `tmp_validation/mirror_reques
 `week_number` is `yyyyMM0W` (week 01–04 of the month). Wanted: the function in `wealth_management`
 that turns it into a date (the one `ft_days_since_salary_transaction` is counted to), with file:line,
 and the snippet A1 v03b used for "WM's decode" (`tmp_validation/a1_v03/`).
+
+### R14 — the v03b CASA transaction classification (S11 gate)
+
+The code in `tmp_validation/a1_v03/` that sorted `comp_financial_tran_repos_dly` rows into
+administrative / unclassified / customer-initiated / self-transfer / EMI repayment (the regexes and
+columns, part D of v03b), verbatim.

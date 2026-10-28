@@ -3,8 +3,8 @@
 Give this to the UAT Sonnet 5.5. Same flow as before: Sonnet writes the snippet in UAT, you run it in
 PROD for `cc_60_180` and `rl_60_180` (switch `model_id` in `globals_dev.yml`), commit the JSONs,
 Sonnet writes the summary. Paste back `tmp_validation/a1_bureau_link/summary.md` and the inventory
-section of its `README.md`. While you are there, the same session can answer R13 (`REQUESTS.md`:
-how WM decodes `week_number`).
+section of its `README.md`. While you are there, the same session can answer R13 and R14 (`REQUESTS.md`: how WM decodes
+`week_number`; the v03b CASA transaction classification).
 
 ````text
 Goal: find how an AECB bureau file is tied to one of our customers (cif_id), so that bureau salary

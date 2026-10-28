@@ -217,6 +217,14 @@ The CC month-end output is in PROD (bundle 03 Step 9 matched the check). A1 is c
 | c | **RL bundle**: RL wrapper on the engine (EMI anchor via a loan feature, the same CIF features), delete the RL waterfall (`rl_a1_ability/` + `crx_rl_a1_group_*`) | decisions below | distribution + crosstab vs the RL waterfall |
 | d | v03 for rl_60_180, then the A1 final report (CC + RL) for GRR | c | — |
 
+**After A1 v03b (2026-10-28, `bundle_helpers/a1_final/a1_v03b_results.md`)** the CC finish bundle also
+carries: the salary dating fix (O64, WM's `week_number` decode, R13); the activity gate on
+customer-initiated CASA movement (S11 revised: a monthly CIF activity feature from a new primary on
+`comp_financial_tran_repos_dly`, classification R14); the bureau CIF link fix if the investigation
+finds one (O65, `sonnet_a1_bureau_link_prompt.md`); the EOSB diagnostic column (S13). S13 bureau EOS
+rule dropped. Its PROD check expects larger moves than first planned: Limited→Unknown (gate),
+Limited→Moderate→High (salary dating, S12).
+
 RL anchor (user, 2026-10-26): `int_loan_master` is the month-end loan snapshot built on the
 loan primary, so the RL anchor node reads it directly (obs base + one dataset):
 `monthly_emi_due` (= `installment_due_amount`) on the observation month's snapshot; missing or

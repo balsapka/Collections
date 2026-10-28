@@ -6,7 +6,8 @@ Section 1–3 transcribe the workbook; section 4 compares it with the code.
 ## 1. Inputs
 
 Internal salary credit, bureau salary, CASA average balance, external card payments,
-cheque bounces, DDS (direct debit) returns, CASA transactions. One added input: the card's
+cheque bounces, DDS (direct debit) returns, customer-initiated CASA transactions (the
+activity gate, S11). One added input: the card's
 outstanding balance, to work out the **minimum due = max(5% × outstanding, AED 100)**.
 Setting the three multiples (`k_inc`, `k_casa`, `k_pay`) to 0 runs on flat amounts only.
 
@@ -19,7 +20,7 @@ State = income points + liquidity points, then distress.
 | High | 4 points and no distress | Regular income and a buffer, both confirmed |
 | Moderate | ≥ 2 but < 4 points and no distress, or 4 points with distress | One side confirmed, or both partly; or everything in place but a payment has just failed |
 | Limited | < 2 points with any signal, or < 4 points with distress | What we can see shows little or nothing to pay with |
-| Unknown | No signal: no income, no CASA balance or transaction, no external card payment, no bounce or return | Absence of data, not evidence of no ability |
+| Unknown | 0 points, no distress, and no CASA with us or a dormant one (no customer-initiated money movement in the window, S11) | We cannot see the customer's money: absence of data, not evidence of no ability |
 
 | Consideration | Level | Points | Rule |
 |---|---|---|---|
@@ -30,7 +31,7 @@ State = income points + liquidity points, then distress.
 | | Weak | 1 | Not Adequate, but a CASA average balance of AED 1,000 or more in any of the last 3 months, or any external card payment of that size |
 | | None | 0 | No CASA average balance and no external card payment of AED 1,000 or more in the last 3 months |
 | Distress (cheque bounce, DDS return) | Yes | −1 level | 1 or more cheque bounces or DDS returns in the last 3 months |
-| Signal (CASA transactions) | No | Unknown | Income None, Liquidity None, no distress and no CASA transaction in the last 3 months |
+| Activity gate (CASA transactions) | Dormant | Unknown | Income None, Liquidity None, no distress, and no customer-initiated CASA transaction in the last 3 months (no CASA at all included) — S11 |
 
 Map (every combination has one state):
 
@@ -38,7 +39,7 @@ Map (every combination has one state):
 |---|---|---|---|
 | **No distress** — Income Stable | High | Moderate | Moderate |
 | Income Weak | Moderate | Moderate | Limited |
-| Income None | Moderate | Limited | Limited (Unknown if no CASA transactions) |
+| Income None | Moderate | Limited | Limited (Unknown if the CASA is dormant or absent) |
 | **With distress** — Income Stable | Moderate | Limited | Limited |
 | Income Weak | Limited | Limited | Limited |
 | Income None | Limited | Limited | Limited |
@@ -76,16 +77,16 @@ decisions by the user where the workbook and the earlier code disagreed:
 |---|---|---|---|
 | S1 | Anchor (the workbook's "minimum due") | **CC 60–180: the amount in the oldest overdue bucket**, excluding the 181–210 bucket and the 211+ catch-all; **CC 180+: no anchor** (absolute thresholds only); **RL: one EMI**. Missing → flat floors | `build_cc_liquidity_anchor`: oldest non-zero of `overdue_bucket_01..06` on the latest snapshot in the observation month; NULL at 180+ |
 | S2 | Income multiple | Income ≥ max(AED 3,000, **2 × anchor**) | `K_INC = 2` |
-| S3 | Salary month | per-month amount ≥ threshold, Stable = 2 of the last 3 | internal credits recovered per month from the WM salary snapshots (credit date = snapshot − days since credit); bureau salary per month; the larger counts. TODO(sonnet): validate against `feat_payroll_indicator` |
+| S3 | Salary month | per-month amount ≥ threshold, Stable = 2 of the last 3 | internal credits recovered per month from the WM salary snapshots (salary month = the snapshot date − days since credit, with `week_number` decoded as WM does — O64: today parsed as a date, one month early; fix in the CC finish bundle, R13); bureau salary per month (the CIF link is under investigation, O65); the larger counts |
 | S4 | Income weakening | last-3-month average ≥ 75% of the prior 3 | `D_INC = 0.25`, months without salary count as 0 |
 | S5/S6 | Weak income, bureau window | any month ≥ AED 1,000 in the last 3 months (bureau included) | the observation month (a month end) and the 2 months before it (6-month window at 180+, S10) |
 | S7 | CASA | ≥ floor in 2 of the last 3 months and not > 50% below the prior 3 | monthly CASA (CA+SA) average from `wm_fea_casa_eod_avg_balance` (4-week average at the month's last weekly snapshot) |
 | S8 | External card payment | one payment ≥ max(AED 500, anchor) / ≥ AED 1,000 for Weak | largest single payment in the last 3 months |
 | S9 | Distress | cheque bounces and DDS returns, bureau **and internal**, across all the customer's accounts | bureau bounced cheques wired; `payment_order` and `internal_returns` slots ready. TODO(sonnet): find the internal returned-cheque / DDS-return source |
 | S10 | Window by segment (user, 2026-10-24) | the workbook's 3-month windows | **60–180: 3 months, 180+: 6 months**, the observation month included, as on every other axis; "2 of 3" becomes **3 of 6** at 180+; the prior window is the 6 months before; card payments, distress and CASA activity read the 6 months | `_common.window_months(model_id)`; `classify.MIN_MONTHS = {3: 2, 6: 3}` |
-| S11 | Unknown gate (user, 2026-10-27) | the *Signal* row (no CASA transaction) and the *Unknown* state text ("no CASA balance or transaction, no external card payment") disagree | the Signal row: Unknown = 0 points, no distress and no CASA transaction in the window; a CASA balance or an external card payment under the Weak floors does not rule it out | `classify.build_a1_ability` (`casa_active`) |
+| S11 | Activity gate (user, 2026-10-27; revised 2026-10-28 after A1 v03b) | the *Signal* row (no CASA transaction) and the *Unknown* text disagree; and any WM CASA flow kept the gate open, mostly the bank's own EMI recovery on RL | Within 0 points and no distress (balance < AED 1,000 in every month, no qualifying income or card payment): **Unknown** when the customer has no CASA with us or a **dormant** one — no customer-initiated money movement on any of the CIF's CASA accounts in the window; otherwise **Limited** (an account they use, where money never stays). Counts: credits from third parties (salary, transfers in, cash deposits), card and ATM spend, transfers out, bill payments, paying their own credit card. Does not count: the bank recovering the customer's own loan instalment (`INSTL_RECOVERY-PL/AL`, debits to their loan account), transfers between their own CASA accounts (net zero at CIF level), fees, charges, interest, reversals. Distress always means Limited. Sized by v03b: CC Limited→Unknown 1,058–2,171 (15–31%), RL Limited 89.5% → ~45–60% | not yet: CC finish bundle — a monthly CIF activity feature from `comp_financial_tran_repos_dly` (a primary beside `prm_casa_return_events`); the type classification of v03b (R14) |
 | S12 | Salary timing (user, 2026-10-27; sized by A1 v03) | a salary month = a calendar month with salary ≥ the threshold, 2 of 3 months | an employer may pay early, so one month holds two salaries and the next none; the WM table gives only monthly totals (`bundle_helpers/a1_final/wm_salary_feature_logic.md`). **Window-total rule:** Stable = salary received in the window (sum of the monthly incomes, each the larger of internal and bureau) ≥ 2 × the threshold (3 × at 180+) **and** the window total not more than 25% below the prior window's total. Known limit: a month with salary plus a large bonus can pass | not yet: CC finish bundle |
-| S13 | End-of-service payment (user, 2026-10-27) | — (the workbook has no EOS rule) | EOS is not salary; it counts only through the CASA balance. The WM salary table already excludes EOS (user), so internal income needs no rule. Bureau salary: if v03 finds EOS-like spikes (a month > 3× the customer's median of the 12 months before), the same exclusion applies to the bureau sources | internal: as is; bureau: after v03 |
+| S13 | End-of-service payment (user, 2026-10-27) | — (the workbook has no EOS rule) | EOS is not salary; it counts only through the CASA balance. The WM salary table already excludes EOS (user), so internal income needs no rule. Bureau: no rule — v03b found bureau history too thin to show spikes (CC 3, RL 10 EOS-like months); revisit with GRR's bureau feed. DCORE EOSB results (EOS expected / received; v03b: 292 CC, 175 RL rows) are a **diagnostic column only**, no effect on points or state (user, 2026-10-28) | internal: as is; bureau: none; EOSB diagnostic: CC finish bundle |
 
 Every customer-level signal is read across **all accounts of the CIF**. Local check:
 `workplace_mirror/checks/a1_engine_spec.py` — 25 cases built from the workbook rows, all
