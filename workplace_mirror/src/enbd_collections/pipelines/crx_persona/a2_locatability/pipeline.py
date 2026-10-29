@@ -28,6 +28,7 @@ from .b06_check import (
     compare_a2_outputs,
     describe_a2_rules,
     describe_debit_evidence,
+    explain_reachability,
     split_by_product,
 )
 from .classify import build_a2_locatability
@@ -126,6 +127,19 @@ def create_b06_check_pipeline(product: str) -> Pipeline:
             inputs=[check, "params:model_id"],
             outputs=None,
             name=f"describe_crx_{product}_a2_b06_rules",
+            tags=tags,
+        ),
+        node(
+            func=explain_reachability,
+            inputs=[
+                obs,
+                "dcore_prm_followup_outcomes",
+                "prm_dcore_account_agreements",
+                check,
+                "params:model_id",
+            ],
+            outputs=None,
+            name=f"explain_crx_{product}_a2_b06_reach",
             tags=tags,
         ),
         node(

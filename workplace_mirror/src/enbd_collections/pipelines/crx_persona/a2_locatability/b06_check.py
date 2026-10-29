@@ -12,18 +12,32 @@ Log blocks, aggregates only:
   ``prm_casa_card_transactions`` by month, channel / type and place (the Offline → Machine
   change, ATM placement), and their ``reason_for_excluding`` values.
 * ``split_by_product`` (``B06 PRODUCT``, RL only): the latest month by ``loan_type``.
+* ``explain_reachability`` (``B06 REACH``): reachability rebuilt under the earlier rule,
+  then each change in turn, with the moves at every step.
 
 Removed by the bundle's cleanup.
 """
 
 import logging
+from itertools import pairwise
 
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
 from enbd_collections.nodes.utils.location import is_uae
 
-from .._common import window_months
+from .._common import GRAIN, window_months
+from .codes import (
+    CALL_CODES,
+    FAILED_CALL,
+    IGNORED,
+    IGNORED_PREFIX,
+    INBOUND_CODES,
+    OUTBOUND_CODES,
+    RIGHT_PARTY_CONTACT,
+    SUCCESS_CATEGORY,
+)
+from .signals import GONE_DARK_DAYS, _dcore_events
 
 LOG = logging.getLogger(__name__)
 
@@ -259,3 +273,143 @@ def split_by_product(new: DataFrame, rl_spine: DataFrame, model_id: str) -> None
         *_table(df, "loan_type", "deceased_flag"),
     ]
     _log("PRODUCT", model_id, lines)
+
+
+# Rang out / no answer only: the narrow failure set of the earlier rule.
+_RINGING = frozenset({"RINGING NO REPLY", "RINGING NO RESPONSE", "NO ANSWER"})
+
+
+def _gone_dark(
+    calls: DataFrame, failed_names: frozenset, w_start: F.Column
+) -> DataFrame:
+    """Per row: gone dark (last GONE_DARK_DAYS call days all failed, oldest in W, no
+    contact since) with ``failed_names`` as the failure set and the given calls."""
+    outbound = F.col("action_code").isin(*OUTBOUND_CODES)
+    days = calls.groupBy(*GRAIN, "day").agg(
+        F.max(outbound.cast("int")).alias("_attempt"),
+        F.max(F.col("_contact").cast("int")).alias("_c"),
+        F.min(F.when(outbound, F.col("name").isin(*failed_names).cast("int"))).alias(
+            "_all_failed"
+        ),
+    )
+    days = days.withColumn(
+        "_failed", ((F.col("_c") == 0) & (F.col("_all_failed") == 1)).cast("int")
+    )
+    recent = Window.partitionBy(*GRAIN).orderBy(F.col("day").desc())
+    last = (
+        days.filter(F.col("_attempt") == 1)
+        .withColumn("_rank", F.row_number().over(recent))
+        .filter(F.col("_rank") <= GONE_DARK_DAYS)
+        .groupBy(*GRAIN)
+        .agg(
+            F.count("*").alias("_n"),
+            F.sum("_failed").alias("_f"),
+            F.min("day").alias("_oldest"),
+        )
+    )
+    contact = days.groupBy(*GRAIN).agg(
+        F.max(F.when(F.col("_c") == 1, F.col("day"))).alias("_last_contact")
+    )
+    return last.join(contact, on=list(GRAIN), how="left").select(
+        *GRAIN,
+        (
+            (F.col("_n") == GONE_DARK_DAYS)
+            & (F.col("_f") == GONE_DARK_DAYS)
+            & (F.col("_oldest") >= w_start)
+            & (
+                F.col("_last_contact").isNull()
+                | (F.col("_last_contact") < F.col("_oldest"))
+            )
+        ).alias("gd"),
+    )
+
+
+def explain_reachability(  # pylint: disable=too-many-locals
+    obs_base: DataFrame,
+    followup: DataFrame,
+    agreements: DataFrame,
+    new: DataFrame,
+    model_id: str,
+) -> None:
+    """Reachability rebuilt from the same DCORE calls under the earlier rule, then each
+    change applied in turn, latest month: the state mix after every step and the moves
+    between steps.
+
+    R0 earlier rule: any contact ever → reachable, unless the last 3 call days only rang
+       out (admin entries kept as calls) → non_reachable
+    R1 + dead lines, invalid numbers and LEFT_MSG count as failed (D-A2-7, D-A2-17)
+    R2 + admin / legal entries ignored (D-A2-17)
+    R3 + the contact must be in W (= the new rule; checked against ``new``)
+    """
+    obs = _latest_month(obs_base).select(*GRAIN)
+    events = _dcore_events(obs, followup, agreements)
+    name, code = F.col("name"), F.col("action_code")
+    events = events.withColumn(
+        "_contact",
+        code.isin(*INBOUND_CODES)
+        | (code.isin(*OUTBOUND_CODES) & (F.col("category") == SUCCESS_CATEGORY))
+        | name.isin(*RIGHT_PARTY_CONTACT),
+    )
+    calls_all = events.filter(code.isin(*CALL_CODES))
+    calls_new = calls_all.filter(
+        ~name.isin(*IGNORED) & ~name.startswith(IGNORED_PREFIX)
+    )
+    w_start = F.add_months(
+        F.trunc("observation_date", "month"), 1 - window_months(model_id)
+    )
+    contact = calls_new.groupBy(*GRAIN).agg(
+        F.max(F.when(F.col("_contact"), F.col("day"))).alias("last_contact")
+    )
+    variants = {
+        "gd_r0": (calls_all, _RINGING),
+        "gd_r1": (calls_all, FAILED_CALL),
+        "gd_r2": (calls_new, FAILED_CALL),
+    }
+    df = obs.join(contact, on=list(GRAIN), how="left").withColumn("_w", w_start)
+    for col, (calls, failed) in variants.items():
+        gd = _gone_dark(calls, failed, w_start).withColumnRenamed("gd", col)
+        df = df.join(gd, on=list(GRAIN), how="left")
+
+    def state(gd: str, in_window: bool) -> F.Column:
+        has_contact = (
+            F.col("last_contact") >= F.col("_w")
+            if in_window
+            else F.col("last_contact").isNotNull()
+        )
+        return (
+            F.when(F.coalesce(F.col(gd), F.lit(False)), "non_reachable")
+            .when(has_contact, "reachable")
+            .otherwise("unknown")
+        )
+
+    df = (
+        df.withColumn("R0", state("gd_r0", False))
+        .withColumn("R1", state("gd_r1", False))
+        .withColumn("R2", state("gd_r2", False))
+        .withColumn("R3", state("gd_r2", True))
+        .cache()
+    )
+    steps = ["R0", "R1", "R2", "R3"]
+    lines = []
+    for step in steps:
+        lines += [f"{step} state:", *_table(df, step)]
+    for before, after in pairwise(steps):
+        lines += [
+            f"moves {before} -> {after}:",
+            *_table(df.filter(F.col(before) != F.col(after)), before, after),
+        ]
+    engine = _latest_month(new).select(
+        *GRAIN, F.col("reachability_state").alias("_engine")
+    )
+    mismatches = (
+        df.join(engine, on=list(GRAIN), how="inner")
+        .filter(F.col("R3") != F.col("_engine"))
+        .count()
+    )
+    lines += [
+        "R0 -> R3 (all changes):",
+        *_table(df, "R0", "R3"),
+        f"R3 vs the engine's reachability_state: {mismatches} mismatches",
+    ]
+    _log("REACH", model_id, lines)
+    df.unpersist()
