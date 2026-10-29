@@ -535,7 +535,7 @@ DETAIL = [  # (section, [(label, state tone, CC count, RL count)]); RL rules / r
         ("Non-Reachable · never a contact", "non_reachable", 4961, None),
         ("Reachable · contact in the window", "reachable", 4043, None),
         ("Unknown · contact before the window", "unknown", 1065, None),
-        ("Unknown · never a contact (273 never called)", "unknown", 1146, None)]),
+        ("Unknown · never a confirmed contact (273 with no collections record)", "unknown", 1146, None)]),
     ("Call days in the window", [
         ("None", "unknown", 743, None), ("1–2", "unknown", 446, None),
         ("3–5", "unknown", 1539, None), ("6 or more", "unknown", 16564, None)]),
