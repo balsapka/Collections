@@ -1,4 +1,4 @@
-# A2 v04: the debit-row drop from 2026-05 and foreign logins (VPN) before GRR
+# A2 v04: the debit-row drop from 2026-05, foreign logins (VPN), and the Non-Reachable threshold, before GRR
 
 Give this to the UAT Sonnet 5.5. Same flow as before: Sonnet writes the snippet in UAT. You run it in PROD
 for `cc_60_180` and `rl_60_180` (switch `model_id` in `globals_dev.yml`) and commit the JSONs. Sonnet then
@@ -6,7 +6,7 @@ writes the summary. Paste back `tmp_validation/a2_v04/summary.md`.
 Our review of the bundle 07 check is in `bundle_helpers/b07_a2/b07_check_results.md`.
 
 ````text
-Goal: two checks on the new A2 locatability output (crx_cc_a2_locatability / crx_rl_a2_locatability,
+Goal: three checks on the new A2 locatability output (crx_cc_a2_locatability / crx_rl_a2_locatability,
 latest observation month 2026-08) before it goes to GRR. You work in UAT with no data: write a
 validation snippet, the user runs it in PROD, then you analyse the results. Change no pipeline code.
 
@@ -51,11 +51,28 @@ Hypotheses, each with a verdict and the numbers behind it:
      Re-derive these in the snippet from the same inputs as the engine (feat_cif_location_monthly
      and the login primary). First reproduce the engine's location_state for the "as now" case:
      0 mismatches, else report the count and stop V2.
+  R1 Non-Reachable threshold (GONE_DARK_DAYS = 3 in a2_locatability/signals.py, build_dcore_signals).
+     Today: Non-Reachable = the last 3 call days all failed, the oldest in W, no contact since;
+     else Reachable = a contact in W; else Unknown. CC 2026-08: Non-Reachable 67.6%, Reachable 21.0%,
+     Unknown 11.5%. 3,386 accounts (17.6%) had a contact in W and are Non-Reachable anyway; 85.9%
+     have 6+ call days in W. Reuse the engine's own helpers and code lists (_dcore_events,
+     codes.py) so call days, failures and contacts are defined exactly as in the engine.
+     Per account, the failed run k = the number of consecutive failed call days counted back from
+     the latest call day, stopping at a call day that did not fail, at the start of W, or at the
+     last contact date. Non-Reachable at threshold N <=> k >= N. First check that N = 3 gives the
+     engine's reachability_state: 0 mismatches, else report the count and stop R1. Then:
+     - the distribution of k (0..15, 16+);
+     - for N = 1..10: Non-Reachable / Reachable / Unknown counts and shares, and how many of the
+       Non-Reachable had a contact in W;
+     - span: for k >= 3, the calendar days from the run's oldest to its latest call day (buckets
+       1-3, 4-7, 8-14, 15-30, 31+), crossed with k (3-5, 6-9, 10+), so a rule like "N failed call
+       days spanning at least D days" can be read off;
+     - the same N table by month, Jan-Aug 2026, Non-Reachable share only.
 
 Hard rules:
 - catalog.load only (no spark.read, no paths); model_id from catalog.load("params:model_id"), in
   the output file name; nothing hardcoded or overridden.
-- Aggregates only: no CIFs, account ids, IPs or customer rows in the results. Countries by ISO code
+- Aggregates only: no CIFs, account ids, IPs, call notes or customer rows in the results. Countries by ISO code
   are fine; leave out any count under 10.
 - Base = the obs base for model_id (crx_cc_obs_base / crx_rl_obs_base), latest observation month;
   customer = cif_id; dates never joined exactly to cc_spine / dcore_observation_spine / prm_contract
@@ -72,5 +89,7 @@ Deliverables:
    - per hypothesis, a verdict line and the key numbers, CC and RL side by side;
    - then a recommendation: does the debit drop need a data fix, and should foreign logins stay
      L1 evidence as they are, or be ignored when a UAE login falls within N days?
+   - the R1 table for N = 1..10, CC and RL side by side, and where the curve flattens.
+     Do not recommend a value; the user decides.
    Check each number against the JSON; write NOT IN JSON when one is missing.
 ````
