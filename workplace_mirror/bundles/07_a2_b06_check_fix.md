@@ -1,6 +1,6 @@
 # Mirror bundle 07 — A2 — bundle 06 check fix (old single-state schema) + reachability attribution
 
-apply_bundle version: 6 · built 2026-10-29 from `840e3f5..038994b` · source: 0 added, 2 replaced, 0 deleted · helpers: 0
+apply_bundle version: 6 · built 2026-10-29 from `840e3f5..3ac0310` · source: 0 added, 2 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -52,29 +52,20 @@ python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/07_a2
 git fetch origin && git checkout feature/persona_redesign_b01 && git pull
 ```
 
-Only the log nodes are run for CC; everything upstream is already written.
-First **`cc_60_180`** (the default), then **`rl_60_180`** (full bundle 06 step 7, since RL has
-not run yet). Switch `model_id` back to `cc_60_180` when done.
+Only the log nodes are re-run; everything upstream is already written (the earlier runs stopped
+at the comparison node). First **`cc_60_180`** (the default), then **`rl_60_180`**. Switch
+`model_id` back to `cc_60_180` when done.
 
-**Step 6.** CC — run the three log nodes (everything upstream is already written):
+**Step 6.** CC — the three log nodes:
 
 ```bash
 kedro run --env=dev --pipeline=crx_cc_a2_locatability_b06_check --nodes "compare_crx_cc_a2_b06,describe_crx_cc_a2_b06_rules,explain_crx_cc_a2_b06_reach"
 ```
 
-**Step 7.** RL (`model_id: rl_60_180`) — bundle 06 steps 6 and 7 (logins and CASA primaries
-for RL, then the full check):
+**Step 7.** RL (`model_id: rl_60_180`) — the log nodes, including the debit and product blocks:
 
 ```bash
-kedro run --env=dev --pipeline=digital_login
-```
-
-```bash
-kedro run --env=dev --pipeline=casa_primary
-```
-
-```bash
-kedro run --env=dev --pipeline=crx_rl_a2_locatability_b06_check
+kedro run --env=dev --pipeline=crx_rl_a2_locatability_b06_check --nodes "compare_crx_rl_a2_b06,describe_crx_rl_a2_b06_rules,explain_crx_rl_a2_b06_reach,describe_crx_rl_a2_b06_debit,split_crx_rl_a2_b06_product"
 ```
 
 Paste back every block from `=== B06 … START ===` to `=== B06 … END ===`: CC `OUTPUT`,
