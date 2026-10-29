@@ -13,3 +13,15 @@ casa_primary:
   # including the persona start month (location evidence has no age limit; the raw
   # table holds about three years).
   card_history_months: 36
+  # Calendar months of all CASA legs kept in prm_casa_transactions up to and including the
+  # persona start month: the A1 "holds a CASA with us" test looks back 12 months.
+  transaction_history_months: 12
+
+##################################################
+# CASA FEATURES
+##################################################
+casa_features:
+  # Calendar months kept up to and including the persona start month by the WM-based
+  # features (balances, external card payments): the A1 prior window (12 months at 180+)
+  # and the 12-month CASA test. Internal salary keeps all history.
+  history_months: 12

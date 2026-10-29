@@ -241,6 +241,13 @@ source is refreshed more often; then RL relies on the bureau
 source tables and pipeline only. rl_60_180 first, rl_180_plus later (as cc_180_plus). Bundle numbers: the next free one when built — A2's
 refactor waits on v02, so A1's bundles may come first.
 
+**Bundle 08 = the A1 finish (built 2026-10-29, user: full relayering now, bureau reads as today,
+the GRR report from its check).** Everything above except the bureau link (O65, cause found:
+only `subj_cntrct_link` ties files to subjects in the sandpit) and `feat_cc_balance_month_end`
+(the anchor keeps reading the primary `prm_balance`, which the layer rule allows). R13 / R14 were
+not needed (O64 rounded to the month's first; the gate uses the FTR row-handling lanes). The
+departure-signature packages stay (`rl_a4_spine` imports one). Its check logs M1–M12.
+
 ### A1 final report: metrics (user, 2026-10-28)
 
 The report to GRR is written only from the final pipeline (after the CC finish bundle), never from

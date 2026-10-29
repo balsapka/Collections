@@ -4,19 +4,21 @@ Spec: ``workplace_mirror/specs/A1_ability_spec.md`` (GRR workbook A1_ability_202
 
 Observation dates are month ends. The window is W calendar months, the observation month
 included (``_common.window_months``: 3 for 60–180, 6 for 180+): m1 = the observation
-month … mW; "the prior window" is m(W+1)–m(2W). The builders return the amounts the
-classifier compares with its thresholds:
+month … mW; "the prior window" is m(W+1)–m(2W). The builders read the observation base
+and monthly ``(cif_id, month_end)`` feature tables, and return what the classifier
+compares with its thresholds:
 
 * income    — salary received in each month (internal credit or bureau salary,
               the larger);
 * liquidity — CASA average balance in each month, largest single external card payment;
-* activity  — any CASA transaction in the window (the Unknown gate);
-* distress  — a cheque bounce or direct-debit return in the window.
+* activity  — customer-initiated CASA movement in the window (the Unknown gate) and
+              whether the customer holds a CASA with us at all;
+* distress  — a cheque return, a direct-debit (DDS) return or a new bureau bounce in
+              the window;
+* EOSB      — a DCORE end-of-service result in the window (diagnostic only).
 
-Customer-level sources are always read for the whole CIF — all the customer's accounts —
-never for the scored account_id alone (an RL account_id is not a CASA account). Each
-builder reads its sources from the earliest observation's first month on
-(``lookback_floor``), so source history before it is never shuffled.
+Features are per customer (CIF): every account of the customer counts, never the scored
+account_id alone (an RL account_id is not a CASA account).
 """
 
 from __future__ import annotations
@@ -28,18 +30,31 @@ from .._common import (
     GRAIN,
     left_join_all,
     lookback_floor,
-    parse_yyyymmdd,
     require_columns,
     window_agg,
     window_months,
 )
 
-# reason_for_excluding values that count as distress. prm_casa_return_events also carries
-# "RETURNS", which is POS reversals (checked in PROD, Sonnet v01).
-DISTRESS_RETURN_REASONS = ("CHEQUE RETURNS", "DDS Rejects/Reversal")
-_CASA_MONTH_COL = "ft_avg_casa_eod_balance_in_last_0_3_weeks_avg"  # CA+SA, ~1 month
-_CASA_IN_COL = "ft_inflow_casa_amt_in_last_0_0_weeks_sum"
-_CASA_OUT_COL = "ft_outflow_casa_amt_in_last_0_0_weeks_sum"
+# prm_casa_return_events reasons that count as distress; it also carries "RETURNS"
+# (POS refunds).
+CHEQUE_RETURN, DDS_RETURN = "CHEQUE RETURNS", "DDS Rejects/Reversal"
+# feat_cif_casa_activity_monthly lanes that are money the customer moved (S11): third-
+# party credits, transfers to others, cash, clearing, bill payments, card spend and
+# paying their own credit card. Not: own-account wash, the bank recovering the
+# customer's loan instalment, fees, interest, reversals, returns, group-internal and
+# ambiguous rows.
+CUSTOMER_LANES = ("economic", "card_spend", "card_payment")
+# Months in which a CASA leg or a positive balance shows the customer holds a CASA
+# with us (WM may fill missing balances with 0, so a zero balance proves nothing).
+CASA_HELD_MONTHS = 12
+EOSB = "EOSB"  # in a DCORE result name: end-of-service benefits expected / received
+
+
+def _cifs(obs_base: DataFrame) -> DataFrame:
+    """Observation rows with a CIF, ``cif_id`` as string (the features' type)."""
+    return obs_base.filter(F.col("cif_id").isNotNull()).withColumn(
+        "cif_id", F.col("cif_id").cast("string")
+    )
 
 
 def _month_index(date: Column) -> Column:
@@ -51,12 +66,12 @@ def _month_index(date: Column) -> Column:
 def _by_month(
     obs: DataFrame, series: DataFrame, value: str, prefix: str, months: int
 ) -> DataFrame:
-    """Spread a ``(cif_id, month, value)`` series over ``{prefix}_m1 … _m{months}`` per
-    observation (NULL where the month has no value)."""
+    """Spread a ``(cif_id, month_end, value)`` series over ``{prefix}_m1 …
+    _m{months}`` per observation (NULL where the month has no value)."""
     return (
         obs.select(*GRAIN, "cif_id")
-        .join(series, on="cif_id")
-        .withColumn("_k", _month_index(F.col("month")))
+        .join(series.select("cif_id", "month_end", value), on="cif_id")
+        .withColumn("_k", _month_index(F.col("month_end")))
         .filter(F.col("_k").between(1, months))
         .groupBy(*GRAIN)
         .agg(
@@ -68,61 +83,12 @@ def _by_month(
     )
 
 
+def _in_window(obs: DataFrame, series: DataFrame, months: int, *aggs) -> DataFrame:
+    """``aggs`` over the ``(cif_id, month_end, …)`` rows of the last ``months`` months."""
+    return window_agg(obs, series, date_col="month_end", aggs=list(aggs), months=months)
+
+
 # ── Income ────────────────────────────────────────────────────────────────────
-
-
-def _internal_salary(wm_salary: DataFrame, since: str) -> DataFrame:
-    """Salary credits by month, recovered from the weekly WM snapshots dated ``since`` on
-    (an earlier snapshot cannot see a later credit).
-
-    Each snapshot carries the last salary credited and how many days before the snapshot
-    it was, so snapshot date minus that gap is the credit date. Several snapshots see
-    the same credit; they collapse to one value per month.
-
-    This is the only internal salary source. ``feat_payroll_indicator`` is not used: it is
-    stamped the month after the credit and flags a subset of these months.
-    """
-    require_columns(
-        wm_salary,
-        [
-            "cif_id",
-            "week_number",
-            "ft_last_salary_amount",
-            "ft_days_since_salary_transaction",
-        ],
-        "wm_fea_salary_days_since_increment",
-    )
-    week = parse_yyyymmdd("week_number")
-    credit_date = F.date_sub(
-        week, F.col("ft_days_since_salary_transaction").cast("int")
-    )
-    return wm_salary.filter(week >= F.lit(since)).select(
-        "cif_id",
-        F.trunc(credit_date, "month").alias("month"),
-        F.col("ft_last_salary_amount").cast("double").alias("amount"),
-    )
-
-
-def _bureau_salary(salary_hist: DataFrame, cif_bridge: DataFrame) -> DataFrame:
-    """Bureau-reported salary by month."""
-    require_columns(
-        salary_hist,
-        [
-            "subj_salcr_hist_hdr_file_id",
-            "subj_salcr_hist_ref_mnth",
-            "subj_salcr_hist_tot_sal_amt",
-        ],
-        "stg_aecb_salary_history",
-    )
-    require_columns(cif_bridge, ["bureau_file_id", "cif_id"], "prm_bureau_cif_bridge")
-    bridge = cif_bridge.select(
-        F.col("bureau_file_id").alias("subj_salcr_hist_hdr_file_id"), "cif_id"
-    ).distinct()
-    return salary_hist.join(bridge, on="subj_salcr_hist_hdr_file_id").select(
-        "cif_id",
-        F.to_date("subj_salcr_hist_ref_mnth", "MMyyyy").alias("month"),
-        F.col("subj_salcr_hist_tot_sal_amt").cast("double").alias("amount"),
-    )
 
 
 def _loan_bureau_salary(obs_base: DataFrame, loan_features: DataFrame) -> DataFrame:
@@ -137,181 +103,137 @@ def _loan_bureau_salary(obs_base: DataFrame, loan_features: DataFrame) -> DataFr
         ["account_id", "aecb_bureau_pull_date", "aecb_last_salary_credit_amount"],
         "feature_retail_loans",
     )
-    cifs = (
-        obs_base.filter(F.col("cif_id").isNotNull())
-        .select("account_id", "cif_id")
-        .distinct()
-    )
+    cifs = _cifs(obs_base).select("account_id", "cif_id").distinct()
     return (
         loan_features.select(
             F.col("account_id").cast("string").alias("account_id"),
-            F.trunc(F.to_date("aecb_bureau_pull_date"), "month").alias("month"),
-            F.col("aecb_last_salary_credit_amount").cast("double").alias("amount"),
+            F.last_day(F.to_date("aecb_bureau_pull_date")).alias("month_end"),
+            F.col("aecb_last_salary_credit_amount")
+            .cast("double")
+            .alias("bureau_salary"),
         )
-        .filter(F.col("month").isNotNull() & F.col("amount").isNotNull())
+        .filter(F.col("month_end").isNotNull() & (F.col("bureau_salary") > 0))
         .join(cifs, on="account_id")
-        .select("cif_id", "month", "amount")
+        .select("cif_id", "month_end", "bureau_salary")
     )
 
 
-def build_income_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def build_income_signals(
     obs_base: DataFrame,
-    wm_salary: DataFrame,
-    salary_hist: DataFrame,
-    bureau_cif_bridge: DataFrame,
+    internal_salary: DataFrame,
+    bureau_salary: DataFrame,
     model_id: str,
     loan_features: DataFrame | None = None,
 ) -> DataFrame:
     """``income_m1 … income_m{2W}``: salary received per month — the larger of the
-    internal credit and the bureau salary (NULL: no salary that month).
+    internal salary (``feat_cif_internal_salary_monthly``) and the bureau salary
+    (``feat_cif_bureau_salary_monthly``); NULL: no salary that month. Also the window's
+    largest month per source, ``internal_salary_w`` / ``bureau_salary_w``.
 
     ``loan_features`` (RL only): ``feature_retail_loans``, whose latest-pull bureau salary
     joins the bureau salary.
     """
-    obs = obs_base.filter(F.col("cif_id").isNotNull())
-    months = 2 * window_months(model_id)
-    since = lookback_floor(obs, months)
-    sources = _internal_salary(wm_salary, since).unionByName(
-        _bureau_salary(salary_hist, bureau_cif_bridge)
+    require_columns(
+        internal_salary,
+        ["cif_id", "month_end", "salary"],
+        "feat_cif_internal_salary_monthly",
     )
+    require_columns(
+        bureau_salary,
+        ["cif_id", "month_end", "bureau_salary"],
+        "feat_cif_bureau_salary_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    since = lookback_floor(obs, 2 * w)
+    internal = internal_salary.select(
+        "cif_id",
+        "month_end",
+        F.col("salary").alias("amount"),
+        F.lit("int").alias("src"),
+    )
+    bureau = bureau_salary.select("cif_id", "month_end", "bureau_salary")
     if loan_features is not None:
-        sources = sources.unionByName(_loan_bureau_salary(obs_base, loan_features))
-    monthly = (
-        sources.filter(F.col("month") >= F.lit(since))
-        .groupBy("cif_id", "month")
-        .agg(F.max("amount").alias("amount"))
+        bureau = bureau.unionByName(_loan_bureau_salary(obs_base, loan_features))
+    sources = internal.unionByName(
+        bureau.select(
+            "cif_id",
+            "month_end",
+            F.col("bureau_salary").alias("amount"),
+            F.lit("bur").alias("src"),
+        )
+    ).filter(F.col("month_end") >= F.lit(since))
+    monthly = sources.groupBy("cif_id", "month_end").agg(
+        F.max("amount").alias("amount")
     )
     return left_join_all(
-        obs_base, [_by_month(obs, monthly, "amount", "income", months)]
+        obs_base,
+        [
+            _by_month(obs, monthly, "amount", "income", 2 * w),
+            _in_window(
+                obs,
+                sources,
+                w,
+                F.max(F.when(F.col("src") == "int", F.col("amount"))).alias(
+                    "internal_salary_w"
+                ),
+                F.max(F.when(F.col("src") == "bur", F.col("amount"))).alias(
+                    "bureau_salary_w"
+                ),
+            ),
+        ],
     )
 
 
 # ── Liquidity and activity ────────────────────────────────────────────────────
 
 
-def _casa_by_month(wm_casa_bal: DataFrame, since: str) -> DataFrame:
-    """CASA (current + savings) average balance per month from ``since`` on: the 4-week
-    average at the month's last weekly snapshot."""
-    require_columns(
-        wm_casa_bal,
-        ["cif_id", "week_number", _CASA_MONTH_COL],
-        "wm_fea_casa_eod_avg_balance",
-    )
-    week = parse_yyyymmdd("week_number")
-    last_in_month = F.max(
-        F.struct(week.alias("w"), F.col(_CASA_MONTH_COL).cast("double").alias("v"))
-    )
-    return (
-        wm_casa_bal.filter(week >= F.lit(since))
-        .groupBy("cif_id", F.trunc(week, "month").alias("month"))
-        .agg(last_in_month.alias("_last"))
-        .select("cif_id", "month", F.col("_last.v").alias("balance"))
-    )
-
-
-def _ext_card_payments(
-    obs: DataFrame,
-    labelled_txn: DataFrame,
-    beneficiary_cards: DataFrame,
-    months: int,
-    since: str,
-) -> DataFrame:
-    """Largest single CASA payment to one of the customer's registered external credit
-    cards in the window.
-
-    ``raw_beneficiary_cards`` is a live snapshot: a card registered after the
-    observation date still counts (mild look-ahead, accepted).
-    """
-    require_columns(
-        labelled_txn,
-        [
-            "cif_id",
-            "in_out_flow",
-            "product_category",
-            "tran_date",
-            "tran_amt",
-            "transaction_acid",
-        ],
-        "wm_pri_labelled_transactions",
-    )
-    require_columns(
-        beneficiary_cards,
-        ["instrument_number", "instrument_type"],
-        "raw_beneficiary_cards",
-    )
-    cards = (
-        beneficiary_cards.filter(F.col("instrument_type") == "CARD_NUMBER")
-        .select(F.col("instrument_number").alias("transaction_acid"))
-        .distinct()
-    )
-    src = (
-        labelled_txn.filter(
-            (F.col("tran_date") >= F.lit(since))
-            & (F.col("in_out_flow") == "outflow")
-            & (F.col("product_category") == "CASA")
-        )
-        .join(F.broadcast(cards), on="transaction_acid", how="leftsemi")
-        .select(
-            "cif_id", F.col("tran_date").cast("date"), F.col("tran_amt").cast("double")
-        )
-    )
-    return window_agg(
-        obs,
-        src,
-        date_col="tran_date",
-        aggs=[F.max("tran_amt").alias("ext_card_payment_max")],
-        months=months,
-    )
-
-
-def _casa_activity(
-    obs: DataFrame, wm_casa_flow: DataFrame, months: int, since: str
-) -> DataFrame:
-    """Any CASA credit or debit in the window."""
-    require_columns(
-        wm_casa_flow,
-        ["cif_id", "week_number", _CASA_IN_COL, _CASA_OUT_COL],
-        "wm_fea_casa_cc_inflow_outflow",
-    )
-    week = parse_yyyymmdd("week_number")
-    src = wm_casa_flow.filter(week >= F.lit(since)).select(
-        "cif_id",
-        week.alias("week"),
-        ((F.col(_CASA_IN_COL) > 0) | (F.col(_CASA_OUT_COL) > 0))
-        .cast("int")
-        .alias("_active"),
-    )
-    return window_agg(
-        obs,
-        src,
-        date_col="week",
-        aggs=[F.max("_active").alias("casa_active")],
-        months=months,
-    )
-
-
-def build_liquidity_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def build_liquidity_signals(
     obs_base: DataFrame,
-    wm_casa_bal: DataFrame,
-    wm_casa_flow: DataFrame,
-    labelled_txn: DataFrame,
-    beneficiary_cards: DataFrame,
+    casa_balance: DataFrame,
+    ext_card_payments: DataFrame,
+    casa_activity: DataFrame,
     model_id: str,
 ) -> DataFrame:
-    """``casa_m1 … casa_m{2W}``, ``ext_card_payment_max``, ``casa_active``."""
-    obs = obs_base.filter(F.col("cif_id").isNotNull())
+    """``casa_m1 … casa_m{2W}`` (``feat_cif_casa_balance_monthly``),
+    ``ext_card_payment_max`` (largest single payment to an external card in W),
+    ``casa_active`` (1: a leg in ``CUSTOMER_LANES`` in W) and ``casa_held`` (1: any CASA
+    leg or a positive balance in the last ``CASA_HELD_MONTHS`` months)."""
+    require_columns(
+        casa_balance,
+        ["cif_id", "month_end", "casa_balance"],
+        "feat_cif_casa_balance_monthly",
+    )
+    require_columns(
+        ext_card_payments,
+        ["cif_id", "month_end", "max_payment"],
+        "feat_cif_ext_card_payment_monthly",
+    )
+    require_columns(
+        casa_activity,
+        ["cif_id", "month_end", "lane", "legs"],
+        "feat_cif_casa_activity_monthly",
+    )
+    obs = _cifs(obs_base)
     w = window_months(model_id)
-    since = lookback_floor(obs, 2 * w)  # the balances' prior window reaches furthest
+    customer = casa_activity.filter(F.col("lane").isin(*CUSTOMER_LANES))
+    held = casa_activity.select("cif_id", "month_end").unionByName(
+        casa_balance.filter(F.col("casa_balance") > 0).select("cif_id", "month_end")
+    )
     return left_join_all(
         obs_base,
         [
-            _by_month(
-                obs, _casa_by_month(wm_casa_bal, since), "balance", "casa", 2 * w
+            _by_month(obs, casa_balance, "casa_balance", "casa", 2 * w),
+            _in_window(
+                obs,
+                ext_card_payments,
+                w,
+                F.max("max_payment").alias("ext_card_payment_max"),
             ),
-            _ext_card_payments(obs, labelled_txn, beneficiary_cards, w, since),
-            _casa_activity(obs, wm_casa_flow, w, since),
+            _in_window(obs, customer, w, F.max(F.lit(1)).alias("casa_active")),
+            _in_window(obs, held, CASA_HELD_MONTHS, F.max(F.lit(1)).alias("casa_held")),
         ],
-    )
+    ).fillna(0, subset=["casa_active", "casa_held"])
 
 
 # ── Distress ──────────────────────────────────────────────────────────────────
@@ -319,29 +241,46 @@ def build_liquidity_signals(  # pylint: disable=too-many-arguments,too-many-posi
 
 def build_distress_signals(
     obs_base: DataFrame,
-    bureau_alert: DataFrame,
-    internal_returns: DataFrame,
+    returns: DataFrame,
+    bureau_bounces: DataFrame,
     model_id: str,
     payment_order: DataFrame | None = None,
 ) -> DataFrame:
-    """distress_flag: a cheque bounce or direct-debit (DDS) return in the window,
-    from the bureau and from the bank's own records.
+    """``distress_flag`` and its parts in the window, each 0 / 1:
 
-    * ``bureau_alert`` — bureau-reported bounced cheques, dated by ``extract_date``
-      (the bureau pull date, not the bounce date: a bounce can repeat in later pulls);
-    * ``internal_returns`` — the bank's own returned cheques / DDS returns as
-      ``(cif_id, event_date)`` from ``build_internal_returns``;
+    * ``distress_cheque`` / ``distress_dds`` — the bank's own returned cheques and DDS
+      returns, across all the customer's CASA accounts (``feat_cif_returns_monthly``);
+    * ``distress_bureau`` — a new bureau-reported bounce (``feat_cif_bureau_bounces_monthly``
+      ``bounce_events``; a bounce repeated unchanged in later pulls counts once);
     * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet.
+
+    Stops the run when the returns table starts after the earliest observation's window
+    (it follows ``crx_persona.persona_start_date``; rebuilt for an older one otherwise).
     """
-    obs = obs_base.filter(F.col("cif_id").isNotNull())
-    w = window_months(model_id)
     require_columns(
-        bureau_alert,
-        ["cif_id", "extract_date", "bounced_cheque_amount"],
-        "prm_bureau_alert_enriched",
+        returns, ["cif_id", "month_end", "reason", "events"], "feat_cif_returns_monthly"
     )
-    events = bureau_alert.filter(F.col("bounced_cheque_amount") > 0).select(
-        "cif_id", F.to_date("extract_date").alias("event_date")
+    require_columns(
+        bureau_bounces,
+        ["cif_id", "month_end", "bounce_events"],
+        "feat_cif_bureau_bounces_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    since = lookback_floor(obs, w)
+    first = returns.agg(F.min("month_end")).first()[0]
+    if first is None or first.isoformat()[:7] > since[:7]:
+        raise ValueError(
+            f"feat_cif_returns_monthly starts at {first}, but the observations need "
+            f"returns from {since}: rerun casa_primary and casa_features after changing "
+            "crx_persona.persona_start_date"
+        )
+
+    def flag(reason: str) -> Column:
+        return F.max((F.col("reason") == reason).cast("int"))
+
+    events = bureau_bounces.filter(F.col("bounce_events") > 0).select(
+        "cif_id", "month_end", F.lit("BUREAU").alias("reason")
     )
     if payment_order is not None:
         require_columns(
@@ -351,59 +290,67 @@ def build_distress_signals(
         )
         events = events.unionByName(
             payment_order.filter(F.col("reason_code").isNotNull()).select(
-                "cif_id", F.to_date("return_date").alias("event_date")
+                F.col("cif_id").cast("string").alias("cif_id"),
+                F.last_day(F.to_date("return_date")).alias("month_end"),
+                F.lit("BUREAU").alias("reason"),
             )
         )
-    require_columns(internal_returns, ["cif_id", "event_date"], "internal_returns")
     events = events.unionByName(
-        internal_returns.select("cif_id", F.to_date("event_date").alias("event_date"))
+        returns.filter(
+            F.col("reason").isin(CHEQUE_RETURN, DDS_RETURN) & (F.col("events") > 0)
+        ).select("cif_id", "month_end", "reason")
+    )
+    parts = ["distress_cheque", "distress_dds", "distress_bureau"]
+    hits = _in_window(
+        obs,
+        events,
+        w,
+        flag(CHEQUE_RETURN).alias("distress_cheque"),
+        flag(DDS_RETURN).alias("distress_dds"),
+        flag("BUREAU").alias("distress_bureau"),
+    )
+    return (
+        left_join_all(obs_base, [hits])
+        .fillna(0, subset=parts)
+        .withColumn("distress_flag", F.greatest(*[F.col(p) for p in parts]))
+    )
+
+
+# ── EOSB (diagnostic) ─────────────────────────────────────────────────────────
+
+
+def build_eosb_signals(
+    obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
+) -> DataFrame:
+    """``eosb_flag``: 1 when a DCORE result on any of the customer's agreements names an
+    end-of-service benefit (EOSB expected / awaited / received) in the window. A
+    diagnostic only: it changes no level or state."""
+    require_columns(
+        followup,
+        ["agreement_id", "action_ts", "result_name"],
+        "dcore_prm_followup_outcomes",
+    )
+    require_columns(
+        agreements, ["agreement_id", "cif_id"], "prm_dcore_account_agreements"
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    notes = (
+        followup.filter(F.upper(F.col("result_name")).contains(EOSB))
+        .select(
+            F.col("agreement_id").cast("string").alias("agreement_id"),
+            F.to_date("action_ts").alias("day"),
+        )
+        .join(
+            agreements.select(
+                F.col("agreement_id").cast("string").alias("agreement_id"),
+                F.col("cif_id").cast("string").alias("cif_id"),
+            ).distinct(),
+            on="agreement_id",
+        )
+        .filter(F.col("day") >= F.lit(lookback_floor(obs, w)))
     )
     hits = window_agg(
-        obs,
-        events.filter(F.col("event_date") >= F.lit(lookback_floor(obs, w))),
-        date_col="event_date",
-        aggs=[F.max(F.lit(1)).alias("distress_flag")],
-        months=w,
+        obs, notes, date_col="day", aggs=[F.max(F.lit(1)).alias("eosb_flag")], months=w
     )
-    return left_join_all(obs_base, [hits]).fillna(0, subset=["distress_flag"])
-
-
-def build_internal_returns(
-    obs_base: DataFrame, return_events: DataFrame, model_id: str
-) -> DataFrame:
-    """The bank's own returned cheques and DDS returns for the observation base's CIFs, as
-    distinct ``(cif_id, event_date, reason)`` from ``prm_casa_return_events`` (all of the
-    customer's CASA accounts; the debit and credit legs of a return collapse to one row).
-
-    Stops the run when the table starts after the earliest observation's window (both
-    follow ``crx_persona.persona_start_date``; the table was built for an older one).
-    """
-    require_columns(
-        return_events,
-        ["cif_id", "tran_date", "reason_for_excluding", "event_month"],
-        "prm_casa_return_events",
-    )
-    since = lookback_floor(obs_base, window_months(model_id))
-    # partition column: Spark infers its folder values as dates, so compare ISO strings
-    first = return_events.agg(F.min("event_month")).first()[0]
-    if first is None or str(first) > since:
-        raise ValueError(
-            f"prm_casa_return_events starts at {first}, but the observations need returns "
-            f"from {since}: rerun casa_primary after changing "
-            "crx_persona.persona_start_date"
-        )
-    cifs = obs_base.select("cif_id").filter(F.col("cif_id").isNotNull()).distinct()
-    # since is a month start, so event_month >= since is tran_date >= since, and prunes
-    return (
-        return_events.filter(
-            (F.col("event_month") >= F.lit(since))
-            & F.col("reason_for_excluding").isin(*DISTRESS_RETURN_REASONS)
-        )
-        .join(F.broadcast(cifs), on="cif_id", how="leftsemi")
-        .select(
-            "cif_id",
-            F.to_date("tran_date").alias("event_date"),
-            F.col("reason_for_excluding").alias("reason"),
-        )
-        .distinct()
-    )
+    return left_join_all(obs_base, [hits]).fillna(0, subset=["eosb_flag"])

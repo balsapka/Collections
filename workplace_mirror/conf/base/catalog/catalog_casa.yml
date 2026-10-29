@@ -1,4 +1,4 @@
-# CASA primary datasets (pipeline casa_primary).
+# CASA primary datasets (pipeline casa_primary) and monthly CASA features (casa_features).
 
 # Returned CASA transactions, all CIFs, one row per (tran_id, part_tran_srl_num, tran_date).
 prm_casa_return_events:
@@ -24,3 +24,81 @@ prm_casa_card_transactions:
   metadata:
     kedro-viz:
       layer: primary
+
+# Every CASA transaction leg, all CIFs, one row per (tran_id, part_tran_srl_num, tran_date).
+prm_casa_transactions:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/casa/transactions"
+  save_args:
+    mode: overwrite
+    partitionBy: ["event_month"]
+  metadata:
+    kedro-viz:
+      layer: primary
+
+# Card numbers registered as payment beneficiaries (no CIF in the source).
+prm_beneficiary_cards:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/casa/beneficiary_cards"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: primary
+
+# Salary credited with us per (cif_id, month_end), from the WM salary snapshots, all history.
+feat_cif_internal_salary_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_internal_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# CASA average balance and any flow per (cif_id, month_end), from the WM weekly tables.
+feat_cif_casa_balance_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_casa_balance_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# CASA legs and AED per (cif_id, month_end, lane), from prm_casa_transactions.
+feat_cif_casa_activity_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_casa_activity_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Largest CASA payment to a registered external card per (cif_id, month_end).
+feat_cif_ext_card_payment_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_ext_card_payment_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Returned-transaction events per (cif_id, month_end, reason), from prm_casa_return_events.
+feat_cif_returns_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_returns_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature

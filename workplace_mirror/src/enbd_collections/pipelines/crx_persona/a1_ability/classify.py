@@ -5,8 +5,9 @@ Spec: ``workplace_mirror/specs/A1_ability_spec.md``.
     income level     stable 2 / weak 1 / none 0
   + liquidity level  adequate 2 / weak 1 / none 0
   = points           4 high, 2–3 moderate, 0–1 low
-  distress (cheque bounce / DDS return) lowers the state one level;
-  no income, no liquidity, no distress and no CASA transaction → unknown.
+  distress (cheque / DDS return, new bureau bounce) lowers the state one level;
+  0 points, no distress and no customer-initiated CASA movement → unknown
+  (no CASA with us, or a dormant one).
 
 Thresholds scale with ``liquidity_anchor_amt`` — what the customer must find now
 (CC 60–180: the oldest overdue bucket; RL: one instalment; NULL: flat floors only).
@@ -21,10 +22,12 @@ from pyspark.sql import functions as F
 from .._common import GRAIN, left_join_all, log_latest_month, window_months
 from ..scoring_engine import StateLadder, points_from_level
 
-MIN_MONTHS = {3: 2, 6: 3}  # months of the window (by its length) that must qualify
+MIN_MONTHS = {3: 2, 6: 3}  # CASA: months of the window (by its length) that qualify
 F_INC = 3000.0  # salary floor (internal and bureau), AED
 K_INC = 2.0  # income must also cover this multiple of the anchor
-D_INC = 0.25  # stable income may fall at most this share vs the prior window
+# Stable income: the window's salary total covers this many monthly floors (S12) …
+INC_FLOORS = {3: 2, 6: 3}
+D_INC = 0.25  # … and is at most this share below the prior window's total
 F_CASA = 3000.0
 K_CASA = 1.0
 D_CASA = 0.50
@@ -83,18 +86,20 @@ def _not_weakening(
 
 
 def income_level(anchor: Column, w: int) -> Column:
-    """stable / weak / none over a ``w``-month window (README section 1)."""
+    """stable / weak / none over a ``w``-month window (spec S12).
+
+    Stable counts the window's total, not months: an employer paying early puts two
+    salaries in one month and none in the next."""
     last = _months("income", _window(w)[0])
     floor = F.greatest(F.lit(F_INC), K_INC * anchor)
-    stable = (_count_at_least(last, floor) >= MIN_MONTHS[w]) & _not_weakening(
-        "income", D_INC, True, w
-    )
+    total = sum(F.coalesce(c, F.lit(0.0)) for c in last)
+    stable = (total >= INC_FLOORS[w] * floor) & _not_weakening("income", D_INC, True, w)
     weak = _count_at_least(last, F.lit(DEMIN)) > 0
     return F.when(stable, "stable").when(weak, "weak").otherwise("none")
 
 
 def liquidity_level(anchor: Column, w: int) -> Column:
-    """adequate / weak / none over a ``w``-month window (README section 2)."""
+    """adequate / weak / none over a ``w``-month window (spec S7, S8)."""
     last = _months("casa", _window(w)[0])
     payment = F.coalesce(F.col("ext_card_payment_max"), F.lit(0.0))
     casa_floor = F.greatest(F.lit(F_CASA), K_CASA * anchor)
@@ -111,6 +116,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
     income: DataFrame,
     liquidity: DataFrame,
     distress: DataFrame,
+    eosb: DataFrame,
     anchor: DataFrame,
     model_id: str,
     persona_end_date: str,
@@ -119,8 +125,11 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
     distribution of the month of ``persona_end_date`` (the latest observation month).
 
     ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
+    ``a1_unknown_reason`` says why a row is unknown: ``no_casa`` (no CASA leg or
+    positive balance with us in 12 months) or ``dormant_casa``. ``a1_eosb_flag`` (a DCORE
+    end-of-service result in the window) is a diagnostic and changes nothing.
     """
-    df = left_join_all(obs_base, [income, liquidity, distress, anchor])
+    df = left_join_all(obs_base, [income, liquidity, distress, eosb, anchor])
     amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
     w = window_months(model_id)
     df = (
@@ -142,6 +151,9 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
         "a1_state",
         _LADDER.state(F.col("a1_points_total"), F.col("a1_distress_flag"), unknown),
     )
+    unknown_reason = F.when(F.col("casa_held") == 1, "dormant_casa").otherwise(
+        "no_casa"
+    )
     labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
     out = df.select(
         *GRAIN,
@@ -150,11 +162,15 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
         F.when(F.col("a1_state") == _LADDER.unknown, "no_signal")
         .otherwise("observed")
         .alias("a1_provenance"),
+        F.when(F.col("a1_state") == _LADDER.unknown, unknown_reason).alias(
+            "a1_unknown_reason"
+        ),
         "a1_income_level",
         "a1_liquidity_level",
         F.col("a1_points_total").cast("int"),
         F.col("a1_distress_flag").cast("int"),
         F.col("liquidity_anchor_amt").cast("double"),
+        F.col("eosb_flag").cast("int").alias("a1_eosb_flag"),
         F.current_date().alias("computed_at"),
     )
     log_latest_month(out, "a1_state", f"a1_ability [{model_id}]", persona_end_date)

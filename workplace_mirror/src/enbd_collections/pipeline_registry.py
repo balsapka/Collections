@@ -29,8 +29,10 @@ from enbd_collections.pipelines.bureau import staging as bureau_stg
 from enbd_collections.pipelines.bureau import primary as bureau_prm
 from enbd_collections.pipelines.bureau import intermediate as bureau_int
 from enbd_collections.pipelines.bureau import features as bureau_feat
+from enbd_collections.pipelines.bureau import salary_bounces as bureau_salary_bounces
 
 from enbd_collections.pipelines.casa import primary as casa_prm
+from enbd_collections.pipelines.casa import features as casa_feat
 
 from enbd_collections.pipelines.retail_loans import staging as retail_loans_stg
 from enbd_collections.pipelines.retail_loans import primary as retail_loans_prm
@@ -89,9 +91,6 @@ from enbd_collections.pipelines.crx_persona import (
 from enbd_collections.pipelines.crx_persona import (
     cc_a1_ability as crx_cc_a1_ability,
 )
-from enbd_collections.pipelines.crx_persona import (
-    cc_a1_ability_v2 as crx_cc_a1_ability_v2,
-)
 from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
@@ -105,9 +104,6 @@ from enbd_collections.pipelines.crx_persona import (
     rl_a4_deterioration as crx_rl_a4_deterioration,
 )
 from enbd_collections.pipelines.crx_persona import rl_a1_ability as crx_rl_a1_ability
-from enbd_collections.pipelines.crx_persona import (
-    rl_a1_ability_v2 as crx_rl_a1_ability_v2,
-)
 from enbd_collections.pipelines.crx_persona import (
     rl_a2_locatability as crx_rl_a2_locatability,
 )
@@ -165,8 +161,10 @@ def register_pipelines() -> dict[str, Pipeline]:
         "bureau_primary": bureau_prm.create_pipeline(),
         "bureau_intermediate": bureau_int.create_pipeline(),
         "bureau_features": bureau_feat.create_pipeline(),
+        "bureau_salary_bounces": bureau_salary_bounces.create_pipeline(),
         # -- CASA (domain) ---------------------------------------------------
         "casa_primary": casa_prm.create_pipeline(),
+        "casa_features": casa_feat.create_pipeline(),
         # -- Retail Loans (domain) -----------------------------------------
         "retail_loans": retail_loans.create_pipeline(),
         "retail_loans_staging": retail_loans_stg.create_pipeline(),
@@ -243,7 +241,10 @@ def register_pipelines() -> dict[str, Pipeline]:
             crx_cc_a2_locatability.create_b06_check_pipeline()
         ),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
-        "crx_cc_a1_ability_v2": crx_cc_a1_ability_v2.create_pipeline(),
+        # TEMPORARY (mirror bundle 08): A1 check; removed by the bundle's cleanup.
+        "crx_cc_a1_ability_b08_check": (
+            crx_cc_a1_ability.create_b08_check_pipeline()
+        ),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_a3_payment_credibility": crx_cc_a3_payment_credibility.create_pipeline(),
@@ -252,9 +253,10 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
-        "crx_rl_a1_ability_v2": crx_rl_a1_ability_v2.create_pipeline(),
-        # TEMPORARY (mirror bundle 05 check) — remove with its catalog entry
-        "crx_rl_a1_ability_b05_check": crx_rl_a1_ability_v2.create_b05_check_pipeline(),
+        # TEMPORARY (mirror bundle 08): A1 check; removed by the bundle's cleanup.
+        "crx_rl_a1_ability_b08_check": (
+            crx_rl_a1_ability.create_b08_check_pipeline()
+        ),
         "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
         # TEMPORARY (mirror bundle 06): A2 check; removed by the bundle's cleanup.

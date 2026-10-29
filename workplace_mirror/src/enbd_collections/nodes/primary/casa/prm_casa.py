@@ -1,4 +1,5 @@
-"""Primary CASA datasets built from comp_financial_tran_repos_dly."""
+"""Primary CASA datasets built from comp_financial_tran_repos_dly, and the registered
+beneficiary cards."""
 
 from __future__ import annotations
 
@@ -43,6 +44,19 @@ _CARD_COLUMNS = [
     "counter_party_bank_cntry",
     "tran_narration_1",
     "actual_tran_amt_aed",
+]
+
+_TRANSACTION_COLUMNS = [
+    *_KEY,
+    "cif_id",
+    "foracid",
+    "tran_dc",
+    "tran_type",
+    "reason_for_excluding",
+    "tran_particular_code",
+    "tran_narration_1",
+    "actual_tran_amt_aed",
+    "edp_load_date",
 ]
 
 POS, ATM = "Point of Sale", "ATM Transactions"
@@ -168,4 +182,37 @@ def build_card_transactions(
         .when((channel == ATM) & code.isNotNull(), "narration")
         .when((channel == ATM) & bank.isNotNull(), "counter_party_bank")
         .alias("place_source"),
+    )
+
+
+def build_transactions(
+    tran_repos: DataFrame, persona_start_date: str, history_months: int
+) -> DataFrame:
+    """Every CASA transaction leg for all CIFs, one row per transaction key,
+    partitioned by ``event_month``: direction, type, reason, code, first narration and
+    the AED amount, as loaded. Which legs count for what is decided downstream. Same
+    history and reload rule as ``build_return_events``; the NI POS sink CIF is dropped.
+    """
+    rows = _scoped(tran_repos, _TRANSACTION_COLUMNS, persona_start_date, history_months)
+    return _latest_load(
+        rows.filter(~F.col("cif_id").cast("string").isin(*_NON_CUSTOMER_CIFS))
+    )
+
+
+def build_beneficiary_cards(beneficiary: DataFrame) -> DataFrame:
+    """Distinct card numbers registered as payment beneficiaries in online / mobile
+    banking (any customer: the source carries no CIF), with the issuing institution."""
+    missing = sorted(
+        {"instrument_number", "instrument_type", "institution_name"}
+        - set(beneficiary.columns)
+    )
+    if missing:
+        raise ValueError(f"raw_beneficiary_cards is missing columns: {missing}")
+    return (
+        beneficiary.filter(
+            (F.col("instrument_type") == "CARD_NUMBER")
+            & F.col("instrument_number").isNotNull()
+        )
+        .groupBy(F.col("instrument_number").cast("string").alias("card_number"))
+        .agg(F.max("institution_name").alias("institution_name"))
     )

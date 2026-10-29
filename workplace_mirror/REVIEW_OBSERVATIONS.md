@@ -85,8 +85,8 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O60 | L | confirmed | feature_retail_loans | `aecb_direct_debit_returns_6m` is declared but missing from the PROD table |
 | O61 | M | closed | prm_demographics | `build_customer_individual` projects through `CustomerGroupingXref`, which may drop `deceased_flag` |
 | O62 | L | confirmed | data_engineering models / bureau | `BureauSalaryHistory.reference_month` documented as YYYYMM; staging says MMYYYY |
-| O64 | H | confirmed (A1 v03b) | a1_ability/signals.py | `_internal_salary` parses WM `week_number` (`yyyyMM0W`) as `yyyyMMdd`, so every internal salary lands one month early |
-| O65 | H | confirmed (A1 v03b) | prm_bureau / prm_bureau_cif_bridge | The bureau CIF bridge reaches 0.58% (CC) / 3.4% (RL) of base CIFs, so AECB salary is cut off by the join, not by scarcity |
+| O64 | H | fixed in bundle 08 | a1_ability/signals.py | `_internal_salary` parses WM `week_number` (`yyyyMM0W`) as `yyyyMMdd`, so every internal salary lands one month early |
+| O65 | H | cause found (handoff 18); fix after bundle 08 | prm_bureau / prm_bureau_cif_bridge | The bureau CIF bridge reaches 0.58% (CC) / 3.4% (RL) of base CIFs, so AECB salary is cut off by the join, not by scarcity |
 
 ---
 
@@ -799,8 +799,11 @@ finds a month difference of −1 on 100% of rows (WM's own decode lands on day 1
 `income_m1` is filled for 0.0% of CC rows. Effect of the fix (31 Aug, engine rule): CC Low→Moderate
 80, Moderate→High 20; RL 32 / 6; no Unknown row moves. The CASA balance and flow readers use the same
 parse only to pick the month, which stays right (day 01–04 of the same month).
-**Fix (CC finish bundle):** decode `week_number` as WM does (the decode is needed from the
-workplace: R13), in `feat_cif_internal_salary_monthly`.
+**Fixed (bundle 08, 2026-10-29)** in `feat_cif_internal_salary_monthly` without waiting for R13:
+the snapshot is placed mid-week (day 4 / 11 / 18 / 25 of the `yyyyMM` month), the days since are
+subtracted, and the result is rounded to the nearest first of a month. WM's own date lies within the
+same week, so the error is at most a few days, and the true value is always a first of a month.
+The b08 check's `B08 CHANGES` block measures the move (step s1).
 
 ### O65 — The bureau CIF bridge covers under 4% of customers (H, confirmed by A1 v03b)
 
@@ -813,3 +816,11 @@ This is a broken link, not the expected bureau scarcity. Bounce distress is unaf
 `prm_bureau_alert_enriched`, which carries `cif_id`). RL bureau salary comes mostly from
 `feature_retail_loans` (53% of RL CIFs have a month). **Fix:** find the field that links an AECB
 file to a customer (open; see the A1 v03b review).
+
+**Cause (handoff 18, 2026-10-29, `bundle_helpers/a1_final/bureau_table_inventory.md`):** the sandpit
+holds 11 AECB tables in `dpl_uae_operations`, and the only one that ties a bureau file to a subject is
+`sa_ops_aecb_subj_cntrct_link` (1.3M rows, against 148M in `sa_ops_aecb_sub_sal_cr_hist` and 90M in
+`sa_ops_aecb_alert`). The bridge can therefore reach only files that carry a contract link. The fix
+needs the bureau table that maps every file to its subject identifiers; it ships in a later bureau
+bundle, with GRR's salary feed. Bundle 08 keeps today's bureau reads (user, 2026-10-29). The
+bureau-link Sonnet run is on hold (raw bureau tables temporarily missing from the sandpit).

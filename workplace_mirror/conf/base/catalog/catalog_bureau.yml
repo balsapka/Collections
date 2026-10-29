@@ -1,0 +1,34 @@
+# Bureau salary and bounce datasets of the persona axes (pipeline bureau_salary_bounces).
+
+# AECB salary history: one row per (bureau_file_id, reference_month, provider_no, edp_load_date).
+prm_bureau_salary_history:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/bureau/salary_history"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: primary
+
+# Bureau-reported salary per (cif_id, month_end): the largest total, all history.
+feat_cif_bureau_salary_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/cif_bureau_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Bureau bounce pulls and new bounce events per (cif_id, month_end).
+feat_cif_bureau_bounces_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/cif_bureau_bounces_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
