@@ -1,6 +1,6 @@
-# Mirror bundle 07 — A2 — bundle 06 check fix (old single-state schema)
+# Mirror bundle 07 — A2 — bundle 06 check fix (old single-state schema) + reachability attribution
 
-apply_bundle version: 6 · built 2026-10-28 from `840e3f5..c4de0e9` · source: 0 added, 1 replaced, 0 deleted · helpers: 0
+apply_bundle version: 6 · built 2026-10-29 from `840e3f5..038994b` · source: 0 added, 2 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -35,7 +35,7 @@ committing.
 **Step 4.** Commit the source only, and push:
 
 ```bash
-git add src conf && git commit -m "A2: b06 check compares on the old single-state schema" && git push
+git add src conf && git commit -m "A2: b06 check compares on the old single-state schema + B06 REACH" && git push
 ```
 
 **Undo** (before step 4) — puts every touched file back to the last commit:
@@ -52,14 +52,14 @@ python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/07_a2
 git fetch origin && git checkout feature/persona_redesign_b01 && git pull
 ```
 
-Only the two log nodes that did not run are re-run; everything upstream is already written.
+Only the log nodes are run for CC; everything upstream is already written.
 First **`cc_60_180`** (the default), then **`rl_60_180`** (full bundle 06 step 7, since RL has
 not run yet). Switch `model_id` back to `cc_60_180` when done.
 
-**Step 6.** CC — resume the two comparison nodes:
+**Step 6.** CC — run the three log nodes (everything upstream is already written):
 
 ```bash
-kedro run --env=dev --pipeline=crx_cc_a2_locatability_b06_check --from-nodes "compare_crx_cc_a2_b06,describe_crx_cc_a2_b06_rules"
+kedro run --env=dev --pipeline=crx_cc_a2_locatability_b06_check --nodes "compare_crx_cc_a2_b06,describe_crx_cc_a2_b06_rules,explain_crx_cc_a2_b06_reach"
 ```
 
 **Step 7.** RL (`model_id: rl_60_180`) — bundle 06 steps 6 and 7 (logins and CASA primaries
@@ -77,8 +77,8 @@ kedro run --env=dev --pipeline=casa_primary
 kedro run --env=dev --pipeline=crx_rl_a2_locatability_b06_check
 ```
 
-Paste back every block from `=== B06 … START ===` to `=== B06 … END ===`: CC `OUTPUT` and
-`RULES` (DEBIT already received); RL `OUTPUT`, `RULES`, `DEBIT`, `PRODUCT`. Then continue with
+Paste back every block from `=== B06 … START ===` to `=== B06 … END ===`: CC `OUTPUT`,
+`RULES` and `REACH` (DEBIT already received); RL `OUTPUT`, `RULES`, `REACH`, `DEBIT`, `PRODUCT`. Then continue with
 bundle 06 step 8 and its cleanup only after the review.
 
 **When you are done**, give the *Cleanup prompt* at the bottom to the workplace
@@ -91,7 +91,13 @@ earlier single-state schema (`a2_state_v1`), so `compare_a2_outputs` could not f
 `location_state`; it now compares on whichever schema the old output has (old `a2_state_v1` ×
 new location and × new reachability). `describe_a2_rules` also logs reachability × last contact
 (in the window / before it / never), to show how many Non-Reachable rows had a contact in the
-window. Only `a2_locatability/b06_check.py` changes; the engine and its output are untouched.
+window. A new log node `explain_crx_<p>_a2_b06_reach` (`B06 REACH`) explains the reachability move: it
+rebuilds reachability from the same DCORE calls under the earlier rule (any contact ever is
+Reachable unless the last 3 call days only rang out, admin entries kept as calls), then applies
+each change in turn — dead lines / invalid numbers / LEFT_MSG count as failed, admin and legal
+entries ignored, the contact must fall in the window — logging the state mix and the moves at
+every step, and checks that the last step equals the engine's `reachability_state`. Only
+`b06_check.py` and the check pipeline change; the engine and its output are untouched.
 
 ## Instructions for the workplace assistant
 
@@ -107,11 +113,12 @@ window. Only `a2_locatability/b06_check.py` changes; the engine and its output a
 | Action | Path |
 |---|---|
 | replace | `src/enbd_collections/pipelines/crx_persona/a2_locatability/b06_check.py` |
+| replace | `src/enbd_collections/pipelines/crx_persona/a2_locatability/pipeline.py` |
 
 ## Files
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a2_locatability/b06_check.py`
-action: replace · base sha256 `d62bab99dddd4d6b7e6c430529b40bedc937c6ad8e064dc0b6ae0c4763fd99d1` · base trailing newline: yes · new sha256 `a42d770c5bfd9bfdb91b7fac129b052238cdbfeec584652d12319facc6c4432d` · new trailing newline: yes
+action: replace · base sha256 `d62bab99dddd4d6b7e6c430529b40bedc937c6ad8e064dc0b6ae0c4763fd99d1` · base trailing newline: yes · new sha256 `e5353dcc27094c25e703df1c15fa0d04a64cad319da006ecad2b0eb4b6c6a0c1` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -363,18 +370,32 @@ Log blocks, aggregates only:
   ``prm_casa_card_transactions`` by month, channel / type and place (the Offline → Machine
   change, ATM placement), and their ``reason_for_excluding`` values.
 * ``split_by_product`` (``B06 PRODUCT``, RL only): the latest month by ``loan_type``.
+* ``explain_reachability`` (``B06 REACH``): reachability rebuilt under the earlier rule,
+  then each change in turn, with the moves at every step.
 
 Removed by the bundle's cleanup.
 """
 
 import logging
+from itertools import pairwise
 
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
 from enbd_collections.nodes.utils.location import is_uae
 
-from .._common import window_months
+from .._common import GRAIN, window_months
+from .codes import (
+    CALL_CODES,
+    FAILED_CALL,
+    IGNORED,
+    IGNORED_PREFIX,
+    INBOUND_CODES,
+    OUTBOUND_CODES,
+    RIGHT_PARTY_CONTACT,
+    SUCCESS_CATEGORY,
+)
+from .signals import GONE_DARK_DAYS, _dcore_events
 
 LOG = logging.getLogger(__name__)
 
@@ -610,6 +631,487 @@ def split_by_product(new: DataFrame, rl_spine: DataFrame, model_id: str) -> None
         *_table(df, "loan_type", "deceased_flag"),
     ]
     _log("PRODUCT", model_id, lines)
+
+
+# Rang out / no answer only: the narrow failure set of the earlier rule.
+_RINGING = frozenset({"RINGING NO REPLY", "RINGING NO RESPONSE", "NO ANSWER"})
+
+
+def _gone_dark(
+    calls: DataFrame, failed_names: frozenset, w_start: F.Column
+) -> DataFrame:
+    """Per row: gone dark (last GONE_DARK_DAYS call days all failed, oldest in W, no
+    contact since) with ``failed_names`` as the failure set and the given calls."""
+    outbound = F.col("action_code").isin(*OUTBOUND_CODES)
+    days = calls.groupBy(*GRAIN, "day").agg(
+        F.max(outbound.cast("int")).alias("_attempt"),
+        F.max(F.col("_contact").cast("int")).alias("_c"),
+        F.min(F.when(outbound, F.col("name").isin(*failed_names).cast("int"))).alias(
+            "_all_failed"
+        ),
+    )
+    days = days.withColumn(
+        "_failed", ((F.col("_c") == 0) & (F.col("_all_failed") == 1)).cast("int")
+    )
+    recent = Window.partitionBy(*GRAIN).orderBy(F.col("day").desc())
+    last = (
+        days.filter(F.col("_attempt") == 1)
+        .withColumn("_rank", F.row_number().over(recent))
+        .filter(F.col("_rank") <= GONE_DARK_DAYS)
+        .groupBy(*GRAIN)
+        .agg(
+            F.count("*").alias("_n"),
+            F.sum("_failed").alias("_f"),
+            F.min("day").alias("_oldest"),
+        )
+    )
+    contact = days.groupBy(*GRAIN).agg(
+        F.max(F.when(F.col("_c") == 1, F.col("day"))).alias("_last_contact")
+    )
+    return last.join(contact, on=list(GRAIN), how="left").select(
+        *GRAIN,
+        (
+            (F.col("_n") == GONE_DARK_DAYS)
+            & (F.col("_f") == GONE_DARK_DAYS)
+            & (F.col("_oldest") >= w_start)
+            & (
+                F.col("_last_contact").isNull()
+                | (F.col("_last_contact") < F.col("_oldest"))
+            )
+        ).alias("gd"),
+    )
+
+
+def explain_reachability(  # pylint: disable=too-many-locals
+    obs_base: DataFrame,
+    followup: DataFrame,
+    agreements: DataFrame,
+    new: DataFrame,
+    model_id: str,
+) -> None:
+    """Reachability rebuilt from the same DCORE calls under the earlier rule, then each
+    change applied in turn, latest month: the state mix after every step and the moves
+    between steps.
+
+    R0 earlier rule: any contact ever → reachable, unless the last 3 call days only rang
+       out (admin entries kept as calls) → non_reachable
+    R1 + dead lines, invalid numbers and LEFT_MSG count as failed (D-A2-7, D-A2-17)
+    R2 + admin / legal entries ignored (D-A2-17)
+    R3 + the contact must be in W (= the new rule; checked against ``new``)
+    """
+    obs = _latest_month(obs_base).select(*GRAIN)
+    events = _dcore_events(obs, followup, agreements)
+    name, code = F.col("name"), F.col("action_code")
+    events = events.withColumn(
+        "_contact",
+        code.isin(*INBOUND_CODES)
+        | (code.isin(*OUTBOUND_CODES) & (F.col("category") == SUCCESS_CATEGORY))
+        | name.isin(*RIGHT_PARTY_CONTACT),
+    )
+    calls_all = events.filter(code.isin(*CALL_CODES))
+    calls_new = calls_all.filter(
+        ~name.isin(*IGNORED) & ~name.startswith(IGNORED_PREFIX)
+    )
+    w_start = F.add_months(
+        F.trunc("observation_date", "month"), 1 - window_months(model_id)
+    )
+    contact = calls_new.groupBy(*GRAIN).agg(
+        F.max(F.when(F.col("_contact"), F.col("day"))).alias("last_contact")
+    )
+    variants = {
+        "gd_r0": (calls_all, _RINGING),
+        "gd_r1": (calls_all, FAILED_CALL),
+        "gd_r2": (calls_new, FAILED_CALL),
+    }
+    df = obs.join(contact, on=list(GRAIN), how="left").withColumn("_w", w_start)
+    for col, (calls, failed) in variants.items():
+        gd = _gone_dark(calls, failed, w_start).withColumnRenamed("gd", col)
+        df = df.join(gd, on=list(GRAIN), how="left")
+
+    def state(gd: str, in_window: bool) -> F.Column:
+        has_contact = (
+            F.col("last_contact") >= F.col("_w")
+            if in_window
+            else F.col("last_contact").isNotNull()
+        )
+        return (
+            F.when(F.coalesce(F.col(gd), F.lit(False)), "non_reachable")
+            .when(has_contact, "reachable")
+            .otherwise("unknown")
+        )
+
+    df = (
+        df.withColumn("R0", state("gd_r0", False))
+        .withColumn("R1", state("gd_r1", False))
+        .withColumn("R2", state("gd_r2", False))
+        .withColumn("R3", state("gd_r2", True))
+        .cache()
+    )
+    steps = ["R0", "R1", "R2", "R3"]
+    lines = []
+    for step in steps:
+        lines += [f"{step} state:", *_table(df, step)]
+    for before, after in pairwise(steps):
+        lines += [
+            f"moves {before} -> {after}:",
+            *_table(df.filter(F.col(before) != F.col(after)), before, after),
+        ]
+    engine = _latest_month(new).select(
+        *GRAIN, F.col("reachability_state").alias("_engine")
+    )
+    mismatches = (
+        df.join(engine, on=list(GRAIN), how="inner")
+        .filter(F.col("R3") != F.col("_engine"))
+        .count()
+    )
+    lines += [
+        "R0 -> R3 (all changes):",
+        *_table(df, "R0", "R3"),
+        f"R3 vs the engine's reachability_state: {mismatches} mismatches",
+    ]
+    _log("REACH", model_id, lines)
+    df.unpersist()
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/a2_locatability/pipeline.py`
+action: replace · base sha256 `af38bc9e38fec005ef836d670dd2a55d88320031abbfb3d4b39bc1167d7d184c` · base trailing newline: yes · new sha256 `1c4d86c21f83daa41f7f1f71a2d2c919417b5a5c97873640baf2c9d6c6b65a26` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""The A2 locatability pipeline for one product (``cc`` or ``rl``).
+
+    crx_<p>_obs_base ─┬─ location signals ─────────────┐   feat_cif_location_monthly
+                      ├─ DCORE signals ────────────────┤   dcore_prm_followup_outcomes,
+                      │  (reachability, DCORE deceased)│   prm_dcore_account_agreements
+                      ├─ Way4 deceased ────────────────┼─► crx_<p>_a2_locatability
+                      └─ demographics deceased ────────┘   prm_contract, prm_client,
+                                                           feat_demographics_cif
+
+Needs, for the model_id: the observation base, ``digital_login``, ``casa_primary`` and
+``location_features`` (``feat_cif_location_monthly``, ``prm_dcore_account_agreements``).
+
+TEMPORARY (mirror bundle 06): ``create_b06_check_pipeline`` runs the observation base,
+``location_features`` and the same nodes, writes the axis to
+``crx_<p>_a2_locatability_b06_check`` and logs the comparison with the old A2
+(``b06_check.py``). Removed by the bundle's cleanup.
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from enbd_collections.pipelines.location.pipeline import (
+    create_pipeline as create_location_pipeline,
+)
+
+from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
+from ..obs_base import create_rl_pipeline as create_rl_obs_pipeline
+from .b06_check import (
+    compare_a2_outputs,
+    describe_a2_rules,
+    describe_debit_evidence,
+    split_by_product,
+)
+from .classify import build_a2_locatability
+from .signals import (
+    build_dcore_signals,
+    build_demographics_deceased,
+    build_location_signals,
+    build_way4_deceased,
+)
+
+
+def create_a2_pipeline(product: str, output: str) -> Pipeline:
+    """Signal nodes and the state node of ``product``'s A2 axis, written to ``output``."""
+    obs = f"crx_{product}_obs_base"
+    prefix = f"crx_{product}_a2"
+    tags = ["crx_persona", "crx", "a2", "locatability", "persona_axis"]
+    return Pipeline(
+        [
+            node(
+                func=build_location_signals,
+                inputs={
+                    "obs_base": obs,
+                    "location_features": "feat_cif_location_monthly",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_location_signals",
+                name=f"build_{prefix}_location_signals",
+                tags=tags,
+            ),
+            node(
+                func=build_dcore_signals,
+                inputs={
+                    "obs_base": obs,
+                    "followup": "dcore_prm_followup_outcomes",
+                    "agreements": "prm_dcore_account_agreements",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_dcore_signals",
+                name=f"build_{prefix}_dcore_signals",
+                tags=tags,
+            ),
+            node(
+                func=build_way4_deceased,
+                inputs={
+                    "obs_base": obs,
+                    "contracts": "prm_contract",
+                    "clients": "prm_client",
+                },
+                outputs=f"{prefix}_way4_deceased",
+                name=f"build_{prefix}_way4_deceased",
+                tags=tags,
+            ),
+            node(
+                func=build_demographics_deceased,
+                inputs={"obs_base": obs, "demographics": "feat_demographics_cif"},
+                outputs=f"{prefix}_demographics_deceased",
+                name=f"build_{prefix}_demographics_deceased",
+                tags=tags,
+            ),
+            node(
+                func=build_a2_locatability,
+                inputs={
+                    "obs_base": obs,
+                    "location": f"{prefix}_location_signals",
+                    "dcore": f"{prefix}_dcore_signals",
+                    "way4_deceased": f"{prefix}_way4_deceased",
+                    "demographics_deceased": f"{prefix}_demographics_deceased",
+                    "model_id": "params:model_id",
+                    "persona_end_date": "params:crx_persona.persona_end_date",
+                },
+                outputs=output,
+                name=f"build_{prefix}_locatability",
+                tags=tags,
+            ),
+        ],
+    )
+
+
+def create_b06_check_pipeline(product: str) -> Pipeline:
+    """TEMPORARY: observation base + location inputs + the A2 pipeline writing to
+    crx_<p>_a2_locatability_b06_check + the log-only comparison nodes.
+    Remove with b06_check.py and the catalog entries."""
+    obs = f"crx_{product}_obs_base"
+    check = f"crx_{product}_a2_locatability_b06_check"
+    tags = ["crx_persona"]
+    checks = [
+        node(
+            func=compare_a2_outputs,
+            inputs=[f"crx_{product}_a2_locatability", check, "params:model_id"],
+            outputs=None,
+            name=f"compare_crx_{product}_a2_b06",
+            tags=tags,
+        ),
+        node(
+            func=describe_a2_rules,
+            inputs=[check, "params:model_id"],
+            outputs=None,
+            name=f"describe_crx_{product}_a2_b06_rules",
+            tags=tags,
+        ),
+        node(
+            func=describe_debit_evidence,
+            inputs=[obs, "prm_casa_card_transactions", "params:model_id"],
+            outputs=None,
+            name=f"describe_crx_{product}_a2_b06_debit",
+            tags=tags,
+        ),
+    ]
+    if product == "rl":
+        checks.append(
+            node(
+                func=split_by_product,
+                inputs=[check, "rl_spine", "params:model_id"],
+                outputs=None,
+                name="split_crx_rl_a2_b06_product",
+                tags=tags,
+            )
+        )
+    obs_pipeline = (
+        create_cc_obs_pipeline() if product == "cc" else create_rl_obs_pipeline()
+    )
+    return (
+        obs_pipeline
+        + create_location_pipeline()
+        + create_a2_pipeline(product, output=check)
+        + Pipeline(checks)
+    )
+`````
+
+New:
+
+`````python
+"""The A2 locatability pipeline for one product (``cc`` or ``rl``).
+
+    crx_<p>_obs_base ─┬─ location signals ─────────────┐   feat_cif_location_monthly
+                      ├─ DCORE signals ────────────────┤   dcore_prm_followup_outcomes,
+                      │  (reachability, DCORE deceased)│   prm_dcore_account_agreements
+                      ├─ Way4 deceased ────────────────┼─► crx_<p>_a2_locatability
+                      └─ demographics deceased ────────┘   prm_contract, prm_client,
+                                                           feat_demographics_cif
+
+Needs, for the model_id: the observation base, ``digital_login``, ``casa_primary`` and
+``location_features`` (``feat_cif_location_monthly``, ``prm_dcore_account_agreements``).
+
+TEMPORARY (mirror bundle 06): ``create_b06_check_pipeline`` runs the observation base,
+``location_features`` and the same nodes, writes the axis to
+``crx_<p>_a2_locatability_b06_check`` and logs the comparison with the old A2
+(``b06_check.py``). Removed by the bundle's cleanup.
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from enbd_collections.pipelines.location.pipeline import (
+    create_pipeline as create_location_pipeline,
+)
+
+from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
+from ..obs_base import create_rl_pipeline as create_rl_obs_pipeline
+from .b06_check import (
+    compare_a2_outputs,
+    describe_a2_rules,
+    describe_debit_evidence,
+    explain_reachability,
+    split_by_product,
+)
+from .classify import build_a2_locatability
+from .signals import (
+    build_dcore_signals,
+    build_demographics_deceased,
+    build_location_signals,
+    build_way4_deceased,
+)
+
+
+def create_a2_pipeline(product: str, output: str) -> Pipeline:
+    """Signal nodes and the state node of ``product``'s A2 axis, written to ``output``."""
+    obs = f"crx_{product}_obs_base"
+    prefix = f"crx_{product}_a2"
+    tags = ["crx_persona", "crx", "a2", "locatability", "persona_axis"]
+    return Pipeline(
+        [
+            node(
+                func=build_location_signals,
+                inputs={
+                    "obs_base": obs,
+                    "location_features": "feat_cif_location_monthly",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_location_signals",
+                name=f"build_{prefix}_location_signals",
+                tags=tags,
+            ),
+            node(
+                func=build_dcore_signals,
+                inputs={
+                    "obs_base": obs,
+                    "followup": "dcore_prm_followup_outcomes",
+                    "agreements": "prm_dcore_account_agreements",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_dcore_signals",
+                name=f"build_{prefix}_dcore_signals",
+                tags=tags,
+            ),
+            node(
+                func=build_way4_deceased,
+                inputs={
+                    "obs_base": obs,
+                    "contracts": "prm_contract",
+                    "clients": "prm_client",
+                },
+                outputs=f"{prefix}_way4_deceased",
+                name=f"build_{prefix}_way4_deceased",
+                tags=tags,
+            ),
+            node(
+                func=build_demographics_deceased,
+                inputs={"obs_base": obs, "demographics": "feat_demographics_cif"},
+                outputs=f"{prefix}_demographics_deceased",
+                name=f"build_{prefix}_demographics_deceased",
+                tags=tags,
+            ),
+            node(
+                func=build_a2_locatability,
+                inputs={
+                    "obs_base": obs,
+                    "location": f"{prefix}_location_signals",
+                    "dcore": f"{prefix}_dcore_signals",
+                    "way4_deceased": f"{prefix}_way4_deceased",
+                    "demographics_deceased": f"{prefix}_demographics_deceased",
+                    "model_id": "params:model_id",
+                    "persona_end_date": "params:crx_persona.persona_end_date",
+                },
+                outputs=output,
+                name=f"build_{prefix}_locatability",
+                tags=tags,
+            ),
+        ],
+    )
+
+
+def create_b06_check_pipeline(product: str) -> Pipeline:
+    """TEMPORARY: observation base + location inputs + the A2 pipeline writing to
+    crx_<p>_a2_locatability_b06_check + the log-only comparison nodes.
+    Remove with b06_check.py and the catalog entries."""
+    obs = f"crx_{product}_obs_base"
+    check = f"crx_{product}_a2_locatability_b06_check"
+    tags = ["crx_persona"]
+    checks = [
+        node(
+            func=compare_a2_outputs,
+            inputs=[f"crx_{product}_a2_locatability", check, "params:model_id"],
+            outputs=None,
+            name=f"compare_crx_{product}_a2_b06",
+            tags=tags,
+        ),
+        node(
+            func=describe_a2_rules,
+            inputs=[check, "params:model_id"],
+            outputs=None,
+            name=f"describe_crx_{product}_a2_b06_rules",
+            tags=tags,
+        ),
+        node(
+            func=explain_reachability,
+            inputs=[
+                obs,
+                "dcore_prm_followup_outcomes",
+                "prm_dcore_account_agreements",
+                check,
+                "params:model_id",
+            ],
+            outputs=None,
+            name=f"explain_crx_{product}_a2_b06_reach",
+            tags=tags,
+        ),
+        node(
+            func=describe_debit_evidence,
+            inputs=[obs, "prm_casa_card_transactions", "params:model_id"],
+            outputs=None,
+            name=f"describe_crx_{product}_a2_b06_debit",
+            tags=tags,
+        ),
+    ]
+    if product == "rl":
+        checks.append(
+            node(
+                func=split_by_product,
+                inputs=[check, "rl_spine", "params:model_id"],
+                outputs=None,
+                name="split_crx_rl_a2_b06_product",
+                tags=tags,
+            )
+        )
+    obs_pipeline = (
+        create_cc_obs_pipeline() if product == "cc" else create_rl_obs_pipeline()
+    )
+    return (
+        obs_pipeline
+        + create_location_pipeline()
+        + create_a2_pipeline(product, output=check)
+        + Pipeline(checks)
+    )
 `````
 
 ## Apply script
