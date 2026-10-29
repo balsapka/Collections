@@ -217,7 +217,7 @@ def overview(wb: Workbook, scoring: str) -> None:
         ("skip", "Location", "The latest evidence places the customer abroad (however old), or they went silent soon after buying a ticket."),
         ("unknown", "Location", "No evidence, or the latest UAE evidence is older than the window."),
         ("reachable", "Reachability", "We were in contact with the customer recently."),
-        ("non_reachable", "Reachability", "The last 3 days we called all failed, with no contact since."),
+        ("non_reachable", "Reachability", "The last 3 days we called all failed, with no confirmed contact since."),
         ("unknown", "Reachability", "Not enough recent call evidence either way."),
         ("deceased", "Override", "Reported deceased. Overrides both dimensions."),
     ]:
@@ -276,7 +276,8 @@ def logic(wb: Workbook) -> None:
         ("Travel purchase (airline, cruise, travel agency), any channel, any card",
          "Departure signal", "bad", "Location"),
         ("Customer called us, a call marked successful, or a result only the customer can give "
-         "(promise to pay, dispute, settlement request, …)", "Contact", "good", "Reachability"),
+         "(promise to pay, dispute, settlement request, …)", "Confirmed contact", "good",
+         "Reachability"),
         ("A day we called and every call rang out, went unanswered (message left included) or "
          "hit a dead line (switched off, wrong or invalid number)", "Failed call day", "bad",
          "Reachability"),
@@ -304,7 +305,8 @@ def logic(wb: Workbook) -> None:
         ("Latest UAE evidence", "Date of the most recent UAE evidence.", "Location"),
         ("Latest foreign evidence", "Date of the most recent foreign evidence.", "Location"),
         ("Last travel purchase", "Date of the most recent departure signal.", "Location"),
-        ("Last contact", "Date of the most recent contact.", "Reachability"),
+        ("Last confirmed contact", "Date of the most recent confirmed contact with the customer.",
+         "Reachability"),
         ("Last 3 call days", "The 3 most recent days we called, each failed or not.", "Reachability"),
         ("Deceased flag", "Any deceased evidence, at any date.", "Override"),
     ]:
@@ -323,9 +325,10 @@ def logic(wb: Workbook) -> None:
          "unknown"),
     ])
     flow("Reachability", [
-        ("Last 3 call days all failed, the oldest within the window, and no contact since.",
+        ("Last 3 call days all failed, the oldest within the window, and no confirmed contact since.",
          "non_reachable"),
-        ("Last contact is within the window.", "reachable"),
+        ("The last confirmed contact with the customer (they called us, a call marked successful, "
+         "or a result only the customer can give) is within the window.", "reachable"),
         ("Otherwise.", "unknown"),
     ])
     flow("Deceased", [("Deceased flag is set, at any date. Overrides both dimensions.", "deceased")])
@@ -342,7 +345,7 @@ def logic(wb: Workbook) -> None:
         ("Failed call days", "The last 3 call days.",
          "Fewer is not a pattern. 86% of accounts have 6+ call days in 3 months; sensitivity "
          "1–10 days under check."),
-        ("Contacts for Reachable", "1 is enough.", "One recent contact shows they can be reached."),
+        ("Confirmed contacts for Reachable", "1 is enough.", "One recent confirmed contact shows they can be reached."),
     ]:
         s.text(1, p, bold=True)
         s.text(2, v, span=2)
@@ -626,7 +629,7 @@ def results(wb: Workbook, scoring: str) -> None:
             data=RESULTS["Reachability"])
     _counts(s, "Why Unknown", [("Reason", 2)],
             ["Location: no evidence", "Location: UAE evidence too old",
-             "Reachability: no calls", "Reachability: no recent contact"],
+             "Reachability: no calls", "Reachability: no recent confirmed contact"],
             lambda t: s.chip(1, "unknown", t, span=2), VARIANTS, total=None, share_of=tot,
             data=RESULTS["Why Unknown"])
     s.note("Shares are of all accounts in the variant.")
