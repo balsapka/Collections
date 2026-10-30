@@ -5,7 +5,8 @@
 Raw-shaped rows go through the whole chain: login staging + monthly primary, the CASA card
 primary, the DCORE agreement primary, the location feature, the signals and the state.
 Each case is one account / customer at one observation date (cc_60_180, W = 3 months)
-with the rule and states the spec prescribes. Prints a table, exits non-zero on a mismatch.
+with the rule and states the spec prescribes; the S cases also run the reachability rule
+at 180+ (W = 6 months, 6 failed days). Prints a table, exits non-zero on a mismatch.
 """
 
 import os
@@ -51,6 +52,7 @@ from enbd_collections.pipelines.crx_persona.a2_locatability import (  # noqa: E4
 )
 
 MODEL = "cc_60_180"
+MODEL_180 = "cc_180_plus"
 OBS = date(2026, 7, 31)  # W = May, Jun, Jul
 START = "2026-01-01"
 UAE, GB = "United Arab Emirates", "United Kingdom"
@@ -85,6 +87,10 @@ CASES = {
     "R6": ("L4", "non_reachable", None),  # admin entries are ignored
     "R7": ("L4", "reachable", None),  # outbound SUC in W
     "R8": ("L4", "unknown", None),  # only 2 failed days, contact before W
+    "S1": ("L4", "non_reachable", None),  # 6 failed days, contact before
+    "S2": ("L4", "non_reachable", None),  # 5 failed days after a contact
+    "S3": ("L4", "non_reachable", None),  # 5 failed days, no contact ever
+    "S4": ("L4", "non_reachable", None),  # 6 failed days, the oldest before W at 180+
     "D1": ("L4", "unknown", "dcore"),  # relative's claim (admin note)
     "D2": ("L4", "unknown", "way4"),  # block D on the latest snapshot
     "D3": ("L4", "unknown", None),  # block D removed on a later snapshot
@@ -96,6 +102,13 @@ UNKNOWN_REASON = {
     "15": "no_evidence",
 }
 REACH_REASON = {"R3": "no_contact_in_window", "05": "no_dcore_record"}
+# Reachability of the S cases at 180+, W = Feb..Jul.
+REACH_180 = {
+    "S1": "non_reachable",
+    "S2": "reachable",
+    "S3": "unknown",
+    "S4": "unknown",
+}
 
 
 def ts(y, mo, d):
@@ -162,6 +175,12 @@ DCORE = [
     ("R7", ts(2026, 6, 10), "OC", "SUC", "OTHER"),
     *[("R8", ts(2026, 7, d), "OC", "UNS", RING) for d in (5, 10)],
     ("R8", ts(2026, 3, 1), "IC", "INT", "OTHER"),
+    *[("S1", ts(2026, m, 10), "OC", "UNS", RING) for m in (2, 3, 4, 5, 6, 7)],
+    ("S1", ts(2026, 1, 5), "OC", "SUC", "OTHER"),
+    *[("S2", ts(2026, m, 10), "OC", "UNS", RING) for m in (3, 4, 5, 6, 7)],
+    ("S2", ts(2026, 2, 20), "IC", "INT", "OTHER"),
+    *[("S3", ts(2026, m, 10), "OC", "UNS", RING) for m in (3, 4, 5, 6, 7)],
+    *[("S4", ts(2026, m, 10), "OC", "UNS", RING) for m in (1, 3, 4, 5, 6, 7)],
     ("D1", ts(2026, 5, 1), "IA", "", "DECEASED CLAIMED"),
 ]
 
@@ -287,7 +306,16 @@ def main() -> int:
             f"  travel={r['last_travel_date']}  reach={r['reachability_unknown_reason']}"
             f"  deceased={r['deceased_source']}  label={r['a2_state_label']}"
         )
-    print(f"\n{len(CASES) - bad}/{len(CASES)} cases pass")
+    reach_180 = {
+        r["account_id"][1:]: r["reachability_state"]
+        for r in build_dcore_signals(obs_base, followup, agreements, MODEL_180).collect()
+    }
+    for case, state in REACH_180.items():
+        ok = reach_180[case] == state
+        bad += not ok
+        print(f"{'ok ' if ok else 'BAD'} {case}  180+ reachability={reach_180[case]}")
+    total = len(CASES) + len(REACH_180)
+    print(f"\n{total - bad}/{total} cases pass")
     return 1 if bad else 0
 
 

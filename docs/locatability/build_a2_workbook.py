@@ -217,7 +217,7 @@ def overview(wb: Workbook, scoring: str) -> None:
         ("skip", "Location", "The latest evidence places the customer abroad (however old), or they went silent soon after buying a ticket."),
         ("unknown", "Location", "No evidence, or the latest UAE evidence is older than the window."),
         ("reachable", "Reachability", "We were in contact with the customer recently."),
-        ("non_reachable", "Reachability", "The last 3 days we called all failed, with no confirmed contact since."),
+        ("non_reachable", "Reachability", "The last 3 days we called (6 at 180+) all failed, with no confirmed contact since."),
         ("unknown", "Reachability", "Not enough recent call evidence either way."),
         ("deceased", "Override", "Reported deceased. Overrides both dimensions."),
     ]:
@@ -307,7 +307,7 @@ def logic(wb: Workbook) -> None:
         ("Last travel purchase", "Date of the most recent departure signal.", "Location"),
         ("Last confirmed contact", "Date of the most recent confirmed contact with the customer.",
          "Reachability"),
-        ("Last 3 call days", "The 3 most recent days we called, each failed or not.", "Reachability"),
+        ("Last call days", "The 3 most recent days we called (6 at 180+), each failed or not.", "Reachability"),
         ("Deceased flag", "Any deceased evidence, at any date.", "Override"),
     ]:
         s.text(1, feat, bold=True, align=MID)
@@ -325,7 +325,8 @@ def logic(wb: Workbook) -> None:
          "unknown"),
     ])
     flow("Reachability", [
-        ("Last 3 call days all failed, the oldest within the window, and no confirmed contact since.",
+        ("Last 3 call days (6 at 180+) all failed, the oldest within the window, and no confirmed "
+         "contact since.",
          "non_reachable"),
         ("The last confirmed contact with the customer (they called us, a call marked successful, "
          "or a result only the customer can give) is within the window.", "reachable"),
@@ -342,9 +343,9 @@ def logic(wb: Workbook) -> None:
          "Covers 82% (cards) / 84% (loans) of known leavers, about 5% of stayers."),
         ("Travel rule: silence", "At least 1 month without UAE evidence.",
          "Keeps a customer who just bought a ticket and is still active out of Skip."),
-        ("Failed call days", "The last 3 call days.",
-         "Fewer is not a pattern. 86% of accounts have 6+ call days in 3 months; sensitivity "
-         "1–10 days under check."),
+        ("Failed call days", "The last 3 call days at 61–180 DPD, the last 6 at 180+ DPD.",
+         "Fewer is not a pattern; 6 at 180+ set by GRR. 86% of accounts at 61–180 have 6+ call days "
+         "in 3 months; sensitivity 1–10 days under check."),
         ("Confirmed contacts for Reachable", "1 is enough.", "One recent confirmed contact shows they can be reached."),
     ]:
         s.text(1, p, bold=True)
@@ -463,7 +464,8 @@ CHANGES = [  # (area, the model it replaces, now, effect on CC 61–180, 31 Aug 
     ("Admin entries", "Result not found, follow up, e-mail sent, legal / repossession counted "
      "and broke a run of failed calls.", "Ignored.", "Reachable −21.1 pt (the largest move)."),
     ("Reachable", "Any contact since the spell began; overruled only by 3 ringing events.",
-     "A contact within the window; 3 failed call days after it still make Non-Reachable.",
+     "A contact within the window; 3 failed call days after it (6 at 180+) still make "
+     "Non-Reachable.",
      "Reachable −5.5 pt (1,065 → Unknown)."),
     ("Call minimum", "3 outbound attempts needed for any reachability state.", "Needed for "
      "Non-Reachable only.", "Reachable 62.7% → 21.0%, Non-Reachable 7.0% → 67.6% overall."),

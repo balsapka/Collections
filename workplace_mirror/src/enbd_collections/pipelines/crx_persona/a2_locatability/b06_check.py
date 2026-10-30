@@ -37,7 +37,7 @@ from .codes import (
     RIGHT_PARTY_CONTACT,
     SUCCESS_CATEGORY,
 )
-from .signals import GONE_DARK_DAYS, _dcore_events
+from .signals import _dcore_events, gone_dark_days
 
 LOG = logging.getLogger(__name__)
 
@@ -280,9 +280,9 @@ _RINGING = frozenset({"RINGING NO REPLY", "RINGING NO RESPONSE", "NO ANSWER"})
 
 
 def _gone_dark(
-    calls: DataFrame, failed_names: frozenset, w_start: F.Column
+    calls: DataFrame, failed_names: frozenset, w_start: F.Column, streak: int
 ) -> DataFrame:
-    """Per row: gone dark (last GONE_DARK_DAYS call days all failed, oldest in W, no
+    """Per row: gone dark (last ``streak`` call days all failed, oldest in W, no
     contact since) with ``failed_names`` as the failure set and the given calls."""
     outbound = F.col("action_code").isin(*OUTBOUND_CODES)
     days = calls.groupBy(*GRAIN, "day").agg(
@@ -299,7 +299,7 @@ def _gone_dark(
     last = (
         days.filter(F.col("_attempt") == 1)
         .withColumn("_rank", F.row_number().over(recent))
-        .filter(F.col("_rank") <= GONE_DARK_DAYS)
+        .filter(F.col("_rank") <= streak)
         .groupBy(*GRAIN)
         .agg(
             F.count("*").alias("_n"),
@@ -313,8 +313,8 @@ def _gone_dark(
     return last.join(contact, on=list(GRAIN), how="left").select(
         *GRAIN,
         (
-            (F.col("_n") == GONE_DARK_DAYS)
-            & (F.col("_f") == GONE_DARK_DAYS)
+            (F.col("_n") == streak)
+            & (F.col("_f") == streak)
             & (F.col("_oldest") >= w_start)
             & (
                 F.col("_last_contact").isNull()
@@ -335,7 +335,7 @@ def explain_reachability(  # pylint: disable=too-many-locals
     change applied in turn, latest month: the state mix after every step and the moves
     between steps.
 
-    R0 earlier rule: any contact ever → reachable, unless the last 3 call days only rang
+    R0 earlier rule: any contact ever → reachable, unless the last call days of the streak only rang
        out (admin entries kept as calls) → non_reachable
     R1 + dead lines, invalid numbers and LEFT_MSG count as failed (D-A2-7, D-A2-17)
     R2 + admin / legal entries ignored (D-A2-17)
@@ -367,7 +367,9 @@ def explain_reachability(  # pylint: disable=too-many-locals
     }
     df = obs.join(contact, on=list(GRAIN), how="left").withColumn("_w", w_start)
     for col, (calls, failed) in variants.items():
-        gd = _gone_dark(calls, failed, w_start).withColumnRenamed("gd", col)
+        gd = _gone_dark(
+            calls, failed, w_start, gone_dark_days(model_id)
+        ).withColumnRenamed("gd", col)
         df = df.join(gd, on=list(GRAIN), how="left")
 
     def state(gd: str, in_window: bool) -> F.Column:

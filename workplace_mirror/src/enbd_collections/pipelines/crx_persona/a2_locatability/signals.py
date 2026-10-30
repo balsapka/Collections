@@ -20,6 +20,7 @@ from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, left_join_all, require_columns, window_months
+from .._dpd_journey.constants import MODEL_ID_SEGMENT
 from .codes import (
     CALL_CODES,
     DECEASED,
@@ -37,8 +38,8 @@ from .codes import (
 # ticket, and none for at least SILENCE months before the observation date.
 TRAVEL_GAP_MONTHS = 3
 TRAVEL_SILENCE_MONTHS = 1
-# Non-Reachable: the last this-many call days all failed.
-GONE_DARK_DAYS = 3
+# Non-Reachable: the last this-many call days all failed, per segment.
+GONE_DARK_DAYS = {"60_180": 3, "180_plus": 6}
 WAY4_DECEASED_BLOCK = "D"  # block_code_2
 # Per-month evidence columns of feat_cif_location_monthly, latest as of the observation.
 LOCATION_EVIDENCE = [
@@ -177,6 +178,11 @@ def _dcore_events(
     )
 
 
+def gone_dark_days(model_id: str) -> int:
+    """The failed-call-day streak that makes ``model_id``'s segment Non-Reachable."""
+    return GONE_DARK_DAYS[MODEL_ID_SEGMENT[model_id]]
+
+
 def build_dcore_signals(  # pylint: disable=too-many-locals
     obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
 ) -> DataFrame:
@@ -187,12 +193,13 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
     day failed (``codes.FAILED_CALL``) and no contact was confirmed. A contact is an
     inbound call, an outbound call in category SUC, or a right-party result.
 
-    non_reachable  the last GONE_DARK_DAYS call days all failed, the oldest in W, and no
-                   contact since
+    non_reachable  the last ``gone_dark_days`` call days all failed, the oldest in W, and
+                   no contact since
     reachable      a contact in W
     unknown        no_dcore_record · no_contact_in_window
     """
     w_start = _window_start(window_months(model_id))
+    streak = gone_dark_days(model_id)
     events = _dcore_events(obs_base, followup, agreements)
     name = F.col("name")
     code = F.col("action_code")
@@ -223,7 +230,7 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
     last_days = (
         days.filter(F.col("_attempt") == 1)
         .withColumn("_rank", F.row_number().over(recent))
-        .filter(F.col("_rank") <= GONE_DARK_DAYS)
+        .filter(F.col("_rank") <= streak)
         .groupBy(*GRAIN)
         .agg(
             F.count("*").alias("_n_last"),
@@ -246,8 +253,8 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
     )
     last_contact = F.col("last_contact_date")
     gone_dark = (
-        (F.col("_n_last") == GONE_DARK_DAYS)
-        & (F.col("_failed_last") == GONE_DARK_DAYS)
+        (F.col("_n_last") == streak)
+        & (F.col("_failed_last") == streak)
         & (F.col("_oldest_last") >= w_start)
         & (last_contact.isNull() | (last_contact < F.col("_oldest_last")))
     )

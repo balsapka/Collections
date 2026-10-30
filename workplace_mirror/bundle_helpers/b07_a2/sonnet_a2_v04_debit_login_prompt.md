@@ -54,7 +54,7 @@ Hypotheses, each with a verdict and the numbers behind it:
      Re-derive these in the snippet from the same inputs as the engine (feat_cif_location_monthly
      and the login primary). First reproduce the engine's location_state for the "as now" case:
      0 mismatches, else report the count and stop V2.
-  R1 Non-Reachable threshold (GONE_DARK_DAYS = 3 in a2_locatability/signals.py, build_dcore_signals).
+  R1 Non-Reachable threshold at 60-180 (GONE_DARK_DAYS in a2_locatability/signals.py: 3 at 60-180, 6 at 180+ set by GRR, not under test).
      Today: Non-Reachable = the last 3 call days all failed, the oldest in W, no contact since;
      else Reachable = a contact in W; else Unknown. CC 2026-08: Non-Reachable 67.6%, Reachable 21.0%,
      Unknown 11.5%. 3,386 accounts (17.6%) had a contact in W and are Non-Reachable anyway; 85.9%

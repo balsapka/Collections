@@ -97,12 +97,12 @@ money home every month; neither places the customer.
 
 | State | Rule (checked in order) |
 |---|---|
-| **Non-Reachable** | the last 3 attempt dates all failed, the oldest of them in `W`, no contact since ("gone dark") |
+| **Non-Reachable** | the last 3 attempt dates (6 at 180+) all failed, the oldest of them in `W`, no contact since ("gone dark") |
 | **Reachable** | a contact confirmed in `W` |
 | **Unknown** | otherwise — `reachability_unknown_reason`: `no_dcore_record` · `no_contact_in_window` |
 
 A fresh run of failed calls outweighs an earlier answered call. A customer who only calls in is
-Reachable; the 3-attempt minimum guards Non-Reachable only.
+Reachable; the attempt minimum guards Non-Reachable only.
 
 ---
 
@@ -148,7 +148,7 @@ Both dimensions are computed on every row, deceased included, so each can be use
 | Window `W` | 3 months (60–180), 6 (180+) | as every axis |
 | Travel: last UAE evidence after the last ticket, at most | 3 months | covers 82% / 84% of known leavers' lags, ~5% of stayers' |
 | Travel: silence before the observation date, at least | 1 month | catches recent leavers; L2 ≈ 3.8% / 2.9% of rows, ~130 / 17 of them from In Country |
-| Gone dark | last 3 attempt dates failed | ~95% have 6+ outbound dates in 3 months, so the minimum rarely binds |
+| Gone dark | last 3 attempt dates failed at 60–180, last 6 at 180+ (GRR, D-A2-20) | ~95% have 6+ outbound dates in 3 months at 60–180, so the minimum rarely binds; not yet measured at 180+ |
 
 ---
 
@@ -175,6 +175,7 @@ Both dimensions are computed on every row, deceased included, so each can be use
 | D-A2-17 | DCORE off-list outcomes: `LEFT_MSG` failed; `CALL CONNECTED` (not `SUC`) neutral; `Skip - Under Tracing/Traced` diagnostic only; RL legal / repossession and admin codes ignored. |
 | D-A2-18 | After v02: travel GAP 3 months, SILENCE 1 month. Credit-card in-person = option C2 (§10). |
 | D-A2-19 | Debit cards / CASA are evidence, from the raw CASA table via a new primary, with the v03 rule as recommended (user, 2026-10-28): POS Machine / Offline debits, ATM withdrawals placed by the narration country; no re-run. |
+| D-A2-20 | GRR accepted the logic (2026-10-30) with one change: the failed-call-day streak for Non-Reachable is 6 at 180+ (3 at 60–180). |
 
 ---
 
