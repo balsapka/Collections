@@ -469,6 +469,8 @@ CHANGES = [  # (area, the model it replaces, now, effect on CC 61–180, 31 Aug 
      "Reachable −5.5 pt (1,065 → Unknown)."),
     ("Call minimum", "3 outbound attempts needed for any reachability state.", "Needed for "
      "Non-Reachable only.", "Reachable 62.7% → 21.0%, Non-Reachable 7.0% → 67.6% overall."),
+    ("Failed call days at 180+", "3 call days.", "6 call days (GRR); 3 at 61–180.",
+     "None at 61–180; 180+ not run yet."),
     ("Call history", "From the spell start.", "All collections history up to the scoring date.",
      "—"),
     ("Deceased", "Collector note; card block joined on the exact date.", "Collector note "
