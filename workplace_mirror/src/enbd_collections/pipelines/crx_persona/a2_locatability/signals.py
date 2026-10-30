@@ -193,8 +193,8 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
     day failed (``codes.FAILED_CALL``) and no contact was confirmed. A contact is an
     inbound call, an outbound call in category SUC, or a right-party result.
 
-    non_reachable  the last ``gone_dark_days`` call days all failed, the oldest in W, and
-                   no contact since
+    non_reachable  the last ``gone_dark_days`` call days all failed, the oldest in W,
+                   and no contact since
     reachable      a contact in W
     unknown        no_dcore_record · no_contact_in_window
     """
