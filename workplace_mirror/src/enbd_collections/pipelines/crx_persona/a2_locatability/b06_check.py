@@ -335,8 +335,8 @@ def explain_reachability(  # pylint: disable=too-many-locals
     change applied in turn, latest month: the state mix after every step and the moves
     between steps.
 
-    R0 earlier rule: any contact ever → reachable, unless the last call days of the streak only rang
-       out (admin entries kept as calls) → non_reachable
+    R0 earlier rule: any contact ever → reachable, unless the last streak of call days
+       only rang out (admin entries kept as calls) → non_reachable
     R1 + dead lines, invalid numbers and LEFT_MSG count as failed (D-A2-7, D-A2-17)
     R2 + admin / legal entries ignored (D-A2-17)
     R3 + the contact must be in W (= the new rule; checked against ``new``)
