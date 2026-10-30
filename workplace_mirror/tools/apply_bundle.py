@@ -42,7 +42,7 @@ import subprocess
 import sys
 import tempfile
 
-APPLY_VERSION = 6
+APPLY_VERSION = 7
 PROTECTED_BRANCHES = {"main", "master"}
 FENCE = re.compile(r"^(`{5,})")
 
@@ -430,7 +430,7 @@ def cmd_apply(entries: list[dict], do_import: bool) -> bool:
             current = _read(path)
             if status == "todo":
                 new = _rebase(new, e["base"], current)
-            else:
+            elif current is not None:  # a file missing here gets the bundle's version
                 new = _merge3(current, e["base"], new)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(new.encode("utf-8"))
