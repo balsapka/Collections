@@ -1,2 +1,14 @@
-No PROD check for this bundle: the only change is at 180+, and no 180+ A2 output exists yet. The
-60–180 runs need nothing new. The 180+ model_ids pick up the 6-day streak on their first A2 run.
+No check pipeline for this bundle. Only the 180+ output changes: rerun the final A2 pipeline, nothing
+upstream, per model_id (`model_id` in `globals_dev.yml`). 60–180 needs nothing.
+
+`model_id: cc_180_plus`:
+
+```bash
+kedro run --env=dev --pipeline=crx_cc_a2_locatability
+```
+
+`model_id: rl_180_plus`:
+
+```bash
+kedro run --env=dev --pipeline=crx_rl_a2_locatability
+```

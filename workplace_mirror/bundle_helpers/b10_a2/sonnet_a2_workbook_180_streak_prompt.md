@@ -11,8 +11,8 @@ latest version: it holds their edits and results. Change only the text that desc
 The decision: Non-Reachable needs the last 3 failed call days at 61–180 DPD and the last 6 at
 180+ DPD. Everything else in the rule is unchanged: every one of those days failed, the oldest is
 within the window (3 months at 61–180, 6 at 180+), no confirmed contact since. Code: GONE_DARK_DAYS
-and gone_dark_days in a2_locatability/signals.py (bundle 10). 61–180 results do not change, and no
-180+ results exist yet.
+and gone_dark_days in a2_locatability/signals.py (bundle 10). 61–180 results do not change. 180+ results
+change; the user re-runs them and updates those numbers themselves.
 
 Edits (the user has changed some wording, so find each by meaning, and keep their wording around
 the change):
@@ -28,12 +28,12 @@ the change):
 - Changes, Reachable row, "Now": 3 failed call days after a contact (6 at 180+) still make
   Non-Reachable.
 - Changes: add one row after "Call minimum". Area "Failed call days at 180+"; Before "3 call days";
-  Now "6 call days (GRR); 3 at 61–180"; Effect "None at 61–180; 180+ not run yet". Copy the
+  Now "6 call days (GRR); 3 at 61–180"; Effect "None at 61–180; 180+: Non-Reachable falls, see Results". Copy the
   formats of the row above.
 - Any other place that states the 3-day streak as applying to all segments (Overview included):
   fix it the same way, and list it in your report.
 - Leave as they are: the Examples sheet (its 3-day cases are 61–180 examples) and every Results
-  sheet, whatever they say about call days.
+  sheet, whatever they say about call days: the user updates the numbers.
 
 Hard rules:
 - Find cells by sheet and text, never by fixed address. Use openpyxl, without data_only, so
