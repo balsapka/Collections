@@ -14,11 +14,13 @@ import pathlib
 import sys
 
 from openpyxl import Workbook
+from openpyxl.chart import BarChart, Reference
+from openpyxl.formatting.rule import DataBarRule
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, str(pathlib.Path(__file__).parents[1] / "locatability"))
 from build_a2_workbook import (  # noqa: E402
-    CENTER, INPUT_FILL, MID, MUTED, NAVY, TONE, WINDOW_FILL, WINDOW_HEAD, Sheet, _fill, _fit,
+    CENTER, INPUT_FILL, MID, MUTED, NAVY, TONE, WINDOW_FILL, WINDOW_HEAD, Sheet, _fill, _fit, _font,
 )
 
 # --- rules (reference implementation, monthly granularity) ---------------------------------
@@ -75,6 +77,8 @@ LABEL = {"high": "High", "moderate": "Moderate", "low": "Low", "unknown": "Unkno
 FILLS = {"high": ("A9D08E", "274E13"), "moderate": TONE["good"], "low": TONE["bad"],
          "unknown": TONE["unknown"]}
 LEVEL_TONE = {"stable": "high", "adequate": "high", "weak": "moderate", "none": "unknown"}
+SERIES = {"high": "2E7D32", "moderate": "8BC34A", "low": "D9652B", "unknown": "9E9E9E"}
+BAR = "9DC3E6"  # share bars: structure, not a state
 PULL, CARRIED, CLOSED = ("DDEBF7", "1F4E79"), ("EEF5FB", "1F4E79"), TONE["bad"]
 
 
@@ -85,6 +89,7 @@ def chip(s: Sheet, col: int, tone: str, label: str | None = None, span: int = 1)
 
 # --- results: (label, tone, credit cards, retail loans), None = not available yet -----------
 RESULTS_DATE = "31 Aug 2026"
+RESULTS_FIRST = 6  # the first state row on the Results sheet (the Overview links to it)
 CC, RL = 19292, None  # accounts
 STATE_ROWS = [("high", 47, None), ("moderate", 2689, None), ("low", 5737, None),
               ("unknown", 10819, None)]
@@ -221,93 +226,81 @@ NOTES = [
 
 
 # --- sheets ---------------------------------------------------------------------------------
-def rules(wb: Workbook) -> None:
-    s = Sheet(wb.active, [20, 14, 8, 44, 44])
-    s.ws.title = "A1 rules"
-    s.title("A1 Ability", "State = income points + liquidity points, then distress. Customer-level "
-                          "signals are read across all accounts of the customer (CIF).")
-    text = ("Internal salary credit, AECB salary, CASA average balance, external card payments, "
-            "cheque bounces, DDS (direct debit) returns, bureau bounces, customer-initiated CASA "
-            "transactions. Scope: credit cards and retail loans at 61–180 DPD; 180+ DPD follows.")
-    s.text(1, "Inputs", bold=True, color=NAVY, border=False)
-    s.text(2, text, span=4, border=False)
-    _fit(s.ws, s.r, [(text, s.width(2, 5))], floor=18)
+def overview(wb: Workbook) -> None:
+    s = Sheet(wb.active, [31, 31, 31, 31])
+    s.ws.title = "Overview"
+    s.title("A1 Ability", "Can the customer pay? Income and liquidity give points, payment distress "
+                          "lowers the state, and Unknown marks customers whose money we cannot see.")
+    for k, v in [
+        ("Scope", "Credit cards and retail loans (Personal Loans, Personal Cash Loans, Auto) at "
+                  "61–180 DPD. 180+ DPD follows."),
+        ("Customer level", "Salary, CASA, card payments and distress are read across all accounts "
+                           "of the customer (CIF)."),
+        ("Principle", "The state reflects only money we can see. Unknown is absence of data, not "
+                      "evidence of no ability."),
+    ]:
+        s.text(1, k, bold=True, color=NAVY, border=False)
+        s.text(2, v, span=3, border=False)
+        _fit(s.ws, s.r, [(v, s.width(2, 4))], floor=18)
+        s.r += 1
+
+    s.section(f"At a glance, {RESULTS_DATE}")
+    for j, st in enumerate(STATES, 1):
+        chip(s, j, st).alignment = CENTER
+    s.ws.row_dimensions[s.r].height = 20
+    s.r += 1
+    for j, _ in enumerate(STATES):
+        cell = s.text(j + 1, f"=Results!C{RESULTS_FIRST + j}", bold=True, color=NAVY, align=CENTER)
+        cell.font, cell.number_format = _font(size=20, bold=True, color=NAVY), "0.0%"
+    s.ws.row_dimensions[s.r].height = 36
+    s.r += 1
+    for j, _ in enumerate(STATES):
+        ref = f"Results!B{RESULTS_FIRST + j}"
+        loans = f"Results!E{RESULTS_FIRST + j}"
+        formula = (f'=TEXT({ref},"#,##0")&" cards"&IF({loans}="",""," · "&'
+                   f'TEXT({loans},"#,##0")&" loans")')
+        s.text(j + 1, formula, color=MUTED, align=CENTER)
+    s.ws.row_dimensions[s.r].height = 20
     s.r += 1
 
     s.section("States")
-    s.header(["State", "Rule", "In plain words"], [1, 3, 1])
+    s.header(["State", "Rule", "In plain words"], [1, 2, 1])
     for st, rule, plain in [
-        ("high", "4 points and no distress", "Regular income and a buffer, both confirmed"),
-        ("moderate", "≥ 2 but < 4 points and no distress, or 4 points with distress",
-         "One side confirmed, or both partly; or everything in place but a payment has just failed"),
-        ("low", "< 2 points with any signal, or < 4 points with distress",
-         "What we can see shows little or nothing to pay with"),
-        ("unknown", "0 points, no distress, and no CASA with us or a dormant one (no "
-                    "customer-initiated money movement in the window)",
-         "We cannot see the customer's money: absence of data, not evidence of no ability"),
+        ("high", "4 points and no distress", "Regular income and a buffer, both confirmed."),
+        ("moderate", "2–3 points and no distress, or 4 points with distress",
+         "One side confirmed, or both partly; or everything in place but a payment just failed."),
+        ("low", "0–1 points, or under 4 points with distress",
+         "What we can see shows little or nothing to pay with."),
+        ("unknown", "0 points, no distress, and no CASA with us or a dormant one",
+         "We cannot see the customer's money."),
     ]:
         chip(s, 1, st)
-        s.text(2, rule, span=3, align=MID)
-        s.text(5, plain, align=MID)
-        _fit(s.ws, s.r, [(rule, s.width(2, 4)), (plain, s.widths[4])])
+        s.text(2, rule, span=2, align=MID)
+        s.text(4, plain, align=MID)
+        _fit(s.ws, s.r, [(rule, s.width(2, 3)), (plain, s.widths[3])])
         s.r += 1
 
-    s.section("Considerations")
-    s.header(["Consideration", "Level", "Points", "Rule"], [1, 1, 1, 2])
-    for name, level, points, rule in [
-        ("Income (internal salary credit, AECB salary)", "Stable", "2",
-         "One salary amount per month, the larger of internal and AECB; an AECB salary counts in its "
-         "extract month and the next. Stable = the window's total ≥ 2 × max(AED 3,000, 2 × the amount "
-         "due), and the total not more than 25% below the prior window"),
-        ("", "Weak", "1", "Some income in the window (AED 1,000 or more in any month) but not Stable: "
-                          "below threshold, irregular or weakening"),
-        ("", "None", "0", "No internal salary credit and no AECB salary of AED 1,000 or more in any "
-                          "month of the window"),
-        ("Liquidity (CASA average balance, external card payments)", "Adequate", "2",
-         "CASA average balance ≥ max(AED 3,000, 1 × the amount due) in at least 2 of the last 3 months "
-         "and the 3-month average not more than 50% below the prior 3 months. Or at least one external "
-         "card payment ≥ max(AED 500, 1 × the amount due) in the last 3 months"),
-        ("", "Weak", "1", "Not Adequate, but a CASA average balance of AED 1,000 or more in any of the "
-                          "last 3 months, or any external card payment of that size"),
-        ("", "None", "0", "No CASA average balance and no external card payment of AED 1,000 or more "
-                          "in the last 3 months"),
-        ("Distress (cheque bounce, DDS return, bureau bounce)", "Yes", "−1 level",
-         "1 or more cheque bounces, DDS returns or new bureau bounces in the last 3 months"),
-        ("Activity gate (CASA transactions)", "Dormant", "Unknown",
-         "Income None, Liquidity None, no distress, and no customer-initiated CASA transaction in the "
-         "last 3 months (no CASA at all included)"),
-    ]:
-        s.text(1, name, bold=True, align=MID)
-        s.text(2, level, bold=True, align=MID)
-        s.text(3, points, align=CENTER)
-        s.text(4, rule, span=2, align=MID)
-        _fit(s.ws, s.r, [(name, s.widths[0]), (rule, s.width(4, 5))])
-        s.r += 1
-
-    s.section("Map (every combination has one state)")
-    s.text(1, "", fill=NAVY)
-    s.text(2, "Liquidity Adequate", span=2, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    s.text(4, "Liquidity Weak", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    s.text(5, "Liquidity None", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    s.r += 1
+    s.section("State map: income points + liquidity points, then distress")
     for distress in (False, True):
+        s.text(1, "With distress" if distress else "No distress", bold=True, color="FFFFFF",
+               fill=NAVY, align=CENTER)
+        for j, liq in enumerate(("adequate", "weak", "none"), 2):
+            s.text(j, f"Liquidity {LABEL[liq]}", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+        s.ws.row_dimensions[s.r].height = 20
+        s.r += 1
         for inc in ("stable", "weak", "none"):
-            head = f"{'With' if distress else 'No'} distress · Income {LABEL[inc]}"
-            s.text(1, head, bold=True, align=MID)
-            for col, span, liq in ((2, 2, "adequate"), (4, 1, "weak"), (5, 1, "none")):
+            s.text(1, f"Income {LABEL[inc]}", bold=True, align=MID)
+            for j, liq in enumerate(("adequate", "weak", "none"), 2):
                 st = ability(inc, liq, distress, True)
                 label = LABEL[st]
                 if inc == liq == "none" and not distress:
-                    label += " (Unknown if the CASA is dormant or absent)"
-                chip(s, col, st, label, span=span).alignment = CENTER
-            s.ws.row_dimensions[s.r].height = 30
+                    label += " (Unknown if CASA dormant or absent)"
+                chip(s, j, st, label).alignment = CENTER
+            s.ws.row_dimensions[s.r].height = 22
             s.r += 1
-
-    s.section("Reading the results")
-    for n in NOTES:
-        s.text(1, n, span=5, border=False)
-        _fit(s.ws, s.r, [(n, s.width(1, 5))], floor=18)
         s.r += 1
+    s.note("Rules: 'Logic'. Which rule gave each state: 'Results detail'. What we can see of the "
+           "customer: 'Results summaries'.")
     s.ws.freeze_panes = "A4"
 
 
@@ -344,8 +337,9 @@ def thresholds(wb: Workbook) -> None:
 
 def logic(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Logic"), [26, 62, 30])
-    s.title("Logic", "How the inputs are read. The window is the scoring month and the 2 before it; "
-                     "the prior window is the 3 months before that.")
+    s.title("Logic", "What the model computes for each account at the end of the scoring month. The "
+                     "window is the scoring month and the 2 before it; the prior window is the 3 "
+                     "months before that.")
 
     def table(title: str, heads: list[str], rows: list, gap: int = 1) -> None:
         s.section(title, gap=gap)
@@ -356,6 +350,21 @@ def logic(wb: Workbook) -> None:
             _fit(s.ws, s.r, [(v, s.widths[j]) for j, v in enumerate(row)])
             s.r += 1
 
+    table("Points", ["Consideration", "Rule", "Result"], [
+        ("Income: Stable", "One salary amount per month. The window's total at least 2 × the "
+                           "threshold, and no more than 25% below the prior window. Threshold = "
+                           "max(AED 3,000, 2 × the amount due).", "2 points"),
+        ("Income: Weak", "Not Stable, but AED 1,000 or more in any month of the window.", "1 point"),
+        ("Income: None", "Nothing of AED 1,000 or more in the window.", "0 points"),
+        ("Liquidity: Adequate", "CASA average balance at least max(AED 3,000, the amount due) in 2 of 3 "
+                                "months and no more than 50% below the prior window; or an external "
+                                "card payment of at least max(AED 500, the amount due).", "2 points"),
+        ("Liquidity: Weak", "Not Adequate, but a balance or card payment of AED 1,000 or more.", "1 point"),
+        ("Liquidity: None", "Neither.", "0 points"),
+        ("Distress", "A cheque bounce, DDS return or new bureau bounce in the window.", "Down one level"),
+        ("Activity gate", "0 points, no distress and no customer money movement in the window.",
+         "Unknown instead of Low"),
+    ], gap=0)
     table("Salary per month", ["Source", "Rule", "Timing"], [
         ("Internal salary", "The month's salary-flagged credits with us, bonuses included.",
          "The month of the credit."),
@@ -364,7 +373,7 @@ def logic(wb: Workbook) -> None:
          "The pull's month and the next one, never earlier and no later."),
         ("Salary account closed", "An AECB closure alert ends the AECB salary.", "From the alert."),
         ("One amount per month", "The larger of internal and AECB, never the sum.", "Each month."),
-    ], gap=0)
+    ])
     table("Distress", ["Source", "Rule", "Timing"], [
         ("Cheque / DDS return", "A returned cheque or direct debit on any CASA of the customer.",
          "The month of the return."),
@@ -493,6 +502,11 @@ def _rows(s: Sheet, rows: list, base: int) -> None:
             s.text(3 + 2 * j, share, color=MUTED).number_format = "0.0%"
         _fit(s.ws, s.r, [(label, s.widths[0])], floor=18)
         s.r += 1
+    for col in ("C", "E"):
+        s.ws.conditional_formatting.add(
+            f"{col}{s.r - len(rows)}:{col}{s.r - 1}",
+            DataBarRule(start_type="num", start_value=0, end_type="num", end_value=1, color=BAR),
+        )
 
 
 def _blocks(wb: Workbook, name: str, lead: str, blocks: list) -> Sheet:
@@ -520,6 +534,8 @@ def results(wb: Workbook) -> None:
     s.ws.row_dimensions[s.r].height = 30
     s.r += 1
     first, total = s.r, s.r + len(STATE_ROWS)
+    if first != RESULTS_FIRST:
+        raise SystemExit(f"Overview reads Results row {RESULTS_FIRST}, the states start at {first}")
     for st, cards, loans in STATE_ROWS:
         chip(s, 1, st)
         for j, n in enumerate((cards, loans, None, None, None)):
@@ -534,7 +550,12 @@ def results(wb: Workbook) -> None:
         s.text(2 + 2 * j, f'=IF(COUNT({L}{first}:{L}{total - 1})=0,"",SUM({L}{first}:{L}{total - 1}))',
                bold=True).number_format = "#,##0"
         s.text(3 + 2 * j, None)
-    s.r += 2
+    s.section("Reading the results")
+    for n in NOTES:
+        s.text(1, n, span=s.last, border=False)
+        _fit(s.ws, s.r, [(n, s.width(1, s.last))], floor=18)
+        s.r += 1
+    s.r += 1
     s.note("Which rule gave each state: 'Results detail'. Coverage of salary, CASA and bureau: "
            "'Results summaries'.")
     s.ws.freeze_panes = "B4"
@@ -569,12 +590,32 @@ def summaries(wb: Workbook) -> None:
     s.r += 1
 
 
+def _chart(s: Sheet, head: int, months: int) -> None:
+    """100% stacked bars of the card states by month, beside the table."""
+    chart = BarChart()
+    chart.type, chart.grouping, chart.overlap, chart.gapWidth = "col", "percentStacked", 100, 40
+    chart.title = "Credit cards: share of accounts by state"
+    chart.height, chart.width = 8.5, 15
+    chart.legend.position = "b"
+    chart.y_axis.number_format, chart.y_axis.majorUnit = "0%", 0.25
+    chart.x_axis.delete = chart.y_axis.delete = False
+    for j, st in enumerate(STATES):
+        chart.add_data(Reference(s.ws, min_col=3 + j, min_row=head, max_row=head + months),
+                       titles_from_data=True)
+        chart.series[j].graphicalProperties.solidFill = SERIES[st]
+        chart.series[j].graphicalProperties.line.solidFill = "FFFFFF"
+    chart.set_categories(Reference(s.ws, min_col=1, min_row=head + 1, max_row=head + months))
+    s.ws.add_chart(chart, f"H{head}")
+
+
 def trend(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Results trend"), [12, 12] + [11] * len(STATES))
     s.title("Results trend", "Share of accounts per state by month, Jan–Aug 2026 (month ends), "
                              "61–180 DPD.")
+    first_rows = []
     for i, (title, months) in enumerate(TREND.items()):
         s.section(title, gap=0 if i == 0 else 1)
+        first_rows.append(s.r)
         s.text(1, "Month", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
         s.text(2, "Accounts", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
         for j, st in enumerate(STATES):
@@ -589,16 +630,17 @@ def trend(wb: Workbook) -> None:
                 cell.number_format = "0.0%"
             s.r += 1
     s.r += 1
+    _chart(s, first_rows[0], len(TREND["Credit cards 61–180"]))
     s.note("The book grows from May. Moderate falls steadily, and August also has slightly short "
-           "alert data ('A1 rules').")
+           "alert data ('Results').")
     s.ws.freeze_panes = "A4"
 
 
 def build(out: pathlib.Path) -> pathlib.Path:
     wb = Workbook()
-    rules(wb)
-    thresholds(wb)
+    overview(wb)
     logic(wb)
+    thresholds(wb)
     examples(wb)
     results(wb)
     detail(wb)
@@ -607,7 +649,7 @@ def build(out: pathlib.Path) -> pathlib.Path:
     wb.move_sheet("Salary sources", offset=len(wb.sheetnames) - 2 - wb.sheetnames.index("Salary sources"))
     wb.calculation.fullCalcOnLoad = True
     for ws in wb:
-        ws.sheet_properties.tabColor = NAVY if ws.title in ("A1 rules", "Thresholds", "Logic", "Examples") else "2E75B6"
+        ws.sheet_properties.tabColor = NAVY if ws.title in ("Overview", "Logic", "Thresholds", "Examples") else "2E75B6"
     wb.save(out)
     return out
 
