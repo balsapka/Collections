@@ -3,16 +3,16 @@
 Give this to the UAT Sonnet 5.5. Sonnet writes the snippet in UAT. You run it in PROD once per RL
 model_id (`rl_60_180`, and `rl_180_plus` once its A2 output exists; switch `model_id` in
 `globals_dev.yml` and reload the kernel), then commit and push the results. Pull in UAT in the same
-Sonnet session: it checks the numbers and writes the workbook tables. Paste back
-`tmp_validation/a2_rl_product/summary.md`. The workbook is generated from
-`docs/locatability/build_a2_workbook.py` in the mirror repo, so the pasted summary is what fills it.
+Sonnet session: it checks the numbers and fills your workplace copy of the A2 model workbook
+(`a2_locatability_reference.xlsx`, with your edits). Paste back `tmp_validation/a2_rl_product/summary.md`
+so the mirror has the numbers too.
 
 ````text
 Goal: the A2 model workbook needs the retail-loan results split by product (Personal Loans,
 Personal Cash Loans, Auto) and, at 180+, by charge-off vintage. The final A2 output
 (crx_rl_a2_locatability) does not carry the product, so join it in a validation snippet. You work in
 UAT with no data: write the snippet, the user runs it in PROD per model_id and commits the results,
-then you turn them into the workbook tables. Change no pipeline code.
+then you fill the retail-loan cells of the A2 model workbook. Change no pipeline code.
 
 What is known:
 - crx_rl_a2_locatability: one row per (account_id, observation_date), month-end dates. Columns in
@@ -61,9 +61,26 @@ Hard rules:
 
 Deliverables:
 1. a2_rl_product_snippet.py and a README.md with the run steps (one run per model_id, kernel reloaded).
-2. After the user commits the JSONs, summary.md (no commentary beyond one line per check):
+2. After the user commits the JSONs, fill the workbook a2_locatability_reference.xlsx (find it in
+   the repo; ask the user if there is more than one or none). The user has edited it, so find cells
+   by their sheet, section title and row / column labels, never by fixed address, and change
+   nothing else (formulas, formats, the user's text, the credit-card numbers stay as they are).
+   Use openpyxl and keep the file's formulas (do not load with data_only).
+   - Sheet "Results", sections Combined state, Location, Reachability, Why Unknown: the pale-yellow
+     entry cells of the columns "RL 61–180 <product>" (and "RL 180+ <product>" from a 180+ run).
+     The "RL … total" columns: where a number was typed in, put back the sum formula of the three
+     product columns, as the other total cells have. "Accounts in scope": the total.
+   - Sheet "Results detail", column "Retail loans": the totals of T5-T8 on the matching rows
+     (rule and source, last contact, call days, deceased source).
+   - Sheet "Results 180+ vintage", columns "RL 180+ early-stage / late-stage charge-off": T9.
+   - Loan products outside the three, or NULL: do not add columns; list them in the summary.
+   Then reopen the file and check: every filled cell equals the JSON, each total equals its
+   product sum, and nothing outside those cells changed (diff the cell values and formulas of
+   every sheet against the file before your edit). Commit the workbook only if the user says so.
+3. summary.md (no commentary beyond one line per check):
    - checks: each product split adds up to its total; the totals match the numbers above for
      rl_60_180; the join match rate. Write FAIL with the difference if one does not hold.
+   - the workbook fill: cells written per sheet, and the result of the reopen check;
    - per model_id, T1-T8 (and T9) as markdown tables, rows in the order listed, one column per
      product then total, counts only. Check every number against the JSON; write NOT IN JSON when
      one is missing.
