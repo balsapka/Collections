@@ -1,5 +1,8 @@
 # A2 v04: the debit-row drop from 2026-05, foreign logins (VPN), and the Non-Reachable threshold, before GRR
 
+**Run bundle 06 step 8 first** (`kedro run --env=dev --pipeline=crx_<p>_a2_locatability` for cc and rl, per
+model_id): until then `crx_<p>_a2_locatability` still holds the old A2 output.
+
 Give this to the UAT Sonnet 5.5. Same flow as before: Sonnet writes the snippet in UAT. You run it in PROD
 for `cc_60_180` and `rl_60_180` (switch `model_id` in `globals_dev.yml`) and commit the JSONs. Sonnet then
 writes the summary. Paste back `tmp_validation/a2_v04/summary.md`.
@@ -70,6 +73,8 @@ Hypotheses, each with a verdict and the numbers behind it:
      - the same N table by month, Jan-Aug 2026, Non-Reachable share only.
 
 Hard rules:
+- First check that the A2 output has the column location_state; if not, stop and say bundle 06
+  step 8 has not run (the path still holds the old A2 output).
 - catalog.load only (no spark.read, no paths); model_id from catalog.load("params:model_id"), in
   the output file name; nothing hardcoded or overridden.
 - Aggregates only: no CIFs, account ids, IPs, call notes or customer rows in the results. Countries by ISO code

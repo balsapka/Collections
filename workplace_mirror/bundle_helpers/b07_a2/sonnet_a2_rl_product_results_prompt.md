@@ -1,5 +1,8 @@
 # A2: retail-loan results by product (and by charge-off vintage at 180+) for the model workbook
 
+**Run bundle 06 step 8 first** (`kedro run --env=dev --pipeline=crx_rl_a2_locatability`, per model_id): until
+then `crx_rl_a2_locatability` still holds the old A2 output. The bundle 06 cleanup can come before or after.
+
 Give this to the UAT Sonnet 5.5. Sonnet writes the snippet in UAT. You run it in PROD once per RL
 model_id (`rl_60_180`, and `rl_180_plus` once its A2 output exists; switch `model_id` in
 `globals_dev.yml` and reload the kernel), then commit and push the results. Pull in UAT in the same
@@ -51,6 +54,8 @@ Also: the join match rate (output rows with no spine row), and T1 by product for
 the output (rows only, for a trend check).
 
 Hard rules:
+- First check that the A2 output has the column location_state; if not, stop and say bundle 06
+  step 8 has not run (the path still holds the old A2 output).
 - catalog.load only (no spark.read, no paths); model_id from catalog.load("params:model_id"), in
   the output file name; nothing hardcoded or overridden.
 - Aggregates only: counts, no account ids, CIFs or customer rows. Exact counts (small ones too);
