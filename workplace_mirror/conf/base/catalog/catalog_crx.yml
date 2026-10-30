@@ -353,7 +353,7 @@ crx_cc_a1_ability:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 08): the previous output, the baseline of the b08 check.
+# TEMPORARY (mirror bundle 09): the bundle 05 output, the baseline of the b09 check.
 # Remove the entry and its HDFS folder with the check.
 crx_cc_a1_ability_v2:
   type: spark.SparkDataset
@@ -362,12 +362,12 @@ crx_cc_a1_ability_v2:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 08): the new output written by the b08 check pipeline.
+# TEMPORARY (mirror bundle 09): the new output written by the b09 check pipeline.
 # Remove the entry, the pipeline and its HDFS folder after the check.
-crx_cc_a1_ability_b08_check:
+crx_cc_a1_ability_b09_check:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b08_check"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b09_check"
   save_args:
     mode: overwrite
 
@@ -507,7 +507,7 @@ crx_rl_a1_ability:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 08): the previous output, the baseline of the b08 check.
+# TEMPORARY (mirror bundle 09): the bundle 05 output, the baseline of the b09 check.
 # Remove the entry and its HDFS folder with the check.
 crx_rl_a1_ability_v2:
   type: spark.SparkDataset
@@ -516,12 +516,12 @@ crx_rl_a1_ability_v2:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 08): the new output written by the b08 check pipeline.
+# TEMPORARY (mirror bundle 09): the new output written by the b09 check pipeline.
 # Remove the entry, the pipeline and its HDFS folder after the check.
-crx_rl_a1_ability_b08_check:
+crx_rl_a1_ability_b09_check:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_b08_check"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_b09_check"
   save_args:
     mode: overwrite
 

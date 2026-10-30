@@ -32,7 +32,6 @@ from enbd_collections.nodes.features.bureau import (  # noqa: E402
     feat_cif_bureau_salary_monthly,
 )
 from enbd_collections.nodes.features.casa import feat_cif_casa as fc  # noqa: E402
-from enbd_collections.nodes.primary.bureau import prm_bureau_salary_history  # noqa: E402
 from enbd_collections.nodes.primary.casa import prm_casa  # noqa: E402
 from enbd_collections.pipelines.crx_persona import _common  # noqa: E402
 from enbd_collections.pipelines.crx_persona.a1_ability import (  # noqa: E402
@@ -76,14 +75,15 @@ LEG = {  # active= : (tran_type, reason, code, narration)
 }
 rows = {
     k: []
-    for k in "spine wmsal salhist bridge bal casa flow txn bene alert ret ftr dcore agr".split()
+    for k in "spine wmsal bal casa flow txn bene alert ret ftr dcore agr".split()
 }
 expect = {}
 
 
 def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active="economic",
          buckets=None, internal=None, eosb=None, model="cc_60_180", **want):
-    """salary / bureau: [(k, amount)]; casa: [(k, balance)]; payments: [(k, amount)];
+    """salary: [(k, amount)]; bureau: [(k, amount[, alert type[, pull day]])]; casa:
+    [(k, balance)]; payments: [(k, amount)];
     bounces: [(k, bureau bounced amount on that pull)]; active: a CASA leg lane in m2 (None:
     no leg); buckets: overdue_bucket_01..08 on the latest snapshot; eosb: k of a DCORE
     EOSB result."""
@@ -93,16 +93,17 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active
     for k, amt in salary:  # a week-2 snapshot of the salary month; days from its 1st
         snap = m(k, 10)
         rows["wmsal"].append((cif, week(snap), float(amt), (snap - m(k, 1)).days))
-    for k, amt in bureau:
-        rows["bridge"].append((f"F{i}", cif))
-        rows["salhist"].append((f"F{i}", m(k).strftime("%m%Y"), "P1", m(k, 28), float(amt), 1.0))
+    for k, amt, *rest in bureau:
+        alert_type = rest[0] if rest else 31
+        day = rest[1] if len(rest) > 1 else 5
+        rows["alert"].append((cif, "CC", "SALARY", m(k, day), 0.0, alert_type, float(amt)))
     for k, bal in casa:
         rows["casa"].append((cif, week(m(k, 22)), float(bal)))
     for k, amt in payments:
         rows["bene"].append((f"CARD{i}", "CARD_NUMBER", "OTHER BANK"))
         rows["txn"].append((cif, "outflow", "CASA", m(k), float(amt), f"CARD{i}"))
     for k, amt in bounces:
-        rows["alert"].append((cif, "CC", "BOUNCED CHEQUE", m(k, 5), float(amt)))
+        rows["alert"].append((cif, "CC", "BOUNCED CHEQUE", m(k, 5), float(amt), 99, None))
     if internal is not None:  # (k, reason_for_excluding)
         k, reason = internal
         rows["ret"].append((cif, f"T{i}", m(k), reason))
@@ -132,7 +133,29 @@ case("weakening > 25% breaks stable", salary=[(1, 4000), (2, 4000), (3, 4000), (
      income="weak")
 case("bureau salary counts", bureau=[(1, 4000), (2, 4000)], income="stable")
 case("salary after the observation month ignored", salary=[(0, 9000), (1, 4000)], income="weak")
-case("bureau older than 3 months ignored", bureau=[(4, 4000), (5, 4000)], income="none")
+case("bureau older than W + the carry ignored", bureau=[(5, 9000), (6, 9000)], income="none")
+# AECB salary (S14): the pull's month and the next, never before the pull
+case("AECB: pull in the first month of W gives 2 months", bureau=[(3, 3000)], income="stable",
+     source="bureau")
+case("AECB: pull in the middle month gives 2 months", bureau=[(2, 3000)], income="stable")
+case("AECB: pull in the observation month gives 1 month", bureau=[(1, 3000)], income="weak")
+case("AECB: one month of 6000 reaches the total", bureau=[(1, 6000)], income="stable")
+case("AECB: a pull before W carries into W", bureau=[(4, 3000)], income="weak")
+case("AECB: pulls every 2 months fill W", bureau=[(3, 2000), (1, 2000)], income="stable")
+case("AECB: the carry goes 1 month only", bureau=[(4, 9000)], income="stable")
+case("AECB: the month's latest pull wins, not the sum", bureau=[(2, 9000, 31, 5), (2, 2000, 31, 25)],
+     income="weak")
+case("AECB: type 32 counts", bureau=[(3, 3000, 32)], income="stable")
+case("AECB: other alert types do not count", bureau=[(3, 9000, 77)], income="none")
+case("AECB: a closure ends the carry", bureau=[(3, 3000), (2, 0, 43)], income="weak")
+case("AECB: a closure on the same pull wins", bureau=[(2, 9000), (2, 0, 43)], income="none")
+case("AECB + internal: the larger per month, not the sum", salary=[(2, 2000)], bureau=[(2, 2500)],
+     income="weak", source="both")
+case("internal salary stopped, one AECB pull at the same level -> Weak",
+     salary=[(4, 10000), (5, 10000), (6, 10000)], bureau=[(2, 10000)], income="weak",
+     source="bureau", stopped=1)
+case("AECB in W with internal salary in W: not stopped",
+     salary=[(1, 5000), (2, 5000), (4, 5000)], income="stable", source="internal", stopped=0)
 # ── Liquidity (S7, S8) ──
 case("casa adequate 2 of 3 >= 3000", casa=[(1, 3500), (2, 3500), (3, 100)], liquidity="adequate")
 case("casa drop > 50% -> not adequate", casa=[(1, 3500), (2, 3500), (3, 3500), (4, 9000), (5, 9000), (6, 9000)],
@@ -202,13 +225,9 @@ ftr_schema = ("cif_id long, tran_date date, tran_dc string, tran_type string, re
 
 internal_salary = fc.build_internal_salary(df(
     rows["wmsal"], "cif_id long, week_number int, ft_last_salary_amount double, ft_days_since_salary_transaction int"))
-bureau_salary = feat_cif_bureau_salary_monthly.build(
-    prm_bureau_salary_history.build(df(
-        rows["salhist"],
-        "subj_salcr_hist_hdr_file_id string, subj_salcr_hist_ref_mnth string, subj_salcrdt_prvdr_no string,"
-        " EDP_LOAD_DATE date, subj_salcr_hist_tot_sal_amt double, subj_salcr_hist_trnsfr_cnt double")),
-    df(rows["bridge"], "bureau_file_id string, cif_id long"),
-)
+alert_schema = ("cif_id long, contract_type string, alert_description string, extract_date date,"
+                " bounced_cheque_amount double, alert_type_number int, salary_credit_amount double")
+bureau_salary = feat_cif_bureau_salary_monthly.build(df(rows["alert"], alert_schema))
 casa_balance = fc.build_casa_balance(
     df(rows["casa"], "cif_id long, week_number int, ft_avg_casa_eod_balance_in_last_0_3_weeks_avg double"),
     df(rows["flow"], "cif_id long, week_number int, ft_inflow_casa_amt_in_last_0_0_weeks_sum double,"
@@ -224,9 +243,7 @@ payments = fc.build_ext_card_payments(
 )
 activity = fc.build_casa_activity(df(rows["ftr"], ftr_schema))
 returns = fc.build_returns(df(rows["ret"] + COVER, ret_schema))
-bounces = feat_cif_bureau_bounces_monthly.build(df(
-    rows["alert"], "cif_id long, contract_type string, alert_description string, extract_date date,"
-                   " bounced_cheque_amount double"))
+bounces = feat_cif_bureau_bounces_monthly.build(df(rows["alert"], alert_schema))
 followup = df(rows["dcore"], "agreement_id string, action_ts date, result_name string")
 agreements = df(rows["agr"], "account_id string, agreement_id string, cif_id string")
 
@@ -256,7 +273,8 @@ for acct, (name, want, _) in expect.items():
     r = got[acct]
     actual = {"income": r["a1_income_level"], "liquidity": r["a1_liquidity_level"],
               "state": r["a1_state"], "anchor": r["liquidity_anchor_amt"],
-              "reason": r["a1_unknown_reason"], "eosb_flag": r["a1_eosb_flag"]}
+              "reason": r["a1_unknown_reason"], "eosb_flag": r["a1_eosb_flag"],
+              "source": r["a1_income_source"], "stopped": r["a1_salary_stopped"]}
     ok = all(actual[k] == v for k, v in want.items())
     fails += not ok
     print(f"{'ok  ' if ok else 'FAIL'} {name:<58} want={want} got={ {k: actual[k] for k in want} }")
@@ -296,14 +314,15 @@ emi = {r["account_id"]: r["liquidity_anchor_amt"] for r in build_rl_liquidity_an
     obs, df([("A0", OBS, 2000.0), ("A1", OBS, 0.0), ("A2", date(2026, 6, 30), 1500.0)],
             loan_schema)).collect()}
 assert emi == {"A0": 2000.0, "A1": None}, emi  # 0 EMI → no anchor; a June snapshot is stale
-# RL: the loan's latest-pull bureau salary is income in its pull month, PIT
+# RL: the loan's latest-pull bureau salary is income in its pull month and the next, PIT
 frl_schema = "account_id string, observation_date date, aecb_bureau_pull_date date, aecb_last_salary_credit_amount double"
 frl = df([("A0", OBS, m(2, 10), 6000.0), ("A1", OBS, m(0, 5), 7000.0)], frl_schema)
 inc = {r["account_id"]: r for r in build_income_signals(
     obs.filter(F.col("account_id").isin("A0", "A1")), internal_salary, bureau_salary, "cc_60_180",
     loan_features=frl,
 ).collect()}
-assert inc["A0"]["income_m2"] == 6000.0 and inc["A0"]["bureau_salary_w"] == 6000.0, inc["A0"]
+assert inc["A0"]["income_m2"] == 6000.0 == inc["A0"]["income_m1"], inc["A0"]
+assert inc["A0"]["income_m3"] is None and inc["A0"]["bureau_salary_w"] == 6000.0, inc["A0"]
 # a pull after the observation month never counts
 assert 7000.0 not in [inc["A1"][f"income_m{i}"] for i in range(1, 7)], inc["A1"]
 print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ dating, lanes, anchor, returns and loan salary checks)")

@@ -111,7 +111,7 @@ def liquidity_level(anchor: Column, w: int) -> Column:
     return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
 
 
-def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     obs_base: DataFrame,
     income: DataFrame,
     liquidity: DataFrame,
@@ -126,8 +126,11 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
 
     ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
     ``a1_unknown_reason`` says why a row is unknown: ``no_casa`` (no CASA leg or
-    positive balance with us in 12 months) or ``dormant_casa``. ``a1_eosb_flag`` (a DCORE
-    end-of-service result in the window) is a diagnostic and changes nothing.
+    positive balance with us in 12 months) or ``dormant_casa``. Diagnostics, which change
+    nothing: ``a1_eosb_flag`` (a DCORE end-of-service result in the window),
+    ``a1_income_source`` (who shows AED 1,000 or more in the window: ``internal``,
+    ``bureau``, ``both`` or ``none``), ``a1_salary_stopped`` (internal salary in the prior
+    window, none in the window).
     """
     df = left_join_all(obs_base, [income, liquidity, distress, eosb, anchor])
     amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
@@ -155,6 +158,9 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
         "no_casa"
     )
     labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
+    internal_w = F.coalesce(F.col("internal_salary_w"), F.lit(0.0)) >= DEMIN
+    bureau_w = F.coalesce(F.col("bureau_salary_w"), F.lit(0.0)) >= DEMIN
+    internal_prior = F.coalesce(F.col("internal_salary_prior"), F.lit(0.0)) >= DEMIN
     out = df.select(
         *GRAIN,
         "a1_state",
@@ -171,6 +177,12 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
         F.col("a1_distress_flag").cast("int"),
         F.col("liquidity_anchor_amt").cast("double"),
         F.col("eosb_flag").cast("int").alias("a1_eosb_flag"),
+        F.when(internal_w & bureau_w, "both")
+        .when(internal_w, "internal")
+        .when(bureau_w, "bureau")
+        .otherwise("none")
+        .alias("a1_income_source"),
+        (internal_prior & ~internal_w).cast("int").alias("a1_salary_stopped"),
         F.current_date().alias("computed_at"),
     )
     log_latest_month(out, "a1_state", f"a1_ability [{model_id}]", persona_end_date)

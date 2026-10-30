@@ -1,17 +1,16 @@
-"""TEMPORARY (mirror bundle 08): the A1 report tables and the old-vs-new check, in PROD.
+"""TEMPORARY (mirror bundle 09): the A1 report tables and the AECB salary check, in PROD.
 
 Log blocks, aggregates only, latest observation month unless named:
 
-* ``compare_a1_outputs`` (``B08 OUTPUT``): states (M1) — latest month, old
-  (``crx_<p>_a1_ability_v2``) × new, the 8-month range; RL by ``loan_type``.
-* ``describe_a1_report`` (``B08 REPORT``): income source and level (M4), CASA
+* ``compare_a1_outputs`` (``B09 OUTPUT``): states (M1) — latest month, old
+  (``crx_<p>_a1_ability_v2``) × new, the monthly range; RL by ``loan_type``.
+* ``describe_a1_report`` (``B09 REPORT``): income source and level (M4), CASA
   relationship (M5), liquidity (M6), Unknown / Low / Moderate-High reasons (M7–M9),
   distress parts (M10), EOSB and the anchor (M11).
-* ``describe_a1_sources`` (``B08 SOURCES``): how far back each source goes, internal
-  salary history (M2), bureau coverage (M3), CASA legs by lane, WM vs FTR coverage.
-* ``explain_a1_changes`` (``B08 CHANGES``): the state rebuilt under the old rules, then
-  each change in turn (salary dating, S12, the activity gate, bureau repeats), with the
-  moves at every step (M12); the first and last steps are checked against the outputs.
+* ``describe_a1_sources`` (``B09 SOURCES``): how far back each source goes, internal
+  salary history (M2), AECB salary coverage (M3), CASA legs by lane, WM vs FTR coverage.
+* ``explain_a1_aecb`` (``B09 AECB``): the state without the alert salary, with its pull
+  months, then with the 1-month carry (S14); the last step is checked against the output.
 
 Removed by the bundle's cleanup.
 """
@@ -24,31 +23,25 @@ from itertools import pairwise
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
-from enbd_collections.nodes.features.casa.feat_cif_casa import (
-    build_internal_salary,
-    transaction_lane,
-)
+from enbd_collections.nodes.features.casa.feat_cif_casa import transaction_lane
 
-from .._common import GRAIN, lookback_floor, parse_yyyymmdd, window_months
+from .._common import GRAIN, lookback_floor, window_months
 from ..scoring_engine import points_from_level
 from .classify import (
     _LADDER,
-    D_INC,
     DEMIN,
     F_CASA,
     F_INC,
     F_PAY,
+    INC_FLOORS,
     K_CASA,
     K_INC,
     K_PAY,
-    MIN_MONTHS,
-    _count_at_least,
     _months,
-    _not_weakening,
     _window,
     income_level,
 )
-from .signals import CUSTOMER_LANES, _loan_bureau_salary
+from .signals import CUSTOMER_LANES, _loan_bureau_salary, _with_next_month
 
 LOG = logging.getLogger(__name__)
 _STATES = ("high", "moderate", "low", "unknown")
@@ -56,9 +49,9 @@ _STATES = ("high", "moderate", "low", "unknown")
 
 def _log(name: str, model_id: str, lines: list[str]) -> None:
     block = [
-        f"=== B08 {name} START === [{model_id}]",
+        f"=== B09 {name} START === [{model_id}]",
         *lines,
-        f"=== B08 {name} END ===",
+        f"=== B09 {name} END ===",
     ]
     LOG.info("\n%s", "\n".join(block))
 
@@ -94,7 +87,7 @@ def _with_cif(df: DataFrame, obs_base: DataFrame) -> DataFrame:
     return df.join(cifs, on=list(GRAIN), how="left")
 
 
-# ── B08 OUTPUT (M1) ───────────────────────────────────────────────────────────
+# ── B09 OUTPUT (M1) ───────────────────────────────────────────────────────────
 
 
 def _product(df: DataFrame, products: DataFrame) -> DataFrame:
@@ -158,7 +151,7 @@ def compare_a1_outputs(
     _log("OUTPUT", model_id, lines)
 
 
-# ── B08 REPORT (M4–M11) ──────────────────────────────────────────────────────
+# ── B09 REPORT (M4–M11) ──────────────────────────────────────────────────────
 
 
 def _bucket(amount: Column, edges: list[tuple[float, str]], none: str) -> Column:
@@ -286,7 +279,7 @@ def describe_a1_report(  # pylint: disable=too-many-arguments,too-many-positiona
     _log("REPORT", model_id, lines)
 
 
-# ── B08 SOURCES (M2, M3, lanes, coverage) ────────────────────────────────────
+# ── B09 SOURCES (M2, M3, lanes, coverage) ────────────────────────────────────
 
 
 def _months_since(last: Column) -> Column:
@@ -304,10 +297,9 @@ def describe_a1_sources(  # pylint: disable=too-many-arguments,too-many-position
     casa_activity: DataFrame,
     transactions: DataFrame,
     alerts: DataFrame,
-    cif_bridge: DataFrame,
     model_id: str,
 ) -> None:
-    """Source depth, salary history (M2), bureau coverage (M3), legs by lane, WM vs FTR."""
+    """Source depth, salary history (M2), AECB coverage (M3), legs by lane, WM vs FTR."""
     w = window_months(model_id)
     base = _with_cif(_latest_month(new).select(*GRAIN, "a1_state"), obs_base).filter(
         F.col("cif_id").isNotNull()
@@ -340,31 +332,24 @@ def describe_a1_sources(  # pylint: disable=too-many-arguments,too-many-position
         )
 
     internal = history(last_before(internal_salary, "salary"), "internal_salary")
-    bureau_last = last_before(bureau_salary, "bureau_salary")
     alert_cifs = (
         alerts.filter(F.col("cif_id").isNotNull())
         .select(F.col("cif_id").cast("string").alias("cif_id"))
         .distinct()
         .withColumn("_alert", F.lit(1))
     )
-    bridge_cifs = (
-        cif_bridge.filter(F.col("cif_id").isNotNull())
-        .select(F.col("cif_id").cast("string").alias("cif_id"))
-        .distinct()
-        .withColumn("_bridge", F.lit(1))
-    )
     bureau = (
-        history(bureau_last, "_hist")
+        history(last_before(bureau_salary, "bureau_salary"), "_hist")
         .join(alert_cifs, on="cif_id", how="left")
-        .join(bridge_cifs, on="cif_id", how="left")
         .withColumn(
             "bureau",
-            F.when(F.col("_alert").isNull() & F.col("_bridge").isNull(), "no_record")
-            .when(F.col("_bridge").isNull(), "record_not_linked")
-            .when(F.col("_hist") == "never", "linked_never_salary")
-            .when(F.col("_hist") != "in_W", "salary_ever_none_in_W")
-            .otherwise("salary_in_W"),
+            F.when(F.col("_alert").isNull(), "no_alert_row")
+            .when(F.col("_hist") == "never", "alert_never_salary")
+            .otherwise(F.col("_hist")),
         )
+    )
+    salary_sources = internal.select(*GRAIN, "internal_salary").join(
+        bureau.select(*GRAIN, "bureau"), on=list(GRAIN)
     )
     obs_month = base.agg(F.max("observation_date")).first()[0]
     w_floor = lookback_floor(base, w)
@@ -423,8 +408,10 @@ def describe_a1_sources(  # pylint: disable=too-many-arguments,too-many-position
         "M2 internal salary (>= 1000) history x a1_state:",
         *_table(internal, "internal_salary"),
         *_table(internal, "internal_salary", "a1_state"),
-        "M3 bureau (record = an alert row; linked = CIF in the bridge):",
+        "M3 AECB salary (>= 1000) by last pull month, before the carry:",
         *_table(bureau, "bureau"),
+        "M3 internal salary x AECB salary history:",
+        *_table(salary_sources, "internal_salary", "bureau"),
         f"CASA legs of base CIFs in W ({w_floor} .. {obs_month}) by lane (legs, CIFs):",
         *[f"  {r['lane']:<16} {r['legs']:>10} {r['cifs']:>8}" for r in by_lane],
         "top unclassified / ambiguous (lane, tran_type, reason):",
@@ -442,18 +429,7 @@ def describe_a1_sources(  # pylint: disable=too-many-arguments,too-many-position
     _log("SOURCES", model_id, lines)
 
 
-# ── B08 CHANGES (M12) ─────────────────────────────────────────────────────────
-
-
-def _old_internal_salary(wm_salary: DataFrame, since: str) -> DataFrame:
-    """The bundle 03–05 dating: ``week_number`` parsed as a date (one month early)."""
-    week = parse_yyyymmdd("week_number")
-    credit = F.date_sub(week, F.col("ft_days_since_salary_transaction").cast("int"))
-    return wm_salary.filter(week >= F.lit(since)).select(
-        F.col("cif_id").cast("string").alias("cif_id"),
-        F.last_day(credit).alias("month_end"),
-        F.col("ft_last_salary_amount").cast("double").alias("amount"),
-    )
+# ── B09 AECB ──────────────────────────────────────────────────────────────────
 
 
 def _spread(base: DataFrame, series: DataFrame, prefix: str, months: int) -> DataFrame:
@@ -479,183 +455,134 @@ def _spread(base: DataFrame, series: DataFrame, prefix: str, months: int) -> Dat
     )
 
 
-def _months_rule(prefix: str, anchor: Column, w: int) -> Column:
-    """The bundle 03–05 income rule: a salary month ≥ the floor in 2 of 3 (3 of 6)."""
-    last = _months(prefix, _window(w)[0])
-    floor = F.greatest(F.lit(F_INC), K_INC * anchor)
-    stable = (_count_at_least(last, floor) >= MIN_MONTHS[w]) & _not_weakening(
-        prefix, D_INC, True, w
-    )
-    weak = _count_at_least(last, F.lit(DEMIN)) > 0
-    return F.when(stable, "stable").when(weak, "weak").otherwise("none")
-
-
-def explain_a1_changes(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def explain_a1_aecb(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     obs_base: DataFrame,
-    old: DataFrame,
     new: DataFrame,
-    income: DataFrame,
     liquidity: DataFrame,
-    distress: DataFrame,
-    anchor: DataFrame,
-    wm_salary: DataFrame,
+    internal_salary: DataFrame,
     bureau_salary: DataFrame,
-    casa_balance: DataFrame,
-    bureau_bounces: DataFrame,
     model_id: str,
     loan_features: DataFrame | None = None,
 ) -> None:
-    """Latest month: the state under the old rules, then each change in turn."""
+    """Latest month: the state without the alert salary, with its pull months, with the
+    1-month carry. RL's loan salary stays in every step and is carried in the last."""
     w = window_months(model_id)
-    base = _with_cif(_latest_month(new).select(*GRAIN), obs_base)
-    since = lookback_floor(base, 2 * w)
-    bureau = bureau_salary.select(
-        "cif_id", "month_end", F.col("bureau_salary").alias("amount")
-    )
-    if loan_features is not None:
-        bureau = bureau.unionByName(
-            _loan_bureau_salary(obs_base, loan_features).withColumnRenamed(
-                "bureau_salary", "amount"
-            )
-        )
-    bureau = bureau.filter(F.col("month_end") >= F.lit(since))
-    new_internal = (
-        build_internal_salary(wm_salary)
-        .filter(F.col("month_end") >= F.lit(since))
-        .withColumnRenamed("salary", "amount")
-    )
-    old_series = _old_internal_salary(wm_salary, since).unionByName(bureau)
-    new_series = new_internal.unionByName(bureau)
-    w_start = F.add_months(F.trunc("observation_date", "month"), 1 - w)
-    in_w = (F.col("month_end") >= w_start) & (
-        F.col("month_end") <= F.col("observation_date")
-    )
-    flows = (
-        base.join(casa_balance.filter(F.col("casa_flow") == 1), on="cif_id")
-        .filter(in_w)
-        .groupBy(*GRAIN)
-        .agg(F.max(F.lit(1)).alias("old_gate"))
-    )
-    pulls = (
-        base.join(bureau_bounces.filter(F.col("bounce_pulls") > 0), on="cif_id")
-        .filter(in_w)
-        .groupBy(*GRAIN)
-        .agg(F.max(F.lit(1)).alias("old_bureau"))
-    )
     keys = list(GRAIN)
-    df = (
-        base.join(_spread(base, old_series, "old", 2 * w), on=keys, how="left")
-        .join(_spread(base, new_series, "income", 2 * w), on=keys, how="left")
-        .join(
-            income.select(
-                *keys,
-                *[
-                    F.col(f"income_m{i}").alias(f"sig_m{i}")
-                    for i in range(1, 2 * w + 1)
-                ],
-            ),
-            on=keys,
-            how="left",
-        )
+    base = (
+        _with_cif(_latest_month(new), obs_base)
+        .filter(F.col("cif_id").isNotNull())
         .join(liquidity.select(*keys, "casa_active"), on=keys, how="left")
-        .join(
-            distress.select(
-                *keys, "distress_cheque", "distress_dds", "distress_bureau"
-            ),
-            on=keys,
-            how="left",
-        )
-        .join(anchor, on=keys, how="left")
-        .join(flows, on=keys, how="left")
-        .join(pulls, on=keys, how="left")
-        .join(new.select(*keys, "a1_liquidity_level", "a1_state"), on=keys, how="left")
-        .join(
-            old.select(
-                F.col("account_id").cast("string").alias("account_id"),
-                "observation_date",
-                F.col("a1_state").alias("old_state"),
-            ),
-            on=keys,
-            how="left",
-        )
-        .fillna(
-            0,
-            subset=[
-                "old_gate",
-                "old_bureau",
-                "casa_active",
-                "distress_cheque",
-                "distress_dds",
-                "distress_bureau",
-            ],
-        )
+        .fillna(0, subset=["casa_active"])
     )
+    since = lookback_floor(base, 2 * w)
+    columns = ["cif_id", "month_end", "amount"]
+    internal = internal_salary.withColumnRenamed("salary", "amount").select(*columns)
+    alert = bureau_salary.select("cif_id", "month_end", "bureau_salary")
+    if loan_features is not None:
+        loans = _loan_bureau_salary(obs_base, loan_features)
+    else:
+        loans = alert.limit(0)
+    carried = _with_next_month(alert.unionByName(loans))
+
+    def amounts(df: DataFrame) -> DataFrame:
+        return df.withColumnRenamed("bureau_salary", "amount").select(*columns)
+
+    def recent(df: DataFrame) -> DataFrame:
+        return df.filter(F.col("month_end") >= F.lit(since))
+
+    steps = {
+        "s0_no_aecb": internal.unionByName(amounts(loans)),
+        "s1_pull_months": internal.unionByName(amounts(loans)).unionByName(
+            amounts(alert)
+        ),
+        "s2_one_month_carry": internal.unionByName(amounts(carried)),
+    }
     amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))
     liq = points_from_level(F.col("a1_liquidity_level"), {"adequate": 2, "weak": 1})
-    internal_distress = (F.col("distress_cheque") == 1) | (F.col("distress_dds") == 1)
-
-    def state(level: Column, gate: str, bureau_col: str) -> Column:
+    distressed = F.col("a1_distress_flag") == 1
+    last = _months("income", _window(w)[0])
+    total = sum(F.coalesce(c, F.lit(0.0)) for c in last)
+    floor = F.greatest(F.lit(F_INC), K_INC * amt)
+    df = base
+    for name, series in steps.items():
+        level = income_level(amt, w)
         points = points_from_level(level, {"stable": 2, "weak": 1}) + liq
-        distressed = internal_distress | (F.col(bureau_col) == 1)
-        unknown = (points == 0) & ~distressed & (F.col(gate) == 0)
-        return _LADDER.state(points, distressed, unknown)
-
-    steps = [
-        ("s0_old_rules", state(_months_rule("old", amt, w), "old_gate", "old_bureau")),
-        (
-            "s1_salary_dating",
-            state(_months_rule("income", amt, w), "old_gate", "old_bureau"),
-        ),
-        ("s2_window_total", state(income_level(amt, w), "old_gate", "old_bureau")),
-        ("s3_activity_gate", state(income_level(amt, w), "casa_active", "old_bureau")),
-        (
-            "s4_bureau_repeats",
-            state(income_level(amt, w), "casa_active", "distress_bureau"),
-        ),
-    ]
-    df = df.select("*", *[expr.alias(name) for name, expr in steps])
-    same_income = F.lit(True)
-    for i in range(1, 2 * w + 1):
-        same_income = same_income & F.col(f"income_m{i}").eqNullSafe(F.col(f"sig_m{i}"))
+        unknown = (points == 0) & ~distressed & (F.col("casa_active") == 0)
+        step = base.join(
+            _spread(base, recent(series), "income", 2 * w), on=keys, how="left"
+        ).select(
+            *keys,
+            level.alias(f"{name}_income"),
+            _LADDER.state(points, distressed, unknown).alias(name),
+            (total >= INC_FLOORS[w] * floor).alias(f"{name}_total_ok"),
+        )
+        df = df.join(step, on=keys, how="left")
+    aecb_w = (
+        base.select(*keys, "cif_id")
+        .join(amounts(carried).filter(F.col("amount") >= DEMIN), on="cif_id")
+        .filter(
+            (
+                F.col("month_end")
+                >= F.add_months(F.trunc("observation_date", "month"), 1 - w)
+            )
+            & (F.col("month_end") <= F.col("observation_date"))
+        )
+        .groupBy(*keys)
+        .agg(F.count(F.lit(1)).alias("aecb_months_w"))
+    )
+    df = df.join(aecb_w, on=keys, how="left").fillna(0, subset=["aecb_months_w"])
+    final = "s2_one_month_carry"
     checks = df.agg(
+        F.sum((~F.col(final).eqNullSafe(F.col("a1_state"))).cast("int")).alias("state"),
         F.sum(
-            (~F.col("s0_old_rules").eqNullSafe(F.col("old_state"))).cast("int")
-        ).alias("s0"),
-        F.sum(F.col("old_state").isNull().cast("int")).alias("no_old"),
+            (~F.col(f"{final}_income").eqNullSafe(F.col("a1_income_level"))).cast("int")
+        ).alias("income"),
         F.sum(
-            (~F.col("s4_bureau_repeats").eqNullSafe(F.col("a1_state"))).cast("int")
-        ).alias("s4"),
-        F.sum((~same_income).cast("int")).alias("income"),
+            (
+                (F.col("aecb_months_w") > 0)
+                & F.col(f"{final}_total_ok")
+                & (F.col("a1_income_level") != "stable")
+            ).cast("int")
+        ).alias("fall"),
     ).first()
     lines = [
         (
-            f"rows {df.count()}; s0 vs the old output: {checks['s0']} differ "
-            f"({checks['no_old']} without an old row); s4 vs the new output: {checks['s4']} "
-            f"differ; income series vs the signals: {checks['income']} differ"
+            f"rows {df.count()}; last step vs the output: {checks['state']} states, "
+            f"{checks['income']} income levels differ"
         ),
         "rows per state at each step (high, moderate, low, unknown):",
         *[
-            f"  {n:<20} " + " ".join(f"{r[s]:>8}" for s in _STATES)
-            for n, r in (
-                (
-                    n,
+            f"  {n:<20} "
+            + " ".join(
+                f"{r[s]:>8}"
+                for r in [
                     df.agg(
                         *[F.sum((F.col(n) == s).cast("int")).alias(s) for s in _STATES]
-                    ).first(),
-                )
-                for n, _ in steps
+                    ).first()
+                ]
+                for s in _STATES
             )
+            for n in steps
         ],
     ]
-    for (a, _), (b, _) in pairwise(steps):
+    for a, b in pairwise(steps):
         moved = df.filter(~F.col(a).eqNullSafe(F.col(b)))
         lines += [f"{a} -> {b}: {moved.count()} rows move", *_table(moved, a, b)]
     lines += [
-        "old output -> new output:",
+        "income source x income level:",
+        *_table(df, "a1_income_source", "a1_income_level"),
+        "income source x a1_state:",
+        *_table(df, "a1_income_source", "a1_state"),
+        "AECB months in W (with the carry) x income level:",
+        *_table(df, "aecb_months_w", "a1_income_level"),
+        f"AECB in W, window total passes, the 25% check fails: {checks['fall']}",
+        "salary stopped x income source x income level:",
         *_table(
-            df.filter(~F.col("old_state").eqNullSafe(F.col("a1_state"))),
-            "old_state",
-            "a1_state",
+            df.filter(F.col("a1_salary_stopped") == 1),
+            "a1_income_source",
+            "a1_income_level",
         ),
+        "salary stopped x a1_state:",
+        *_table(df, "a1_salary_stopped", "a1_state"),
     ]
-    _log("CHANGES", model_id, lines)
+    _log("AECB", model_id, lines)

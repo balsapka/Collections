@@ -8,8 +8,8 @@ month … mW; "the prior window" is m(W+1)–m(2W). The builders read the observ
 and monthly ``(cif_id, month_end)`` feature tables, and return what the classifier
 compares with its thresholds:
 
-* income    — salary received in each month (internal credit or bureau salary,
-              the larger);
+* income    — salary in each month: the larger of the internal credit and the bureau
+              salary, a pull counting in its own month and the next (S14);
 * liquidity — CASA average balance in each month, largest single external card payment;
 * activity  — customer-initiated CASA movement in the window (the Unknown gate) and
               whether the customer holds a CASA with us at all;
@@ -95,8 +95,7 @@ def _loan_bureau_salary(obs_base: DataFrame, loan_features: DataFrame) -> DataFr
     """RL: the last salary credit reported by each loan's latest bureau pull
     (``feature_retail_loans``, one row per spine row), dated by the pull month.
 
-    Pulls are rare (most accounts have one), so this rarely falls in the window. It is an
-    extra bureau source until the bureau salary history covers RL customers.
+    Pulls are rare (most accounts have one), so this rarely falls in the window.
     """
     require_columns(
         loan_features,
@@ -118,6 +117,26 @@ def _loan_bureau_salary(obs_base: DataFrame, loan_features: DataFrame) -> DataFr
     )
 
 
+def _with_next_month(bureau: DataFrame) -> DataFrame:
+    """One bureau salary per ``(cif_id, month_end)``: each pull's month, and the month
+    after it unless that month has its own pull (never before a pull; pulls every 2
+    months make a continuous series). A pull of 0 (salary account closed) ends the carry.
+    """
+    pulls = bureau.groupBy("cif_id", "month_end").agg(
+        F.max("bureau_salary").alias("bureau_salary")
+    )
+    carried = pulls.select(
+        "cif_id",
+        F.last_day(F.add_months("month_end", 1)).alias("month_end"),
+        F.col("bureau_salary").alias("_carried"),
+    )
+    return pulls.join(carried, on=["cif_id", "month_end"], how="full").select(
+        "cif_id",
+        "month_end",
+        F.coalesce("bureau_salary", "_carried").alias("bureau_salary"),
+    )
+
+
 def build_income_signals(
     obs_base: DataFrame,
     internal_salary: DataFrame,
@@ -127,8 +146,9 @@ def build_income_signals(
 ) -> DataFrame:
     """``income_m1 … income_m{2W}``: salary received per month — the larger of the
     internal salary (``feat_cif_internal_salary_monthly``) and the bureau salary
-    (``feat_cif_bureau_salary_monthly``); NULL: no salary that month. Also the window's
-    largest month per source, ``internal_salary_w`` / ``bureau_salary_w``.
+    (``feat_cif_bureau_salary_monthly``, carried one month forward); NULL: no salary that
+    month. Also the largest month per source: ``internal_salary_w`` / ``bureau_salary_w`` in
+    the window, ``internal_salary_prior`` in the prior window.
 
     ``loan_features`` (RL only): ``feature_retail_loans``, whose latest-pull bureau salary
     joins the bureau salary.
@@ -156,7 +176,7 @@ def build_income_signals(
     if loan_features is not None:
         bureau = bureau.unionByName(_loan_bureau_salary(obs_base, loan_features))
     sources = internal.unionByName(
-        bureau.select(
+        _with_next_month(bureau).select(
             "cif_id",
             "month_end",
             F.col("bureau_salary").alias("amount"),
@@ -166,6 +186,8 @@ def build_income_signals(
     monthly = sources.groupBy("cif_id", "month_end").agg(
         F.max("amount").alias("amount")
     )
+    in_w = _month_index(F.col("month_end")) <= w
+    internal_rows = F.col("src") == "int"
     return left_join_all(
         obs_base,
         [
@@ -173,12 +195,15 @@ def build_income_signals(
             _in_window(
                 obs,
                 sources,
-                w,
-                F.max(F.when(F.col("src") == "int", F.col("amount"))).alias(
+                2 * w,
+                F.max(F.when(internal_rows & in_w, F.col("amount"))).alias(
                     "internal_salary_w"
                 ),
-                F.max(F.when(F.col("src") == "bur", F.col("amount"))).alias(
+                F.max(F.when(~internal_rows & in_w, F.col("amount"))).alias(
                     "bureau_salary_w"
+                ),
+                F.max(F.when(internal_rows & ~in_w, F.col("amount"))).alias(
+                    "internal_salary_prior"
                 ),
             ),
         ],

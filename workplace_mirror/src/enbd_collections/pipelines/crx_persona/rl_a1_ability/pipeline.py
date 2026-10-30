@@ -6,14 +6,14 @@ Needs, for the model_id (rl_60_180 / rl_180_plus): ``crx_rl_obs_base``,
 
     kedro run --pipeline=crx_rl_a1_ability
 
-TEMPORARY (mirror bundle 08): ``create_b08_check_pipeline`` — see
+TEMPORARY (mirror bundle 09): ``create_b09_check_pipeline`` — see
 ``a1_ability/pipeline.py``.
 """
 
 from kedro.pipeline import Pipeline, node
 
 from ..a1_ability.pipeline import TAGS, create_a1_pipeline
-from ..a1_ability.pipeline import create_b08_check_pipeline as _b08_check
+from ..a1_ability.pipeline import create_b09_check_pipeline as _b09_check
 from .nodes import build_rl_liquidity_anchor
 
 _ANCHOR = node(
@@ -32,6 +32,6 @@ def create_pipeline(  # pylint: disable=unused-argument
     return create_a1_pipeline("rl", output, _ANCHOR)
 
 
-def create_b08_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the RL A1 check (bundle 08)."""
-    return _b08_check("rl", _ANCHOR)
+def create_b09_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """TEMPORARY: the RL A1 check (bundle 09)."""
+    return _b09_check("rl", _ANCHOR)

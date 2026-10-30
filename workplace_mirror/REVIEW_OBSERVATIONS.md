@@ -86,7 +86,7 @@ rl_a1_ability; batch 6: cc_a1_ability v1 + enrichers, scoring_engine, catalog_cr
 | O61 | M | closed | prm_demographics | `build_customer_individual` projects through `CustomerGroupingXref`, which may drop `deceased_flag` |
 | O62 | L | confirmed | data_engineering models / bureau | `BureauSalaryHistory.reference_month` documented as YYYYMM; staging says MMYYYY |
 | O64 | H | fixed in bundle 08 | a1_ability/signals.py | `_internal_salary` parses WM `week_number` (`yyyyMM0W`) as `yyyyMMdd`, so every internal salary lands one month early |
-| O65 | H | cause found (handoff 18); fix after bundle 08 | prm_bureau / prm_bureau_cif_bridge | The bureau CIF bridge reaches 0.58% (CC) / 3.4% (RL) of base CIFs, so AECB salary is cut off by the join, not by scarcity |
+| O65 | H | bypassed for A1 by bundle 09 (salary from the alert table, S14); link unfixed until `sub_basic_dtl` or `crr_enqsubj_indv` is restored | prm_bureau / prm_bureau_cif_bridge | The bureau CIF bridge reaches 0.58% (CC) / 3.4% (RL) of base CIFs, so AECB salary is cut off by the join, not by scarcity |
 
 ---
 
@@ -806,6 +806,8 @@ same week, so the error is at most a few days, and the true value is always a fi
 The b08 check's `B08 CHANGES` block measures the move (step s1).
 
 ### O65 — The bureau CIF bridge covers under 4% of customers (H, confirmed by A1 v03b)
+
+Update 2026-10-30 (`bundle_helpers/a1_final/bureau_link_results_cc.md`): no usable link in the tables that load (best 94 CIFs, 0.50%). The bridge also keeps one arbitrary subject per file, and a file lists every party of its contracts, so it can give a co-party's salary (R19 in the workplace results). A1 stops reading it in bundle 09.
 
 `prm_bureau.py:46–59`: `prm_bureau_cif_bridge` takes `cif_id` from the digits of the alert table's
 `PRVDR_SUBJ_NUM` (one arbitrary row per subject) and inner-joins `contract_link`. 93.8% (CC) /

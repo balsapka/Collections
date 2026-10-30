@@ -15,9 +15,9 @@
 Needs, for the model_id: the observation base, ``casa_primary``, ``casa_features``,
 ``bureau_salary_bounces`` and ``location_features`` (``prm_dcore_account_agreements``).
 
-TEMPORARY (mirror bundle 08): ``create_b08_check_pipeline`` runs the observation base and
-the same nodes, writes the axis to ``crx_<p>_a1_ability_b08_check`` and logs the report
-tables (``b08_check.py``). Removed by the bundle's cleanup.
+TEMPORARY (mirror bundle 09): ``create_b09_check_pipeline`` runs the observation base and
+the same nodes, writes the axis to ``crx_<p>_a1_ability_b09_check`` and logs the report
+tables (``b09_check.py``). Removed by the bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
@@ -25,11 +25,11 @@ from kedro.pipeline.node import Node
 
 from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
 from ..obs_base import create_rl_pipeline as create_rl_obs_pipeline
-from .b08_check import (
+from .b09_check import (
     compare_a1_outputs,
     describe_a1_report,
     describe_a1_sources,
-    explain_a1_changes,
+    explain_a1_aecb,
 )
 from .classify import build_a1_ability
 from .signals import (
@@ -122,33 +122,29 @@ def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
     )
 
 
-def create_b08_check_pipeline(product: str, anchor: Node) -> Pipeline:
+def create_b09_check_pipeline(product: str, anchor: Node) -> Pipeline:
     """TEMPORARY: observation base + the A1 pipeline writing to
-    crx_<p>_a1_ability_b08_check + the log-only report nodes.
-    Remove with b08_check.py and the catalog entries."""
+    crx_<p>_a1_ability_b09_check + the log-only report nodes.
+    Remove with b09_check.py and the catalog entries."""
     obs = f"crx_{product}_obs_base"
     prefix = f"crx_{product}_a1"
-    check = f"{prefix}_ability_b08_check"
+    check = f"{prefix}_ability_b09_check"
     signals = {
         "income": f"{prefix}_income_signals",
         "liquidity": f"{prefix}_liquidity_signals",
         "distress": f"{prefix}_distress_signals",
     }
     products = "rl_spine" if product == "rl" else obs
-    changes = {
+    aecb = {
         "obs_base": obs,
-        "old": f"{prefix}_ability_v2",
         "new": check,
-        **signals,
-        "anchor": f"{prefix}_liquidity_anchor",
-        "wm_salary": "wm_fea_salary_days_since_increment",
+        "liquidity": f"{prefix}_liquidity_signals",
+        "internal_salary": "feat_cif_internal_salary_monthly",
         "bureau_salary": "feat_cif_bureau_salary_monthly",
-        "casa_balance": "feat_cif_casa_balance_monthly",
-        "bureau_bounces": "feat_cif_bureau_bounces_monthly",
         "model_id": "params:model_id",
     }
     if product == "rl":
-        changes["loan_features"] = "feature_retail_loans"
+        aecb["loan_features"] = "feature_retail_loans"
     tags = ["crx_persona"]
     checks = [
         node(
@@ -160,7 +156,7 @@ def create_b08_check_pipeline(product: str, anchor: Node) -> Pipeline:
                 "model_id": "params:model_id",
             },
             outputs=None,
-            name=f"compare_{prefix}_b08",
+            name=f"compare_{prefix}_b09",
             tags=tags,
         ),
         node(
@@ -173,7 +169,7 @@ def create_b08_check_pipeline(product: str, anchor: Node) -> Pipeline:
                 "model_id": "params:model_id",
             },
             outputs=None,
-            name=f"describe_{prefix}_b08_report",
+            name=f"describe_{prefix}_b09_report",
             tags=tags,
         ),
         node(
@@ -187,18 +183,17 @@ def create_b08_check_pipeline(product: str, anchor: Node) -> Pipeline:
                 "casa_activity": "feat_cif_casa_activity_monthly",
                 "transactions": "prm_casa_transactions",
                 "alerts": "prm_bureau_alert_enriched",
-                "cif_bridge": "prm_bureau_cif_bridge",
                 "model_id": "params:model_id",
             },
             outputs=None,
-            name=f"describe_{prefix}_b08_sources",
+            name=f"describe_{prefix}_b09_sources",
             tags=tags,
         ),
         node(
-            func=explain_a1_changes,
-            inputs=changes,
+            func=explain_a1_aecb,
+            inputs=aecb,
             outputs=None,
-            name=f"explain_{prefix}_b08_changes",
+            name=f"explain_{prefix}_b09_aecb",
             tags=tags,
         ),
     ]

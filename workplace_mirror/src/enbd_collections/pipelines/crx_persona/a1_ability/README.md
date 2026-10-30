@@ -25,7 +25,7 @@ it in `cc_a1_ability`, RL in `rl_a1_ability`; each wrapper adds its anchor.
   | `feat_cif_casa_activity_monthly` | `prm_casa_transactions` ← FTR (`casa_primary`, `casa_features`) |
   | `feat_cif_ext_card_payment_monthly` | `wm_pri_labelled_transactions` + `prm_beneficiary_cards` |
   | `feat_cif_returns_monthly` | `prm_casa_return_events` ← FTR |
-  | `feat_cif_bureau_salary_monthly` | `prm_bureau_salary_history` + `prm_bureau_cif_bridge` (`bureau_salary_bounces`) |
+  | `feat_cif_bureau_salary_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
   | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
 
 - **Windows are calendar months, by segment** (`_common.window_months`), the observation
@@ -52,13 +52,14 @@ month **the larger one wins**.
   days from the first of that month; `week_number` is `yyyyMM0W` (week 1–4 of the month), so
   the salary month is the snapshot week minus those days, rounded to the nearest first of a
   month.
-- **Bureau salary** — the AECB salary history, the largest total any provider reported for
-  the month, linked to the CIF through `prm_bureau_cif_bridge`. RL also reads
-  `feature_retail_loans`: the salary of each loan's latest bureau pull, dated by the pull
-  month.
+- **Bureau salary** — the salary on AECB's alert feed (types 31 and 32, keyed by CIF), an
+  accurate level on the pull date. It counts in the pull's month and the next, never before
+  the pull and no further (S14), so pulls every 2 months make a continuous series; a salary
+  account closure (type 43) ends it. RL also reads `feature_retail_loans`: the salary of each
+  loan's latest bureau pull, handled the same way.
 
 The result is `income_m1 … income_m6` (`… m12` at 180+; NULL = no salary that month), and
-the window's largest month per source (`internal_salary_w`, `bureau_salary_w`).
+the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) and the prior window's internal salary (`internal_salary_prior`).
 
 **Step 2: the level** (`income_level`, spec S12).
 
@@ -145,9 +146,10 @@ changes nothing.
   overtime and commissions, so a month with a large bonus can pass on its own.
 - **Only what WM labels as salary counts.** Regular non-salary income is invisible; about a
   third of customers ever show an internal salary, and about a third hold no CASA with us.
-- **Bureau salary reaches few customers** because `prm_bureau_cif_bridge` links only the
-  bureau files with a contract link (O65). The GRR bureau salary feed and the link fix enter
-  through the same "larger of the two per month" rule.
+- **Bureau salary is an event feed for now.** An alert row appears only when something changes,
+  so no row means nothing is known, not that the salary stopped, and few pulls fall in the
+  window. GRR's feed of pulls every 2 months enters through the same rule. A stop shows only
+  as a closure, a lower amount or the end of an internal salary (`a1_salary_stopped`).
 - **Missing salary months count as 0** in the window total and the weakening check.
 - **Inputs follow the persona start.** `prm_casa_return_events`, `prm_casa_transactions` and
   the WM-based features keep a fixed number of months before
