@@ -284,14 +284,6 @@ crx_cc_a2_locatability:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 06): the A2 check output; removed by the bundle's cleanup.
-crx_cc_a2_locatability_b06_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_locatability_b06_check"
-  save_args:
-    mode: overwrite
-
 # ── Observation base: (account_id, observation_date, cif_id), one per product ──
 crx_cc_obs_base:
   type: spark.SparkDataset
@@ -617,14 +609,6 @@ crx_rl_a2_locatability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_locatability"
-  save_args:
-    mode: overwrite
-
-# TEMPORARY (mirror bundle 06): the A2 check output; removed by the bundle's cleanup.
-crx_rl_a2_locatability_b06_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_locatability_b06_check"
   save_args:
     mode: overwrite
 

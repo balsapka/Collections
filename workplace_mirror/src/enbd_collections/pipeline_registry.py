@@ -236,10 +236,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_departure_signature": crx_cc_departure.create_pipeline(),
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
-        # TEMPORARY (mirror bundle 06): A2 check; removed by the bundle's cleanup.
-        "crx_cc_a2_locatability_b06_check": (
-            crx_cc_a2_locatability.create_b06_check_pipeline()
-        ),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
         # TEMPORARY (mirror bundle 12): A1 check; removed by the bundle's cleanup.
         "crx_cc_a1_ability_b12_check": (
@@ -263,10 +259,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         ),
         "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
-        # TEMPORARY (mirror bundle 06): A2 check; removed by the bundle's cleanup.
-        "crx_rl_a2_locatability_b06_check": (
-            crx_rl_a2_locatability.create_b06_check_pipeline()
-        ),
         "crx_rl_a3_payment_credibility": crx_rl_a3_payment_credibility.create_pipeline(),
         # -- Digital login (OMB) --------------------------------------------
         "digital_login": dl.create_pipeline(),
