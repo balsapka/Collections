@@ -33,8 +33,8 @@ from .._dpd_journey import (
 from .chains import Edge, resolve_chains
 
 # Account columns of int_loan_restructure_link.
-_LINK_ACCOUNT = "restr_acct_num"
-_LINK_ORIGINAL = "orig_acct_num"
+_LINK_ACCOUNT = "account_id"
+_LINK_ORIGINAL = "orig_account_id"
 
 _CHAIN_SCHEMA = T.StructType(
     [
