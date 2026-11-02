@@ -4,7 +4,7 @@
     Node 1  build_rl_full_history_linked -> crx_rl_full_history_linked,
                                             crx_rl_restructure_chains
     Node 2  build_rl_dpd_sequences       -> crx_rl_dpd_sequences
-    Node 3  build_rl_dpd_sequences       -> crx_rl_dpd_sequences_linked
+    Node 3  build_rl_linked_dpd_sequences -> crx_rl_dpd_sequences_linked
     Node 4  build_rl_a4_deterioration    -> crx_rl_a4_deterioration
 
 Requires crx_rl_full_history (RL-B1) to already be materialized.
@@ -12,17 +12,18 @@ Requires crx_rl_full_history (RL-B1) to already be materialized.
 Run with:
     kedro run --pipeline=crx_rl_a4_deterioration
 
-TEMPORARY (mirror bundle 11): create_b11_check_pipeline writes the new state to temporary
+TEMPORARY (mirror bundle 13): create_b13_check_pipeline writes the new state to temporary
 entries and logs old vs new; removed by the bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
 
-from .b11_check import compare_rl_a4_outputs
+from .b13_check import compare_rl_a4_outputs
 from .nodes import (
     build_rl_a4_deterioration,
     build_rl_dpd_sequences,
     build_rl_full_history_linked,
+    build_rl_linked_dpd_sequences,
 )
 
 
@@ -40,12 +41,33 @@ def _linked_node() -> node:
     )
 
 
-def _sequences_node(history: str, output: str) -> node:
+def _sequences_node(output: str) -> node:
     return node(
         func=build_rl_dpd_sequences,
-        inputs=[history, "params:crx_persona", "params:model_id"],
+        inputs=[
+            "crx_rl_full_history",
+            "feature_retail_loans",
+            "params:crx_persona",
+            "params:model_id",
+        ],
         outputs=output,
         name=f"build_{output}",
+        tags=["crx", "rl", "rl_a4_deterioration"],
+    )
+
+
+def _linked_sequences_node() -> node:
+    return node(
+        func=build_rl_linked_dpd_sequences,
+        inputs=[
+            "crx_rl_full_history_linked",
+            "crx_rl_restructure_chains",
+            "feature_retail_loans",
+            "params:crx_persona",
+            "params:model_id",
+        ],
+        outputs="crx_rl_dpd_sequences_linked",
+        name="build_crx_rl_dpd_sequences_linked",
         tags=["crx", "rl", "rl_a4_deterioration"],
     )
 
@@ -72,34 +94,30 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     return Pipeline(
         [
             _linked_node(),
-            _sequences_node("crx_rl_full_history", "crx_rl_dpd_sequences"),
-            _sequences_node(
-                "crx_rl_full_history_linked", "crx_rl_dpd_sequences_linked"
-            ),
+            _sequences_node("crx_rl_dpd_sequences"),
+            _linked_sequences_node(),
             _state_node("crx_rl_dpd_sequences", "crx_rl_a4_deterioration"),
         ],
         tags=["crx_persona"],
     )
 
 
-def create_b11_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the new RL A4 into temporary entries, then old vs new (bundle 11)."""
+def create_b13_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """TEMPORARY: the new RL A4 into temporary entries, then old vs new (bundle 13)."""
     return Pipeline(
         [
             _linked_node(),
-            _sequences_node("crx_rl_full_history", "crx_rl_dpd_sequences_b11_check"),
-            _sequences_node(
-                "crx_rl_full_history_linked", "crx_rl_dpd_sequences_linked"
-            ),
+            _sequences_node("crx_rl_dpd_sequences_b13_check"),
+            _linked_sequences_node(),
             _state_node(
-                "crx_rl_dpd_sequences_b11_check", "crx_rl_a4_deterioration_b11_check"
+                "crx_rl_dpd_sequences_b13_check", "crx_rl_a4_deterioration_b13_check"
             ),
             node(
                 func=compare_rl_a4_outputs,
                 inputs=[
                     "crx_rl_a4_deterioration",
-                    "crx_rl_a4_deterioration_b11_check",
-                    "crx_rl_dpd_sequences_b11_check",
+                    "crx_rl_a4_deterioration_b13_check",
+                    "feature_retail_loans",
                     "rl_spine",
                     "params:model_id",
                 ],

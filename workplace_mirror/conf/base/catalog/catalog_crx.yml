@@ -468,19 +468,19 @@ crx_rl_dpd_sequences_linked:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 11): the sequences of the b11 check.
-crx_rl_dpd_sequences_b11_check:
+# TEMPORARY (mirror bundle 13): the sequences of the b13 check.
+crx_rl_dpd_sequences_b13_check:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_dpd_sequences_b11_check"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_dpd_sequences_b13_check"
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 11): the new output written by the b11 check pipeline.
-crx_rl_a4_deterioration_b11_check:
+# TEMPORARY (mirror bundle 13): the new output written by the b13 check pipeline.
+crx_rl_a4_deterioration_b13_check:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_b11_check"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_b13_check"
   save_args:
     mode: overwrite
 

@@ -1,0 +1,14 @@
+- HDFS first (the user runs this in PROD; UAT has no data): resolve these catalog paths for model_id rl_60_180 and rl_180_plus from the workplace conf and write out each command in full, `hdfs dfs -rm -r <resolved path>`. Skip any that does not exist:
+  - `${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_dpd_sequences_b11_check`
+  - `${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_b11_check`
+  - `${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_dpd_sequences_b13_check`
+  - `${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_b13_check`
+- Remove the temporary check (everything marked TEMPORARY for bundle 13):
+  - conf/base/catalog/catalog_crx.yml: the two `*_b13_check` entries and their comments;
+  - src/enbd_collections/pipeline_registry.py: the `crx_rl_a4_deterioration_b13_check` entry and its comment;
+  - crx_persona/rl_a4_deterioration/pipeline.py: `create_b13_check_pipeline`, the `b13_check` import and the TEMPORARY docstring paragraph;
+  - crx_persona/rl_a4_deterioration/__init__.py: `create_b13_check_pipeline`;
+  - delete crx_persona/rl_a4_deterioration/b13_check.py.
+  Then check: `kedro registry list` still works and `grep -rn "b11\|b13" src conf` prints nothing.
+- Delete the folder data/input/mirror_bundles/: rm -rf data/input/mirror_bundles
+- Run `git status`, commit src/ and conf/ and push. Report what you removed and the hdfs commands the user still has to run in PROD.

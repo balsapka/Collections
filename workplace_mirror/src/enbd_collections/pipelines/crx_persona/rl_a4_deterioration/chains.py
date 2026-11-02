@@ -33,11 +33,10 @@ class Chain(NamedTuple):
 
 
 class Member(NamedTuple):
-    """One original loan of a chain. ``is_end``: it has no original of its own."""
+    """One original loan of a chain."""
 
     account: str
     original: str
-    is_end: bool
 
 
 def resolve_chains(
@@ -73,5 +72,5 @@ def resolve_chains(
                 max(e.candidates for e in walked),
             )
         )
-        members += [Member(account, o, o not in by_account) for o in originals]
+        members += [Member(account, o) for o in originals]
     return chains, members
