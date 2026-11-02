@@ -43,14 +43,9 @@ def assign_state(
     f: dict,
     cropped: bool,
     restructure_blind_spot: bool = False,
-    ecl_gap_blind_spot: bool = False,
 ) -> str:
     """One state per account, same tree and vocabulary in both segments. First 'yes' wins.
 
-    ECL  a confirmed per-account source gap (RL ECL/DPL union seam, RL-A4-5/RL-A4-6) means
-                             we have no reliable signal about this account's shape before
-                             the visible window AT ALL, not just its exact onset month ->
-                             bypasses the whole cascade: stabilized if Q2, else unknown
     Q0 journey start not observed (oldest observed month delinquent AND history_blind —
                              history before the window is genuinely missing, or this
                              account is a restructured entry whose predecessor contract's
@@ -83,16 +78,6 @@ def assign_state(
             and f["chg_6m"] <= p["stabilized_long_run_max_rise"]
         )
     )
-    # ECL — a confirmed per-account source gap (RL ECL/DPL union seam) means we have no
-    # reliable signal about this account's shape before the visible window AT ALL, not
-    # just its exact onset month. Unlike cropped/restructure_blind_spot (which still
-    # trust the visible run-up's shape for Q3/Q4), this also disqualifies that shape,
-    # since the run-up itself may be a window-boundary artifact of the data gap, not the
-    # account's true history — bypasses the whole cascade. This is the only path that
-    # reaches "unknown" for an EPD-shaped (clean-then-delinquent) sequence, which
-    # starts_delinquent-gated Q0 structurally cannot do (RL-A4-7).
-    if ecl_gap_blind_spot:
-        return "stabilized" if stab else "unknown"
     # Q0 — only a confidence guard when history before the window is genuinely
     # missing (history_blind). When history_blind=False we trust we've seen the
     # whole observed journey, so a delinquent oldest month is not evidence of
@@ -132,13 +117,10 @@ def classify(  # pylint: disable=too-many-positional-arguments
     canon_top: int,
     repair: bool = True,
     restructure_blind_spot: bool = False,
-    ecl_gap_blind_spot: bool = False,
 ) -> dict:
     """Features + state for one account (native buckets, oldest -> newest)."""
     f = journey_features(
         [max(x + offset, 1) for x in buckets_native], canon_top, repair
     )
-    f["det_state"] = assign_state(
-        f, cropped, restructure_blind_spot, ecl_gap_blind_spot
-    )
+    f["det_state"] = assign_state(f, cropped, restructure_blind_spot)
     return f

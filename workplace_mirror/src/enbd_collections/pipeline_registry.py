@@ -252,6 +252,10 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
+        # TEMPORARY (mirror bundle 11): A4 check; removed by the bundle's cleanup.
+        "crx_rl_a4_deterioration_b11_check": (
+            crx_rl_a4_deterioration.create_b11_check_pipeline()
+        ),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
         # TEMPORARY (mirror bundle 09): A1 check; removed by the bundle's cleanup.
         "crx_rl_a1_ability_b09_check": (

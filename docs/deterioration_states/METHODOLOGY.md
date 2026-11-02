@@ -119,9 +119,6 @@ only. The current-behaviour inputs are confined to the stabilized question and t
 Questions are asked **in order**; the first "yes" assigns the state.
 
 ```
-ECL RL source gap?          disbursed before the ECL/DPL seam with a product code
-                            outside the ECL extract: the visible run-up may be an artefact
-                            of the gap -> stabilized if Q2 holds, else -> unknown
 Q0  Journey start observed?  the oldest observed month is already at bucket 2+ AND the
                             start is not observed (history cropped by the window / floor /
                             an unresolvable gap, or the account was restructured):

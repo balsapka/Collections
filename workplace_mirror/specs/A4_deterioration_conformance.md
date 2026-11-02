@@ -18,12 +18,12 @@ of one kind (D1 below). Thresholds in `STATE_RULES` are identical.
 |---|---|---|---|
 | D1 | **Q0:** any history whose oldest observed month is at bucket 2+ → stabilized if Q2, else unknown | Q0 fires only when the start is also **not observed** (`history_blind` = cropped by the window / floor / an unresolvable gap, or a restructured account). A history that starts delinquent but is fully observed falls through to the normal tree | RL loans that miss their very first EMI (native 1 → canonical 2) get a real state instead of unknown — typically **EPD**. For CC the comment argues a fully observed history cannot start at 2+, so it should be rare there (check E04) |
 | D2 | Restructured re-opens are one of the reasons a history can start delinquent (caught by Q0) | `restructure_blind_spot_flag` (account ever restructured) is treated like `cropped` everywhere: Q0 applies, never EPD, a straight roller is always seasoned | Restructured accounts never become EPD or early-life straight rollers |
-| D3 | — | RL only: `ecl_gap_blind_spot_flag` (disbursed before the ECL/DPL seam with a product code outside the ECL extract) bypasses the whole tree → stabilized if Q2, else unknown | Confirmed source gap: the visible run-up may be an artefact, so no fall-in state is claimed |
+| D3 | — | Removed by bundle 11 (2026-11-02): the RL ECL-gap rule. RL history is now complete, so a rule on disbursement date and product code alone no longer marks a real gap | RL accounts it held in unknown go through the normal tree |
 | D4 | +2 billing-cycle jump repair described for CC | RL skips the repair (`BucketScheme.repair_jumps=False`); an RL +2 is a real move | RL only |
 | D5 | One CC history floor (2024-01) | Separate overridable floor for CC 180+ (`cc_history_floor_date_180_plus`, same default) | None until overridden |
 
 ## Decision (2026-10-23)
 
 The code is the spec. `METHODOLOGY.md` §2 and §4 now describe D1–D5 (Q0 for unobserved
-starts only, the restructure and RL ECL-gap blind spots, the RL scale, the CC 180+ floor).
+starts only, the restructure blind spot, the RL scale, the CC 180+ floor).
 No code change.

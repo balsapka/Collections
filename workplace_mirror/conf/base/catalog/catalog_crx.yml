@@ -461,6 +461,22 @@ crx_rl_a4_deterioration:
   save_args:
     mode: overwrite
 
+# TEMPORARY (mirror bundle 11): the sequences of the b11 check.
+crx_rl_dpd_sequences_b11_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_dpd_sequences_b11_check"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (mirror bundle 11): the new output written by the b11 check pipeline.
+crx_rl_a4_deterioration_b11_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_b11_check"
+  save_args:
+    mode: overwrite
+
 # ── RL A1 ability (shared a1_ability engine) ────────────────────────────────
 # Signal tables at (account_id, observation_date) and the axis crx_rl_a1_ability:
 # a1_state in {high, moderate, low, unknown}; a1_state_label in {High, Moderate, Low,

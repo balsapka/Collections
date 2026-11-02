@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from enbd_collections.nodes.staging.retail_loans.stg_rr_portf import ECL_CUTOFF_DATE
-
 from .constants import BucketScheme, MODEL_ID_SEGMENT
 
 # Read from params:crx_persona -> dpd_journey (all optional). persona_end_date is required.
@@ -20,15 +18,6 @@ PARAM_DEFAULTS = {
     # floor for 180_plus once the pre-2024 data-quality tradeoff is decided.
     "cc_history_floor_date_180_plus": "2024-01-01",
     "rl_history_floor_date": None,
-    # RL only. The int_loan_master lineage unions the Group ECL historical extract
-    # (pre-cutoff) with the DPL monthly tables (post-cutoff) at this exact date — imported
-    # from stg_rr_portf.py::ECL_CUTOFF_DATE (single source of truth, no longer duplicated).
-    # Accounts disbursed before this date whose product_code falls outside
-    # ECL_WINNOWED_PRODUCT_CODES are a confirmed raw-source gap (the pre-cutoff ECL
-    # historical extract is structurally winnowed to those codes server-side) — RL-A4-5/
-    # RL-A4-6/RL-A4-8 -> ecl_gap_blind_spot_flag. No cc_ variant: CC has no equivalent
-    # mechanism.
-    "rl_ecl_gap_cutoff_date": ECL_CUTOFF_DATE,
     "on_unresolvable_gap": "truncate",  # "truncate" (keep months after the gap) or "drop"
     "fill_straight_roll_gaps": True,  # 3 · 5 -> 3 4 5: the only path without a +2 jump
     "repair_cycle_shift": True,  # two bills in one month + empty neighbour month
@@ -45,7 +34,6 @@ class JourneyParams:
     end_date: str
     floor_date: str | None
     segment: str
-    ecl_gap_cutoff_date: str | None
     on_unresolvable_gap: str
     fill_straight_roll_gaps: bool
     repair_cycle_shift: bool
@@ -83,7 +71,6 @@ def journey_params(
         end_date=str(crx_persona["persona_end_date"]),
         floor_date=p[floor_key],
         segment=segment,
-        ecl_gap_cutoff_date=p.get(f"{scheme.name}_ecl_gap_cutoff_date"),
         on_unresolvable_gap=p["on_unresolvable_gap"],
         fill_straight_roll_gaps=bool(p["fill_straight_roll_gaps"]),
         repair_cycle_shift=bool(p["repair_cycle_shift"]),

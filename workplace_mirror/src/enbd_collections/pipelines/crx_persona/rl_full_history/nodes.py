@@ -36,15 +36,13 @@ def build_rl_full_history(
         rl_spine: model-namespaced RL spine (~31k accounts). Column: account_id.
         int_loan_master: monthly snapshots for all RL accounts. Columns: account_id (string),
             observation_date (date), dpd_bucket (int: 0 = 0 DPD, 1 = 1-30, ..., 7 = 180+),
-            emi_coverage_ratio, outstanding_balance, is_restructured, loan_type,
-            disbursement_date, product_code.
+            emi_coverage_ratio, outstanding_balance, is_restructured, loan_type.
         crx_persona: optional params dict (only dpd_journey.log_stats is read).
 
     Returns:
         DataFrame at grain (account_id, month_end_date): account_id string, month_end_date
         date, dlq_bucket int, emi_coverage_ratio double, outstanding_balance double,
-        restructure_flag int, loan_type string, disbursement_date date, product_code string,
-        computed_at timestamp.
+        restructure_flag int, loan_type string, computed_at timestamp.
     """
     # -- Step 1 (R20): scope to the spine (broadcast: the spine is model-sized) ----------
     spine_keys = rl_spine.select(_string_key(rl_spine).alias("account_id")).distinct()
@@ -60,8 +58,6 @@ def build_rl_full_history(
         F.col("outstanding_balance").cast("double"),
         F.col("is_restructured").cast("int").alias("restructure_flag"),
         F.col("loan_type").cast("string"),
-        F.col("disbursement_date").cast("date"),
-        F.col("product_code").cast("string"),
         F.current_timestamp().alias("computed_at"),
     )
 

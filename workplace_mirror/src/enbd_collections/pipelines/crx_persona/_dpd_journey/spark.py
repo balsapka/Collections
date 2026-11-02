@@ -16,10 +16,6 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from enbd_collections.nodes.staging.retail_loans.stg_rr_portf import (
-    ECL_WINNOWED_PRODUCT_CODES,
-)
-
 from ._dates import _month_col, _month_idx
 from .constants import BucketScheme
 from .history import build_history
@@ -137,10 +133,7 @@ def build_dpd_sequences(
     restructure: DataFrame | None = None,
 ) -> DataFrame:
     """history: account_id, obs_date (date/timestamp), dlq_bucket (native int),
-    optionally restructure_flag (0/1 per row; max over the account's rows), optionally
-    disbursement_date (date; max over the account's rows, robust to nulls elsewhere),
-    optionally product_code (string; max over the account's rows, robust to nulls
-    elsewhere).
+    optionally restructure_flag (0/1 per row; max over the account's rows).
     restructure: optional (account_id, restructure_blind_spot_flag), one row per account.
 
     Returns ONE row per account (every account in `history`, with a build_status):
@@ -149,14 +142,7 @@ def build_dpd_sequences(
         dpd_string (native digits, LEFTMOST = latest month — the bank's string convention),
         history_cropped, n_gap_months_filled, n_gap_months_rolled, n_gap_months_inferred,
         n_cycle_shift_moves, n_months_truncated, n_dup_month_rows, n_invalid_rows,
-        legacy_drop (the old rule would have dropped it), restructure_blind_spot_flag,
-        ecl_gap_blind_spot_flag (1 if disbursement_date AND product_code are both present,
-        params.ecl_gap_cutoff_date is set, the account disbursed before that cutoff, and its
-        product_code is NOT one of ECL_WINNOWED_PRODUCT_CODES -- the pre-cutoff ECL
-        historical extract is structurally winnowed server-side to those codes only, so a
-        loan outside that set is genuinely, structurally absent from it regardless of
-        disbursement date (confirmed root cause, RL-A4-5/RL-A4-6/RL-A4-8); 0 otherwise/when
-        a required column or the param is absent, e.g. CC, which has neither column)
+        legacy_drop (the old rule would have dropped it), restructure_blind_spot_flag
     """
     missing = [
         c for c in ("account_id", "obs_date", "dlq_bucket") if c not in history.columns
@@ -195,33 +181,9 @@ def build_dpd_sequences(
     ]
     if "restructure_flag" in history.columns:
         aggs.append(F.max(F.col("restructure_flag").cast("int")).alias("_rf"))
-    has_ecl_gap_check = (
-        "disbursement_date" in history.columns
-        and "product_code" in history.columns
-        and params.ecl_gap_cutoff_date
-    )
-    if has_ecl_gap_check:
-        aggs.append(F.max(F.col("disbursement_date").cast("date")).alias("_disb_date"))
-        aggs.append(
-            F.max(F.trim(F.col("product_code").cast("string"))).alias("_product_code")
-        )
     per_acc = h.groupBy("account_id").agg(*aggs)  # the one shuffle
     source_min = h.where(valid).agg(F.min(m).alias("_global_min"))  # 1 row
     per_acc = per_acc.crossJoin(F.broadcast(source_min))
-
-    if has_ecl_gap_check:
-        covered = list(ECL_WINNOWED_PRODUCT_CODES)
-        per_acc = per_acc.withColumn(
-            "_ecl_gap_blind_spot",
-            (
-                F.col("_disb_date").isNotNull()
-                & (F.col("_disb_date") < F.lit(params.ecl_gap_cutoff_date).cast("date"))
-                & F.col("_product_code").isNotNull()
-                & (~F.col("_product_code").isin(covered))
-            ).cast("int"),
-        )
-    else:
-        per_acc = per_acc.withColumn("_ecl_gap_blind_spot", F.lit(0))
 
     offset, fill, how = (
         scheme.offset,
@@ -267,7 +229,6 @@ def build_dpd_sequences(
         F.coalesce("_h.n_dup_month_rows", F.lit(0)).alias("n_dup_month_rows"),
         F.col("n_invalid_rows").cast("int"),
         (F.col("_rf") if "_rf" in s.columns else F.lit(None).cast("int")).alias("_rf"),
-        F.col("_ecl_gap_blind_spot").alias("ecl_gap_blind_spot_flag"),
     )
     if restructure is not None:
         out = out.join(
@@ -310,7 +271,7 @@ def build_deterioration(
         account_id, observation_date, det_state, det_state_label, det_segment,
         current_bucket (native, as of this row's date), <features>, history_months
         (months observed as of this row), history_cropped, n_months_truncated,
-        restructure_blind_spot_flag, ecl_gap_blind_spot_flag, computed_at
+        restructure_blind_spot_flag, computed_at
     """
     _ship_by_value()
     segment = params.segment
@@ -341,7 +302,7 @@ def build_deterioration(
         .where((F.col("_trunc_len") >= 1) & (F.col("_obs_idx") <= F.col("_last_idx")))
     )
 
-    def _udf(buckets, trunc_len_, cropped, restructure_blind_spot, ecl_gap_blind_spot):
+    def _udf(buckets, trunc_len_, cropped, restructure_blind_spot):
         sl = list(buckets)[:trunc_len_]
         if not sl or max(sl[-1] + offset, 1) < 2:
             return None
@@ -352,7 +313,6 @@ def build_deterioration(
             top,
             repair,
             bool(restructure_blind_spot),
-            bool(ecl_gap_blind_spot),
         )
 
     schema = _CLASSIFY_SCHEMA
@@ -363,7 +323,6 @@ def build_deterioration(
             "_trunc_len",
             "history_cropped",
             "restructure_blind_spot_flag",
-            "ecl_gap_blind_spot_flag",
         ),
     ).where(F.col("_s").isNotNull())
 
@@ -386,7 +345,6 @@ def build_deterioration(
         F.col("history_cropped"),
         F.col("n_months_truncated"),
         F.col("restructure_blind_spot_flag"),
-        F.col("ecl_gap_blind_spot_flag"),
         F.current_timestamp().alias("computed_at"),
     )
     # Always-on, like every other persona axis's own state-distribution log

@@ -1,0 +1,7 @@
+**What this bundle does.** RL A4 no longer uses the ECL gap rule, now that the history source covers all loans.
+
+- **Removed**: `ecl_gap_blind_spot_flag` and the rule behind it (`assign_state`, `classify`, `build_dpd_sequences`, `build_deterioration`), the parameter `rl_ecl_gap_cutoff_date`, and `disbursement_date` / `product_code` in `crx_rl_full_history`, which only that rule read.
+- **Why**: the rule looked at disbursement date and product code alone, never at the history. Those accounts went to Stabilized or Unknown even with a full clean history.
+- **Unchanged**: `ECL_CUTOFF_DATE` and the source union in `stg_rr_portf.py`, the restructured path (`restructure_blind_spot_flag`, Q0), every CC result, every other state rule.
+- **Check** (`rl_a4_deterioration/b11_check.py`, pipeline `crx_rl_a4_deterioration_b11_check`): the new state goes to temporary entries and `crx_rl_a4_deterioration` stays untouched as the baseline until step 8. Blocks `B11 OUTPUT` (old × new, new by `loan_type`), `ECL` (flagged accounts: does their history now start before 2025-12, and what they became), `UNKNOWN` (what is left, by route × `loan_type`).
+- **Expected**: Unknown falls and, after this bundle, only restructured and cropped accounts can be Unknown, so route `other` must be 0. In `B11 ECL`, `2025_12_or_later` should be near 0: those accounts still miss their older history and would now get a state from a short history. Restructured accounts stay as they are until their new columns are wired in.

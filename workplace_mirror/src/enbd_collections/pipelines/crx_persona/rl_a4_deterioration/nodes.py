@@ -18,18 +18,13 @@ def build_rl_dpd_sequences(
     crx_rl_full_history: DataFrame, crx_persona: dict, model_id: str
 ) -> DataFrame:
     """One row per RL account: gap-filled monthly bucket array + audit columns +
-    restructure_blind_spot_flag (1 if the loan was restructured in any month) +
-    ecl_gap_blind_spot_flag (1 if the loan was disbursed before the ECL/DPL union seam
-    AND its product_code falls outside the set the pre-cutoff ECL historical extract is
-    structurally winnowed to — see _dpd_journey.spark.build_dpd_sequences).
+    restructure_blind_spot_flag (1 if the loan was restructured in any month).
     """
     history = crx_rl_full_history.select(
         "account_id",
         F.col("month_end_date").alias("obs_date"),
         "dlq_bucket",
         "restructure_flag",
-        "disbursement_date",
-        "product_code",
     )
     return build_dpd_sequences(history, RL, journey_params(crx_persona, RL, model_id))
 
