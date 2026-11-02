@@ -1,8 +1,11 @@
 """Kedro pipeline: RL-A4-3 — DPD-journey deterioration state for Retail Loans.
 
-2-node pipeline:
-    Node 1  build_rl_dpd_sequences       -> crx_rl_dpd_sequences
-    Node 2  build_rl_a4_deterioration    -> crx_rl_a4_deterioration
+4-node pipeline:
+    Node 1  build_rl_full_history_linked -> crx_rl_full_history_linked,
+                                            crx_rl_restructure_chains
+    Node 2  build_rl_dpd_sequences       -> crx_rl_dpd_sequences
+    Node 3  build_rl_dpd_sequences       -> crx_rl_dpd_sequences_linked
+    Node 4  build_rl_a4_deterioration    -> crx_rl_a4_deterioration
 
 Requires crx_rl_full_history (RL-B1) to already be materialized.
 
@@ -16,36 +19,64 @@ entries and logs old vs new; removed by the bundle's cleanup.
 from kedro.pipeline import Pipeline, node
 
 from .b11_check import compare_rl_a4_outputs
-from .nodes import build_rl_a4_deterioration, build_rl_dpd_sequences
+from .nodes import (
+    build_rl_a4_deterioration,
+    build_rl_dpd_sequences,
+    build_rl_full_history_linked,
+)
+
+
+def _linked_node() -> node:
+    return node(
+        func=build_rl_full_history_linked,
+        inputs=[
+            "crx_rl_full_history",
+            "int_loan_master",
+            "int_loan_restructure_link",
+        ],
+        outputs=["crx_rl_full_history_linked", "crx_rl_restructure_chains"],
+        name="build_crx_rl_full_history_linked",
+        tags=["crx", "rl", "rl_a4_deterioration"],
+    )
+
+
+def _sequences_node(history: str, output: str) -> node:
+    return node(
+        func=build_rl_dpd_sequences,
+        inputs=[history, "params:crx_persona", "params:model_id"],
+        outputs=output,
+        name=f"build_{output}",
+        tags=["crx", "rl", "rl_a4_deterioration"],
+    )
+
+
+def _state_node(own: str, output: str) -> node:
+    return node(
+        func=build_rl_a4_deterioration,
+        inputs=[
+            own,
+            "crx_rl_dpd_sequences_linked",
+            "crx_rl_restructure_chains",
+            "rl_spine",
+            "params:crx_persona",
+            "params:model_id",
+        ],
+        outputs=output,
+        name=f"build_{output}",
+        tags=["crx", "rl", "rl_a4_deterioration"],
+    )
 
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """2-node pipeline: build per-account DPD sequences, then classify deterioration state."""
+    """Link the restructured loans, build both sequences, classify deterioration state."""
     return Pipeline(
         [
-            node(
-                func=build_rl_dpd_sequences,
-                inputs=[
-                    "crx_rl_full_history",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
-                outputs="crx_rl_dpd_sequences",
-                name="build_crx_rl_dpd_sequences",
-                tags=["crx", "rl", "rl_a4_deterioration"],
+            _linked_node(),
+            _sequences_node("crx_rl_full_history", "crx_rl_dpd_sequences"),
+            _sequences_node(
+                "crx_rl_full_history_linked", "crx_rl_dpd_sequences_linked"
             ),
-            node(
-                func=build_rl_a4_deterioration,
-                inputs=[
-                    "crx_rl_dpd_sequences",
-                    "rl_spine",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
-                outputs="crx_rl_a4_deterioration",
-                name="build_crx_rl_a4_deterioration",
-                tags=["crx", "rl", "rl_a4_deterioration"],
-            ),
+            _state_node("crx_rl_dpd_sequences", "crx_rl_a4_deterioration"),
         ],
         tags=["crx_persona"],
     )
@@ -55,28 +86,13 @@ def create_b11_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-a
     """TEMPORARY: the new RL A4 into temporary entries, then old vs new (bundle 11)."""
     return Pipeline(
         [
-            node(
-                func=build_rl_dpd_sequences,
-                inputs=[
-                    "crx_rl_full_history",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
-                outputs="crx_rl_dpd_sequences_b11_check",
-                name="build_crx_rl_dpd_sequences_b11_check",
-                tags=["crx", "rl", "rl_a4_deterioration"],
+            _linked_node(),
+            _sequences_node("crx_rl_full_history", "crx_rl_dpd_sequences_b11_check"),
+            _sequences_node(
+                "crx_rl_full_history_linked", "crx_rl_dpd_sequences_linked"
             ),
-            node(
-                func=build_rl_a4_deterioration,
-                inputs=[
-                    "crx_rl_dpd_sequences_b11_check",
-                    "rl_spine",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
-                outputs="crx_rl_a4_deterioration_b11_check",
-                name="build_crx_rl_a4_deterioration_b11_check",
-                tags=["crx", "rl", "rl_a4_deterioration"],
+            _state_node(
+                "crx_rl_dpd_sequences_b11_check", "crx_rl_a4_deterioration_b11_check"
             ),
             node(
                 func=compare_rl_a4_outputs,

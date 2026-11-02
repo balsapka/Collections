@@ -6,6 +6,8 @@ until step 8 rewrites it. Log blocks, aggregates only, latest observation month:
 * ``B11 OUTPUT``: states old × new, and new states by ``loan_type``.
 * ``B11 ECL``: the accounts the rule flagged, by ``loan_type`` and whether their history
   now starts before the old table's end (2025-12), then their new states.
+* ``B11 CHAIN``: restructured accounts stitched or not, by ``loan_type``; match type,
+  ambiguous links, months added, old × new on the stitched rows.
 * ``B11 UNKNOWN``: what is left in Unknown, by route and ``loan_type``.
 
 Removed by the bundle's cleanup.
@@ -80,6 +82,10 @@ def compare_rl_a4_outputs(
             "n_months_truncated",
             "restructure_blind_spot_flag",
             "history_months",
+            "chain_stitched_flag",
+            "chain_match_type",
+            "chain_candidate_count",
+            "chain_months_added",
         )
         .join(
             _keyed(
@@ -133,6 +139,36 @@ def compare_rl_a4_outputs(
                 )
                 .collect()
             ],
+        ],
+    )
+
+    stitched = latest.filter(F.col("chain_stitched_flag") == 1)
+    restructured = latest.filter(
+        (F.col("chain_stitched_flag") == 1)
+        | (F.col("restructure_blind_spot_flag") == 1)
+    )
+    months = stitched.agg(
+        F.expr("percentile_approx(chain_months_added, array(0, 0.5, 1))").alias("q")
+    ).first()["q"]
+    _log(
+        "CHAIN",
+        model_id,
+        [
+            f"restructured {restructured.count()}, stitched {stitched.count()}",
+            "loan_type x stitched x still blind",
+            *_table(
+                restructured,
+                "loan_type",
+                "chain_stitched_flag",
+                "restructure_blind_spot_flag",
+            ),
+            "match_type",
+            *_table(stitched, "chain_match_type"),
+            f"ambiguous (candidate_count > 1) "
+            f"{stitched.filter(F.col('chain_candidate_count') > 1).count()}",
+            f"months added min / median / max {months}",
+            "stitched: old x new",
+            *_table(stitched, "old_state", "det_state"),
         ],
     )
 

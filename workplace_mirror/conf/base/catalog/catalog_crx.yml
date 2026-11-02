@@ -452,6 +452,30 @@ crx_rl_a4_deterioration:
   save_args:
     mode: overwrite
 
+# Spine history with the original loans of matched restructured accounts in front.
+crx_rl_full_history_linked:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_full_history_linked"
+  save_args:
+    mode: overwrite
+
+# One row per restructure chain: when it is known, its size and match audit.
+crx_rl_restructure_chains:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_restructure_chains"
+  save_args:
+    mode: overwrite
+
+# crx_rl_dpd_sequences on the linked history.
+crx_rl_dpd_sequences_linked:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_dpd_sequences_linked"
+  save_args:
+    mode: overwrite
+
 # TEMPORARY (mirror bundle 11): the sequences of the b11 check.
 crx_rl_dpd_sequences_b11_check:
   type: spark.SparkDataset

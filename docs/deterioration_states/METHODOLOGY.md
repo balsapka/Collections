@@ -121,7 +121,8 @@ Questions are asked **in order**; the first "yes" assigns the state.
 ```
 Q0  Journey start observed?  the oldest observed month is already at bucket 2+ AND the
                             start is not observed (history cropped by the window / floor /
-                            an unresolvable gap, or the account was restructured):
+                            an unresolvable gap, or a restructured RL loan not stitched to
+                            its original loan):
                             stabilized if Q2 holds, else -> unknown. A delinquent start
                             that IS observed (an RL loan missing its first EMI) goes on
                             through the tree

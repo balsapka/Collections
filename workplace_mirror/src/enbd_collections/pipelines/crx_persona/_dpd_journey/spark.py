@@ -252,7 +252,11 @@ def build_dpd_sequences(
 
 # pylint: disable-next=too-many-locals
 def build_deterioration(
-    sequences: DataFrame, scheme: BucketScheme, params: JourneyParams, spine: DataFrame
+    sequences: DataFrame,
+    scheme: BucketScheme,
+    params: JourneyParams,
+    spine: DataFrame,
+    log_states: bool = True,
 ) -> DataFrame:
     """sequences: output of build_dpd_sequences (one row per account). spine: 2-column
     (account_id, observation_date) — one row per point-in-time state to classify, e.g.
@@ -353,5 +357,6 @@ def build_deterioration(
     # build_dpd_sequences telemetry above. The month filter inside _log_state_stats
     # pushes down through the join, so this does not force materialization of the
     # full point-in-time result.
-    _log_state_stats(out, params.end_date, scheme, params)
+    if log_states:  # False: the caller unions two runs and logs the result
+        _log_state_stats(out, params.end_date, scheme, params)
     return out
