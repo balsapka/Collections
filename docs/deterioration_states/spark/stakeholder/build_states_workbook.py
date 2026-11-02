@@ -1,14 +1,14 @@
 """Build the stakeholder workbook for the DPD deterioration states (the 'deterioration axis').
 
-    python build_states_workbook.py --out dpd_deterioration_states_<date>.xlsx \
-        [--results results_60_180.json --results results_180_plus.json] [--scoring-date "Aug 2026"]
+    python build_states_workbook.py [--out dpd_deterioration_states_reference.xlsx] \
+        [--scoring-date "Aug 2026"]
 
 Everything rule-related is read from the deployed engine, so the workbook cannot drift from
 the pipeline: thresholds come from STATE_RULES / PARAM_DEFAULTS, and every worked example is
 run through classify() — the build FAILS if an example no longer gets the state it
-illustrates. Results (counts per product x segment x state) come from the JSON that
-prod_check.report(catalog, save_json=...) writes in PROD (aggregates only); without it the
-Results sheet is left for manual entry. Shares and coverage are Excel formulas.
+illustrates. Results sheets: pale-yellow entry cells hold production counts (RESULTS below;
+the rest are filled in the workplace copy by the UAT assistant, so a rebuild here drops
+them). Shares, totals and coverage are Excel formulas.
 
 The engine is imported from the repo package (enbd_collections.pipelines.crx_persona) or,
 when run from the bundle, from ../crx_persona/_dpd_journey.py.
@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import importlib.util
-import json
 import pathlib
 import sys
 
@@ -185,8 +184,10 @@ STATE_TEXT = {   # state: (one sentence, typical action, changes over time)
 
 STEPS = [   # (step, question, state on yes, exact test)
     ("0", "Is the start of this delinquency missing?", "unknown",
-     "Oldest month we hold is already overdue (CC 1+ DPD; RL 31+ DPD). "
-     "Stabilized if Step 2 passes, else Unknown."),
+     "Oldest month we hold is already overdue and its start is not in the data: the history "
+     "is cut by the window or a long gap, or a restructured retail loan has no original loan "
+     "found. Stabilized if Step 2 passes, else Unknown. A loan that misses its first payment "
+     "is followed normally."),
     ("1", "Early payment default?", "early_payment_default",
      f"Fell behind within {R['epd_max_history']} months of the start of its history, with no "
      "earlier delinquency (one short paid-off slip allowed), and has not paid since: one bucket "
@@ -505,8 +506,14 @@ def _data_handling(wb: Workbook) -> None:
     rows = [
         (f"History before the window start ({WINDOWS})", "Not used.",
          "Never EPD; a straight roller counts as seasoned."),
-        ("History starts already overdue", "Start of the delinquency is missing.",
-         "Unknown, unless Stabilized."),
+        ("History cut and already overdue in its oldest month", "Start of the delinquency is "
+         "missing.", "Unknown, unless Stabilized."),
+        ("Restructured retail loan, original loan found", "The original loan's months are put "
+         "before the new loan's, from the later of the restructure and the closure. Closed months "
+         "are not used.", "Real journey. A reset to 0 DPD at the restructure reads as an ended "
+         "delinquency."),
+        ("Restructured retail loan, no original loan found", "Only the new loan's months are "
+         "used.", "As for history before the window start."),
         ("Missing month between two equal buckets", "Filled with that bucket.", "None."),
         ("Missing month where only a straight roll fits", "Filled as the roll.", "None."),
         (f"Other gaps of up to {gap} months", "Filled: last bucket carried, rising as late as "
@@ -523,89 +530,206 @@ def _data_handling(wb: Workbook) -> None:
     _print(ws)
 
 
-def _results(wb: Workbook, results: dict | None, scoring_date: str) -> None:
-    ws = wb.create_sheet("Results")
-    blocks = [("cc", "60_180", "CC 61–180 DPD"), ("cc", "180_plus", "CC 180+ DPD"),
-              ("rl", "60_180", "RL 61–180 DPD"), ("rl", "180_plus", "RL 180+ DPD")]
-    last_col = 1 + 2 * len(blocks)
-    r = _title(ws, "Results",
-               f"Accounts per state, scoring date {scoring_date}. Blue = counts from the scoring "
-               "run; shares and coverage are calculated. Yellow = to fill in.", last_col)
-    head = ["State"]
-    for _, _, label in blocks:
-        head += [f"{label}\naccounts", "share"]
-    r = _header(ws, r, head)
-    ws.row_dimensions[r - 1].height = 44
-    first = r
-    total_row = first + len(J.STATES)
+RESULTS_DATE = "31 Aug 2026"
+INPUT_FILL = "FFF2CC"
+MUTED = GREY
+PRODUCTS = ["Personal Loans", "Personal Cash Loans", "Auto"]
+COLUMNS = ([("CC\n61–180", None), ("CC\n180+", None)]
+           + [(f"RL 61–180\n{p}", None) for p in PRODUCTS] + [("RL 61–180\ntotal", (2, 3, 4))]
+           + [(f"RL 180+\n{p}", None) for p in PRODUCTS] + [("RL 180+\ntotal", (6, 7, 8))])
+VINTAGES = [(f"{prod}\n{v}", None) for prod in ("CC 180+", "RL 180+")
+            for v in ("early-stage\ncharge-off", "late-stage\ncharge-off")]
+SEGMENTS = [("CC\n61–180", None), ("CC\n180+", None), ("RL\n61–180", None), ("RL\n180+", None)]
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"]
+# Production run, Aug 2026, retail loans 61–180 (bundle 13 check). Counts in J.STATES order.
+RESULTS = {2: [0, 125, 94, 109, 470, 284, 315],
+           3: [0, 56, 155, 67, 443, 216, 287],
+           4: [0, 48, 162, 187, 436, 200, 331]}
+RL_ACCOUNTS = 3985
+ACCOUNTS = {2: 1397, 3: 1224, 4: 1364}  # accounts in scope per Results column
+DETAIL = [  # (section, labels, {segment column: counts in row order})
+    ("Why Unknown", ["History cut by the window", "History cut at a long gap",
+                     "Restructured, no original loan found"], {2: [0, 0, 0]}),
+    ("Stabilized: which test passed", ["Short-term: 5 of the last 6 months near today's bucket",
+                                       "Long-term only: 6+ months at 61+ DPD, no real rise"], {}),
+    ("Start of the delinquency", ["Oldest month already overdue", "History cut, oldest month clean",
+                                  "History complete"], {}),
+    ("Months of history", ["Under 12", "12–23", "24–35", "36 or more"], {}),
+    ("DPD band today", ["61–90", "91–120", "121–150", "151–180", "181+"], {}),
+    ("Restructured loans", ["Original loan found, history joined",
+                            "No original loan found"], {2: [65, 2]}),
+]
 
-    def seg_res(prod, seg):
-        return (results or {}).get("products", {}).get(prod, {}).get("segments", {}).get(seg)
 
-    for st in J.STATES:
+def _pair(ws: Worksheet, r: int, col: int, value, base, fmt: str = "#,##0",
+          entry: bool = True, bold: bool = False) -> None:
+    """A count (entry cell or formula) and its share of cell ``base`` in the same column."""
+    c = ws.cell(row=r, column=col, value=value)
+    c.number_format = fmt
+    c.border = BOX
+    c.font = _font(color="0000FF") if entry else _font(bold=bold)
+    if entry:
+        c.fill = _fill(INPUT_FILL)
+    L = get_column_letter(col)
+    sh = ws.cell(row=r, column=col + 1)
+    sh.border = BOX
+    sh.font = _font(color=MUTED)
+    sh.number_format = "0.0%"
+    if base is not None:
+        sh.value = f'=IF(OR({L}{r}="",N({L}${base})=0),"",{L}{r}/{L}${base})'
+
+
+def _heads(ws: Worksheet, r: int, first: str, cols: list) -> int:
+    r = _header(ws, r, [first] + [x for name, _ in cols for x in (name, "share")])
+    ws.row_dimensions[r - 1].height = 58
+    return r
+
+
+def _state_table(ws: Worksheet, r: int, cols: list, data: dict) -> tuple[int, int]:
+    """One row per state and a Total row; ``data`` = {column: counts in state order}.
+    Returns the next row and the Total row."""
+    r, first, total = _heads(ws, r, "State", cols), r + 1, r + 1 + len(J.STATES)
+    for i, st in enumerate(J.STATES):
         _chip_l(ws.cell(row=r, column=1), st)
-        for b, (prod, seg, _) in enumerate(blocks):
+        for b, (_, parts) in enumerate(cols):
             col = 2 + 2 * b
-            res = seg_res(prod, seg)
-            c = ws.cell(row=r, column=col)
-            if res is not None:
-                c.value = int(res["state_counts"].get(st, 0))
+            if parts is None:
+                _pair(ws, r, col, data[b][i] if b in data else None, total)
             else:
-                c.fill = _fill("FFFF00")
-            c.font = _font(color="0000FF")
-            c.number_format = "#,##0"
-            c.border = BOX
-            L = get_column_letter(col)
-            s = ws.cell(row=r, column=col + 1,
-                        value=f'=IF(${L}${total_row}=0,"",{L}{r}/${L}${total_row})')
-            s.number_format = "0.0%"
-            s.font = _font()
-            s.border = BOX
+                cells = ",".join(f"{get_column_letter(2 + 2 * p)}{r}" for p in parts)
+                _pair(ws, r, col, f'=IF(COUNT({cells})=0,"",SUM({cells}))', total, entry=False)
         r += 1
-    ws.cell(row=r, column=1, value="Classified accounts").font = _font(bold=True)
-    for b in range(len(blocks)):
+    c = ws.cell(row=r, column=1, value="Total")
+    c.font = _font(bold=True)
+    c.border = BOX
+    for b in range(len(cols)):
         L = get_column_letter(2 + 2 * b)
-        c = ws.cell(row=r, column=2 + 2 * b, value=f"=SUM({L}{first}:{L}{r - 1})")
-        c.number_format = "#,##0"
-        c.font = _font(bold=True)
-        c.border = Border(top=Side(style="medium", color=NAVY))
-    r += 1
-    lost_row = r
-    ws.cell(row=r, column=1, value="In segment, not classified").font = _font()
-    for b, (prod, seg, _) in enumerate(blocks):
-        res = seg_res(prod, seg)
-        c = ws.cell(row=r, column=2 + 2 * b)
-        if res is not None:
-            c.value = int(res["in_segment_not_classified"])
-        else:
-            c.fill = _fill("FFFF00")
-        c.font = _font(color="0000FF")
-        c.number_format = "#,##0"
-    r += 1
-    ws.cell(row=r, column=1, value="Coverage (target 99.9%)").font = _font(bold=True)
-    for b in range(len(blocks)):
-        L = get_column_letter(2 + 2 * b)
-        c = ws.cell(row=r, column=2 + 2 * b,
-                    value=f'=IF(({L}{total_row}+{L}{lost_row})=0,"",{L}{total_row}/({L}{total_row}+{L}{lost_row}))')
-        c.number_format = "0.00%"
-        c.font = _font(bold=True)
-    r += 2
-    for note in [
-        "Stabilized is not possible at 180+ (61–180 DPD only).",
-        "Roll rates are not shown: they would be measured on the same months that define the states.",
-        "No account-level data.",
-    ]:
+        _pair(ws, r, 2 + 2 * b, f'=IF(COUNT({L}{first}:{L}{r - 1})=0,"",SUM({L}{first}:{L}{r - 1}))',
+              None, entry=False, bold=True)
+    return r + 1, r
+
+
+def _notes(ws: Worksheet, r: int, notes: list[str], width: int) -> None:
+    for note in notes:
         c = ws.cell(row=r, column=1, value=note)
         c.font = _font(italic=True, color=GREY)
         c.alignment = WRAP
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=last_col)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=width)
+        ws.row_dimensions[r].height = 28
         r += 1
-    _widths(ws, [34] + [14, 9] * len(blocks))
-    ws.freeze_panes = ws.cell(row=first, column=2)
+
+
+def _results(wb: Workbook) -> None:
+    ws = wb.create_sheet("Results")
+    width = 1 + 2 * len(COLUMNS)
+    r = _title(ws, "Results", f"Accounts per state and model variant, {RESULTS_DATE} (production "
+                              "run). Pale yellow = from the run; shares and totals are calculated.",
+               width)
+    r = _section(ws, r, "Deterioration state", width)
+    head = r
+    r, total = _state_table(ws, r, COLUMNS, RESULTS)
+    ws.cell(row=r, column=1, value="Accounts in scope").font = _font()
+    for b, (_, parts) in enumerate(COLUMNS):
+        col = 2 + 2 * b
+        if parts is None:
+            _pair(ws, r, col, ACCOUNTS.get(b), None)
+        else:
+            cells = ",".join(f"{get_column_letter(2 + 2 * p)}{r}" for p in parts)
+            _pair(ws, r, col, f'=IF(COUNT({cells})=0,"",SUM({cells}))', None, entry=False)
+    r += 1
+    ws.cell(row=r, column=1, value="Coverage").font = _font(bold=True)
+    for b in range(len(COLUMNS)):
+        L = get_column_letter(2 + 2 * b)
+        c = ws.cell(row=r, column=2 + 2 * b, value=f'=IF(N({L}{r - 1})=0,"",{L}{total}/{L}{r - 1})')
+        c.number_format = "0.0%"
+        c.font = _font(bold=True)
+    _notes(ws, r + 2, ["Shares are of all accounts in the variant. Stabilized is not possible at "
+                       "180+ (61–180 DPD only).",
+                       "Roll rates are not shown: they would be measured on the same months that "
+                       "define the states. Aggregates only."], width)
+    _widths(ws, [30] + [11, 7] * len(COLUMNS))
+    ws.freeze_panes = ws.cell(row=head + 1, column=2)
     _print(ws)
 
 
-def build(out: pathlib.Path, results: dict | None, scoring_date: str) -> pathlib.Path:
+def _detail(wb: Workbook) -> None:
+    ws = wb.create_sheet("Results detail")
+    width = 1 + 2 * len(SEGMENTS)
+    r = _title(ws, "Results detail", f"What sits behind the states, {RESULTS_DATE}. Shares are of "
+                                     "all accounts in the segment.", width)
+    r = _heads(ws, r, "", SEGMENTS)
+    ws.cell(row=r, column=1, value="Accounts").font = _font(bold=True)
+    base = r
+    for b in range(len(SEGMENTS)):
+        _pair(ws, r, 2 + 2 * b, RL_ACCOUNTS if b == 2 else None, None)
+    r += 1
+    for title, labels, data in DETAIL:
+        r = _section(ws, r + 1, title, width)
+        for i, label in enumerate(labels):
+            c = ws.cell(row=r, column=1, value=label)
+            c.font = _font()
+            c.alignment = WRAP
+            c.border = BOX
+            for b in range(len(SEGMENTS)):
+                _pair(ws, r, 2 + 2 * b, data[b][i] if b in data else None, base)
+            r += 1
+    _notes(ws, r + 1, ["Restructured means the feature flag is set. No restructured Auto loan "
+                       "shows at 61–180 DPD in Aug 2026; the recording of Auto restructures is "
+                       "being checked. Both retail loans with no original loan found are "
+                       "Stabilized."], width)
+    _widths(ws, [52] + [11, 7] * len(SEGMENTS))
+    ws.freeze_panes = "A6"
+    _print(ws)
+
+
+def _trend(wb: Workbook) -> None:
+    ws = wb.create_sheet("Results trend")
+    width = 2 + 2 * len(J.STATES)
+    r = _title(ws, "Results trend", "Accounts per state by month, Jan–Aug 2026 (month ends), "
+                                    "61–180 DPD. Shares are of the month's accounts.", width)
+    for title in ("Credit cards 61–180", "Retail loans 61–180"):
+        r = _section(ws, r, title, width)
+        r = _header(ws, r, ["Month", "Accounts"])
+        for j, st in enumerate(J.STATES):
+            col = 3 + 2 * j
+            _chip_l(ws.cell(row=r - 1, column=col), st)
+            ws.merge_cells(start_row=r - 1, start_column=col, end_row=r - 1, end_column=col + 1)
+        ws.row_dimensions[r - 1].height = 44
+        for month in MONTHS:
+            c = ws.cell(row=r, column=1, value=f"{month} 2026")
+            c.font = _font(bold=True)
+            c.border = BOX
+            cells = "+".join(f"N({get_column_letter(3 + 2 * j)}{r})" for j in range(len(J.STATES)))
+            t = ws.cell(row=r, column=2, value=f'=IF(({cells})=0,"",{cells})')
+            t.number_format = "#,##0"
+            t.font = _font(bold=True)
+            t.border = BOX
+            for j in range(len(J.STATES)):
+                _pair(ws, r, 3 + 2 * j, None, None)
+                L = get_column_letter(3 + 2 * j)
+                ws.cell(row=r, column=4 + 2 * j).value = f'=IF(OR({L}{r}="",N($B{r})=0),"",{L}{r}/$B{r})'
+            r += 1
+        r += 1
+    _widths(ws, [11, 10] + [9, 7] * len(J.STATES))
+    _print(ws)
+
+
+def _vintage(wb: Workbook, scoring_date: str) -> None:
+    ws = wb.create_sheet("Results 180+ vintage")
+    width = 1 + 2 * len(VINTAGES)
+    r = _title(ws, "Results 180+ by vintage",
+               "Early-stage charge-off = charged off less than 2 years ago; late-stage = 2 years or "
+               f"more; {scoring_date}. Shares are within each vintage.", width)
+    r = _section(ws, r, "Deterioration state", width)
+    head = r
+    r, _ = _state_table(ws, r, VINTAGES, {})
+    _notes(ws, r + 1, ["Stabilized is not possible at 180+."], width)
+    _widths(ws, [30] + [12, 7] * len(VINTAGES))
+    ws.freeze_panes = ws.cell(row=head + 1, column=2)
+    _print(ws)
+
+
+def build(out: pathlib.Path, scoring_date: str) -> pathlib.Path:
     wb = Workbook()
     _overview(wb, scoring_date)
     _assignment(wb)
@@ -613,33 +737,22 @@ def build(out: pathlib.Path, results: dict | None, scoring_date: str) -> pathlib
     _thresholds(wb)
     _buckets(wb)
     _data_handling(wb)
-    _results(wb, results, scoring_date)
-    wb.calculation.fullCalcOnLoad = True      # Excel computes the share / coverage formulas on open
+    _results(wb)
+    _detail(wb)
+    _trend(wb)
+    _vintage(wb, scoring_date)
+    wb.calculation.fullCalcOnLoad = True      # Excel computes the formulas on open
     wb.save(out)
     return out
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--out", default=f"dpd_deterioration_states_{dt.date.today():%Y%m%d}.xlsx")
-    ap.add_argument("--results", action="append", default=[],
-                    help="JSON written by prod_check.report(..., save_json=...); repeat it for "
-                         "each run (one per segment) — they are merged")
-    ap.add_argument("--scoring-date", dest="scoring_date", default="(scoring date)")
+    ap.add_argument("--out", default=str(pathlib.Path(__file__).with_name(
+        "dpd_deterioration_states_reference.xlsx")))
+    ap.add_argument("--scoring-date", dest="scoring_date", default="Aug 2026")
     a = ap.parse_args()
-    res = None
-    for path in a.results:
-        part = json.loads(pathlib.Path(path).read_text())
-        if res is None:
-            res = {"generated": part.get("generated"), "products": {}}
-        res["generated"] = max(filter(None, [res["generated"], part.get("generated")]), default=None)
-        for prod, body in part.get("products", {}).items():
-            tgt = res["products"].setdefault(prod, {"segments": {}})
-            for seg, val in body.get("segments", {}).items():
-                if seg in tgt["segments"]:
-                    raise SystemExit(f"{prod} {seg} appears in more than one --results file")
-                tgt["segments"][seg] = val
-    print(build(pathlib.Path(a.out), res, a.scoring_date))
+    print(build(pathlib.Path(a.out), a.scoring_date))
 
 
 if __name__ == "__main__":
