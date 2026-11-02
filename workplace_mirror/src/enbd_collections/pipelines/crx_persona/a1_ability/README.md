@@ -150,7 +150,8 @@ changes nothing.
   so no row means nothing is known, not that the salary stopped, and few pulls fall in the
   window. GRR's feed of pulls every 2 months enters through the same rule. A stop shows only
   as a closure, a lower amount or the end of an internal salary (`a1_salary_stopped`).
-- **Missing salary months count as 0** in the window total and the weakening check.
+- **Missing salary months count as 0** in the window total and the weakening check, except that
+  with no internal salary in either window the weakening check compares the months with a value.
 - **Inputs follow the persona start.** `prm_casa_return_events`, `prm_casa_transactions` and
   the WM-based features keep a fixed number of months before
   `crx_persona.persona_start_date`; after moving that date, rerun `casa_primary` and

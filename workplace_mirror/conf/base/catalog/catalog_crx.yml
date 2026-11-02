@@ -353,6 +353,15 @@ crx_cc_a1_ability:
   save_args:
     mode: overwrite
 
+# TEMPORARY (mirror bundle 12): the new output written by the b12 check pipeline.
+# Remove the entry, the pipeline and its HDFS folder after the check.
+crx_cc_a1_ability_b12_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b12_check"
+  save_args:
+    mode: overwrite
+
 # ── A3 Payment Credibility (T27) ────────────────────────────────────────────
 # Grain: (account_id, spell_id). observation_date = coalesce(spell_end, current_date()).
 # a3_state_v1 ∈ {payment_credibility_high, payment_credibility_moderate,
@@ -502,6 +511,15 @@ crx_rl_a1_ability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (mirror bundle 12): the new output written by the b12 check pipeline.
+# Remove the entry, the pipeline and its HDFS folder after the check.
+crx_rl_a1_ability_b12_check:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_b12_check"
   save_args:
     mode: overwrite
 

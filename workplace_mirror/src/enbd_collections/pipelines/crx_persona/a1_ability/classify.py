@@ -89,11 +89,20 @@ def income_level(anchor: Column, w: int) -> Column:
     """stable / weak / none over a ``w``-month window (spec S12).
 
     Stable counts the window's total, not months: an employer paying early puts two
-    salaries in one month and none in the next."""
+    salaries in one month and none in the next. With no internal salary in either window
+    the fall compares the level of the months with a value, because AECB alerts arrive
+    only on a change and a month without one says nothing."""
     last = _months("income", _window(w)[0])
     floor = F.greatest(F.lit(F_INC), K_INC * anchor)
     total = sum(F.coalesce(c, F.lit(0.0)) for c in last)
-    stable = (total >= INC_FLOORS[w] * floor) & _not_weakening("income", D_INC, True, w)
+    internal = F.greatest(
+        F.coalesce(F.col("internal_salary_w"), F.lit(0.0)),
+        F.coalesce(F.col("internal_salary_prior"), F.lit(0.0)),
+    )
+    holding = F.when(
+        internal < DEMIN, _not_weakening("income", D_INC, False, w)
+    ).otherwise(_not_weakening("income", D_INC, True, w))
+    stable = (total >= INC_FLOORS[w] * floor) & holding
     weak = _count_at_least(last, F.lit(DEMIN)) > 0
     return F.when(stable, "stable").when(weak, "weak").otherwise("none")
 

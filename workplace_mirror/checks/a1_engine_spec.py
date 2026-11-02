@@ -147,6 +147,18 @@ case("AECB: the month's latest pull wins, not the sum", bureau=[(2, 9000, 31, 5)
      income="weak")
 case("AECB: type 32 counts", bureau=[(3, 3000, 32)], income="stable")
 case("AECB: other alert types do not count", bureau=[(3, 9000, 77)], income="none")
+case("AECB level check: fewer alerts at the same level -> Stable",
+     bureau=[(6, 7000), (4, 7000), (1, 7000)], income="stable")
+case("AECB level check: a real fall -> Weak", bureau=[(6, 8000), (4, 8000), (2, 3500)],
+     income="weak")
+case("AECB level check: a fall within 25% -> Stable", bureau=[(6, 8000), (4, 8000), (2, 6500)],
+     income="stable")
+case("level check off: internal salary in the prior window", salary=[(4, 7000), (5, 7000), (6, 7000)],
+     bureau=[(1, 7000)], income="weak", stopped=1)
+case("level check off: internal salary in the window", salary=[(1, 1000)],
+     bureau=[(6, 7000), (4, 7000), (1, 7000)], income="weak")
+case("level check: internal under AED 1,000 does not count", salary=[(1, 800)],
+     bureau=[(6, 7000), (4, 7000), (1, 7000)], income="stable")
 case("AECB: a closure ends the carry", bureau=[(3, 3000), (2, 0, 43)], income="weak")
 case("AECB: a closure on the same pull wins", bureau=[(2, 9000), (2, 0, 43)], income="none")
 case("AECB + internal: the larger per month, not the sum", salary=[(2, 2000)], bureau=[(2, 2500)],
