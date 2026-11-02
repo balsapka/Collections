@@ -1,7 +1,12 @@
-"""DCORE vocabulary for A2 reachability and deceased (``dcore_prm_followup_outcomes``).
+"""DCORE follow-up vocabulary (``dcore_prm_followup_outcomes``) shared by A2 and A3.
 
+Single source of truth for call action codes and result-name sets. A2 (reachability,
+deceased) and A3 (payment credibility) import from here and never from each other.
 Result names are compared upper-cased and trimmed. The departure notes (location
 evidence) live in the location feature.
+
+The A2 ``FAILED_CALL`` and A3 ``NOT_REACHABLE`` / ``RINGING`` sets overlap only partly:
+they are different classifications, not copies.
 """
 
 OUTBOUND_CODES = ("OC", "CB")  # outbound call, callback: we called

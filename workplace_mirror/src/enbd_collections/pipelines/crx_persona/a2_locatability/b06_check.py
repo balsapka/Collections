@@ -27,7 +27,7 @@ from pyspark.sql import functions as F
 from enbd_collections.nodes.utils.location import is_uae
 
 from .._common import GRAIN, window_months
-from .codes import (
+from .._dcore_codes import (
     CALL_CODES,
     FAILED_CALL,
     IGNORED,

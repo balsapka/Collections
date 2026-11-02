@@ -20,8 +20,7 @@ from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, left_join_all, require_columns, window_months
-from .._dpd_journey.constants import MODEL_ID_SEGMENT
-from .codes import (
+from .._dcore_codes import (
     CALL_CODES,
     DECEASED,
     FAILED_CALL,
@@ -33,6 +32,7 @@ from .codes import (
     SKIP_TRACE,
     SUCCESS_CATEGORY,
 )
+from .._dpd_journey.constants import MODEL_ID_SEGMENT
 
 # Travel rule (L2): the latest UAE evidence at most this many months after the last
 # ticket, and none for at least SILENCE months before the observation date.
@@ -190,8 +190,8 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
     ``dcore_deceased_date`` and ``last_skip_trace_date``.
 
     A call day is a day with an outbound call; it failed when every outbound call that
-    day failed (``codes.FAILED_CALL``) and no contact was confirmed. A contact is an
-    inbound call, an outbound call in category SUC, or a right-party result.
+    day failed (``_dcore_codes.FAILED_CALL``) and no contact was confirmed. A contact
+    is an inbound call, an outbound call in category SUC, or a right-party result.
 
     non_reachable  the last ``gone_dark_days`` call days all failed, the oldest in W,
                    and no contact since

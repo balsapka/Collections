@@ -59,7 +59,7 @@ Hypotheses, each with a verdict and the numbers behind it:
      else Reachable = a contact in W; else Unknown. CC 2026-08: Non-Reachable 67.6%, Reachable 21.0%,
      Unknown 11.5%. 3,386 accounts (17.6%) had a contact in W and are Non-Reachable anyway; 85.9%
      have 6+ call days in W. Reuse the engine's own helpers and code lists (_dcore_events,
-     codes.py) so call days, failures and contacts are defined exactly as in the engine.
+     crx_persona/_dcore_codes.py) so call days, failures and contacts are defined exactly as in the engine.
      Per account, the failed run k = the number of consecutive failed call days counted back from
      the latest call day, stopping at a call day that did not fail, at the start of W, or at the
      last contact date. Non-Reachable at threshold N <=> k >= N. First check that N = 3 gives the

@@ -269,6 +269,13 @@ YYYYMM while the CC v1 code reads the staging column as MMYYYY: checked in A1 v0
 - Handoff 9: the gathered snippets (R4, R5, R8–R11) → `bundle_helpers/a1_final/workplace_reference.md`
   ("Handoff 9" and "What handoff 9 settles"); O59 updated, O61–O62 new; D1 answered (R4).
 
+## Handoff 27: `crx_persona/_dcore_codes.py` (2026-11-02)
+
+The user moved `a2_locatability/codes.py` to `crx_persona/_dcore_codes.py`, shared by A2 and A3;
+the A2 modules import from it. Lines 1-35 of the mirror equal the photo. The photo stops at line
+35, so the rest here is our old `codes.py`: the A3 `NOT_REACHABLE` / `RINGING` sets the docstring
+names are missing, and the A2 sets are unconfirmed. To be replaced by the full photo.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
