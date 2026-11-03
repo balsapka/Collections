@@ -128,7 +128,7 @@ DETAIL = [  # counts in the order of BOOKS; None = does not apply
          848, 80, 4691, 430),
         ("Weak · window total not reached", "moderate", 923, 157, 5432, 798),
     ]),
-    ("The 25% rule (decision open, 'Validation'): Stable income with and without it", [
+    ("The 25% rule (kept, to review with GRR; 'Validation'): Stable income with and without it", [
         ("Stable income today", "high", 2996, 371, 21237, 1994),
         ("Weak only because of the 25% rule (AECB in the window)", "moderate", 848, 80, 4691, 430),
         ("Stable income if the rule were removed", "high", 3844, 451, 25928, 2424),
@@ -274,8 +274,8 @@ NOTES = [
     "would show a stop as a pull with no salary.",
     "Fewer alerts in the window than before is not a fall: with no salary with us, the 25% check "
     "compares the level of the months with a value. A real fall in level stays Weak (848 card and "
-    "80 loan accounts at 61–180 reach the window total but fall more than 25%). Whether to keep "
-    "the 25% rule is open: evidence and options on 'Validation'.",
+    "80 loan accounts at 61–180 reach the window total but fall more than 25%). The rule is kept "
+    "for now and will be reviewed with GRR: evidence and options on 'Validation'.",
     "The AECB salary lifts most of Moderate: 93% of card and 75% of loan Moderate at 61–180 is "
     "Stable income with no liquidity, mostly AECB. It separates payers well, but an AECB "
     "Stable customer pays less often than an internal Stable one ('Validation').",
@@ -325,7 +325,7 @@ RULE_25_OPTIONS = [
     ("What the rule still does", "It holds at Weak an account whose salary reached the window "
      "total but fell by more than 25%: a lower AECB amount, or an internal salary that stopped "
      "and was replaced by one AECB pull."),
-    ("Keep (recommended at 61–180)", "On cards the real falls pay 11.8 points less and roll 8.3 "
+    ("Keep (current choice)", "On cards the real falls pay 11.8 points less and roll 8.3 "
      "points more than Stable: they are not Stable customers. The part of the rule that was wrong "
      "(fewer alert months) is already fixed by the level check."),
     ("Remove", "Simpler rule: Stable = the window total alone. 848 card and 80 loan accounts at "
@@ -736,7 +736,7 @@ def validation(wb: Workbook) -> None:
         s.text(2, v, span=4, align=MID)
         _fit(s.ws, s.r, [(v, s.width(2, 5))])
         s.r += 1
-    s.section("Decision open: keep or remove the 25% rule")
+    s.section("The 25% rule: kept for now, to review with GRR")
     s.header(["Accounts failing only the 25% rule", "Rows", "Cure vs Stable", "Roll vs Stable",
               "Payment vs Stable"], height=30)
     for label, *cells in RULE_25:
