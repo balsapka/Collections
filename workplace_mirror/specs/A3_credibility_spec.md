@@ -92,6 +92,30 @@ Measured, not assumed (V2, V3).
   least its amount arrive between the promise date and its due date. CC matches Way4 payment
   transactions by date. RL can only match by month (`total_paid` is a monthly total).
 
+- **D-A3-12: CC due once the ladder sits in bucket 08** (user, 2026-11-03). Deep in delinquency Way4
+  accumulates the whole overdue amount in `overdue_bucket_08`, so no bucket holds one month's due.
+  What is reasonable to ask is estimated from before: the average `minimum_due` of the last 12 months
+  with a positive minimum due, before the first statement where only bucket 08 holds money
+  (`resolve_bucket08_fallback_due`, kept). The waterfall's bucket-08 slicing goes with the waterfall
+  method (D-A3-3).
+- **D-A3-13: RL record before delinquency falls back to the last known EMI** (user, 2026-11-03, O81):
+  a month without its own EMI snapshot is judged against `monthly_emi_asof`, as Dimension B does.
+- **D-A3-14: RL refusal payment test reads the loan's own cash after the refusal** (user,
+  2026-11-03, provisional on the strong-negative redesign, V2): `total_paid` ≥ 100 AED in a month
+  after the refusal month, instead of Dimension B's any-payment flag.
+- **D-A3-15: CC cycles are one month, statement to statement** (user, 2026-11-03: about a month,
+  ~99% on the same day of the month). When a statement is missing (the 2021–2023 gap, the 2024-11/12
+  run), the span to the next existing statement is several months long; such a span is dropped, not
+  read as one month (`_PAYMENT_CYCLE_MAX_LENGTH_D` = 62 days, kept). The 35-day lookback before the
+  history floor keeps the statement just before the floor.
+- **D-A3-16: thresholds ship as the DE sheet proposes** (user, 2026-11-03): points cut-offs 4 / 1,
+  commitments 12 months / 2 concluded / 80% / 40% / streak 3, payments 3 / 6 months, 2 of 3 / 3 of 6,
+  100% of one month's due, record 12 months / 3 months due / 80%, 3 / 6 contact days. Sensitivity in V4.
+- **D-A3-17: the output carries every signal that fed the decision** (user, 2026-11-03): the anchor
+  (latest spell start), windows, dimension levels, points and their inputs (concluded / kept / rate /
+  streak, qualifying-month count, any-payment flag, months due / paid), the strong-negative reason and
+  its evidence. Not carried: per-method columns, confidence, provenance, `computed_at` (D-A3-4).
+
 ## Validations before the bundle
 
 - **V1 (DCORE instalments, Sonnet, no photos unless needed):** confirm the columns and meaning of
@@ -135,12 +159,15 @@ Measured, not assumed (V2, V3).
 
   The right-party definition is checked here too: today `rpc_confirmed` uses `RIGHT_PARTY_CONTACT`
   only, while the classifier also counts `HISTORICAL PROMISE TO PAY` / `RETAIN PTP` (O80).
+- **V4 (threshold sensitivity, PROD aggregates):** latest-month A3 state distribution per model_id
+  when each D-A3-16 threshold moves one step either way (e.g. High from 3 / 5, kept 70% / 90%, broken
+  30% / 50%, streak 2 / 4, Regular 1 / 3 of 3, record clean 70% / 90%, months due 2 / 4), one at a
+  time; report the rows that change state.
+
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
 - Strong negatives (broken commitments, refusal, dispute, avoidance): pending V1 and V2; O85's extra condition goes with the redesign.
-- Ladder: a clean record alone (1 point) gives Moderate; Unknown plus a strong negative gives Low; the
-  `[CONFIRM]` thresholds stand until GRR says otherwise.
 - **CC sources (user, 2026-11-03: review whether the builders are needed or belong in the CC
   pipelines).** Today `crx_cc_billing` / `crx_cc_balance` / `crx_cc_transactions` (`cc_raw_extract`)
   read `raw_*` inside crx_persona, re-implement the `prm_cc` derivations and are scoped by T0 windows,
