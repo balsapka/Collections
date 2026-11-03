@@ -6,13 +6,19 @@ thresholds are the reference.
 
 ## What A3 measures (working framing, 2026-11-03)
 
+(User, 2026-11-03: this framing opens the updated model spec, with the strong-negative test and the
+overlap notes below.)
+
 GRR reframed the axis from payment intent to **payment credibility**: how far we can believe this
 customer will pay on this debt. Two kinds of evidence:
 - **Trust: does what they say happen?** Promises and arrangements made and honoured (Dimension A), and
   explicit statements of non-intent (refusal). Depends on DCORE, whose promise records and the actual
   payments do not always line up.
 - **Flow: is money coming in, and did it before?** Payments while delinquent (Dimension B) and the
-  record before delinquency (Dimension C). This is also the best available read of intent.
+  record before delinquency (Dimension C). Flow reads intent only together with capacity: a customer
+  can mean to pay and be unable to for a while (lost salary, between jobs), and shows None / Some here.
+  So a weak flow is not proof of low intent, and A3 must not be read without A1. The persona combines
+  them; A3 itself stays about this customer's track record on this debt.
 
 Not A3: capacity to pay (A1), reachability / location (A2), the DPD path itself (A4).
 
@@ -106,6 +112,18 @@ Measured, not assumed (V2, V3).
   the A3 state distribution with it; the result names that drive it; how many rows each variant
   moves versus N3.
 
+- **Overlap notes to carry into the model spec (2026-11-03):**
+  - Broken commitments as built counts twice: the level scores 0 and the negative demotes it again,
+    so it acts as a "Broken → Low" cap that rests on DCORE's paid / overdue status.
+  - Refusal is the one negative that carries stated intent. The `REFUSING` list mixes in disputes
+    (`DISPUTE`, `KSA/DISPUTE`), which contest the debt, and `CUSTOMER HUNG UP`, which is closer to
+    avoidance: review it.
+  - No response as built re-derives A2 Non-Reachable (V2).
+  - Dimension C on the latest spell start may duplicate A4's prior episodes; Dimension B may
+    duplicate A4's recent transitions (V3).
+  - A kept PTP and regular payments can be the same cash (A 2 + B 2 = High from one cash flow).
+  - Without DCORE commitments the maximum is 3 points (B regular + C clean) = Moderate, so High
+    depends on DCORE.
 - **V3 (orthogonality, PROD aggregates):** crosstab A3 levels against the other axes at the latest
   month, per model_id: Dimension C (clean / not clean / no record) against A4 state and its
   prior-episode features (`n_prior_episodes`, `clean_gap_before_current`); Dimension B against A4's
