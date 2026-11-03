@@ -37,10 +37,14 @@ thresholds are the reference.
   3 of 6, any-payment window 12 months), as A1 and A2 do (`_common.window_months`). The row's bucket no
   longer picks the band, so the `dlq_bucket_from_hist` / month-end bucket lookups go.
 
+- **D-A3-7: DCORE evidence at account level** (user, 2026-11-03). Commitments and strong negatives
+  read only the scored account's agreement(s), linked date-free through A2's
+  `prm_dcore_account_agreements` (one agreement per account in PROD, A2 v01); `dcore_observation_spine`
+  and its billing-date equality join go (O71, O72). Payments are the account's own. An exception to the
+  CIF-level rule for customer signals: credibility is about this debt.
+
 ## Open (asked 2026-11-03)
 
-- DCORE link: A2's `prm_dcore_account_agreements` (all agreements of the account); account level or
-  CIF level (O72)?
 - Required inputs (D2) for all DCORE tables and `crx_cc_transactions` (O73)?
 - `cc_a3_history_floor_date`: keep and measure, or drop (O77)?
 - Ladder: a clean record alone (1 point) gives Moderate; Unknown plus a strong negative gives Low; the
