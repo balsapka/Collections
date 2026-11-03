@@ -69,9 +69,27 @@ thresholds are the reference.
   if the one-layer rule needs it); and compare the new 12-month counts with the `dcore_feat_*_12m`
   counts on PROD (aggregates) so a difference is explained before shipping.
 
+- **V2 (no response, Sonnet, PROD aggregates; draft for the user to review):** direction (user,
+  2026-11-03): keep the axes orthogonal, so A3 must not re-derive A2's Non-Reachable; the avoidance
+  signal A2 dropped may come back here; decide from data. Facts: A2 `FAILED_CALL` holds all 18
+  `NOT_REACHABLE` names *and* `RINGING NO REPLY / RESPONSE`, `NO ANSWER`, `LEFT_MSG`, so an "unanswered
+  calls" rule overlaps Non-Reachable by construction; the old A2 `avoiding` state (ringing, live line, no
+  pickup) was 24% of CC and split about evenly between new reachable and non-reachable (b07 check).
+  Variants, each at the latest month per model_id, CC and RL:
+  - N0, today's rule (3+ call days in the delinquency, no right-party contact, no plan, no payment);
+  - N1, avoidance: 3+ distinct days of live-line no-pickup outcomes (`RINGING`, `NO ANSWER`, `LEFT_MSG`)
+    in the delinquency, none of the `NOT_REACHABLE` outcomes in between, no plan, no payment ≥ 100 AED;
+  - N2, avoidance after contact: N1, and only after a right-party contact earlier in the delinquency
+    (the line and the customer are proven, then the customer stops answering);
+  - N3, no contact-based negative.
+  Report per variant: firing rate; crosstab with A2 reachability (`non_reachable / reachable / unknown`);
+  the A3 state distribution with it; the result names that drive it; how many rows each variant
+  moves versus N3.
+
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
+- No response strong negative: redesign pending V2 (O85's extra condition goes with it).
 - Ladder: a clean record alone (1 point) gives Moderate; Unknown plus a strong negative gives Low; the
   `[CONFIRM]` thresholds stand until GRR says otherwise.
 - **CC sources (user, 2026-11-03: review whether the builders are needed or belong in the CC
