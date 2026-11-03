@@ -32,9 +32,13 @@ thresholds are the reference.
   the refusal and no-response strong negatives) needs a cycle with at least 100 AED. Dimension C is
   unchanged: paying the billed minimum counts, even below 100 AED (spec row 31).
 
+- **D-A3-6: band rules by `model_id`** (user, 2026-11-03). `*_60_180` runs use the 61–180 rules
+  (Regular 2 of 3 months, any-payment window 3 months); `*_180_plus` runs use the 180+ rules (Regular
+  3 of 6, any-payment window 12 months), as A1 and A2 do (`_common.window_months`). The row's bucket no
+  longer picks the band, so the `dlq_bucket_from_hist` / month-end bucket lookups go.
+
 ## Open (asked 2026-11-03)
 
-- 180+ windows: by `model_id`, as A1 / A2 do, or by the row's current bucket (O74)?
 - DCORE link: A2's `prm_dcore_account_agreements` (all agreements of the account); account level or
   CIF level (O72)?
 - Required inputs (D2) for all DCORE tables and `crx_cc_transactions` (O73)?
