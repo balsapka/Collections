@@ -304,6 +304,17 @@ Uncertain: separator-rule lengths and comment wrapping (as always); the `pipelin
 tables were re-aligned by eye. Not photographed: `pipeline_registry.py`, `catalog_crx.yml` A3 entries,
 `_spine_utils.py` (`rl_spine_as_cc_shim`), the A3 test modules.
 
+## Handoff 33: A1 bundle 12 check summaries, all four models (2026-11-03, photos IMG_8699–8726)
+
+Not code: the UAT Sonnet's `tmp_validation/a1_check/summary_<model_id>.md` (run 2026-11-03, dev env),
+transcribed verbatim to `bundle_helpers/b12_a1/b12_summary_{cc_60_180, cc_180_plus, rl_60_180, rl_180_plus}.md`.
+Every `##` heading sits on the photo's line number. Photos: cc_60_180 8699–8704, cc_180_plus 8705–8710,
+rl_60_180 8711–8714, 8716–8718, rl_180_plus 8719–8720, 8722–8726 (8715 and 8721 were not in the batch;
+the neighbouring photos overlap them, so nothing is lost).
+Incomplete: `b12_summary_cc_60_180.md` ends at line 302. The photos stop mid-table in section 13 (WM vs FTR);
+the row after "True | True | True | False" (True | True | True | True) and anything after it are missing.
+Table separator alignment (`---:`) was normalised; the numbers are as photographed. Not reviewed.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
