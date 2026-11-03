@@ -276,6 +276,17 @@ the A2 modules import from it. Lines 1-35 of the mirror equal the photo. The pho
 35, so the rest here is our old `codes.py`: the A3 `NOT_REACHABLE` / `RINGING` sets the docstring
 names are missing, and the A2 sets are unconfirmed. To be replaced by the full photo.
 
+## Handoff 31: `crx_persona/cc_a3_payment_credibility/` (2026-11-03, photos IMG_8599–8664)
+
+User asked for the DE-owned A3 module, overriding the "never transcribe" rule for this batch
+(mirror only; it stays out of every bundle, `--exclude cc_a3_payment_credibility`). One file per
+module, verbatim, `def`s on the photo's line numbers, `py_compile` and `ruff --select F,E9` clean:
+`__init__.py` (5), `constants.py` (93), `_signals_common.py` (1153), `nodes.py` (1570),
+`pipeline.py` (238). IMG_8599 is the explorer tree (no code); IMG_8600 is `__init__.py`.
+Separator rules and comment wrapping are approximate (see the known limit below).
+Uncertain: the `pipeline.py` docstring column alignment (IMG_8660 is small; re-read from a zoomed
+crop) and the `Inputs:` block wording at lines 55–68.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

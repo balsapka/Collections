@@ -826,3 +826,20 @@ holds 11 AECB tables in `dpl_uae_operations`, and the only one that ties a burea
 needs the bureau table that maps every file to its subject identifiers; it ships in a later bureau
 bundle, with GRR's salary feed. Bundle 08 keeps today's bureau reads (user, 2026-10-29). The
 bureau-link Sonnet run is on hold (raw bureau tables temporarily missing from the sandpit).
+
+
+### O66 — A3 `_strong_negative_reason` builds the reason expression twice (L, confirmed)
+
+`cc_a3_payment_credibility/nodes.py:1313-1322`: the `_sn_reason_expr` loop over `reversed(_SB_PRIORITY)`
+appears twice back to back; the second overwrites the first. Dead duplicate, same result.
+
+### O67 — A3 docstrings and comments carry ticket history (L, confirmed)
+
+`_signals_common.py` (`resolve_dlq_waterfall_qualifying_months_cleared`, ~230 docstring lines of
+dated corrections and "PROD OOM fix"), `nodes.py` (`[TEMPORARY, 2026-10-21]`), `constants.py`. Against
+decision D3 these should describe what the code does now.
+
+### O68 — A3 `crx_cc_transactions` is listed twice in the `pipeline.py` inputs docstring (L, confirmed)
+
+`pipeline.py:60,63`; the node inputs use it once per node, so only the docstring repeats it.
+Also `nodes.py:39-41` repeats `# pylint: disable=too-many-lines, duplicate-code`.
