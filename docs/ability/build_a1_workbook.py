@@ -271,7 +271,7 @@ TREND = {  # month: (accounts, high, moderate, low, unknown %)
 NOTES = [
     "AECB salary alerts arrive only when something changes, so no alert means nothing is known, "
     "not that the salary stopped. Pulls every 2 months would give every customer a value and "
-    "would show a stop as a pull with no salary.",
+    "would show a stop as a pull with no salary. How much this shapes the result: 'AECB coverage'.",
     "Fewer alerts in the window than before is not a fall: with no salary with us, the 25% check "
     "compares the level of the months with a value. A real fall in level stays Weak (848 card and "
     "80 loan accounts at 61–180 reach the window total but fall more than 25%). The rule is kept "
@@ -293,6 +293,48 @@ NOTES = [
     "oldest overdue amount (median AED 837), so a loan salary must cover more to count as Stable.",
     "Internal salary and balances cover the PRB, PSB and PB segments (95% of card customers). "
     "Internal salary history starts in September 2024.",
+]
+PENDING = ""  # an entry cell left for a result not back yet
+AECB_BLOCKS = [  # counts in the order of BOOKS
+    ("Accounts whose state rests on an AECB salary alone (no internal salary in the window)", [
+        ("High", "high", 8, 0, 44, 5),
+        ("Moderate", "moderate", 2525, 268, 19113, 1708),
+        ("Low", "low", 2003, 278, 11766, 1431),
+    ]),
+    ("Coverage gap: latest AECB salary alert of AED 1,000 or more, when it is not in the window", [
+        ("4–12 months ago: known, but too old to count (7–12 at 180+)", "moderate",
+         4396, 486, 9812, 1045),
+        ("13–24 months ago", "moderate", 1346, 274, 12432, 1181),
+        ("25 or more months ago", "unknown", 899, 284, 27234, 2248),
+        ("Alert rows, never a salary alert (a steady salary never alerts)", "unknown",
+         7693, 2325, 150930, 21760),
+        ("No alert row: not in the alert feed", "unknown", 1138, 144, 89007, 26156),
+    ]),
+    ("What-if: the last AECB salary still holds (Sonnet what-if, results pending)", [
+        ("Unknown today (S0)", "unknown", 10760, 1778, 278654, 49574),
+        ("Unknown if an AECB salary of the last 6 months held (S6)", "unknown", *[PENDING] * 4),
+        ("Unknown if an AECB salary of the last 12 months held (S12)", "unknown", *[PENDING] * 4),
+        ("High + Moderate today (S0)", "moderate", 2844, 372, 20018, 2004),
+        ("High + Moderate (S6)", "moderate", *[PENDING] * 4),
+        ("High + Moderate (S12)", "moderate", *[PENDING] * 4),
+    ]),
+]
+AECB_TODAY_VS_FREQUENT = [  # topic, today, with pulls every 2 months
+    ("Source", "AECB alert table: a row only when something changes (salary changed, salary "
+     "account added or closed).", "A pull for every customer every 2 months."),
+    ("When a salary counts", "The pull's month and the next one; never earlier.",
+     "The same rule: consecutive pulls fill 2–3 months of the 3-month window (all 6 at 180+)."),
+    ("Steady salary", "Often never alerts, so it is invisible: 'Alert rows, never a salary alert'.",
+     "Seen on every pull; at or above the threshold it reaches Stable with no rule change."),
+    ("Stopped salary", "Seen only as a closure alert, a lower amount, or the end of an internal "
+     "salary; silence says nothing.", "A pull with no salary shows the stop within 2 months."),
+    ("25% rule", "The level check stops fewer alerts looking like a fall.",
+     "Monthly values make the total and the level agree; the rule works as designed."),
+    ("Quality", "AECB Stable cures 14.4% against 33.0% for internal Stable (cards, 'Validation'): "
+     "alerts are partly stale.", "Expected closer to internal salary; to be re-validated."),
+    ("Expected effect", "Unknown 55.8% of cards and 44.6% of loans at 61–180.",
+     "Unknown falls and Moderate rises, by up to the S12 what-if; customers never on a salary "
+     "alert may add more, which no what-if can show."),
 ]
 VALIDATION_DATE = "cohort months Jan–May 2026, outcomes over the next 3 months"
 VALIDATION = [  # (book, [(state, cure, roll, pay any)] in %)
@@ -614,8 +656,9 @@ def _rows(s: Sheet, rows: list, base: int) -> None:
         chip(s, 1, tone, label)
         for j, n in enumerate(counts):
             L = get_column_letter(2 + 2 * j)
-            fill = INPUT_FILL if n is not None else None
-            s.text(2 + 2 * j, n, color="0000FF", fill=fill).number_format = "#,##0"
+            fill = INPUT_FILL if n is not None else None  # PENDING = an empty entry cell
+            value = None if n is PENDING else n
+            s.text(2 + 2 * j, value, color="0000FF", fill=fill).number_format = "#,##0"
             share = f'=IF(OR({L}{s.r}="",N({L}${base})=0),"",{L}{s.r}/{L}${base})'
             s.text(3 + 2 * j, share, color=MUTED).number_format = "0.0%"
         _fit(s.ws, s.r, [(label, s.widths[0])], floor=18)
@@ -757,6 +800,25 @@ def validation(wb: Workbook) -> None:
     s.ws.freeze_panes = "A4"
 
 
+def aecb(wb: Workbook) -> None:
+    s = _blocks(wb, "AECB coverage", f"How thin AECB data shapes the result, and what frequent pulls "
+                                     f"would change, {RESULTS_DATE}. Shares are of all accounts of "
+                                     "the book.", AECB_BLOCKS)
+    s.section("Today against pulls every 2 months")
+    s.header(["", "Today (alerts)", "With pulls every 2 months"], [1, 4, 4])
+    for topic, today, frequent in AECB_TODAY_VS_FREQUENT:
+        s.text(1, topic, bold=True, align=MID)
+        s.text(2, today, span=4, align=MID)
+        s.text(6, frequent, span=4, align=MID)
+        _fit(s.ws, s.r, [(today, s.width(2, 5)), (frequent, s.width(6, 9))])
+        s.r += 1
+    s.r += 1
+    s.note("The what-if keeps every rule and only lets the last AECB salary count for 6 or 12 months "
+           "instead of 1 (never backwards, a closure stops it): a ceiling for customers who already "
+           "had a salary alert. Prompt: workplace_mirror/bundle_helpers/a1_final/"
+           "sonnet_a1_aecb_whatif_prompt.md.")
+
+
 def _chart(s: Sheet, title: str, head: int, months: int) -> None:
     """100% stacked bars of the states by month, beside the table."""
     chart = BarChart()
@@ -815,8 +877,9 @@ def build(out: pathlib.Path) -> pathlib.Path:
     summaries(wb)
     trend(wb)
     validation(wb)
+    aecb(wb)
     order = ["Overview", "Logic", "Thresholds", "Examples", "Results", "Results detail",
-             "Results summaries", "Salary sources", "Results trend", "Validation"]
+             "Results summaries", "Salary sources", "AECB coverage", "Results trend", "Validation"]
     wb._sheets = [wb[name] for name in order]  # pylint: disable=protected-access
     wb.calculation.fullCalcOnLoad = True
     for ws in wb:
