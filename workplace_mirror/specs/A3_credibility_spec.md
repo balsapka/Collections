@@ -27,8 +27,10 @@ thresholds are the reference.
   per-method columns are dropped (user, 2026-11-03).
 
 - **D-A3-5: 100 AED minimum payment guardrail in every band, not only 180+** (user, 2026-11-03).
-  The exact scope (Dimension B qualifying and any-payment, Dimension C, the refusal follow-up) is
-  being settled with the open items below.
+  Scope (user, 2026-11-03): payments while delinquent only. A Dimension B cycle qualifies when its
+  payments reach `max(100% of one month's due, 100 AED)`; "any payment" (Some, and the payment tests of
+  the refusal and no-response strong negatives) needs a cycle with at least 100 AED. Dimension C is
+  unchanged: paying the billed minimum counts, even below 100 AED (spec row 31).
 
 ## Open (asked 2026-11-03)
 
