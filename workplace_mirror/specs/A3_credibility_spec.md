@@ -54,6 +54,11 @@ thresholds are the reference.
   do not count), window = `[max(latest spell start, obs − 12 m), obs]` (spec rows 19, 76; O75, O83).
   `dcore_feat_ptp` / `dcore_feat_settlement` are no longer read.
 
+- **D-A3-10: keep `cc_a3_history_floor_date` (2024-01-01) and measure it** (user, 2026-11-03, O77).
+  The bundle check reports, per model_id, the latest-month rows whose Dimension C reads `no_record`
+  because the floor cut the 12 months before the latest spell start (rows that would have ≥ 3 months
+  due without the floor). Revisit with those numbers or when the billing backfill lands.
+
 ## Validations before the bundle
 
 - **V1 (DCORE instalments, Sonnet, no photos unless needed):** confirm the columns and meaning of
@@ -66,8 +71,7 @@ thresholds are the reference.
 
 ## Open (asked 2026-11-03)
 
-- Required inputs (D2) for all DCORE tables and `crx_cc_transactions` (O73)?
-- `cc_a3_history_floor_date`: keep and measure, or drop (O77)?
+- Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
 - Ladder: a clean record alone (1 point) gives Moderate; Unknown plus a strong negative gives Low; the
   `[CONFIRM]` thresholds stand until GRR says otherwise.
 - **CC sources (user, 2026-11-03: review whether the builders are needed or belong in the CC
