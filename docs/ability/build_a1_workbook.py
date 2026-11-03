@@ -310,13 +310,22 @@ AECB_BLOCKS = [  # counts in the order of BOOKS
          7693, 2325, 150930, 21760),
         ("No alert row: not in the alert feed", "unknown", 1138, 144, 89007, 26156),
     ]),
-    ("What-if: the last AECB salary still holds (Sonnet what-if, results pending)", [
+    ("What-if: the last AECB salary still holds (cards back, loans pending)", [
         ("Unknown today (S0)", "unknown", 10760, 1778, 278654, 49574),
-        ("Unknown if an AECB salary of the last 6 months held (S6)", "unknown", *[PENDING] * 4),
-        ("Unknown if an AECB salary of the last 12 months held (S12)", "unknown", *[PENDING] * 4),
+        ("Unknown if an AECB salary of the last 6 months held (S6)", "unknown",
+         9456, PENDING, 275373, PENDING),
+        ("Unknown if an AECB salary of the last 12 months held (S12)", "unknown",
+         9047, PENDING, 273861, PENDING),
         ("High + Moderate today (S0)", "moderate", 2844, 372, 20018, 2004),
-        ("High + Moderate (S6)", "moderate", *[PENDING] * 4),
-        ("High + Moderate (S12)", "moderate", *[PENDING] * 4),
+        ("High + Moderate (S6)", "moderate", 3902, PENDING, 23983, PENDING),
+        ("High + Moderate (S12)", "moderate", 4265, PENDING, 25824, PENDING),
+    ]),
+    ("Today's Unknown by its latest AECB salary alert (cards back, loans pending)", [
+        ("In the window", "unknown", 101, PENDING, 306, PENDING),
+        ("4–24 months ago: too old (7–24 at 180+)", "moderate", 4017, PENDING, 18065, PENDING),
+        ("25 or more months ago", "unknown", 607, PENDING, 25869, PENDING),
+        ("Alert rows, never a salary alert", "unknown", 5090, PENDING, 145558, PENDING),
+        ("No alert row", "unknown", 945, PENDING, 88856, PENDING),
     ]),
 ]
 AECB_TODAY_VS_FREQUENT = [  # topic, today, with pulls every 2 months
@@ -332,9 +341,14 @@ AECB_TODAY_VS_FREQUENT = [  # topic, today, with pulls every 2 months
      "Monthly values make the total and the level agree; the rule works as designed."),
     ("Quality", "AECB Stable cures 14.4% against 33.0% for internal Stable (cards, 'Validation'): "
      "alerts are partly stale.", "Expected closer to internal salary; to be re-validated."),
-    ("Expected effect", "Unknown 55.8% of cards and 44.6% of loans at 61–180.",
-     "Unknown falls and Moderate rises, by up to the S12 what-if; customers never on a salary "
-     "alert may add more, which no what-if can show."),
+    ("Expected effect", "Unknown 55.8% of cards and 44.6% of loans at 61–180; 87.4% of cards at "
+     "180+.", "Cards: Unknown to 49.0–46.9% at 61–180 (S6–S12), 86.4–85.9% at 180+; almost all "
+     "moves are Unknown or Low to Moderate or Low. More may come from customers never on a salary "
+     "alert, which no what-if can show."),
+    ("Where the gain is", "At 61–180, 56% of card Unknowns never had an AECB salary; 70% of the "
+     "never-alerted card group has an internal salary in 24 months.", "The 2-monthly pull is the "
+     "only way to see them. At 180+, 84% never had one and few have any salary with us: Unknown "
+     "there is coverage, not freshness."),
 ]
 VALIDATION_DATE = "cohort months Jan–May 2026, outcomes over the next 3 months"
 VALIDATION = [  # (book, [(state, cure, roll, pay any)] in %)
@@ -815,8 +829,8 @@ def aecb(wb: Workbook) -> None:
     s.r += 1
     s.note("The what-if keeps every rule and only lets the last AECB salary count for 6 or 12 months "
            "instead of 1 (never backwards, a closure stops it): a ceiling for customers who already "
-           "had a salary alert. Prompt: workplace_mirror/bundle_helpers/a1_final/"
-           "sonnet_a1_aecb_whatif_prompt.md.")
+           "had a salary alert. Card results: workplace_mirror/bundle_helpers/a1_final/"
+           "aecb_whatif_results_cc.md; loans: same prompt, not run yet.")
 
 
 def _chart(s: Sheet, title: str, head: int, months: int) -> None:
