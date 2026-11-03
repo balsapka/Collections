@@ -112,9 +112,10 @@ Measured, not assumed (V2, V3).
   - **Dispute:** the same rule with `DISPUTE` / `KSA/DISPUTE`; it contests the debt, so it may be a
     flag rather than a negative.
   - **Avoidance:** the customer does not take calls on a working line. Variants:
-    - N0, today's no-response rule;
-    - N1, 3+ days of ringing / no-answer / left-message outcomes in the delinquency, no dead-line
-      outcome (`NOT_REACHABLE`) in between, no plan, no payment ≥ 100 AED;
+    - N0, today's no-response rule (3 contact days in every band, as the code has it);
+    - N1, ringing / no-answer / left-message outcomes on 3+ days (61–180) or 6+ days (180+, as A2's
+      `GONE_DARK_DAYS`; user, 2026-11-03) in the delinquency, no dead-line outcome (`NOT_REACHABLE`)
+      in between, no plan, no payment ≥ 100 AED;
     - N2, N1 but only after a right-party contact earlier in the delinquency;
     - N4, hang-ups (`CUSTOMER HUNG UP`, `CUSTOMER_HUNG_UP`) as the latest right-party contact, nothing
       after;
