@@ -116,7 +116,15 @@ Measured, not assumed (V2, V3).
   streak, qualifying-month count, any-payment flag, months due / paid), the strong-negative reason and
   its evidence. Not carried: per-method columns, confidence, provenance, `computed_at` (D-A3-4).
 
+- **D-A3-18: A3 builds the source outputs it needs itself, for now** (user, 2026-11-03). No refactor of
+  the core CC pipelines in this bundle; merging them into the CC primaries / features is a later
+  option. The builders still lose their T0 windows (D-A3-1): rescoping them needs the current
+  `cc_raw_extract/nodes.py` (`build_cc_acct_windows`, `build_cc_billing`) at bundle time.
+
 ## Validations before the bundle
+
+Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`.
+
 
 - **V1 (DCORE instalments, Sonnet, no photos unless needed):** confirm the columns and meaning of
   `dcore_prm_promise_instalments`, `dcore_prm_settlement_schedule_instalments`, `dcore_int_ptp`,
@@ -168,8 +176,7 @@ Measured, not assumed (V2, V3).
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
 - Strong negatives (broken commitments, refusal, dispute, avoidance): pending V1 and V2; O85's extra condition goes with the redesign.
-- **CC sources (user, 2026-11-03: review whether the builders are needed or belong in the CC
-  pipelines).** Today `crx_cc_billing` / `crx_cc_balance` / `crx_cc_transactions` (`cc_raw_extract`)
+- **CC sources (superseded by D-A3-18 for this bundle; kept as the later option).** Today `crx_cc_billing` / `crx_cc_balance` / `crx_cc_transactions` (`cc_raw_extract`)
   read `raw_*` inside crx_persona, re-implement the `prm_cc` derivations and are scoped by T0 windows,
   which breaks D5 and the §7 layer rule. Proposal pending photos: the CC primary pipeline owns the raw
   reads (`prm_balance` / `prm_transaction` / a billing primary, extended with the columns A3 needs),
