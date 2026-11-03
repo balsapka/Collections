@@ -968,3 +968,30 @@ P3:
 `rl_a3_payment_credibility/nodes.py` (C: `_has_due` / `_paid_as_billed` on `monthly_emi_due`; B:
 `monthly_emi_asof`). A month with a NULL EMI snapshot has no due in C but is judged in B against the
 forward-filled EMI.
+
+### O82 — Dimension C ignores the due date; the spec requires it (M, confirmed against the DE sheet)
+
+Sheet row 31: "As billed: at least the amount due, by the due date." The code compares the whole
+cycle's payment (`payment_sum_in_cycle`, `cc_a3_payment_credibility/nodes.py:1016-1021`, marked
+`[TEMPORARY, 2026-10-21]`); `on_time_payment_sum_in_cycle` is computed but unused (O79). RL has no
+due date at all (monthly cash vs EMI). A user decision.
+
+### O83 — Dimension A window is not limited to this delinquency (M, confirmed against the DE sheet)
+
+Sheet row 19 / row 76: instalments "that fell due in the last 12 months of this delinquency". The code
+looks back 12 months from the observation date with no lower bound (`_signals_common.py:942-945`;
+the `dcore_feat_*_12m` counts are the same). With D-A3-2 the window becomes
+`[greatest(anchor, obs − 12 m), obs]`.
+
+### O84 — Code rules not in the DE sheet (L, confirmed)
+
+The 100 AED floor at 180+ (`_TAU_A3V2_DLQ_PAYMENT_MIN_AMOUNT_180_PLUS`), the bucket-08 baseline due
+(`resolve_bucket08_fallback_due`), the cycle sanity limits (35 / 62 days) and `cc_a3_history_floor_date`
+have no row in the sheet. The 12-month any-payment window at 180+ is only a note in the "Some" cell.
+
+### O85 — No response also requires zero concluded commitments in the code (L, confirmed against the DE sheet)
+
+Sheet row 39: "3 or more separate dates without reaching the customer, no promise or arrangement on
+record, and no payment in the window." `_strong_negative_reason` adds `commitments_concluded == 0`
+(`nodes.py:1299`). Mostly redundant with "no plan on record", but it widens the gap between the sheet
+and the code.

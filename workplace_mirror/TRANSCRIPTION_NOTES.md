@@ -314,6 +314,20 @@ the neighbouring photos overlap them, so nothing is lost).
 Complete: `b12_summary_cc_60_180.md` ends at line 302 (the last WM vs FTR row, `True | True | True | False`; confirmed by the user as the end of the file).
 Table separator alignment (`---:`) was normalised; the numbers are as photographed. Not reviewed.
 
+## Handoff 34: A3 spec sheet, catalog and registry excerpts (2026-11-03, photos IMG_8727–8749)
+
+Not full files, so nothing under `src/` or `conf/` changed.
+- IMG_8727–8733: the DE spec `A3_credibility_shared_Nov3.xlsx`, sheet "A3 framework", rows 1–89 →
+  `bundle_helpers/a3_final/a3_framework_sheet.md` (cell text verbatim; the "Tester" sheet not photographed).
+- IMG_8734 `pipeline_registry.py` 213–270, IMG_8736–8741 `catalog_crx.yml` 1–289, IMG_8742–8748
+  `catalog_outputs.yml` excerpts, IMG_8749 `catalog_raw_way4.yml` 7–64 →
+  `bundle_helpers/a3_final/workplace_reference.md` (catalog_crx 14–78 verbatim, the rest as key tables).
+  IMG_8735 was not in the batch.
+- The mirror's `catalog_crx.yml` and `pipeline_registry.py` are left as they are (bundle-managed); the
+  reference file lists the differences (workplace adds `crx_cc_acct_windows`, `crx_cc_billing`,
+  `genesys`; the bundle 13 check entry is gone).
+Still missing: the `crx_cc_a3_*` / `crx_rl_a3_*` / `crx_rl_a4_spine` catalog entries (after line 289).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
