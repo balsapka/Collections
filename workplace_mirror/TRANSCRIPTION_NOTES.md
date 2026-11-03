@@ -287,6 +287,23 @@ Separator rules and comment wrapping are approximate (see the known limit below)
 Uncertain: the `pipeline.py` docstring column alignment (IMG_8660 is small; re-read from a zoomed
 crop) and the `Inputs:` block wording at lines 55–68.
 
+## Handoff 32: A3 batch 2 – RL module, `_dcore_codes.py`, params (2026-11-03, photos IMG_8665–8698)
+
+Verbatim, `def`s on the photo line numbers, `py_compile` and `ruff --select F,E9` clean.
+- `crx_persona/rl_a3_payment_credibility/`: `__init__.py` (5), `_signals_common.py` (105),
+  `constants.py` (58), `nodes.py` (797), `pipeline.py` (168). IMG_8665 `__init__`, 8666–8667
+  `_signals_common`, 8668–8669 `constants`, 8670–8686 `nodes`, 8687–8691 `pipeline`.
+- `crx_persona/_dcore_codes.py` now complete (281 lines, IMG_8691–8696; the old partial copy
+  was replaced from line 165 on, lines 1-164 compared equal to the photos). It carries the A3
+  sets `REFUSING`, `RINGING`, `PROMISE_TO_PAY`, `NOT_REACHABLE`, `RETAIN_PTP`, `PAYMENT_CONFIRMED`,
+  so the `--exclude` on this file is no longer needed once the A3 side is in the workplace copy.
+- `conf/base/parameters/parameters_crx_persona.yml` replaced from IMG_8697–8698 (80 lines): adds
+  `a3_dlq_payment_evidence_method`, `a3_pre_dlq_payment_evidence_method`, the RL pair
+  `rl_a3_*` and `cc_a3_history_floor_date`; the `model_id` comment wording differs from our old copy.
+Uncertain: separator-rule lengths and comment wrapping (as always); the `pipeline.py` docstring
+tables were re-aligned by eye. Not photographed: `pipeline_registry.py`, `catalog_crx.yml` A3 entries,
+`_spine_utils.py` (`rl_spine_as_cc_shim`), the A3 test modules.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

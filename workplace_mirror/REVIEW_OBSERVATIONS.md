@@ -843,3 +843,9 @@ decision D3 these should describe what the code does now.
 
 `pipeline.py:60,63`; the node inputs use it once per node, so only the docstring repeats it.
 Also `nodes.py:39-41` repeats `# pylint: disable=too-many-lines, duplicate-code`.
+
+### O69 — RL strong-negative node hardcodes the 24-month follow-up floor (L, confirmed)
+
+`rl_a3_payment_credibility/nodes.py:183`: `relativedelta(months=24)` is a literal in the node, while
+every other RL A3 threshold lives in `constants.py`. It is a performance guard, not logic, but it
+should be named and documented there.

@@ -162,3 +162,120 @@ DECEASED = frozenset(
         "KSA/DECEASED",
     }
 )
+
+# Explicit refusal signals – result names where confirmed right-party contact was
+# made but the customer explicitly refused, hung up, or disputed.
+# Subset of RIGHT_PARTY_CONTACT (every entry here also confirms contact).
+# Excludes settlement-seeking behaviour (engagement) and autodialler intermediates.
+#
+# Drives refusing_n counter → non_cooperative state (confirmed contact + refusal).
+#
+# Matching must normalise the source column first:
+#   result_name_upper = F.upper(F.trim(F.col("result_name")))
+#   result_name_upper.isin(REFUSING)
+#
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+REFUSING = {
+    "CUSTOMER HUNG UP",
+    "CUSTOMER MISBEHAVED",
+    "CUSTOMER_HUNG_UP",
+    "DISPUTE",
+    "KSA/DISPUTE",
+    "KSA/REFUSE TO PAY",
+    "REFUSE TO PAY",
+    "REFUSED TO PAY",
+    "REWRITE NOT AGREED",
+}
+
+# Ringing no-answer signals – phone rang at the customer end but was not answered.
+# Excludes LINE BUSY (transient, does not indicate call screening).
+# Drives ringing_n counter → avoiding state when ≥3 ringing events and line is live.
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+RINGING = {
+    "RINGING NO REPLY",
+    "RINGING NO RESPONSE",
+}
+
+# Promise to pay or willingness to pay – result names signalling the customer
+# has committed to pay, made a payment arrangement, or actually paid.
+# Covers: all PTP-category outcomes, actual payments (SUC), and INT entries
+# where the customer verbally committed or agreed to a specific arrangement
+# (balance consolidation, rewrite, deferment, settlement, salary-date promise).
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+PROMISE_TO_PAY = {
+    "ACCOUNT PAID",
+    "BALCON WOP 12 MONTHS",
+    "BALCON WOP 24 MONTHS",
+    "BALCON WP 12 MONTHS",
+    "BALCON WP 24 MONTHS",
+    "BALCON WP 48 MONTHS",
+    "CLAIMS MADE PAYMENT",
+    "CODE25 WILL PAY AT SALARY",
+    "CUSTOMER KEPT PROMISE MADE",
+    "CUSTOMER MADE PAYMENT",
+    "DEFERMENT FOR IMPACTED CUSTOMERS",
+    "DIGITAL COLLECT  PTP SUBSCRIBED",
+    "HISTORICAL PROMISE TO PAY",
+    "KSA/CUSTOMER WILL PAY AT SALARY",
+    "KSA/EARLY/FINAL SETTLEMENT",
+    "KSA/PAID AMOUNT",
+    "KSA/PARTIAL PAYMENT",
+    "KSA/PROMISE TO PAY",
+    "PARTIALLY PAID",
+    "PROMISE TO PAY",
+    "PROMISE TO PAY PARTIALLY",
+    "PROMISE TO PAY SCHEDULED",
+    "REWRITE AGREED",
+    "SETTLEMENT",
+    "SOFTPTP",
+    "WILL PAY AT SALARY",
+}
+
+# Customer is fundamentally unreachable – wrong/invalid number, line
+# permanently dead/disconnected, or explicitly flagged uncontactable.
+# Signals a structural contact barrier, not a single failed attempt.
+# Excludes: transient failures (no answer, busy, disconnected call,
+# voicemail, message left) – those only mean the customer didn't pick up
+# this time, not that they are unreachable.
+# Covers both autodialler (ININ-OUTBOUND-*) and manual/KSA-channel outcomes.
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+NOT_REACHABLE = {
+    "CUSTOMER NOT CONTACTABLE",
+    "ININ-OUTBOUND-INVALID-PHONE-NUMBER",
+    "ININ-OUTBOUND-NUMBER_COULD_NOT_BE_DIALED",
+    "ININ-OUTBOUND-ON-DO-NOT-CALL-LIST",
+    "ININ-OUTBOUND-SIT-UNCALLABLE",
+    "KSA/MOBILE SWITCHED OFF",
+    "KSA/OUT OF SERVICE",
+    "KSA/UNCONTACTABLE",
+    "KSA/WRONG NUMBER",
+    "LINE DISCONNECTED",
+    "MOBILE SWICTHED OFF",
+    "MOBILE SWITCHED OFF",
+    "NOT REACHABLE",
+    "OUTBOUND-INVALID-PHONE-NUMBER",
+    "PHONE OUT OF SERVICE",
+    "UNCONTACTABLE",
+    "WRONG NO",
+    "WRONG NUMBER",
+}
+
+# Customer honoured or is actively maintaining an existing promise-to-pay – a
+# stronger/narrower signal than generic PROMISE_TO_PAY. Not restricted to
+# a particular action_code: in practice RETAIN PTP is logged administratively (action_code
+# IA) rather than against a live call, so consumers must not pre-filter to call-type
+# action codes before matching this set.
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+RETAIN_PTP = {
+    "CUSTOMER KEPT PROMISE MADE",
+    "RETAIN PTP",
+}
+
+# Confirmed completed payment – distinct from a promise/commitment (PROMISE_TO_PAY) or
+# an unverified claim of payment ("CLAIMS MADE PAYMENT", which stays PTP-classified).
+# Drives a dedicated "paid" disposition, separate from PTP.
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+PAYMENT_CONFIRMED = {
+    "ACCOUNT PAID",
+    "CUSTOMER MADE PAYMENT",
+}
