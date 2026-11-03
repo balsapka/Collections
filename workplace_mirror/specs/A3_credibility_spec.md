@@ -85,6 +85,13 @@ Measured, not assumed (V2, V3).
   because the floor cut the 12 months before the latest spell start (rows that would have ≥ 3 months
   due without the floor). Revisit with those numbers or when the billing backfill lands.
 
+- **D-A3-11: kept / broken is judged by the payments, unless DCORE's status proves reliable**
+  (user, 2026-11-03: payment data is the truth, DCORE status is simpler if reliable). V1 extension
+  decides: if DCORE's paid / overdue status agrees with the ledger closely enough (the user judges
+  from the numbers), A3 uses DCORE's status. Otherwise an instalment counts as kept when payments of at
+  least its amount arrive between the promise date and its due date. CC matches Way4 payment
+  transactions by date. RL can only match by month (`total_paid` is a monthly total).
+
 ## Validations before the bundle
 
 - **V1 (DCORE instalments, Sonnet, no photos unless needed):** confirm the columns and meaning of
