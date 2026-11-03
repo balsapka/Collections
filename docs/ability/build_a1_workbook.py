@@ -4,8 +4,8 @@
 
 The rules follow ``workplace_mirror/specs/A1_ability_spec.md``. Every worked example is run
 through the reference rules below and the build FAILS if an example no longer gets the level
-or state it illustrates. Results are entry cells (pale yellow): credit cards come from the
-check of 31 Aug 2026, retail loans are filled when their check is back. Shares are formulas.
+or state it illustrates. Results are entry cells (pale yellow) from the bundle 12 check of
+31 Aug 2026 (cards and loans, 61–180 and 180+). Shares are formulas.
 """
 from __future__ import annotations
 
@@ -42,10 +42,17 @@ def income_months(internal: dict, pulls: dict) -> dict:
 
 
 def income_level(internal: dict, pulls: dict, anchor: float = 0) -> str:
+    """With no internal salary in either window the 25% check compares the average of the
+    months with a value: AECB alerts arrive only on a change."""
     amounts = income_months(internal, pulls)
     now = sum(v for k, v in amounts.items() if in_window(k))
-    prior = sum(v for k, v in amounts.items() if not in_window(k))
-    if now >= FLOORS_IN_TOTAL * max(F_INC, K_INC * anchor) and now >= prior * (1 - D_INC):
+    if any(internal.get(k, 0) >= DEMIN for k in OFFSETS):
+        recent, prior = now / W, sum(v for k, v in amounts.items() if not in_window(k)) / W
+    else:
+        seen = set(internal) | set(pulls) | {k + 1 for k in pulls}
+        level = [[amounts[k] for k in OFFSETS if k in seen and in_window(k) == w] for w in (True, False)]
+        recent, prior = (sum(v) / len(v) if v else 0 for v in level)
+    if now >= FLOORS_IN_TOTAL * max(F_INC, K_INC * anchor) and recent >= prior * (1 - D_INC):
         return "stable"
     return "weak" if any(v >= DEMIN for k, v in amounts.items() if in_window(k)) else "none"
 
@@ -87,160 +94,220 @@ def chip(s: Sheet, col: int, tone: str, label: str | None = None, span: int = 1)
     return s.text(col, label or LABEL[tone], span=span, bold=True, color=ink, fill=fill, align=MID)
 
 
-# --- results: (label, tone, credit cards, retail loans), None = not available yet -----------
+# --- results (check of 31 Aug 2026, bundle 12) --------------------------------------------
 RESULTS_DATE = "31 Aug 2026"
-RESULTS_FIRST = 6  # the first state row on the Results sheet (the Overview links to it)
-CC, RL = 19292, 3985  # accounts
-STATE_ROWS = [  # state, cards, loans, then the loan products
-    ("high", 47, 11, 6, 3, 2), ("moderate", 2689, 358, 100, 134, 124),
-    ("low", 5737, 1837, 593, 608, 636), ("unknown", 10819, 1779, 698, 479, 602),
-]
+BOOKS = ["Credit cards 61–180", "Retail loans 61–180", "Credit cards 180+", "Retail loans 180+"]
+TOTALS = (19292, 3985, 318663, 55371)  # accounts, in the order of BOOKS
 RL_PRODUCTS = ["Personal Loans", "Personal Cash Loans", "Auto"]
-DETAIL = [
+STATE_BLOCKS = [  # (DPD, first row on the Results sheet, rows: state, cards, loans, loan products)
+    ("61–180 DPD", 6, [
+        ("high", 46, 10, 6, 3, 1), ("moderate", 2798, 362, 99, 138, 125),
+        ("low", 5688, 1835, 595, 604, 636), ("unknown", 10760, 1778, 697, 479, 602),
+    ]),
+    ("180+ DPD", 14, [
+        ("high", 111, 17, 11, 3, 3), ("moderate", 19907, 1987, 748, 781, 458),
+        ("low", 19991, 3793, 1174, 1866, 753), ("unknown", 278654, 49574, 31929, 7656, 9989),
+    ]),
+]
+DETAIL = [  # counts in the order of BOOKS; None = does not apply
     ("Income: who shows the salary, and the level it reaches", [
-        ("Stable · internal salary only", "high", 190, 41),
-        ("Stable · AECB salary only", "high", 2656, 307),
-        ("Stable · both", "high", 26, 13),
-        ("Weak · internal salary only", "moderate", 212, 143),
-        ("Weak · AECB salary only", "moderate", 1807, 231),
-        ("Weak · both", "moderate", 12, 8),
-        ("None · no salary of AED 1,000 or more in the window", "unknown", 14389, 3242),
+        ("Stable · internal salary only", "high", 190, 41, 335, 51),
+        ("Stable · AECB salary only", "high", 2778, 317, 20827, 1927),
+        ("Stable · both", "high", 28, 13, 75, 16),
+        ("Weak · internal salary only", "moderate", 209, 143, 176, 71),
+        ("Weak · AECB salary only", "moderate", 1758, 229, 10096, 1217),
+        ("Weak · both", "moderate", 13, 8, 27, 11),
+        ("None · no salary of AED 1,000 or more in the window", "unknown", 14316, 3234, 287127, 52078),
     ]),
     ("Income with an AECB salary in the window: why it is Stable or Weak", [
-        ("Stable · 1 AECB month in the window", "high", 292, 37),
-        ("Stable · 2 AECB months", "high", 1225, 161),
-        ("Stable · 3 AECB months", "high", 1165, 122),
-        ("Weak · window total reached, but more than 25% below the prior window", "moderate", 912, 86),
-        ("Weak · window total not reached", "moderate", 907, 153),
+        ("Stable · 1 AECB month in the window", "high", 459, 46, 807, 68),
+        ("Stable · 2 AECB months", "high", 1286, 165, 4495, 449),
+        ("Stable · 3 AECB months", "high", 1061, 119, 4325, 392),
+        ("Stable · 4–6 AECB months (180+ only)", "high", None, None, 11275, 1034),
+        ("Weak · window total reached, but more than 25% below the prior window", "moderate",
+         848, 80, 4691, 430),
+        ("Weak · window total not reached", "moderate", 923, 157, 5432, 798),
     ]),
     ("Liquidity: the arm that fired", [
-        ("Adequate · CASA balance (no external card payment)", "high", 142, 46),
-        ("Adequate · with an external card payment (card or CASA arm)", "high", 54, 11),
-        ("Weak · CASA balance of AED 1,000 or more (no card payment)", "moderate", 327, 291),
-        ("Weak · with an external card payment", "moderate", 15, 14),
-        ("None · a card payment below AED 1,000", "unknown", 49, 14),
-        ("None · no CASA balance or card payment", "unknown", 18705, 3609),
+        ("Adequate · CASA balance (no external card payment)", "high", 142, 46, 583, 255),
+        ("Adequate · with an external card payment (card or CASA arm)", "high", 54, 11, 72, 10),
+        ("Weak · CASA balance of AED 1,000 or more (no card payment)", "moderate", 327, 291, 760, 408),
+        ("Weak · with an external card payment", "moderate", 15, 14, 3, 18),
+        ("None · a card payment below AED 1,000", "unknown", 49, 14, 19, 9),
+        ("None · no CASA balance or card payment", "unknown", 18705, 3609, 317226, 54671),
     ]),
     ("Distress in the window", [
-        ("No distress", "moderate", 17616, 3261),
-        ("Bureau bounce only", "low", 483, 282),
-        ("Cheque return only", "low", 451, 189),
-        ("Direct-debit return only", "low", 596, 184),
-        ("Two or more kinds", "low", 146, 69),
+        ("No distress", "moderate", 17609, 3260, 310349, 53383),
+        ("Bureau bounce only", "low", 490, 283, 4104, 636),
+        ("Cheque return only", "low", 449, 189, 1310, 415),
+        ("Direct-debit return only", "low", 596, 184, 2558, 796),
+        ("Two or more kinds", "low", 148, 69, 342, 141),
     ]),
     ("High and Moderate: the combination that gave the state", [
-        ("High · Stable income, Adequate liquidity", "high", 47, 11),
-        ("Moderate · Stable income, no liquidity", "moderate", 2492, 271),
-        ("Moderate · no income, Adequate liquidity", "moderate", 89, 23),
-        ("Moderate · Stable income, Weak liquidity", "moderate", 47, 19),
-        ("Moderate · Weak income, Weak liquidity", "moderate", 28, 39),
-        ("Moderate · Weak income, Adequate liquidity", "moderate", 20, 3),
-        ("Moderate · 4 points with distress", "moderate", 13, 3),
+        ("High · Stable income, Adequate liquidity", "high", 46, 10, 111, 17),
+        ("Moderate · Stable income, no liquidity", "moderate", 2597, 273, 19197, 1664),
+        ("Moderate · no income, Adequate liquidity", "moderate", 89, 23, 436, 193),
+        ("Moderate · Stable income, Weak liquidity", "moderate", 46, 19, 156, 47),
+        ("Moderate · Weak income, Weak liquidity", "moderate", 29, 39, 66, 62),
+        ("Moderate · Weak income, Adequate liquidity", "moderate", 21, 4, 30, 13),
+        ("Moderate · 4 points with distress", "moderate", 16, 4, 22, 8),
     ]),
     ("Low: why", [
-        ("1 point (mostly Weak income, nothing else)", "low", 2211, 559),
-        ("0 points, an active CASA where money does not stay", "low", 2065, 656),
-        ("0 points with distress", "low", 1151, 539),
-        ("2–3 points with distress", "low", 310, 83),
+        ("1 point (mostly Weak income, nothing else)", "low", 2164, 557, 10672, 1496),
+        ("0 points, an active CASA where money does not stay", "low", 2049, 649, 1937, 572),
+        ("0 points with distress", "low", 1153, 539, 5560, 1417),
+        ("2–3 points with distress", "low", 322, 90, 1822, 308),
     ]),
     ("Unknown: why", [
-        ("Dormant CASA: no customer money movement in the window", "unknown", 6744, 1779),
-        ("No CASA with us (no transaction or positive balance in 12 months)", "unknown", 4075, 0),
+        ("Dormant CASA: no customer money movement in the window", "unknown", 6716, 1778, 38743, 13542),
+        ("No CASA with us (no transaction or positive balance in 12 months)", "unknown",
+         4044, 0, 239911, 36032),
     ]),
 ]
 SUMMARIES = [
     ("CASA relationship", [
-        ("Active: customer moved money in the window", "high", 3631, 1332),
-        ("Dormant: holds a CASA, no customer movement", "unknown", 9125, 2653),
-        ("No CASA with us", "unknown", 6536, 0),
+        ("Active: customer moved money in the window", "high", 3631, 1332, 4744, 1419),
+        ("Dormant: holds a CASA, no customer movement", "unknown", 9125, 2653, 49500, 16917),
+        ("No CASA with us", "unknown", 6536, 0, 264419, 37035),
     ]),
     ("Internal salary: latest month with AED 1,000 or more", [
-        ("In the window", "high", 440, 205),
-        ("4–6 months ago", "moderate", 3094, 1146),
-        ("7–12 months ago", "moderate", 3599, 888),
-        ("13–24 months ago", "moderate", 1941, 528),
-        ("No salary in 24 months (the history available)", "unknown", 10218, 1218),
+        ("In the window", "high", 440, 205, 613, 149),
+        ("4–6 months ago (in the window at 180+)", "moderate", 3094, 1146, None, None),
+        ("7–12 months ago", "moderate", 3599, 888, 3172, 1273),
+        ("13–24 months ago", "moderate", 1941, 528, 11280, 3963),
+        ("No salary in 24 months (the history available)", "unknown", 10218, 1218, 303598, 49986),
     ]),
     ("Latest AECB salary alert of AED 1,000 or more", [
-        ("In the window", "high", 3729, 461),
-        ("4–6 months ago", "moderate", 2362, 262),
-        ("7–12 months ago", "moderate", 2097, 230),
-        ("13–24 months ago", "moderate", 1349, 274),
-        ("25 or more months ago", "moderate", 902, 285),
-        ("Alert rows, never a salary", "unknown", 7644, 2310),
-        ("No alert row", "unknown", 1209, 163),
+        ("In the window", "high", 3820, 472, 29248, 2981),
+        ("4–6 months ago (in the window at 180+)", "moderate", 2319, 257, None, None),
+        ("7–12 months ago", "moderate", 2077, 229, 9812, 1045),
+        ("13–24 months ago", "moderate", 1346, 274, 12432, 1181),
+        ("25 or more months ago", "moderate", 899, 284, 27234, 2248),
+        ("Alert rows, never a salary", "unknown", 7693, 2325, 150930, 21760),
+        ("No alert row", "unknown", 1138, 144, 89007, 26156),
     ]),
     ("Salary evidence from either source", [
-        ("In the window", "high", 4135, 645),
-        ("Only older", "moderate", 12332, 2615),
-        ("None: no internal salary in 24 months, no AECB salary alert", "unknown", 2825, 725),
+        ("In the window", "high", 4223, 656, 29764, 3105),
+        ("Only older", "moderate", 12253, 2604, 58107, 7684),
+        ("None: no internal salary in 24 months, no AECB salary alert", "unknown",
+         2816, 725, 230792, 44582),
     ]),
     ("Salary stopped: internal salary in the prior window, none in the window", [
-        ("Stopped · no income in the window", "low", 2679, 1025),
-        ("Stopped · Weak on AECB salary", "moderate", 208, 72),
-        ("Stopped · Stable on AECB salary", "high", 207, 49),
-        ("Not stopped", "unknown", 16198, 2839),
+        ("Stopped · no income in the window", "low", 2673, 1019, 2480, 1059),
+        ("Stopped · Weak on AECB salary", "moderate", 208, 76, 347, 119),
+        ("Stopped · Stable on AECB salary", "high", 213, 51, 345, 95),
+        ("Not stopped", "unknown", 16198, 2839, 315491, 54098),
     ]),
     ("Highest monthly CASA balance in the window", [
-        ("AED 3,000 or more", "high", 242, 158),
-        ("AED 1,000–3,000", "moderate", 254, 193),
-        ("Under AED 1,000", "low", 4775, 1410),
-        ("No balance", "unknown", 14021, 2224),
+        ("AED 3,000 or more", "high", 242, 158, 776, 407),
+        ("AED 1,000–3,000", "moderate", 254, 193, 596, 274),
+        ("Under AED 1,000", "low", 4775, 1410, 23929, 7237),
+        ("No balance", "unknown", 14021, 2224, 293362, 47453),
     ]),
     ("End-of-service result from collections, in the window (does not change the state)", [
-        ("Yes", "unknown", 25, 12),
+        ("Yes", "unknown", 25, 12, 18, 15),
     ]),
 ]
 CROSS_COLS = ["AECB in window", "AECB 4–6 m", "AECB 7–12 m", "AECB 13+ m", "Never"]
-CROSS = {  # internal salary (rows) x latest AECB salary alert
-    "Credit cards": [
-        ("Internal in window", 34, 15, 14, 79, 298),
-        ("Internal 4–6 m", 349, 121, 88, 299, 2237),
-        ("Internal 7–12 m", 438, 265, 197, 310, 2389),
-        ("Internal 13–24 m", 268, 167, 189, 213, 1104),
-        ("No internal in 24 m", 2640, 1794, 1609, 1350, 2825),
+CROSS = {  # internal salary (rows) x latest AECB salary alert; None = inside the 180+ window
+    "Credit cards 61–180": [
+        ("Internal in window", 37, 15, 14, 79, 295),
+        ("Internal 4–6 m", 356, 120, 88, 297, 2233),
+        ("Internal 7–12 m", 443, 264, 196, 309, 2387),
+        ("Internal 13–24 m", 280, 163, 186, 212, 1100),
+        ("No internal in 24 m", 2704, 1757, 1593, 1348, 2816),
     ],
-    "Retail loans": [
+    "Retail loans 61–180": [
         ("Internal in window", 21, 1, 4, 29, 150),
-        ("Internal 4–6 m", 93, 47, 42, 178, 786),
-        ("Internal 7–12 m", 108, 62, 42, 136, 540),
-        ("Internal 13–24 m", 91, 49, 40, 76, 272),
-        ("No internal in 24 m", 148, 103, 102, 140, 725),
+        ("Internal 4–6 m", 99, 46, 41, 177, 783),
+        ("Internal 7–12 m", 109, 61, 42, 136, 540),
+        ("Internal 13–24 m", 93, 48, 40, 76, 271),
+        ("No internal in 24 m", 150, 101, 102, 140, 725),
+    ],
+    "Credit cards 180+ (6-month window)": [
+        ("Internal in window", 97, None, 30, 127, 359),
+        ("Internal 7–12 m", 637, None, 237, 300, 1998),
+        ("Internal 13–24 m", 2012, None, 838, 1642, 6788),
+        ("No internal in 24 m", 26502, None, 8707, 37597, 230792),
+    ],
+    "Retail loans 180+ (6-month window)": [
+        ("Internal in window", 25, None, 5, 13, 106),
+        ("Internal 7–12 m", 191, None, 81, 179, 822),
+        ("Internal 13–24 m", 643, None, 272, 642, 2406),
+        ("No internal in 24 m", 2122, None, 687, 2595, 44582),
     ],
 }
 TREND = {  # month: (accounts, high, moderate, low, unknown %)
     "Credit cards 61–180": {
-        "Jan": (14664, 0.43, 19.19, 28.48, 51.90), "Feb": (14576, 0.41, 19.40, 27.41, 52.77),
-        "Mar": (14455, 0.33, 18.27, 28.19, 53.21), "Apr": (14671, 0.31, 17.84, 28.23, 53.62),
-        "May": (15890, 0.35, 17.26, 30.96, 51.44), "Jun": (16982, 0.29, 16.93, 31.39, 51.39),
-        "Jul": (18397, 0.29, 15.08, 32.44, 52.19), "Aug": (19292, 0.24, 13.94, 29.74, 56.08),
+        "Jan": (14664, 0.44, 19.94, 27.73, 51.90), "Feb": (14576, 0.41, 19.47, 27.35, 52.77),
+        "Mar": (14455, 0.33, 18.71, 27.76, 53.21), "Apr": (14671, 0.31, 18.68, 27.39, 53.62),
+        "May": (15890, 0.34, 18.02, 30.20, 51.44), "Jun": (16982, 0.28, 17.57, 30.76, 51.39),
+        "Jul": (18397, 0.29, 15.59, 31.92, 52.19), "Aug": (19292, 0.24, 14.50, 29.48, 55.77),
     },
     "Retail loans 61–180": {
-        "Jan": (2324, 0.04, 12.56, 46.17, 41.22), "Feb": (2213, 0.09, 10.94, 44.24, 44.74),
-        "Mar": (2218, 0.14, 11.23, 45.90, 42.74), "Apr": (2661, 0.15, 11.84, 47.80, 40.21),
-        "May": (3096, 0.10, 11.53, 49.10, 39.28), "Jun": (3514, 0.17, 10.33, 48.80, 40.69),
-        "Jul": (3728, 0.08, 9.63, 47.42, 42.86), "Aug": (3985, 0.28, 8.98, 46.10, 44.64),
+        "Jan": (2324, 0.04, 12.61, 46.13, 41.22), "Feb": (2213, 0.09, 10.85, 44.33, 44.74),
+        "Mar": (2218, 0.14, 11.09, 46.03, 42.74), "Apr": (2661, 0.15, 12.14, 47.50, 40.21),
+        "May": (3096, 0.10, 11.82, 48.80, 39.28), "Jun": (3514, 0.17, 10.36, 48.78, 40.69),
+        "Jul": (3728, 0.08, 9.68, 47.37, 42.86), "Aug": (3985, 0.25, 9.08, 46.05, 44.62),
+    },
+    "Credit cards 180+": {
+        "Jan": (305257, 0.03, 6.19, 6.51, 87.27), "Feb": (306854, 0.02, 6.22, 6.53, 87.23),
+        "Mar": (308742, 0.03, 6.29, 6.46, 87.22), "Apr": (310709, 0.03, 6.35, 6.43, 87.20),
+        "May": (312626, 0.03, 6.35, 6.36, 87.26), "Jun": (314827, 0.03, 6.43, 6.03, 87.50),
+        "Jul": (316738, 0.03, 6.33, 6.34, 87.30), "Aug": (318663, 0.03, 6.25, 6.27, 87.44),
+    },
+    "Retail loans 180+": {
+        "Jan": (52657, 0.02, 3.30, 6.73, 89.96), "Feb": (52882, 0.03, 3.33, 6.65, 89.98),
+        "Mar": (53270, 0.04, 3.46, 6.68, 89.83), "Apr": (53615, 0.03, 3.45, 6.74, 89.78),
+        "May": (54006, 0.03, 3.47, 6.74, 89.76), "Jun": (54383, 0.03, 3.53, 6.40, 90.04),
+        "Jul": (54819, 0.03, 3.54, 6.68, 89.75), "Aug": (55371, 0.03, 3.59, 6.85, 89.53),
     },
 }
 NOTES = [
     "AECB salary alerts arrive only when something changes, so no alert means nothing is known, "
     "not that the salary stopped. Pulls every 2 months would give every customer a value and "
     "would show a stop as a pull with no salary.",
-    "A customer with fewer alerts in the window than before can look like a fall: 912 card and 86 "
-    "loan accounts reach the window total but fail the 25% check. Some are real falls; the data "
-    "cannot yet split them.",
-    "Weak income with nothing else is Low, so a customer with a reported salary can sit below a "
-    "customer we know nothing about (Unknown).",
+    "Fewer alerts in the window than before is not a fall: with no salary with us, the 25% check "
+    "compares the level of the months with a value. A real fall in level stays Weak (848 card and "
+    "80 loan accounts at 61–180 reach the window total but fall more than 25%).",
+    "The AECB salary lifts most of Moderate: 93% of card and 75% of loan Moderate at 61–180 is "
+    "Stable income with no liquidity, mostly AECB. It separates payers well, but an AECB "
+    "Stable customer pays less often than an internal Stable one ('Validation').",
     "The AECB amount is taken as accurate on the pull date. It rarely equals the internal salary "
     "where both exist, and what it looks back over is not yet known.",
-    "August is the lowest month for Moderate. The alert data used ends on 27 August, so the month "
-    "is slightly short.",
-    "Every loan customer shows a CASA transaction, so No CASA never fires on loans and all their "
-    "Unknowns are dormant. The transaction can be just the bank collecting the instalment.",
-    "Loan thresholds are higher: one instalment (median AED 2,389) against the card's oldest "
-    "overdue amount (median AED 837), so a loan salary must cover more to count as Stable.",
+    "Cards 61–180: Moderate falls from 19.9% in January to 14.5% in August while the book grows by "
+    "a third; Unknown rises 3.6 points in August. The raw alert feed misses 6 and 31 August and is "
+    "thin on 24 August, which can explain part of the August rise.",
+    "At 180+ about 9 in 10 accounts are Unknown: most no longer hold a CASA with us (86% of the "
+    "card Unknowns). Cards at 180+ have no amount due, so the floors are flat (Stable needs AED "
+    "9,000 over six months).",
+    "Every loan customer at 61–180 shows a CASA transaction, so No CASA never fires there and all "
+    "their Unknowns are dormant. The transaction can be just the bank collecting the instalment.",
+    "Loan thresholds are higher: one instalment (median AED 2,389 at 61–180) against the card's "
+    "oldest overdue amount (median AED 837), so a loan salary must cover more to count as Stable.",
     "Internal salary and balances cover the PRB, PSB and PB segments (95% of card customers). "
     "Internal salary history starts in September 2024.",
+]
+VALIDATION_DATE = "cohort months Jan–May 2026, outcomes over the next 3 months"
+VALIDATION = [  # (book, [(state, cure, roll, pay any)] in %)
+    ("Credit cards 61–180", [("high", 33.6, 51.7, 53.5), ("moderate", 16.3, 72.4, 42.2),
+                             ("low", 12.1, 80.4, 32.5), ("unknown", 7.9, 87.5, 19.1)]),
+    ("Retail loans 61–180", [("moderate", 14.9, 70.3, 63.1), ("low", 10.8, 80.3, 47.8),
+                             ("unknown", 8.2, 86.3, 34.4)]),
+]
+VALIDATION_FINDINGS = [
+    ("States rank", "Every state cures and pays more, and rolls less, than the one below it, "
+                    "on cards and loans. One exception: card charge-off, Moderate 43.9% against "
+                    "Low 42.2%. Loan High has under 10 accounts."),
+    ("AECB salary helps", "Among customers who would otherwise be Unknown, AECB Stable pays within "
+                          "3 months 17.7 points (cards) and 23.5 points (loans) more often and rolls "
+                          "10.7 and 14.0 points less. AECB Weak gives about half of that."),
+    ("AECB is weaker than internal", "Card Stable on internal salary cures 33.0% and pays 61.0%; "
+                                     "Stable on AECB salary cures 14.4% and pays 40.7%."),
+    ("Stopped salary", "Stopped internal salary cures 10 points less and pays 15 points less. The "
+                       "AECB salary often outlasts the stop."),
+    ("25% check", "Accounts failing it only on fewer alert months behaved like Stable, real "
+                  "falls in level like Weak; the rule now treats them so."),
 ]
 
 
@@ -252,7 +319,7 @@ def overview(wb: Workbook) -> None:
                           "lowers the state, and Unknown marks customers whose money we cannot see.")
     for k, v in [
         ("Scope", "Credit cards and retail loans (Personal Loans, Personal Cash Loans, Auto) at "
-                  "61–180 DPD. 180+ DPD follows."),
+                  "61–180 DPD (3-month window) and 180+ DPD (6-month window)."),
         ("Customer level", "Salary, CASA, card payments and distress are read across all accounts "
                            "of the customer (CIF)."),
         ("Principle", "The state reflects only money we can see. Unknown is absence of data, not "
@@ -268,14 +335,17 @@ def overview(wb: Workbook) -> None:
         chip(s, j, st).alignment = CENTER
     s.ws.row_dimensions[s.r].height = 20
     s.r += 1
-    for name, count, share in (("credit cards", "B", "C"), ("retail loans", "D", "E")):
+    glance = [(f"{book} {dpd.split()[0]}", count, share, first)
+              for dpd, first, _ in STATE_BLOCKS
+              for book, count, share in (("credit cards", "B", "C"), ("retail loans", "D", "E"))]
+    for name, count, share, first in glance:
         for j, _ in enumerate(STATES):
-            cell = s.text(j + 1, f"=Results!{share}{RESULTS_FIRST + j}", align=CENTER)
+            cell = s.text(j + 1, f"=Results!{share}{first + j}", align=CENTER)
             cell.font, cell.number_format = _font(size=20, bold=True, color=NAVY), "0.0%"
         s.ws.row_dimensions[s.r].height = 34
         s.r += 1
         for j, _ in enumerate(STATES):
-            ref = f"Results!{count}{RESULTS_FIRST + j}"
+            ref = f"Results!{count}{first + j}"
             s.text(j + 1, f'=TEXT({ref},"#,##0")&" {name}"', color=MUTED, align=CENTER)
         s.ws.row_dimensions[s.r].height = 20
         s.r += 1
@@ -370,7 +440,9 @@ def logic(wb: Workbook) -> None:
     table("Points", ["Consideration", "Rule", "Result"], [
         ("Income: Stable", "One salary amount per month. The window's total at least 2 × the "
                            "threshold, and no more than 25% below the prior window. Threshold = "
-                           "max(AED 3,000, 2 × the amount due).", "2 points"),
+                           "max(AED 3,000, 2 × the amount due). With no salary with us in either "
+                           "window, the 25% compares the average of the months with an AECB value: "
+                           "alerts arrive only on a change.", "2 points"),
         ("Income: Weak", "Not Stable, but AED 1,000 or more in any month of the window.", "1 point"),
         ("Income: None", "Nothing of AED 1,000 or more in the window.", "0 points"),
         ("Liquidity: Adequate", "CASA average balance at least max(AED 3,000, the amount due) in 2 of 3 "
@@ -414,6 +486,9 @@ INCOME_EXAMPLES = [  # level, internal, AECB pulls, anchor, why
     ("stable", {}, {0: 6000}, 0, "AECB pull this month: one month, but 6,000 reaches the total."),
     ("stable", {}, {-2: 3000, 0: 3000}, 0, "Pulls every 2 months fill the window."),
     ("stable", {}, {-3: 6000}, 0, "Pull just before the window carries into its first month."),
+    ("stable", {}, {-5: 5000, -4: 5000, 0: 7000}, 0,
+     "Fewer alerts, same level: 7,000 against an average of 5,000. No salary with us, so the "
+     "level is compared, not the totals (7,000 against 15,000)."),
     ("weak", {}, {0: 3000}, 0, "AECB pull this month at 3,000: one month, 3,000 against 6,000."),
     ("weak", {-2: 1200, 0: 4000}, {}, 0, "Salary, but 5,200 against the 6,000 total."),
     ("weak", {-1: 5000, 0: 5000}, {}, 3000, "AED 3,000 overdue lifts the total needed to 12,000."),
@@ -514,12 +589,14 @@ def _rows(s: Sheet, rows: list, base: int) -> None:
         chip(s, 1, tone, label)
         for j, n in enumerate(counts):
             L = get_column_letter(2 + 2 * j)
-            s.text(2 + 2 * j, n, color="0000FF", fill=INPUT_FILL).number_format = "#,##0"
+            fill = INPUT_FILL if n is not None else None
+            s.text(2 + 2 * j, n, color="0000FF", fill=fill).number_format = "#,##0"
             share = f'=IF(OR({L}{s.r}="",N({L}${base})=0),"",{L}{s.r}/{L}${base})'
             s.text(3 + 2 * j, share, color=MUTED).number_format = "0.0%"
         _fit(s.ws, s.r, [(label, s.widths[0])], floor=18)
         s.r += 1
-    for col in ("C", "E"):
+    for j in range(len(BOOKS)):
+        col = get_column_letter(3 + 2 * j)
         s.ws.conditional_formatting.add(
             f"{col}{s.r - len(rows)}:{col}{s.r - 1}",
             DataBarRule(start_type="num", start_value=0, end_type="num", end_value=1, color=BAR),
@@ -527,46 +604,48 @@ def _rows(s: Sheet, rows: list, base: int) -> None:
 
 
 def _blocks(wb: Workbook, name: str, lead: str, blocks: list) -> Sheet:
-    s = Sheet(wb.create_sheet(name), [62, 11, 8, 11, 8])
+    s = Sheet(wb.create_sheet(name), [58] + [11, 8] * len(BOOKS))
     s.title(name, lead)
     base = None
     for i, (title, rows) in enumerate(blocks):
         s.section(title, gap=0 if i == 0 else 1)
-        s.header(["", "Credit cards", "share", "Retail loans", "share"], height=30)
+        s.header([""] + [x for b in BOOKS for x in (b, "share")], height=30)
         if base is None:
-            base = _accounts(s, (CC, RL))
+            base = _accounts(s, TOTALS)
         _rows(s, rows, base)
-    s.ws.freeze_panes = "A4"
+    s.ws.freeze_panes = "B4"
     return s
 
 
 def results(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Results"), [28] + [11, 8] * 5)
-    s.title("Results", f"Accounts per state, 61–180 DPD, {RESULTS_DATE}.")
-    s.section("Ability state", gap=0)
+    s.title("Results", f"Accounts per state, {RESULTS_DATE}.")
     heads = ["Credit cards", "Retail loans"] + RL_PRODUCTS
-    s.text(1, "State", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    for j, h in enumerate(heads):
-        s.text(2 + 2 * j, h, span=2, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    s.ws.row_dimensions[s.r].height = 30
-    s.r += 1
-    first, total = s.r, s.r + len(STATE_ROWS)
-    if first != RESULTS_FIRST:
-        raise SystemExit(f"Overview reads Results row {RESULTS_FIRST}, the states start at {first}")
-    for st, *counts in STATE_ROWS:
-        chip(s, 1, st)
-        for j, n in enumerate(counts):
-            L = get_column_letter(2 + 2 * j)
-            s.text(2 + 2 * j, n, color="0000FF", fill=INPUT_FILL).number_format = "#,##0"
-            share = f'=IF(OR({L}{s.r}="",N({L}${total})=0),"",{L}{s.r}/{L}${total})'
-            s.text(3 + 2 * j, share, color=MUTED).number_format = "0.0%"
+    for i, (dpd, row, rows) in enumerate(STATE_BLOCKS):
+        s.section(f"Ability state, {dpd}", gap=0 if i == 0 else 1)
+        s.text(1, "State", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+        for j, h in enumerate(heads):
+            s.text(2 + 2 * j, h, span=2, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+        s.ws.row_dimensions[s.r].height = 30
         s.r += 1
-    s.text(1, "Total", bold=True)
-    for j in range(len(heads)):
-        L = get_column_letter(2 + 2 * j)
-        s.text(2 + 2 * j, f'=IF(COUNT({L}{first}:{L}{total - 1})=0,"",SUM({L}{first}:{L}{total - 1}))',
-               bold=True).number_format = "#,##0"
-        s.text(3 + 2 * j, None)
+        first, total = s.r, s.r + len(rows)
+        if first != row:
+            raise SystemExit(f"Overview reads Results row {row} for {dpd}, the states start at {first}")
+        for st, *counts in rows:
+            chip(s, 1, st)
+            for j, n in enumerate(counts):
+                L = get_column_letter(2 + 2 * j)
+                s.text(2 + 2 * j, n, color="0000FF", fill=INPUT_FILL).number_format = "#,##0"
+                share = f'=IF(OR({L}{s.r}="",N({L}${total})=0),"",{L}{s.r}/{L}${total})'
+                s.text(3 + 2 * j, share, color=MUTED).number_format = "0.0%"
+            s.r += 1
+        s.text(1, "Total", bold=True)
+        for j in range(len(heads)):
+            L = get_column_letter(2 + 2 * j)
+            s.text(2 + 2 * j, f'=IF(COUNT({L}{first}:{L}{total - 1})=0,"",SUM({L}{first}:{L}{total - 1}))',
+                   bold=True).number_format = "#,##0"
+            s.text(3 + 2 * j, None)
+        s.r += 1
     s.section("Reading the results")
     for n in NOTES:
         s.text(1, n, span=s.last, border=False)
@@ -574,24 +653,24 @@ def results(wb: Workbook) -> None:
         s.r += 1
     s.r += 1
     s.note("Which rule gave each state: 'Results detail'. Coverage of salary, CASA and bureau: "
-           "'Results summaries'.")
+           "'Results summaries'. How the states pay and cure: 'Validation'.")
     s.ws.freeze_panes = "B4"
 
 
 def detail(wb: Workbook) -> None:
-    s = _blocks(wb, "Results detail", f"Which rules fire and why, 61–180 DPD, {RESULTS_DATE}. Shares "
-                                      "are of all accounts.", DETAIL)
+    s = _blocks(wb, "Results detail", f"Which rules fire and why, {RESULTS_DATE}. Shares are of all "
+                                      "accounts of the book.", DETAIL)
     s.r += 1
     s.note("The AECB Stable and Weak rows include accounts with internal salary too; on loans AECB "
            "also includes the salary on the loan's own bureau pull. A card payment can sit beside a "
-           "sufficient balance, so the arms overlap in the second Adequate row.")
+           "sufficient balance, so the arms overlap in the second Adequate row. Blank = does not apply.")
 
 
 def summaries(wb: Workbook) -> None:
-    s = _blocks(wb, "Results summaries", f"What we can see of the customer, 61–180 DPD, {RESULTS_DATE}. "
-                                         "Shares are of all accounts.", SUMMARIES)
+    s = _blocks(wb, "Results summaries", f"What we can see of the customer, {RESULTS_DATE}. Shares are "
+                                         "of all accounts of the book. At 180+ the window is 6 months.",
+                SUMMARIES)
     x = Sheet(wb.create_sheet("Salary sources"), [24] + [13] * len(CROSS_COLS))
-    wb.move_sheet(x.ws, 0)
     x.title("Salary sources", f"Accounts by the latest internal salary and the latest AECB salary "
                               f"alert, {RESULTS_DATE}.")
     for i, (name, rows) in enumerate(CROSS.items()):
@@ -600,13 +679,42 @@ def summaries(wb: Workbook) -> None:
         for label, *counts in rows:
             x.text(1, label, bold=True, align=MID)
             for j, n in enumerate(counts, 2):
-                x.text(j, n, color="0000FF", fill=INPUT_FILL).number_format = "#,##0"
+                fill = INPUT_FILL if n is not None else None
+                x.text(j, n, color="0000FF", fill=fill).number_format = "#,##0"
             x.r += 1
     x.r += 1
     x.note("'Never' = no AECB salary alert of AED 1,000 or more, with or without alert rows. "
-           "Before the 1-month carry.")
+           "Before the 1-month carry. At 180+ the window covers months 1–6, so there is no 4–6 row "
+           "or column.")
     s.r += 1
     s.note("Internal salary against AECB salary: 'Salary sources'.")
+
+
+def validation(wb: Workbook) -> None:
+    s = Sheet(wb.create_sheet("Validation"), [26, 20, 20, 20])
+    s.title("Validation", f"Do the states separate customers who pay? 61–180 DPD, {VALIDATION_DATE}, "
+                          "DPD band controlled. Measured on the rules before the level check, which "
+                          "moved 3% of card and 1% of loan accounts.")
+    for i, (book, rows) in enumerate(VALIDATION):
+        s.section(book, gap=0 if i == 0 else 1)
+        s.header(["State", "Cure in 3 months", "Roll in 3 months", "Any payment in 3 months"],
+                 height=30)
+        for st, *shares in rows:
+            chip(s, 1, st)
+            for j, v in enumerate(shares, 2):
+                s.text(j, v / 100, color="0000FF", fill=INPUT_FILL, align=CENTER).number_format = "0.0%"
+            s.r += 1
+    s.section("Findings")
+    s.header(["", "Finding"], [1, 3])
+    for k, v in VALIDATION_FINDINGS:
+        s.text(1, k, bold=True, align=MID)
+        s.text(2, v, span=3, align=MID)
+        _fit(s.ws, s.r, [(v, s.width(2, 4))])
+        s.r += 1
+    s.r += 1
+    s.note("Association, not cause. Cure = back to current; roll = a worse bucket. 180+ is not "
+           "validated: few of its accounts pay or cure.")
+    s.ws.freeze_panes = "A4"
 
 
 def _chart(s: Sheet, title: str, head: int, months: int) -> None:
@@ -629,8 +737,7 @@ def _chart(s: Sheet, title: str, head: int, months: int) -> None:
 
 def trend(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Results trend"), [12, 12] + [11] * len(STATES))
-    s.title("Results trend", "Share of accounts per state by month, Jan–Aug 2026 (month ends), "
-                             "61–180 DPD.")
+    s.title("Results trend", "Share of accounts per state by month, Jan–Aug 2026 (month ends).")
     first_rows = []
     for i, (title, months) in enumerate(TREND.items()):
         s.section(title, gap=0 if i == 0 else 4)
@@ -650,9 +757,10 @@ def trend(wb: Workbook) -> None:
             s.r += 1
     s.r += 1
     for title, head in zip(TREND, first_rows):
-        _chart(s, title.split(" 61")[0], head, len(TREND[title]))
-    s.note("Both books grow from April–May while Moderate falls and Unknown rises from June. August also "
-           "has slightly short alert data ('Results'). High is too small to read on the charts.")
+        _chart(s, title, head, len(TREND[title]))
+    s.note("At 61–180 both books grow from April–May while Moderate falls and Unknown rises from June; "
+           "the August alert gaps may add to it ('Results'). 180+ is flat. High is too small to read "
+           "on the charts.")
     s.ws.freeze_panes = "A4"
 
 
@@ -666,10 +774,13 @@ def build(out: pathlib.Path) -> pathlib.Path:
     detail(wb)
     summaries(wb)
     trend(wb)
-    wb.move_sheet("Salary sources", offset=len(wb.sheetnames) - 2 - wb.sheetnames.index("Salary sources"))
+    validation(wb)
+    order = ["Overview", "Logic", "Thresholds", "Examples", "Results", "Results detail",
+             "Results summaries", "Salary sources", "Results trend", "Validation"]
+    wb._sheets = [wb[name] for name in order]  # pylint: disable=protected-access
     wb.calculation.fullCalcOnLoad = True
     for ws in wb:
-        ws.sheet_properties.tabColor = NAVY if ws.title in ("Overview", "Logic", "Thresholds", "Examples") else "2E75B6"
+        ws.sheet_properties.tabColor = NAVY if ws.title in order[:4] else "2E75B6"
     wb.save(out)
     return out
 
