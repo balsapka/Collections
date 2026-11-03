@@ -849,3 +849,122 @@ Also `nodes.py:39-41` repeats `# pylint: disable=too-many-lines, duplicate-code`
 `rl_a3_payment_credibility/nodes.py:183`: `relativedelta(months=24)` is a literal in the node, while
 every other RL A3 threshold lives in `constants.py`. It is a performance guard, not logic, but it
 should be named and documented there.
+
+## A3 payment credibility: first review (2026-11-03, CC `nodes.py` + `_signals_common.py`, RL adapter)
+
+Paths are relative to `src/enbd_collections/pipelines/crx_persona/`. Code-only review: the DE spec
+(`A3_credibility_shared.xlsx`, "A3 framework") is not in the mirror yet.
+
+### O70 — A3 is keyed on spells and T0, not the observation base (H, confirmed)
+
+Against D5 / P4 / P5. CC: `_build_agreement_bridge` (`cc_a3_payment_credibility/nodes.py:130-187`),
+`resolve_dlq_payment_window` (`cc_a3_payment_credibility/_signals_common.py:75`) and
+`resolve_pre_dlq_spell_window` (`:178-217`) all go through `join_spine_to_spell(cc_spine,
+crx_cc_spell_table)`. The combiner joins Dimension C on `(account_id, t0)` (`nodes.py:1520-1523`). RL does
+the same through `crx_rl_a4_spine` + `rl_spine_as_cc_shim` (`rl_a3_payment_credibility/nodes.py:135,179`,
+`rl_a3_payment_credibility/_signals_common.py`). What follows from that:
+- A3 inherits `join_spine_to_spell`'s row drops (O22). The combiner's base is `commitment_signals`, which
+  is the bridge, so a spine row the join drops is missing from A3 altogether.
+- A NULL `t0` (no spell covers the row) affects three things. The Dim B window falls back to `obs − N m`,
+  because `F.greatest` skips NULLs. Dim C becomes `no_record`. The contact window becomes the whole
+  history (`nodes.py:528`), as do plans on record (`_signals_common.py:1035`).
+- `t0` is the O26-style spell onset. D6 says DCORE windows start at collections entry, taken
+  point-in-time from A4.
+
+### O71 — A3 grain is `cc_spine`'s billing dates; three equality joins depend on them (H, confirmed)
+
+A3 emits `(account_id, observation_date)` from `cc_spine`, which is still on mid-month billing dates in
+PROD. It does not use the month-end `crx_cc_obs_base` that A1 and A2 use. Three joins match on the exact
+date:
+- `dcore_observation_spine` (`nodes.py:172`);
+- `dcore_feat_ptp` / `dcore_feat_settlement` (`nodes.py:320-347`);
+- `cc_spine.dlq_bucket_from_hist` (`_signals_common.py:77`).
+
+They work only while all of these share the same billing date. Once `cc_spine` moves to month end they
+match nothing, and every row turns Thin / mid-band without an error (the A2 date trap, spec §2). The
+persona master would also join A3 on a different date from A1 and A2.
+
+### O72 — The agreement bridge assumes one DCORE agreement per account-date (H, plausible)
+
+`nodes.py:166-174`: a left join to `dcore_observation_spine` on `(account_id, observation_date)` with no
+dedupe and no guard. If an account-date has two agreement rows, every A3 row is duplicated, since the
+bridge is the combiner's base. If an account has several agreements over time, only the one on that date's
+row counts. A2 replaced this with `prm_dcore_account_agreements`, the distinct `(account_id, agreement_id)`
+pairs (decided 2026-10-27). Check needed: count of `(account_id, observation_date)` rows with more than one
+`agreement_id`.
+
+### O73 — Input guards fail soft (M, confirmed)
+
+Against D2:
+- `_guarded_feat` (`nodes.py:190-201`) turns missing columns *or an empty table* into NULL Dim A counts,
+  so every row reads Thin.
+- Missing follow-up columns or an empty follow-up table only log a warning, and the contact evidence is
+  NULL (`nodes.py:431-446`).
+- The instalment and plan tables are optional `= None` parameters (`nodes.py:280-283, 389-391`).
+- `_build_agreement_bridge` raises, but with a hand-written check (`nodes.py:147-152`) instead of
+  `require_columns`.
+
+All of these sources exist in PROD, so they should be required.
+
+### O74 — The 180+ windows are picked per row, not per segment (M, confirmed)
+
+CC picks them with `dlq_bucket_from_hist >= 8` (`_signals_common.py:95`), RL with `dlq_level_m >= 7` read
+at `billing_date == observation_date` (`rl_a3_payment_credibility/_signals_common.py`). A1 and A2 pick
+windows by `model_id` (`_common.window_months`, A2 `GONE_DARK_DAYS` per segment). As a result:
+- In `cc_60_180`, a row at bucket 8 (181–210 DPD) gets 6 / 12-month windows and the 100 AED floor.
+- In RL, a missing month-end row makes the bucket NULL, and the row silently falls into the 61–180 band.
+
+### O75 — Dimension A defines "concluded" twice and uses a different window from the contact evidence (M, confirmed)
+
+- The counts come from `dcore_feat_*` `*_instalment_due_cnt_12m`. Whether that includes pending
+  instalments is not visible here.
+- The broken streak comes from the raw instalments with its own rule: due ≤ obs, paid or overdue
+  (`_signals_common.py:869-973`).
+- Dim A looks back 12 months from the observation date. The strong negatives look at `[t0, obs)`.
+- The Broken rule hardcodes `>= 2` (`nodes.py:251`) instead of `_TAU_A3V2_COMMITMENTS_MIN_CONCLUDED`.
+
+### O76 — Five shadow methods run every time, and their states cannot be computed anyway (M, confirmed)
+
+Three Dim B methods and two Dim C methods, each with its own node and catalog output, are always built.
+The waterfall walk alone is about 20 chained steps over all balance history (`_signals_common.py:303-598`).
+The strong negatives read only the shipped method's any-payment flag (`nodes.py:1274`), so a shadow
+method's state cannot be rebuilt from the output. Ten per-method columns ride along in the output
+(`nodes.py:1416-1429`).
+
+### O77 — `cc_a3_history_floor_date` silently empties Dimension C for older spells (M, confirmed)
+
+`_signals_common.py:208-211`: the C window starts at `greatest(t0 − 12 m, 2024-01-01)`. A spell with
+t0 before 2024-01 matches no cycles and reads `no_record`; t0 in 2024 keeps fewer than 12 months. At 180+
+that covers most accounts. Dim B and the cycle filter use the same floor. RL has no floor at all, so the
+products differ. The effect on the latest month has not been measured.
+
+### O78 — Logging recomputes the lineage (M, confirmed)
+
+P3:
+- `_build_agreement_bridge` runs two `.count()`s per call and is called by nodes 1 and 2
+  (`nodes.py:176-179`).
+- `_guarded_feat` and the follow-up check run `limit(1).count()` (`nodes.py:193, 440`).
+- `_log_a3_stats` runs a count and two collects, one of them over every `a3_path` (`nodes.py:1550-1570`),
+  on top of `log_latest_month`.
+
+### O79 — Dead or uninformative code and columns (L, confirmed)
+
+- `_dcore_codes.RINGING` and `NOT_REACHABLE` are imported nowhere.
+- `on_time_payment_sum_in_cycle` is computed (`_signals_common.py:283-291`) but nothing reads it.
+- The `due_amount_fallback_m` guard (`nodes.py:818-821`) can never fire: `build_a3_payment_cycles`
+  always outputs that column.
+- `a3_confidence` is a fixed constant per state, and `a3_provenance` is just "state != unknown".
+- `computed_at` (`current_timestamp`) makes the output non-deterministic.
+- `a3_state_v1` carries a version suffix (P7).
+
+### O80 — `rpc_confirmed` and the disposition classifier use different code lists (L, confirmed)
+
+`rpc_confirmed` (`nodes.py:586-593`) tests `RIGHT_PARTY_CONTACT` only. `HISTORICAL PROMISE TO PAY` and
+`RETAIN PTP` are classified as a PTP disposition but are not in that set, so a PTP-only contact gives
+`rpc_confirmed = 0`. Low impact: no_response also requires no plan on record.
+
+### O81 — RL Dimension C judges against `monthly_emi_due` and Dimension B against `monthly_emi_asof` (L, confirmed)
+
+`rl_a3_payment_credibility/nodes.py` (C: `_has_due` / `_paid_as_billed` on `monthly_emi_due`; B:
+`monthly_emi_asof`). A month with a NULL EMI snapshot has no due in C but is judged in B against the
+forward-filled EMI.
