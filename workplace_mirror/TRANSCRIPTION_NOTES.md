@@ -311,8 +311,7 @@ transcribed verbatim to `bundle_helpers/b12_a1/b12_summary_{cc_60_180, cc_180_pl
 Every `##` heading sits on the photo's line number. Photos: cc_60_180 8699–8704, cc_180_plus 8705–8710,
 rl_60_180 8711–8714, 8716–8718, rl_180_plus 8719–8720, 8722–8726 (8715 and 8721 were not in the batch;
 the neighbouring photos overlap them, so nothing is lost).
-Incomplete: `b12_summary_cc_60_180.md` ends at line 302. The photos stop mid-table in section 13 (WM vs FTR);
-the row after "True | True | True | False" (True | True | True | True) and anything after it are missing.
+Complete: `b12_summary_cc_60_180.md` ends at line 302 (the last WM vs FTR row, `True | True | True | False`; confirmed by the user as the end of the file).
 Table separator alignment (`---:`) was normalised; the numbers are as photographed. Not reviewed.
 
 ## Review findings
