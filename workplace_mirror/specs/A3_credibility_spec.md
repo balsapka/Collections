@@ -4,6 +4,26 @@ Code reviewed: O66–O81 in `REVIEW_OBSERVATIONS.md`. The DE spec (`A3_credibili
 "A3 framework") is not in the mirror yet; until it is, the rules below plus the code's `[CONFIRM]`
 thresholds are the reference.
 
+## What A3 measures (working framing, 2026-11-03)
+
+GRR reframed the axis from payment intent to **payment credibility**: how far we can believe this
+customer will pay on this debt. Two kinds of evidence:
+- **Trust: does what they say happen?** Promises and arrangements made and honoured (Dimension A), and
+  explicit statements of non-intent (refusal). Depends on DCORE, whose promise records and the actual
+  payments do not always line up.
+- **Flow: is money coming in, and did it before?** Payments while delinquent (Dimension B) and the
+  record before delinquency (Dimension C). This is also the best available read of intent.
+
+Not A3: capacity to pay (A1), reachability / location (A2), the DPD path itself (A4).
+
+A **strong negative** earns its place only when all four hold:
+1. it adds evidence the points do not already carry;
+2. the data behind it is reliable;
+3. it does not re-derive another axis;
+4. it moves states in a way that makes sense on PROD.
+
+Measured, not assumed (V2, V3).
+
 ## Decided
 
 - **D-A3-1: no spells, no T0 (D5).** Grain = the month-end observation base
@@ -85,6 +105,15 @@ thresholds are the reference.
   Report per variant: firing rate; crosstab with A2 reachability (`non_reachable / reachable / unknown`);
   the A3 state distribution with it; the result names that drive it; how many rows each variant
   moves versus N3.
+
+- **V3 (orthogonality, PROD aggregates):** crosstab A3 levels against the other axes at the latest
+  month, per model_id: Dimension C (clean / not clean / no record) against A4 state and its
+  prior-episode features (`n_prior_episodes`, `clean_gap_before_current`); Dimension B against A4's
+  recent-transition pattern; A3 state against A1 state. The question is whether C and B add anything
+  beyond the DPD path.
+- **V1 extension (promise vs ledger):** for concluded PTP / settlement instalments, how often DCORE's
+  paid / overdue status agrees with the payments actually received in Way4 (CC) or `total_paid` (RL)
+  between the promise and its due date.
 
 ## Open (asked 2026-11-03)
 
