@@ -294,7 +294,6 @@ NOTES = [
     "Internal salary and balances cover the PRB, PSB and PB segments (95% of card customers). "
     "Internal salary history starts in September 2024.",
 ]
-PENDING = ""  # an entry cell left for a result not back yet
 AECB_BLOCKS = [  # counts in the order of BOOKS
     ("Accounts whose state rests on an AECB salary alone (no internal salary in the window)", [
         ("High", "high", 8, 0, 44, 5),
@@ -310,22 +309,22 @@ AECB_BLOCKS = [  # counts in the order of BOOKS
          7693, 2325, 150930, 21760),
         ("No alert row: not in the alert feed", "unknown", 1138, 144, 89007, 26156),
     ]),
-    ("What-if: the last AECB salary still holds (cards back, loans pending)", [
+    ("What-if: the last AECB salary still holds (cards only)", [
         ("Unknown today (S0)", "unknown", 10760, 1778, 278654, 49574),
         ("Unknown if an AECB salary of the last 6 months held (S6)", "unknown",
-         9456, PENDING, 275373, PENDING),
+         9456, None, 275373, None),
         ("Unknown if an AECB salary of the last 12 months held (S12)", "unknown",
-         9047, PENDING, 273861, PENDING),
+         9047, None, 273861, None),
         ("High + Moderate today (S0)", "moderate", 2844, 372, 20018, 2004),
-        ("High + Moderate (S6)", "moderate", 3902, PENDING, 23983, PENDING),
-        ("High + Moderate (S12)", "moderate", 4265, PENDING, 25824, PENDING),
+        ("High + Moderate (S6)", "moderate", 3902, None, 23983, None),
+        ("High + Moderate (S12)", "moderate", 4265, None, 25824, None),
     ]),
-    ("Today's Unknown by its latest AECB salary alert (cards back, loans pending)", [
-        ("In the window", "unknown", 101, PENDING, 306, PENDING),
-        ("4–24 months ago: too old (7–24 at 180+)", "moderate", 4017, PENDING, 18065, PENDING),
-        ("25 or more months ago", "unknown", 607, PENDING, 25869, PENDING),
-        ("Alert rows, never a salary alert", "unknown", 5090, PENDING, 145558, PENDING),
-        ("No alert row", "unknown", 945, PENDING, 88856, PENDING),
+    ("Today's Unknown by its latest AECB salary alert (cards only)", [
+        ("In the window", "unknown", 101, None, 306, None),
+        ("4–24 months ago: too old (7–24 at 180+)", "moderate", 4017, None, 18065, None),
+        ("25 or more months ago", "unknown", 607, None, 25869, None),
+        ("Alert rows, never a salary alert", "unknown", 5090, None, 145558, None),
+        ("No alert row", "unknown", 945, None, 88856, None),
     ]),
 ]
 AECB_TODAY_VS_FREQUENT = [  # topic, today, with pulls every 2 months
@@ -670,9 +669,8 @@ def _rows(s: Sheet, rows: list, base: int) -> None:
         chip(s, 1, tone, label)
         for j, n in enumerate(counts):
             L = get_column_letter(2 + 2 * j)
-            fill = INPUT_FILL if n is not None else None  # PENDING = an empty entry cell
-            value = None if n is PENDING else n
-            s.text(2 + 2 * j, value, color="0000FF", fill=fill).number_format = "#,##0"
+            fill = INPUT_FILL if n is not None else None
+            s.text(2 + 2 * j, n, color="0000FF", fill=fill).number_format = "#,##0"
             share = f'=IF(OR({L}{s.r}="",N({L}${base})=0),"",{L}{s.r}/{L}${base})'
             s.text(3 + 2 * j, share, color=MUTED).number_format = "0.0%"
         _fit(s.ws, s.r, [(label, s.widths[0])], floor=18)
@@ -830,7 +828,7 @@ def aecb(wb: Workbook) -> None:
     s.note("The what-if keeps every rule and only lets the last AECB salary count for 6 or 12 months "
            "instead of 1 (never backwards, a closure stops it): a ceiling for customers who already "
            "had a salary alert. Card results: workplace_mirror/bundle_helpers/a1_final/"
-           "aecb_whatif_results_cc.md; loans: same prompt, not run yet.")
+           "aecb_whatif_results_cc.md. Not run for loans: blank.")
 
 
 def _chart(s: Sheet, title: str, head: int, months: int) -> None:

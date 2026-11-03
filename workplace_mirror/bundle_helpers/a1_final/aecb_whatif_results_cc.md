@@ -51,6 +51,7 @@ S0 check passes on both (0 states and 0 income levels differ). Every column sums
   The bigger lever is the never-alerted salaried group (70% of it at 61–180), which only a real
   2-monthly pull can show.
 
-## Left
+## RL
 
-RL (`rl_60_180`, `rl_180_plus`): same snippet, then the loan cells in the workbook.
+Not run (user, 2026-11-03): the loan cells of the workbook's what-if blocks stay blank. The prompt
+is retired; it is in git history (`sonnet_a1_aecb_whatif_prompt.md`) if RL is wanted later.
