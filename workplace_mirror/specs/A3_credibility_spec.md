@@ -43,6 +43,11 @@ thresholds are the reference.
   and its billing-date equality join go (O71, O72). Payments are the account's own. An exception to the
   CIF-level rule for customer signals: credibility is about this debt.
 
+- **D-A3-8: "paid as billed" = paid before the next statement, not by the due date** (user,
+  2026-11-03; departs from the DE sheet row 31, O82). CC: the cycle's payments with
+  `billing_date < banking_date <= next_billing_date` reach the billed amount; RL: the month's cash
+  reaches the EMI. `on_time_payment_sum_in_cycle` and the TEMPORARY note go.
+
 ## Open (asked 2026-11-03)
 
 - Required inputs (D2) for all DCORE tables and `crx_cc_transactions` (O73)?
