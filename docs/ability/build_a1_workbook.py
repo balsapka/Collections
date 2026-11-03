@@ -128,6 +128,11 @@ DETAIL = [  # counts in the order of BOOKS; None = does not apply
          848, 80, 4691, 430),
         ("Weak · window total not reached", "moderate", 923, 157, 5432, 798),
     ]),
+    ("The 25% rule (decision open, 'Validation'): Stable income with and without it", [
+        ("Stable income today", "high", 2996, 371, 21237, 1994),
+        ("Weak only because of the 25% rule (AECB in the window)", "moderate", 848, 80, 4691, 430),
+        ("Stable income if the rule were removed", "high", 3844, 451, 25928, 2424),
+    ]),
     ("Liquidity: the arm that fired", [
         ("Adequate · CASA balance (no external card payment)", "high", 142, 46, 583, 255),
         ("Adequate · with an external card payment (card or CASA arm)", "high", 54, 11, 72, 10),
@@ -269,7 +274,8 @@ NOTES = [
     "would show a stop as a pull with no salary.",
     "Fewer alerts in the window than before is not a fall: with no salary with us, the 25% check "
     "compares the level of the months with a value. A real fall in level stays Weak (848 card and "
-    "80 loan accounts at 61–180 reach the window total but fall more than 25%).",
+    "80 loan accounts at 61–180 reach the window total but fall more than 25%). Whether to keep "
+    "the 25% rule is open: evidence and options on 'Validation'.",
     "The AECB salary lifts most of Moderate: 93% of card and 75% of loan Moderate at 61–180 is "
     "Stable income with no liquidity, mostly AECB. It separates payers well, but an AECB "
     "Stable customer pays less often than an internal Stable one ('Validation').",
@@ -308,6 +314,25 @@ VALIDATION_FINDINGS = [
                        "AECB salary often outlasts the stop."),
     ("25% check", "Accounts failing it only on fewer alert months behaved like Stable, real "
                   "falls in level like Weak; the rule now treats them so."),
+]
+RULE_25 = [  # pooled Jan–May rows, cards 61–180 unless named
+    ("Fewer alert months, same level (Stable since the level check)", "2,793", "–", "–",
+     "−1.8 (ns)"),
+    ("Real fall in level, cards (Weak under the rule)", "774", "−5.5", "+8.3", "−11.8"),
+    ("Real fall in level, loans", "83", "ns", "ns", "ns"),
+]
+RULE_25_OPTIONS = [
+    ("What the rule still does", "It holds at Weak an account whose salary reached the window "
+     "total but fell by more than 25%: a lower AECB amount, or an internal salary that stopped "
+     "and was replaced by one AECB pull."),
+    ("Keep (recommended at 61–180)", "On cards the real falls pay 11.8 points less and roll 8.3 "
+     "points more than Stable: they are not Stable customers. The part of the rule that was wrong "
+     "(fewer alert months) is already fixed by the level check."),
+    ("Remove", "Simpler rule: Stable = the window total alone. 848 card and 80 loan accounts at "
+     "61–180 (4,691 and 430 at 180+) become Stable and gain one point, so up to that many move up "
+     "one state, mostly Low to Moderate."),
+    ("Evidence gaps", "Loans: 83 rows, no difference shown either way. 180+: not validated. "
+     "Accounts with internal salary only that fail the rule are not counted in the check."),
 ]
 
 
@@ -691,7 +716,7 @@ def summaries(wb: Workbook) -> None:
 
 
 def validation(wb: Workbook) -> None:
-    s = Sheet(wb.create_sheet("Validation"), [26, 20, 20, 20])
+    s = Sheet(wb.create_sheet("Validation"), [34, 16, 16, 16, 16])
     s.title("Validation", f"Do the states separate customers who pay? 61–180 DPD, {VALIDATION_DATE}, "
                           "DPD band controlled. Measured on the rules before the level check, which "
                           "moved 3% of card and 1% of loan accounts.")
@@ -705,15 +730,30 @@ def validation(wb: Workbook) -> None:
                 s.text(j, v / 100, color="0000FF", fill=INPUT_FILL, align=CENTER).number_format = "0.0%"
             s.r += 1
     s.section("Findings")
-    s.header(["", "Finding"], [1, 3])
+    s.header(["", "Finding"], [1, 4])
     for k, v in VALIDATION_FINDINGS:
         s.text(1, k, bold=True, align=MID)
-        s.text(2, v, span=3, align=MID)
-        _fit(s.ws, s.r, [(v, s.width(2, 4))])
+        s.text(2, v, span=4, align=MID)
+        _fit(s.ws, s.r, [(v, s.width(2, 5))])
+        s.r += 1
+    s.section("Decision open: keep or remove the 25% rule")
+    s.header(["Accounts failing only the 25% rule", "Rows", "Cure vs Stable", "Roll vs Stable",
+              "Payment vs Stable"], height=30)
+    for label, *cells in RULE_25:
+        s.text(1, label, bold=True, align=MID)
+        for j, v in enumerate(cells, 2):
+            s.text(j, v, align=CENTER)
+        _fit(s.ws, s.r, [(label, s.widths[0])])
+        s.r += 1
+    for k, v in RULE_25_OPTIONS:
+        s.text(1, k, bold=True, align=MID)
+        s.text(2, v, span=4, align=MID)
+        _fit(s.ws, s.r, [(v, s.width(2, 5))])
         s.r += 1
     s.r += 1
-    s.note("Association, not cause. Cure = back to current; roll = a worse bucket. 180+ is not "
-           "validated: few of its accounts pay or cure.")
+    s.note("Association, not cause. Cure = back to current; roll = a worse bucket; differences in "
+           "percentage points, DPD band controlled, ns = not significant. 180+ is not validated: "
+           "few of its accounts pay or cure. Latest-month counts: 'Results detail'.")
     s.ws.freeze_panes = "A4"
 
 
