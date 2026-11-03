@@ -35,3 +35,10 @@ thresholds are the reference.
 - `cc_a3_history_floor_date`: keep and measure, or drop (O77)?
 - Ladder: a clean record alone (1 point) gives Moderate; Unknown plus a strong negative gives Low; the
   `[CONFIRM]` thresholds stand until GRR says otherwise.
+- **CC sources (user, 2026-11-03: review whether the builders are needed or belong in the CC
+  pipelines).** Today `crx_cc_billing` / `crx_cc_balance` / `crx_cc_transactions` (`cc_raw_extract`)
+  read `raw_*` inside crx_persona, re-implement the `prm_cc` derivations and are scoped by T0 windows,
+  which breaks D5 and the §7 layer rule. Proposal pending photos: the CC primary pipeline owns the raw
+  reads (`prm_balance` / `prm_transaction` / a billing primary, extended with the columns A3 needs),
+  the per-cycle ledger (`build_a3_payment_cycles`) becomes a CC feature, and A3 signals read obs base +
+  that feature. Open: whether the CC primaries stay model-scoped or cover all contracts from a date floor.
