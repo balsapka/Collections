@@ -102,48 +102,42 @@ Measured, not assumed (V2, V3).
   if the one-layer rule needs it); and compare the new 12-month counts with the `dcore_feat_*_12m`
   counts on PROD (aggregates) so a difference is explained before shipping.
 
-- **V2 (no response, Sonnet, PROD aggregates; draft for the user to review):** direction (user,
-  2026-11-03): keep the axes orthogonal, so A3 must not re-derive A2's Non-Reachable; the avoidance
-  signal A2 dropped may come back here; decide from data. Facts: A2 `FAILED_CALL` holds all 18
-  `NOT_REACHABLE` names *and* `RINGING NO REPLY / RESPONSE`, `NO ANSWER`, `LEFT_MSG`, so an "unanswered
-  calls" rule overlaps Non-Reachable by construction; the old A2 `avoiding` state (ringing, live line, no
-  pickup) was 24% of CC and split about evenly between new reachable and non-reachable (b07 check).
-  Variants, each at the latest month per model_id, CC and RL:
-  - N0, today's rule (3+ call days in the delinquency, no right-party contact, no plan, no payment);
-  - N1, avoidance: 3+ distinct days of live-line no-pickup outcomes (`RINGING`, `NO ANSWER`, `LEFT_MSG`)
-    in the delinquency, none of the `NOT_REACHABLE` outcomes in between, no plan, no payment ≥ 100 AED;
-  - N2, avoidance after contact: N1, and only after a right-party contact earlier in the delinquency
-    (the line and the customer are proven, then the customer stops answering);
-  - N3, no contact-based negative.
-  Report per variant: firing rate; crosstab with A2 reachability (`non_reachable / reachable / unknown`);
-  the A3 state distribution with it; the result names that drive it; how many rows each variant
-  moves versus N3.
+- **V2 (strong-negative candidates, Sonnet, PROD aggregates):** direction (user, 2026-11-03):
+  hard negatives only where they add to the picture; keep the axes orthogonal (A3 must not re-derive
+  A2's Non-Reachable). Three candidates to explore (user, 2026-11-03), each measured on its own, at the
+  latest month per model_id, CC and RL:
+  - **Explicit refusal:** the latest right-party contact in the delinquency is a clear refusal
+    (`REFUSE TO PAY`, `REFUSED TO PAY`, `KSA/REFUSE TO PAY`, `REWRITE NOT AGREED`), with no promise,
+    arrangement or payment ≥ 100 AED after it.
+  - **Dispute:** the same rule with `DISPUTE` / `KSA/DISPUTE`; it contests the debt, so it may be a
+    flag rather than a negative.
+  - **Avoidance:** the customer does not take calls on a working line. Variants:
+    - N0, today's no-response rule;
+    - N1, 3+ days of ringing / no-answer / left-message outcomes in the delinquency, no dead-line
+      outcome (`NOT_REACHABLE`) in between, no plan, no payment ≥ 100 AED;
+    - N2, N1 but only after a right-party contact earlier in the delinquency;
+    - N4, hang-ups (`CUSTOMER HUNG UP`, `CUSTOMER_HUNG_UP`) as the latest right-party contact, nothing
+      after;
+    - N3, none.
+    Facts: A2 `FAILED_CALL` holds all 18 `NOT_REACHABLE` names and the ringing / no-answer /
+    left-message ones, so any unanswered-calls rule overlaps Non-Reachable by construction. The old A2
+    `avoiding` state was 24% of CC and split about evenly between the new reachable and non-reachable
+    (b07 check).
+  For every candidate, report:
+  - the firing rate;
+  - the crosstab with A2 reachability;
+  - the A3 state distribution with and without it;
+  - the result names that drive it, including how often each `REFUSING` name and `CUSTOMER MISBEHAVED`
+    is the latest right-party contact;
+  - the overlap between the candidates;
+  - the rows each candidate moves against a run with no negative.
 
-- **Overlap notes to carry into the model spec (2026-11-03):**
-  - Broken commitments as built counts twice: the level scores 0 and the negative demotes it again,
-    so it acts as a "Broken → Low" cap that rests on DCORE's paid / overdue status.
-  - Refusal is the one negative that carries stated intent. The `REFUSING` list mixes in disputes
-    (`DISPUTE`, `KSA/DISPUTE`), which contest the debt, and `CUSTOMER HUNG UP`, which is closer to
-    avoidance: review it.
-  - No response as built re-derives A2 Non-Reachable (V2).
-  - Dimension C on the latest spell start may duplicate A4's prior episodes; Dimension B may
-    duplicate A4's recent transitions (V3).
-  - A kept PTP and regular payments can be the same cash (A 2 + B 2 = High from one cash flow).
-  - Without DCORE commitments the maximum is 3 points (B regular + C clean) = Moderate, so High
-    depends on DCORE.
-- **V3 (orthogonality, PROD aggregates):** crosstab A3 levels against the other axes at the latest
-  month, per model_id: Dimension C (clean / not clean / no record) against A4 state and its
-  prior-episode features (`n_prior_episodes`, `clean_gap_before_current`); Dimension B against A4's
-  recent-transition pattern; A3 state against A1 state. The question is whether C and B add anything
-  beyond the DPD path.
-- **V1 extension (promise vs ledger):** for concluded PTP / settlement instalments, how often DCORE's
-  paid / overdue status agrees with the payments actually received in Way4 (CC) or `total_paid` (RL)
-  between the promise and its due date.
-
+  The right-party definition is checked here too: today `rpc_confirmed` uses `RIGHT_PARTY_CONTACT`
+  only, while the classifier also counts `HISTORICAL PROMISE TO PAY` / `RETAIN PTP` (O80).
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
-- No response strong negative: redesign pending V2 (O85's extra condition goes with it).
+- Strong negatives (broken commitments, refusal, dispute, avoidance): pending V1 and V2; O85's extra condition goes with the redesign.
 - Ladder: a clean record alone (1 point) gives Moderate; Unknown plus a strong negative gives Low; the
   `[CONFIRM]` thresholds stand until GRR says otherwise.
 - **CC sources (user, 2026-11-03: review whether the builders are needed or belong in the CC
