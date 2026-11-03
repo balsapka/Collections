@@ -48,6 +48,22 @@ thresholds are the reference.
   `billing_date < banking_date <= next_billing_date` reach the billed amount; RL: the month's cash
   reaches the EMI. `on_time_payment_sum_in_cycle` and the TEMPORARY note go.
 
+- **D-A3-9: commitments counted once, from the instalments** (user, 2026-11-03, provisional on V1).
+  Kept / concluded counts and the broken streak come from one rule over the PTP and settlement
+  instalments: concluded = due on or before the observation date and paid or overdue (pending ones
+  do not count), window = `[max(latest spell start, obs − 12 m), obs]` (spec rows 19, 76; O75, O83).
+  `dcore_feat_ptp` / `dcore_feat_settlement` are no longer read.
+
+## Validations before the bundle
+
+- **V1 (DCORE instalments, Sonnet, no photos unless needed):** confirm the columns and meaning of
+  `dcore_prm_promise_instalments`, `dcore_prm_settlement_schedule_instalments`, `dcore_int_ptp`,
+  `dcore_int_settlement` (agreement link, due / paid amounts, instalment and cancel statuses, what
+  dcore's `instalment_amount_flags` calls paid / overdue); decide the layer the A3 node reads (the
+  link sits in `dcore_int_*`, the instalments in `dcore_prm_*`; a feature table per agreement × month
+  if the one-layer rule needs it); and compare the new 12-month counts with the `dcore_feat_*_12m`
+  counts on PROD (aggregates) so a difference is explained before shipping.
+
 ## Open (asked 2026-11-03)
 
 - Required inputs (D2) for all DCORE tables and `crx_cc_transactions` (O73)?
