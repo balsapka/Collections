@@ -26,9 +26,13 @@ thresholds are the reference.
 - **D-A3-4: output.** `a3_state_v1` → `a3_state`; `a3_confidence`, `a3_provenance`, `computed_at` and the
   per-method columns are dropped (user, 2026-11-03).
 
+- **D-A3-5: 100 AED minimum payment guardrail in every band, not only 180+** (user, 2026-11-03).
+  The exact scope (Dimension B qualifying and any-payment, Dimension C, the refusal follow-up) is
+  being settled with the open items below.
+
 ## Open (asked 2026-11-03)
 
-- 180+ windows and the 100 AED floor: by `model_id`, as A1 / A2 do, or by the row's current bucket (O74)?
+- 180+ windows: by `model_id`, as A1 / A2 do, or by the row's current bucket (O74)?
 - DCORE link: A2's `prm_dcore_account_agreements` (all agreements of the account); account level or
   CIF level (O72)?
 - Required inputs (D2) for all DCORE tables and `crx_cc_transactions` (O73)?
