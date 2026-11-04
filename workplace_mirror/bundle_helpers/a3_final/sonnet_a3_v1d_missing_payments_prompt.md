@@ -67,10 +67,35 @@ month / not paid, and say whether int_loan_master has any other paid or last-pay
 Rules
 catalog.load only (FTR and Way4 tables through their catalog entries); model_id =
 catalog.load("params:model_id"), in every output file name; aggregates only, no account / agreement /
-CIF ids, cells under 10 as "<10". The V1-V4 snippet was slow: build the instalment list with its group
-once, persist it, filter every source to those accounts / CIFs and the date range before any join, and
-avoid iterative plan growth (no long chains of window / join steps in a loop; checkpoint if needed). A
-part that fails records its error and the rest still runs.
+CIF ids, cells under 10 as "<10". A part that fails records its error and the rest still runs.
+
+Performance (hard rules: the V1-V4 / V1c snippets ran for hours and section 4 died on a Java heap
+error from driver-side plan growth, not data volume)
+- Build the instalment list with its group once (~17k CC, ~1.2k RL instalments): only the columns
+  needed, then persist + count, or localCheckpoint(), so later parts start from a short lineage. Never
+  write row-level data into the tracked folder.
+- Read only the partitions needed. From the instalment list, collect two scalars to the driver:
+  lo = min(plan start) and hi = max(due date) + 30 days (the widest window any part uses). Filter
+  every source with literal values right after catalog.load, before any join or select of the rest:
+    - Hive / raw sources (FTR, Way4, the raw source behind crx_cc_transactions, DCORE raw if used) on
+      their partition column (edp_load_date for FTR and the Way4 extracts), widened by the same
+      EDP_LOAD_DATE_BUFFER_MONTHS buffer as cc_raw_extract/_window_utils.prune_by_edp_load_date;
+    - WM / our partitioned outputs on their partition column (week_number, event_month);
+    - flat parquet outputs (crx_cc_transactions, crx_cc_balance, cc_spine, int_loan_master, the dcore
+      tables) on their date column, so the filter is pushed down.
+  A filter written as a join to the instalment list does not prune: use literals.
+- Check pruning before the heavy work: for each partitioned source print the physical plan
+  (df.explain()) and confirm PartitionFilters is not empty. If it is, fix the filter (column type,
+  string vs date) before running that part. Record the filter and the partitions read per source in
+  the README.
+- Then narrow to the population: inner join to the distinct account / CIF list with
+  F.broadcast(...) (a few thousand to ~20k keys), right after the date filter.
+- No plan growth: no Python loops that chain window / join steps on one DataFrame. Compute the three
+  groups and all buckets in one groupBy with conditional aggregates per part. After each part:
+  unpersist what it cached (or spark.catalog.clearCache()).
+- No collect() / toPandas() of row-level data; only the final aggregates come to the driver.
+- Time a dry run on the latest 3 months of due dates first; if a part takes over ~10 minutes there,
+  fix it before the full run. Report each part's runtime in the results file.
 
 Deliverables
 1. Snippet + README_v1d.md in tmp_validation/a3_v1_v4/, pushed from UAT. The README names every table
