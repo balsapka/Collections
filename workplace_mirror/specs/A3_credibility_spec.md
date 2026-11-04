@@ -138,6 +138,16 @@ Measured, not assumed (V2, V3).
   not unwillingness. `CUSTOMER HUNG UP` moves to the avoidance diagnostics (D-A3-19);
   `CUSTOMER MISBEHAVED` is dropped. The `_dcore_codes.REFUSING` set is split accordingly (A3 only).
 
+- **D-A3-21: both flow dimensions stay as they are; the overlap with A4 is reported** (user,
+  2026-11-04, from V3). Payments drive the DPD path, so overlap is expected (V 0.53–0.62). Both
+  dimensions still split A4's large states. `no_record` is A4's early payment default almost exactly.
+  The axis report shows the crosstabs.
+- **V4 read (2026-11-04):** the thresholds ship as decided (D-A3-16). Only the Moderate cut-off really
+  matters: Moderate from 2 points instead of 1 moves 19% CC / 29% RL. High from 3 / 5 moves 2–6%;
+  every other threshold moves ≤ 4%. High from 3 is the lever if High (today reachable only with DCORE
+  commitments) should open to regular payments plus a clean record. Both are for the GRR calibration,
+  not this bundle.
+
 ## Validations before the bundle
 
 Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`. Results (60_180):
@@ -202,7 +212,7 @@ Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`. Results
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
-- Strong negatives (broken commitments, refusal, dispute, avoidance): pending V1 and V2; O85's extra condition goes with the redesign.
+- Broken commitments (negative, cap or drop) and D-A3-11: pending the V1c rerun.
 - **CC sources (superseded by D-A3-18 for this bundle; kept as the later option).** Today `crx_cc_billing` / `crx_cc_balance` / `crx_cc_transactions` (`cc_raw_extract`)
   read `raw_*` inside crx_persona, re-implement the `prm_cc` derivations and are scoped by T0 windows,
   which breaks D5 and the §7 layer rule. Proposal pending photos: the CC primary pipeline owns the raw
