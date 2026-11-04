@@ -121,6 +121,15 @@ Measured, not assumed (V2, V3).
   option. The builders still lose their T0 windows (D-A3-1): rescoping them needs the current
   `cc_raw_extract/nodes.py` (`build_cc_acct_windows`, `build_cc_billing`) at bundle time.
 
+- **D-A3-19: no contact-based negative in the state** (user, 2026-11-04, from V2). Today's no-response
+  rule goes: it fires on 36% CC / 26% RL and is 84% / 78% A2 Non-Reachable (dead-line outcomes), so
+  it re-derives A2. The avoidance variants overlap A2 too (66–76%). Two diagnostic columns stay in the
+  output, outside the state, for analysis and the persona master:
+  - no pickup after an earlier right-party contact: 3 days at 61–180, 6 at 180+ of ringing / no answer /
+    left message, no dead-line outcome in between;
+  - hang-up as the latest right-party contact.
+  O85 goes with the rule.
+
 ## Validations before the bundle
 
 Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`.
