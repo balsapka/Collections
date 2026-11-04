@@ -140,7 +140,9 @@ Measured, not assumed (V2, V3).
 
 ## Validations before the bundle
 
-Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`.
+Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`. Results (60_180):
+`v1_v4_summary_60_180.md`, review `v1_v4_review.md`. V1c rerun with the corrected allocation (user,
+2026-11-04): `sonnet_a3_v1c_rerun_prompt.md`; D-A3-11 and the Broken question wait on it.
 
 
 - **V1 (DCORE instalments, Sonnet, no photos unless needed):** confirm the columns and meaning of
