@@ -328,6 +328,13 @@ Not full files, so nothing under `src/` or `conf/` changed.
   `genesys`; the bundle 13 check entry is gone).
 Still missing: the `crx_cc_a3_*` / `crx_rl_a3_*` / `crx_rl_a4_spine` catalog entries (after line 289).
 
+## Handoff 33 (A3 session): V1–V4 summary, 60_180 models (2026-11-04)
+
+`pics/claude_code_handoff_33.md` (written in chat from 5 photos of `tmp_validation/a3_v1_v4/summary.md`)
+→ `bundle_helpers/a3_final/v1_v4_summary_60_180.md`, lines 1–119 as given, with the handoff's notes
+appended. Review: `bundle_helpers/a3_final/v1_v4_review.md`. The A1 handoff 33 above is a different
+handoff (same number, other session).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
