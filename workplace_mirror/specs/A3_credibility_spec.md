@@ -130,6 +130,14 @@ Measured, not assumed (V2, V3).
   - hang-up as the latest right-party contact.
   O85 goes with the rule.
 
+- **D-A3-20: explicit refusal is A3's stated-intent negative; dispute is a column** (user, 2026-11-04,
+  from V2). Refusal = the latest right-party contact in the delinquency is `REFUSE TO PAY`,
+  `REFUSED TO PAY`, `KSA/REFUSE TO PAY` or `REWRITE NOT AGREED`, and no PTP / settlement and no payment
+  ≥ 100 AED followed it up to the observation date. It takes the state one level down (4.4% CC and RL).
+  `DISPUTE` / `KSA/DISPUTE` is a diagnostic column, not a negative (0.3% CC, 0 RL): a contested debt is
+  not unwillingness. `CUSTOMER HUNG UP` moves to the avoidance diagnostics (D-A3-19);
+  `CUSTOMER MISBEHAVED` is dropped. The `_dcore_codes.REFUSING` set is split accordingly (A3 only).
+
 ## Validations before the bundle
 
 Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`.
