@@ -81,11 +81,11 @@ expect = {}
 
 
 def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active="economic",
-         buckets=None, internal=None, eosb=None, model="cc_60_180", **want):
+         on_loan=False, buckets=None, internal=None, eosb=None, model="cc_60_180", **want):
     """salary: [(k, amount)]; bureau: [(k, amount[, alert type[, pull day]])]; casa:
     [(k, balance)]; payments: [(k, amount)];
     bounces: [(k, bureau bounced amount on that pull[, k of its return date, None: none])]; active: a CASA leg lane in m2 (None:
-    no leg); buckets: overdue_bucket_01..08 on the latest snapshot; eosb: k of a DCORE
+    no leg); on_loan: that leg is on the loan account, not a CASA; buckets: overdue_bucket_01..08 on the latest snapshot; eosb: k of a DCORE
     EOSB result."""
     i = len(expect)
     acct, cif = f"A{i}", 1000 + i
@@ -108,10 +108,11 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active
         rows["alert"].append((cif, "CC", "BOUNCED CHEQUE", m(k, 5), float(amt), 99, None, returned))
     if internal is not None:  # (k, reason_for_excluding)
         k, reason = internal
-        rows["ret"].append((cif, f"T{i}", m(k), reason))
+        rows["ret"].append((cif, f"CASA{cif}", f"T{i}", m(k), reason))
     if active is not None:
         t, reason, code, narration = LEG[active]
-        rows["ftr"].append((cif, m(2), "D", t, reason, code, narration, 100.0))
+        account = f"LOAN{cif}" if on_loan else f"CASA{cif}"
+        rows["ftr"].append((cif, account, m(2), "D", t, reason, code, narration, 100.0))
         rows["flow"].append((cif, week(m(2, 8)), 100.0, 0.0))
     if eosb is not None:
         rows["agr"].append((acct, f"AG{i}", str(cif)))
@@ -218,6 +219,8 @@ case("0 points, only own-account transfers -> Unknown (dormant)", active="wash",
      reason="dormant_casa")
 case("0 points, only fees, small balance -> Unknown (dormant)", active="fee", casa=[(8, 200)],
      state="unknown", reason="dormant_casa")
+case("0 points, a leg on the loan account only -> Unknown (no CASA)", active="economic", on_loan=True,
+     state="unknown", reason="no_casa")
 case("0 points, no CASA leg, zero balance -> Unknown (no CASA)", active=None, casa=[(2, 0)],
      state="unknown", reason="no_casa")
 case("0 points, only a DDS reject -> distress -> Low", active="dds", internal=(2, "DDS Rejects/Reversal"),
@@ -236,9 +239,10 @@ case("180+: overdue buckets give no anchor", buckets=[100, 200, 0, 0, 0, 0, 0, 0
 df = spark.createDataFrame
 # a return of another CIF in the 180+ window's first month: the returns feature starts
 # early enough (build_distress_signals checks it)
-COVER = [(-1, "TC", m(6), "CHARGES")]
-ret_schema = "cif_id long, tran_id string, tran_date date, reason_for_excluding string"
-ftr_schema = ("cif_id long, tran_date date, tran_dc string, tran_type string, reason_for_excluding string,"
+COVER = [(-1, "CASA-1", "TC", m(6), "CHARGES")]
+ret_schema = "cif_id long, foracid string, tran_id string, tran_date date, reason_for_excluding string"
+ftr_schema = ("cif_id long, foracid string, tran_date date, tran_dc string, tran_type string,"
+              " reason_for_excluding string,"
               " tran_particular_code string, tran_narration_1 string, actual_tran_amt_aed double")
 
 internal_salary = fc.build_internal_salary(df(
@@ -260,8 +264,14 @@ payments = fc.build_ext_card_payments(
         df(rows["bene"], "instrument_number string, instrument_type string, institution_name string")),
     PERSONA["persona_start_date"], 12,
 )
-activity = fc.build_casa_activity(df(rows["ftr"], ftr_schema))
-returns = fc.build_returns(df(rows["ret"] + COVER, ret_schema))
+# every customer has a current account (scheme 101) and a loan account (scheme LAA)
+gam = [(c, f"CASA{c}", "101") for c in range(-1, 1000 + len(expect))]
+gam += [(c, f"LOAN{c}", "LAA") for c in range(1000, 1000 + len(expect))] + [(1, "CASA1", "101")]
+CA, SA = ["101", "110"], ["021"]
+accounts = prm_casa.build_casa_accounts(df(gam, "cif_id long, foracid string, schm_code string"), CA, SA)
+assert {r["schm_code"] for r in accounts.collect()} == {"101"}  # the loan scheme is not CASA
+activity = fc.build_casa_activity(df(rows["ftr"], ftr_schema), accounts)
+returns = fc.build_returns(df(rows["ret"] + COVER, ret_schema), accounts)
 bounces = feat_cif_bureau_bounces_monthly.build(df(rows["alert"], alert_schema))
 followup = df(rows["dcore"], "agreement_id string, action_ts date, result_name string")
 agreements = df(rows["agr"], "account_id string, agreement_id string, cif_id string")
@@ -307,11 +317,11 @@ probe = fc.build_internal_salary(df([(1, week(snap), 5000.0, (snap - m(1, 1)).da
 assert probe["month_end"] == date(2026, 7, 31), probe
 # the lanes of the FTR reference: card payments survive the SELF reason, DDS beats SELF
 lanes = {r["lane"] for r in fc.build_casa_activity(df(
-    [(1, m(1), "D", "CREDIT CARD PAYMENTS", "INTERNAL TRANSFER - SELF", "405", "CC", 1.0),
-     (2, m(1), "D", "INTERNAL TRANSFER - SELF", "DDS Rejects/Reversal", "445", "DDR", 1.0),
-     (3, m(1), "C", "POS TRANSACTIONS", "RETURNS", "948", "REF", 1.0),
-     (4, m(1), "C", "INWARD REMITTANCE", "SUBSIDIARIES EXCLUSION", "101", "X", 1.0)],
-    ftr_schema)).collect()}
+    [(1, "CASA1", m(1), "D", "CREDIT CARD PAYMENTS", "INTERNAL TRANSFER - SELF", "405", "CC", 1.0),
+     (1, "CASA1", m(1), "D", "INTERNAL TRANSFER - SELF", "DDS Rejects/Reversal", "445", "DDR", 1.0),
+     (1, "CASA1", m(1), "C", "POS TRANSACTIONS", "RETURNS", "948", "REF", 1.0),
+     (1, "CASA1", m(1), "C", "INWARD REMITTANCE", "SUBSIDIARIES EXCLUSION", "101", "X", 1.0)],
+    ftr_schema), accounts).collect()}
 assert lanes == {"card_payment", "signal", "refund", "group_internal"}, lanes
 # 180+ has no anchor; a balance snapshot from before the observation month gives none
 assert build_cc_liquidity_anchor(obs, balance, "cc_180_plus").filter(
@@ -319,11 +329,15 @@ assert build_cc_liquidity_anchor(obs, balance, "cc_180_plus").filter(
 stale = df([("A0", date(2026, 6, 30), *[100.0] * 8)], f"contract_id string, observation_date date, {bcols}")
 assert build_cc_liquidity_anchor(obs, stale, "cc_60_180").count() == 0
 # the debit and credit legs of one return count once
-legs = df([(1, "T", m(1), "CHEQUE RETURNS")] * 2 + COVER, ret_schema)
-assert fc.build_returns(legs).filter(F.col("cif_id") == "1").first()["events"] == 1
+legs = df([(1, "CASA1", "T", m(1), "CHEQUE RETURNS")] * 2 + COVER, ret_schema)
+assert fc.build_returns(legs, accounts).filter(F.col("cif_id") == "1").first()["events"] == 1
+# a return on a loan account is not a CASA return
+loan_return = df([(1, "LOAN1", "T", m(1), "CHEQUE RETURNS")], ret_schema)
+assert fc.build_returns(loan_return, accounts).count() == 0
 # a returns feature that starts after the first observation window stops the run
 try:
-    build_distress_signals(obs, fc.build_returns(df(rows["ret"], ret_schema)), bounces, "cc_180_plus")
+    build_distress_signals(obs, fc.build_returns(df(rows["ret"], ret_schema), accounts), bounces,
+                           "cc_180_plus")
     raise AssertionError("returns coverage guard did not fire")
 except ValueError as e:
     assert "persona_start_date" in str(e)

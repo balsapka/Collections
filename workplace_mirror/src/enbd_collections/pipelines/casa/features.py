@@ -2,9 +2,9 @@
 
     wm_fea_salary_days_since_increment ──────────────────► feat_cif_internal_salary_monthly
     wm_fea_casa_eod_avg_balance, wm_fea_casa_cc_inflow_outflow ► feat_cif_casa_balance_monthly
-    prm_casa_transactions ───────────────────────────────► feat_cif_casa_activity_monthly
+    prm_casa_transactions, prm_casa_accounts ────────────► feat_cif_casa_activity_monthly
     wm_pri_labelled_transactions, prm_beneficiary_cards ─► feat_cif_ext_card_payment_monthly
-    prm_casa_return_events ──────────────────────────────► feat_cif_returns_monthly
+    prm_casa_return_events, prm_casa_accounts ───────────► feat_cif_returns_monthly
 
 Needs ``casa_primary`` for the model_id first.
 
@@ -45,7 +45,10 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
             ),
             node(
                 func=feat_cif_casa.build_casa_activity,
-                inputs={"transactions": "prm_casa_transactions"},
+                inputs={
+                    "transactions": "prm_casa_transactions",
+                    "casa_accounts": "prm_casa_accounts",
+                },
                 outputs="feat_cif_casa_activity_monthly",
                 name="build_feat_cif_casa_activity_monthly",
                 tags=tags,
@@ -63,7 +66,10 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
             ),
             node(
                 func=feat_cif_casa.build_returns,
-                inputs={"return_events": "prm_casa_return_events"},
+                inputs={
+                    "return_events": "prm_casa_return_events",
+                    "casa_accounts": "prm_casa_accounts",
+                },
                 outputs="feat_cif_returns_monthly",
                 name="build_feat_cif_returns_monthly",
                 tags=tags,

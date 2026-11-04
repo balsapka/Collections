@@ -15,9 +15,9 @@
 Needs, for the model_id: the observation base, ``casa_primary``, ``casa_features``,
 ``bureau_salary_bounces`` and ``location_features`` (``prm_dcore_account_agreements``).
 
-TEMPORARY (mirror bundle 12): ``create_b12_check_pipeline`` runs the observation base and
-the same nodes, writes the axis to ``crx_<p>_a1_ability_b12_check`` and logs the report
-tables (``b12_check.py``). Removed by the bundle's cleanup.
+TEMPORARY (mirror bundle 14): ``create_b14_check_pipeline`` runs the observation base and
+the same nodes, writes the axis to ``crx_<p>_a1_ability_b14_check`` and logs the check
+tables (``b14_check.py``). Removed by the bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
@@ -25,12 +25,7 @@ from kedro.pipeline.node import Node
 
 from ..obs_base import create_cc_pipeline as create_cc_obs_pipeline
 from ..obs_base import create_rl_pipeline as create_rl_obs_pipeline
-from .b12_check import (
-    compare_a1_outputs,
-    describe_a1_report,
-    describe_a1_sources,
-    explain_a1_aecb,
-)
+from .b14_check import compare_a1_outputs, describe_a1_accounts, describe_a1_bounces
 from .classify import build_a1_ability
 from .signals import (
     build_distress_signals,
@@ -122,30 +117,13 @@ def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
     )
 
 
-def create_b12_check_pipeline(product: str, anchor: Node) -> Pipeline:
+def create_b14_check_pipeline(product: str, anchor: Node) -> Pipeline:
     """TEMPORARY: observation base + the A1 pipeline writing to
-    crx_<p>_a1_ability_b12_check + the log-only report nodes.
-    Remove with b12_check.py and the catalog entries."""
+    crx_<p>_a1_ability_b14_check + the log-only check nodes.
+    Remove with b14_check.py and the catalog entries."""
     obs = f"crx_{product}_obs_base"
     prefix = f"crx_{product}_a1"
-    check = f"{prefix}_ability_b12_check"
-    signals = {
-        "income": f"{prefix}_income_signals",
-        "liquidity": f"{prefix}_liquidity_signals",
-        "distress": f"{prefix}_distress_signals",
-    }
-    products = "rl_spine" if product == "rl" else obs
-    aecb = {
-        "obs_base": obs,
-        "new": check,
-        "income": f"{prefix}_income_signals",
-        "liquidity": f"{prefix}_liquidity_signals",
-        "internal_salary": "feat_cif_internal_salary_monthly",
-        "bureau_salary": "feat_cif_bureau_salary_monthly",
-        "model_id": "params:model_id",
-    }
-    if product == "rl":
-        aecb["loan_features"] = "feature_retail_loans"
+    check = f"{prefix}_ability_b14_check"
     tags = ["crx_persona"]
     checks = [
         node(
@@ -153,48 +131,38 @@ def create_b12_check_pipeline(product: str, anchor: Node) -> Pipeline:
             inputs={
                 "old": f"{prefix}_ability",
                 "new": check,
-                "products": products,
+                "products": "rl_spine" if product == "rl" else obs,
                 "model_id": "params:model_id",
             },
             outputs=None,
-            name=f"compare_{prefix}_b12",
+            name=f"compare_{prefix}_b14",
             tags=tags,
         ),
         node(
-            func=describe_a1_report,
+            func=describe_a1_accounts,
             inputs={
                 "obs_base": obs,
-                "new": check,
-                **signals,
-                "products": products,
-                "model_id": "params:model_id",
-            },
-            outputs=None,
-            name=f"describe_{prefix}_b12_report",
-            tags=tags,
-        ),
-        node(
-            func=describe_a1_sources,
-            inputs={
-                "obs_base": obs,
-                "new": check,
-                "internal_salary": "feat_cif_internal_salary_monthly",
-                "bureau_salary": "feat_cif_bureau_salary_monthly",
-                "casa_balance": "feat_cif_casa_balance_monthly",
-                "casa_activity": "feat_cif_casa_activity_monthly",
                 "transactions": "prm_casa_transactions",
-                "alerts": "prm_bureau_alert_enriched",
+                "acid_to_cif": "raw_casa_acid_to_cif",
+                "current_account_codes": "params:casa_primary.current_account_codes",
+                "saving_account_codes": "params:casa_primary.saving_account_codes",
+                "casa_activity": "feat_cif_casa_activity_monthly",
                 "model_id": "params:model_id",
             },
             outputs=None,
-            name=f"describe_{prefix}_b12_sources",
+            name=f"describe_{prefix}_b14_accounts",
             tags=tags,
         ),
         node(
-            func=explain_a1_aecb,
-            inputs=aecb,
+            func=describe_a1_bounces,
+            inputs={
+                "obs_base": obs,
+                "alerts": "prm_bureau_alert_enriched",
+                "bureau_bounces": "feat_cif_bureau_bounces_monthly",
+                "model_id": "params:model_id",
+            },
             outputs=None,
-            name=f"explain_{prefix}_b12_aecb",
+            name=f"describe_{prefix}_b14_bounces",
             tags=tags,
         ),
     ]

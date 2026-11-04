@@ -1,5 +1,5 @@
-"""Primary CASA datasets built from comp_financial_tran_repos_dly, and the registered
-beneficiary cards."""
+"""Primary CASA datasets built from comp_financial_tran_repos_dly, the CASA accounts from
+the Finacle account master, and the registered beneficiary cards."""
 
 from __future__ import annotations
 
@@ -196,6 +196,30 @@ def build_transactions(
     rows = _scoped(tran_repos, _TRANSACTION_COLUMNS, persona_start_date, history_months)
     return _latest_load(
         rows.filter(~F.col("cif_id").cast("string").isin(*_NON_CUSTOMER_CIFS))
+    )
+
+
+def build_casa_accounts(
+    acid_to_cif: DataFrame,
+    current_account_codes: Sequence[str],
+    saving_account_codes: Sequence[str],
+) -> DataFrame:
+    """Current and savings accounts: distinct ``(foracid, cif_id, schm_code)`` of
+    ``raw_casa_acid_to_cif`` (the Finacle account master, as WM reads it) whose scheme
+    code is a current or savings code. Loans, term deposits and other schemes are left
+    out; ``foracid`` is the account number of the CASA transaction tables."""
+    missing = sorted({"foracid", "cif_id", "schm_code"} - set(acid_to_cif.columns))
+    if missing:
+        raise ValueError(f"raw_casa_acid_to_cif is missing columns: {missing}")
+    codes = [*current_account_codes, *saving_account_codes]
+    return (
+        acid_to_cif.select(
+            F.trim(F.col("foracid").cast("string")).alias("foracid"),
+            F.col("cif_id").cast("string").alias("cif_id"),
+            F.trim(F.col("schm_code").cast("string")).alias("schm_code"),
+        )
+        .filter(F.col("foracid").isNotNull() & F.col("schm_code").isin(*codes))
+        .distinct()
     )
 
 

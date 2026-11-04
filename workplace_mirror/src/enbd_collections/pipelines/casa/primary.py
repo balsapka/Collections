@@ -8,6 +8,7 @@ from kedro.pipeline import Pipeline, node
 from enbd_collections.nodes.primary.casa.prm_casa import (
     build_beneficiary_cards,
     build_card_transactions,
+    build_casa_accounts,
     build_return_events,
     build_transactions,
 )
@@ -15,7 +16,8 @@ from enbd_collections.nodes.primary.casa.prm_casa import (
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     """prm_casa_return_events, prm_casa_card_transactions and prm_casa_transactions from
-    comp_financial_tran_repos_dly; prm_beneficiary_cards from raw_beneficiary_cards."""
+    comp_financial_tran_repos_dly; prm_casa_accounts from raw_casa_acid_to_cif;
+    prm_beneficiary_cards from raw_beneficiary_cards."""
     return Pipeline(
         [
             node(
@@ -50,6 +52,17 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 ],
                 outputs="prm_casa_transactions",
                 name="build_prm_casa_transactions",
+                tags=["casa", "primary"],
+            ),
+            node(
+                func=build_casa_accounts,
+                inputs=[
+                    "raw_casa_acid_to_cif",
+                    "params:casa_primary.current_account_codes",
+                    "params:casa_primary.saving_account_codes",
+                ],
+                outputs="prm_casa_accounts",
+                name="build_prm_casa_accounts",
                 tags=["casa", "primary"],
             ),
             node(

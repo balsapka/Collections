@@ -345,12 +345,12 @@ crx_cc_a1_ability:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 12): the new output written by the b12 check pipeline.
+# TEMPORARY (mirror bundle 14): the new output written by the b14 check pipeline.
 # Remove the entry, the pipeline and its HDFS folder after the check.
-crx_cc_a1_ability_b12_check:
+crx_cc_a1_ability_b14_check:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b12_check"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b14_check"
   save_args:
     mode: overwrite
 
@@ -530,12 +530,12 @@ crx_rl_a1_ability:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 12): the new output written by the b12 check pipeline.
+# TEMPORARY (mirror bundle 14): the new output written by the b14 check pipeline.
 # Remove the entry, the pipeline and its HDFS folder after the check.
-crx_rl_a1_ability_b12_check:
+crx_rl_a1_ability_b14_check:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_b12_check"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_b14_check"
   save_args:
     mode: overwrite
 

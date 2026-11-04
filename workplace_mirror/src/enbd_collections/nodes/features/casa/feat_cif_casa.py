@@ -2,7 +2,9 @@
 
 Each table has one row per ``(cif_id, month_end)`` (plus ``lane`` / ``reason`` where
 named) with any data; customers are CIFs, so every CASA account of the customer counts.
-Values are raw: which lanes, reasons or amounts count is decided by the consumers.
+The FTR-based tables keep only legs on current and savings accounts (``prm_casa_accounts``):
+the transaction table also holds the loan account itself. Values are raw: which lanes,
+reasons or amounts count is decided by the consumers.
 
 * ``feat_cif_internal_salary_monthly`` — salary credited with us per month (WM);
 * ``feat_cif_casa_balance_monthly``    — CASA average balance and any flow per month (WM);
@@ -200,13 +202,23 @@ def transaction_lane() -> Column:
     )
 
 
-def build_casa_activity(transactions: DataFrame) -> DataFrame:
-    """Per ``(cif_id, month_end, lane)``: ``legs`` and the credit / debit AED of
-    ``prm_casa_transactions`` (its whole history)."""
+def _on_casa_accounts(legs: DataFrame, casa_accounts: DataFrame) -> DataFrame:
+    """The legs whose ``foracid`` is a current or savings account."""
+    _require(casa_accounts, ["foracid"], "prm_casa_accounts")
+    accounts = casa_accounts.select("foracid").distinct()
+    return legs.withColumn("foracid", F.trim(F.col("foracid").cast("string"))).join(
+        accounts, on="foracid", how="leftsemi"
+    )
+
+
+def build_casa_activity(transactions: DataFrame, casa_accounts: DataFrame) -> DataFrame:
+    """Per ``(cif_id, month_end, lane)``: ``legs`` and the credit / debit AED of the
+    ``prm_casa_transactions`` legs on CASA accounts (its whole history)."""
     _require(
         transactions,
         [
             "cif_id",
+            "foracid",
             "tran_date",
             "tran_dc",
             "tran_type",
@@ -219,7 +231,8 @@ def build_casa_activity(transactions: DataFrame) -> DataFrame:
     )
     amount = F.col("actual_tran_amt_aed").cast("double")
     return (
-        transactions.withColumn("lane", transaction_lane())
+        _on_casa_accounts(transactions, casa_accounts)
+        .withColumn("lane", transaction_lane())
         .groupBy(_cif(), F.last_day(F.to_date("tran_date")).alias("month_end"), "lane")
         .agg(
             F.count(F.lit(1)).alias("legs"),
@@ -272,18 +285,19 @@ def build_ext_card_payments(
     )
 
 
-def build_returns(return_events: DataFrame) -> DataFrame:
-    """``events``: returned transactions per ``(cif_id, month_end, reason)`` from
-    ``prm_casa_return_events`` — one event per ``(tran_id, tran_date)``, so the debit and
-    credit legs of a return count once."""
+def build_returns(return_events: DataFrame, casa_accounts: DataFrame) -> DataFrame:
+    """``events``: returned transactions on CASA accounts per ``(cif_id, month_end,
+    reason)`` from ``prm_casa_return_events`` — one event per ``(tran_id, tran_date)``, so
+    the debit and credit legs of a return count once."""
     _require(
         return_events,
-        ["cif_id", "tran_id", "tran_date", "reason_for_excluding"],
+        ["cif_id", "foracid", "tran_id", "tran_date", "reason_for_excluding"],
         "prm_casa_return_events",
     )
     one_event = Window.partitionBy("cif_id", "tran_id", "tran_date")
     return (
-        return_events.select(
+        _on_casa_accounts(return_events, casa_accounts)
+        .select(
             _cif(),
             "tran_id",
             F.to_date("tran_date").alias("tran_date"),

@@ -16,6 +16,18 @@ casa_primary:
   # Calendar months of all CASA legs kept in prm_casa_transactions up to and including the
   # persona start month: the A1 "holds a CASA with us" test looks back 12 months.
   transaction_history_months: 12
+  # Finacle scheme codes of current and savings accounts (WM's current_accounts and
+  # saving_accounts lists): prm_casa_accounts keeps these; loans, term deposits and other
+  # schemes are not CASA. WM's casa_scheme_codes (207) also holds term deposits and others.
+  current_account_codes: [
+    "020", "036", "051", "061", "068", "069", "070", "071", "078", "079", "080", "090",
+    "100", "101", "102", "103", "104", "105", "106", "110", "113", "117", "118", "119",
+    "124", "145", "149", "450", "451", "452", "453", "455", "456", "486", "660", "662",
+  ]
+  saving_account_codes: [
+    "021", "023", "026", "031", "034", "035", "038", "082", "085", "086", "097", "311",
+    "590",
+  ]
 
 ##################################################
 # CASA FEATURES

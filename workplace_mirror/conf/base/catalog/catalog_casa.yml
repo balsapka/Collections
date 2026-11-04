@@ -37,6 +37,18 @@ prm_casa_transactions:
     kedro-viz:
       layer: primary
 
+# Current and savings accounts (scheme code in casa_primary's CA / SA lists), one row per
+# (foracid, cif_id, schm_code), from raw_casa_acid_to_cif.
+prm_casa_accounts:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/casa/casa_accounts"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: primary
+
 # Card numbers registered as payment beneficiaries (no CIF in the source).
 prm_beneficiary_cards:
   type: spark.SparkDataset
@@ -70,7 +82,8 @@ feat_cif_casa_balance_monthly:
     kedro-viz:
       layer: feature
 
-# CASA legs and AED per (cif_id, month_end, lane), from prm_casa_transactions.
+# CASA legs and AED per (cif_id, month_end, lane), from prm_casa_transactions on
+# prm_casa_accounts.
 feat_cif_casa_activity_monthly:
   type: spark.SparkDataset
   file_format: parquet
@@ -92,7 +105,8 @@ feat_cif_ext_card_payment_monthly:
     kedro-viz:
       layer: feature
 
-# Returned-transaction events per (cif_id, month_end, reason), from prm_casa_return_events.
+# Returned-transaction events per (cif_id, month_end, reason), from prm_casa_return_events
+# on prm_casa_accounts.
 feat_cif_returns_monthly:
   type: spark.SparkDataset
   file_format: parquet
