@@ -20,14 +20,15 @@ and is never applied silently.
 
 | Tier | What | Lines | Treatment |
 |---|---|---|---|
-| **L — live, review and refactor** | `_common.py`, `scoring_engine.py`, `obs_base/`, `a1_ability/` (except `b14_check.py`), `cc_a1_ability/`, `rl_a1_ability/`, `a2_locatability/`, `cc_a2_locatability/pipeline.py`, `rl_a2_locatability/pipeline.py`, `_dpd_journey/`, `cc_a4_deterioration/`, `rl_a4_deterioration/` (except `b13_check.py`), `cc_full_history/`, `rl_full_history/`, the crx part of `catalog_crx.yml` and `pipeline_registry.py` | ~3,900 | full workflow |
-| **D — dead, delete rather than polish** | `cc_a2_locatability/nodes.py` + `constants.py` and `rl_a2_locatability/nodes.py` (orphaned since bundle 06; the wrappers call the engine) · `cc_departure_signature/` · `cc_payment_trajectory/` · `cc_utilisation/` (no consumer outside this T0 cluster) | ~7,000 | dead-code agent confirms each one; user approves the list (Q2) |
+| **L — live, review and refactor** | `_common.py`, `scoring_engine.py`, `obs_base/`, `a1_ability/` (except `b14_check.py`), `cc_a1_ability/`, `rl_a1_ability/`, `a2_locatability/`, `cc_a2_locatability/pipeline.py`, `rl_a2_locatability/pipeline.py`, `_dpd_journey/`, `cc_a4_deterioration/`, `rl_a4_deterioration/` (except `b13_check.py`), `cc_full_history/`, `rl_full_history/`, the crx part of `catalog_crx.yml` and `pipeline_registry.py` | 3,893 | full workflow |
+| **D — dead, delete rather than polish** | `cc_a2_locatability/nodes.py` + `constants.py` and `rl_a2_locatability/nodes.py` (orphaned since bundle 06; the wrappers call the engine) · `cc_departure_signature/` · `cc_payment_trajectory/` · `cc_utilisation/` · `rl_departure_signature/` except `build_rl_depart_spine` (no consumer outside this T0 cluster; confirmed in `00_baseline/inventory.md`) | 7,028 | dead-code agent confirms each one; user approves the list (Q2) |
 | **K — kept for A3, frozen** | `cc_spell/`, `rl_spell_table/`, `rl_a4_spine/`, `_spine_utils.py`, `cc_raw_extract/` (A3 reads `crx_cc_balance/billing/transactions`), plus `build_rl_depart_spine` in `rl_departure_signature/nodes.py` (`rl_a4_spine` imports it) | — | not touched; may be moved only if a deletion requires it, keeping the same behaviour |
 | **A — A3, design-in (user, 2026-11-04)** | `cc_a3_payment_credibility/`, `rl_a3_payment_credibility/`, `specs/A3_credibility_spec.md` (D-A3-1..21), `bundle_helpers/a3_final/` | ~4,200 today | reviewed and redesigned; edits go to `a3_handoff.md`, see below |
 | **X — out of scope** | `_dcore_codes.py` (only partly mirrored, read-only), `b13_check.py` / `b14_check.py` (removed by their cleanups), test modules (workplace Sonnet) | — | read only, for context |
 
 `rl_departure_signature/` is deleted except `build_rl_depart_spine`. That function moves into
-`rl_a4_spine/` unchanged, so A3 keeps its input until A3 is on the obs base (D-A3-1).
+`rl_a4_spine/` unchanged **in or before the bundle that deletes `cc_departure_signature/`** (the RL
+module imports CC travel constants at module level, so deleting CC first breaks RL A3), so A3 keeps its input until A3 is on the obs base (D-A3-1).
 
 **A3 in the review.** The A3 rebuild (obs-base grain, anchor from the A4 engine, one method per
 dimension, D-A3-1..21) is in progress in another session on `feature/persona_redesign`. Two writers
