@@ -40,8 +40,25 @@ loan, PDC cheque returns) sit in the same table and make loan customers look lik
   numbers (prefixes and lengths are fine). Cells under 10 shown as `<10`.
 - No pipeline, catalog or registry changes.
 
+## Confirmed by the user (2026-11-04)
+
+`comp_financial_tran_repos_dly` carries legs on the loan account itself; they must not count as
+CASA. The question now is which CASA definition to use. Two candidates:
+
+- **A — comp, restricted to CASA accounts.** Keeps all segments and the type columns the lanes
+  need. The account rule: `foracid` starting with `101`, or whatever rule WM uses (below).
+- **B — WM `wm_pri_labelled_transactions` with `product_category == 'CASA'`.** Already excludes the
+  loan account, but covers PRB / PSB / PB only (earlier check: 95% of card base CIFs; 558 CIFs in
+  other segments transact in comp with no WM row) and may lack the type columns.
+
 ## Hypotheses and results to save (`results_<model_id>.md`, one per model_id)
 
+- **H0 — what WM calls CASA** (code only, once, not per model_id). In the `wealth_management` repo
+  find where `product_category = 'CASA'` is set for `wm_pri_labelled_transactions` and the CASA
+  balance / flow tables: the rule (scheme type / code join, account prefix, product table),
+  file:line. List the columns `wm_pri_labelled_transactions` carries, and whether it has what
+  `feat_cif_casa.py::transaction_lane` reads (`tran_type`, `reason_for_excluding`,
+  `tran_particular_code`, `tran_narration_1`, `tran_dc`) or equivalents.
 - **H1 — the table carries non-CASA accounts.** Legs of the model's base CIFs, last 12 months, by
   account class: `foracid` starts with `101` / other prefix (first 3 digits, top 10) / NULL, and
   `foracid` length. Look for any account-type or scheme column in `comp_financial_tran_repos_dly`
@@ -54,6 +71,10 @@ loan, PDC cheque returns) sit in the same table and make loan customers look lik
   `prm_casa_return_events` filtered to `101` accounts: state crosstab today × CASA-only (n), and
   which rule moved each row (Unknown gate, No CASA, distress). RL also by product
   (`rl_spine.loan_type`).
+- **H3b — option B against option A.** Base CIFs, 12 months: CIFs with a CASA leg under A (`101`,
+  and the WM rule if it differs) vs B (labelled CASA rows), 2×2, by `segment_desc` where
+  available; CASA accounts (prefix / length) in B that A misses, and the reverse. If B carries the
+  lane columns, also `casa_active` under A vs B.
 - **H4 — returns on loan accounts.** Cheque returns / DDS on non-`101` accounts: events and CIFs in
   12 months, by reason and account class (loan PDC bounces may be real distress; show them, do not
   decide).
@@ -63,11 +84,13 @@ Run for `rl_60_180`, `cc_60_180`, `rl_180_plus`, `cc_180_plus` (switch `model_id
 
 ## Summary (back in UAT, after the results are committed)
 
-Write `tmp_validation/a1_casa_accounts/summary.md`, one section per model_id:
+Write `tmp_validation/a1_casa_accounts/summary.md`: first H0 (WM's CASA rule, file:line, and
+whether the labelled table can carry the lanes), then one section per model_id:
 - H1: share of legs and of CIFs on non-`101` accounts, the lanes they fall in, and whether a scheme
   column confirms `101` = CASA.
 - H2: `casa_held` / `casa_active` today vs CASA-only (n, %).
 - H3: the state table today vs CASA-only and the 3 biggest moves, with the rule behind them.
+- H3b: CIFs with CASA under A vs B, and who each one misses.
 - H4: returns on non-`101` accounts (n, by reason).
 - One-line verdict per hypothesis.
 The user pastes the summary back here.
