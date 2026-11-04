@@ -74,3 +74,30 @@ Source: `v1_v4_summary_60_180.md` (cc_60_180 19,292 accounts, rl_60_180 3,985, l
    some payment alone) gives Moderate today.
 5. High only reachable with DCORE commitments (High from 3 moves 4.7% CC).
 6. Keep Dimensions B and C despite the A4 overlap (recommended).
+
+## V1c: corrected ledger (2026-11-04, `v1c_summary_60_180.md`)
+
+- **The numbers hold together.** The handoff flagged three possible inconsistencies; all reconcile:
+  - CC PTP: 85.8% overdue and not kept + 7.4% paid and kept = 93.2% agreement. `paid` is then 14.2% of
+    instalments, 52% of it kept: consistent.
+  - CC settlement: 6,311 overdue (almost none kept) = 51.9%, plus 22.1% of the 5,840 `paid` = 10.6%:
+    62.5% agreement. Consistent.
+  - RL 84.0% vs 85.9%: different scopes (all vs last 3 months), not a conflict.
+- **PTP is always a single instalment**, so the fix changed nothing there; settlements are 4+ instalment
+  plans and move (CC V 0.06 → 0.36–0.48).
+- **CC: the disagreement is one-sided.** DCORE `overdue` is never ledger-kept, so a DCORE broken is
+  true. DCORE `paid` is backed by card payments in 52% (PTP) and 22% (settlement) at the due date,
+  69% / 35% with 5 days. DCORE status overstates kept, most of all for settlements.
+- **RL:** `paid` is backed 94% (PTP) / 53% (settlement). 24.6% of PTP `overdue` is ledger-kept, which
+  month-level `total_paid` cannot split into late payment and DCORE error. RL PTP status adds no
+  accuracy over the base rate on all concluded instalments.
+- **Risk in judging by the ledger: CC settlement.** 78% of DCORE-paid settlement instalments have no
+  matching card payment. Either DCORE marks them paid too early, or the money reaches the bank in a way
+  `crx_cc_transactions` does not show as a payment. Candidates: waiver or adjustment credits, another
+  `txn_category`, or O87 (`.distinct()` collapses identical same-day payments). If it is the second,
+  the ledger would mark real payers as broken. The bundle check should split those instalments by the
+  card's balance movement and by non-payment credits.
+- **Section 4 (level DCORE vs ledger) failed again** (driver plan growth). How often Broken fires under
+  the ledger is still unmeasured; the bundle check gives it directly from the new output.
+- `HISTORICAL PROMISE TO PAY` never occurs; `RETAIN PTP` 26 agreements per model; `EOSB_PTP_DOCUMENTS`
+  immaterial. The PTP name sets need no change.

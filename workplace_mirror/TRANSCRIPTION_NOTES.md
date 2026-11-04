@@ -365,6 +365,12 @@ Still the old copy: `cc_raw_extract/pipeline.py` (the current one wires `build_c
   one pattern (`type: spark.SparkDataset`, parquet, `.../crx/<name>`, overwrite) and their names
   are the pipeline outputs.
 
+## Handoff 41 (A3 session): V1c summary (2026-11-04)
+
+- `tmp_validation/a3_v1_v4/summary_v1c.md`, lines 1–104 (4 overlapping photos, chat transcription) →
+  `bundle_helpers/a3_final/v1c_summary_60_180.md`. Tables ragged at lines 70–71 and 82–85, as in the
+  source. The three inconsistencies the transcriber flagged reconcile (review, V1c section).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
