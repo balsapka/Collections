@@ -35,6 +35,10 @@ def _log(name: str, model_id: str, lines: list[str]) -> None:
     LOG.info("\n%s", "\n".join(block))
 
 
+def _n(count: int) -> str:
+    return str(count) if count >= 10 else "<10"
+
+
 def _table(df: DataFrame, *cols: str) -> list[str]:
     """Counts by ``cols`` with the share of all rows; under 10 shown as ``<10``."""
     rows = df.groupBy(*cols).count().orderBy(*cols).collect()
@@ -42,7 +46,7 @@ def _table(df: DataFrame, *cols: str) -> list[str]:
     return [
         "  "
         + " x ".join(f"{r[c]!s:<22}" for c in cols)
-        + f" {r['count'] if r['count'] >= 10 else '<10':>9}"
+        + f" {_n(r['count']):>9}"
         + f"  {100.0 * r['count'] / total:5.1f}%"
         for r in rows
     ]
@@ -189,11 +193,12 @@ def describe_a1_accounts(  # pylint: disable=too-many-arguments,too-many-positio
         f"{n_cifs} base CIFs; legs since {last} minus 12 months",
         "length x scheme_class: legs, CIFs",
         *[
-            f"  {r['length']!s:<4} {r['scheme_class']:<13} {r['legs']:>10} {r['cifs']:>8}"
+            f"  {r['length']!s:<4} {r['scheme_class']:<13} {_n(r['legs']):>10}"
+            f" {_n(r['cifs']):>8}"
             for r in by_class
         ],
         "top other schemes: schm_code, legs, CIFs",
-        *[f"  {r['schm_code']:<8} {r['legs']:>10} {r['cifs']:>8}" for r in top],
+        *[f"  {r['schm_code']:<8} {_n(r['legs']):>10} {_n(r['cifs']):>8}" for r in top],
         (
             f"CIFs with a CASA leg (new feat_cif_casa_activity_monthly) in 12 months: "
             f"{n_casa} ({100.0 * n_casa / max(n_cifs, 1):.1f}%)"
@@ -227,7 +232,8 @@ def _pull_rule(alerts: DataFrame) -> DataFrame:
     previous = F.lag("amount").over(Window.partitionBy(*key).orderBy("pull_date"))
     new = (F.col("amount") > 0) & (F.coalesce(previous, F.lit(0.0)) != F.col("amount"))
     return (
-        pulls.filter(new)
+        pulls.withColumn("_new", new)
+        .filter(F.col("_new"))
         .groupBy("cif_id", F.last_day("pull_date").alias("month_end"))
         .agg(F.count(F.lit(1)).alias("bounce_events"))
     )
