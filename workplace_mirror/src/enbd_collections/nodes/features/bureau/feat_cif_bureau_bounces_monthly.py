@@ -1,54 +1,43 @@
 """Feature node: bureau-reported bounced cheques per customer and month.
 
-One row per ``(cif_id, month_end)`` with a bureau pull that reports a bounced cheque,
-dated by the pull (``extract_date``; the bureau gives no bounce date):
+One row per ``(cif_id, month_end)`` with a bounce, dated by the bureau's return date
+(``dt_of_return``), not by the pull. A bounce is a ``(cif_id, dt_of_return)``: the same
+return date repeated in later pulls is one bounce, and several cheques returned on one
+day are one bounce with the largest amount.
 
-* ``bounce_pulls``  — pulls that report a bounced amount;
-* ``bounce_events`` — of those, the pulls that report something new: per alert key
-  ``(cif_id, contract_type, alert_description)``, the bounced amount differs from the
-  key's previous pull, or the previous pull had none. A bounce repeated unchanged in
-  later pulls counts once.
+* ``bounce_events`` — bounce days in the month;
+* ``max_bounce_amount`` — the largest bounced amount of those days.
+
+Rows with a bounced amount but no return date are not counted.
 """
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-
-_KEY = ["cif_id", "contract_type", "alert_description"]
 
 
 def build(alerts: DataFrame) -> DataFrame:
-    """Bounce pulls and new bounce events from ``prm_bureau_alert_enriched``. Several
-    rows of one key in one pull count as one pull, with the largest amount."""
+    """Bounce days per month from ``prm_bureau_alert_enriched``."""
     missing = sorted(
-        {*_KEY, "extract_date", "bounced_cheque_amount"} - set(alerts.columns)
+        {"cif_id", "dt_of_return", "bounced_cheque_amount"} - set(alerts.columns)
     )
     if missing:
         raise ValueError(f"prm_bureau_alert_enriched is missing columns: {missing}")
-    pulls = (
-        alerts.filter(F.col("cif_id").isNotNull())
-        .select(
+    amount = F.col("bounced_cheque_amount").cast("double")
+    bounces = (
+        alerts.filter(
+            F.col("cif_id").isNotNull()
+            & F.col("dt_of_return").isNotNull()
+            & (amount > 0)
+        )
+        .groupBy(
             F.col("cif_id").cast("string").alias("cif_id"),
-            "contract_type",
-            "alert_description",
-            F.to_date("extract_date").alias("pull_date"),
-            F.coalesce(F.col("bounced_cheque_amount").cast("double"), F.lit(0.0)).alias(
-                "amount"
-            ),
+            F.to_date("dt_of_return").alias("bounce_date"),
         )
-        .groupBy(*_KEY, "pull_date")
-        .agg(F.max("amount").alias("amount"))
+        .agg(F.max(amount).alias("amount"))
     )
-    previous = F.lag("amount").over(Window.partitionBy(*_KEY).orderBy("pull_date"))
-    bounced = F.col("amount") > 0
-    new = bounced & (F.coalesce(previous, F.lit(0.0)) != F.col("amount"))
-    return (
-        pulls.withColumn("_new", new)
-        .filter(bounced)
-        .groupBy("cif_id", F.last_day("pull_date").alias("month_end"))
-        .agg(
-            F.count(F.lit(1)).alias("bounce_pulls"),
-            F.sum(F.col("_new").cast("int")).alias("bounce_events"),
-        )
+    return bounces.groupBy("cif_id", F.last_day("bounce_date").alias("month_end")).agg(
+        F.count(F.lit(1)).alias("bounce_events"),
+        F.max("amount").alias("max_bounce_amount"),
     )

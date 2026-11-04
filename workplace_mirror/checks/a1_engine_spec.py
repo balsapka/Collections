@@ -84,7 +84,7 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active
          buckets=None, internal=None, eosb=None, model="cc_60_180", **want):
     """salary: [(k, amount)]; bureau: [(k, amount[, alert type[, pull day]])]; casa:
     [(k, balance)]; payments: [(k, amount)];
-    bounces: [(k, bureau bounced amount on that pull)]; active: a CASA leg lane in m2 (None:
+    bounces: [(k, bureau bounced amount on that pull[, k of its return date, None: none])]; active: a CASA leg lane in m2 (None:
     no leg); buckets: overdue_bucket_01..08 on the latest snapshot; eosb: k of a DCORE
     EOSB result."""
     i = len(expect)
@@ -96,14 +96,16 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active
     for k, amt, *rest in bureau:
         alert_type = rest[0] if rest else 31
         day = rest[1] if len(rest) > 1 else 5
-        rows["alert"].append((cif, "CC", "SALARY", m(k, day), 0.0, alert_type, float(amt)))
+        rows["alert"].append((cif, "CC", "SALARY", m(k, day), 0.0, alert_type, float(amt), None))
     for k, bal in casa:
         rows["casa"].append((cif, week(m(k, 22)), float(bal)))
     for k, amt in payments:
         rows["bene"].append((f"CARD{i}", "CARD_NUMBER", "OTHER BANK"))
         rows["txn"].append((cif, "outflow", "CASA", m(k), float(amt), f"CARD{i}"))
-    for k, amt in bounces:
-        rows["alert"].append((cif, "CC", "BOUNCED CHEQUE", m(k, 5), float(amt), 99, None))
+    for k, amt, *ret in bounces:
+        back = ret[0] if ret else k  # the return date's month (None: no return date)
+        returned = None if back is None else m(back, 3)
+        rows["alert"].append((cif, "CC", "BOUNCED CHEQUE", m(k, 5), float(amt), 99, None, returned))
     if internal is not None:  # (k, reason_for_excluding)
         k, reason = internal
         rows["ret"].append((cif, f"T{i}", m(k), reason))
@@ -197,10 +199,14 @@ case("RETURNS (POS refunds) ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4
      internal=(1, "RETURNS"), state="high")
 case("bounce older than 3 months ignored", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
      bounces=[(4, 500)], state="high")
-case("bureau bounce repeated unchanged -> not new", salary=[(1, 5000), (2, 5000)],
-     casa=[(1, 4000), (2, 4000)], bounces=[(4, 500), (2, 500)], state="high")
-case("bureau bounce amount changed -> new", salary=[(1, 5000), (2, 5000)],
-     casa=[(1, 4000), (2, 4000)], bounces=[(4, 500), (2, 900)], state="moderate")
+case("bureau bounce repeated in a later pull -> its return date", salary=[(1, 5000), (2, 5000)],
+     casa=[(1, 4000), (2, 4000)], bounces=[(4, 500), (2, 900, 4)], state="high")
+case("bureau bounce, same amount, new return date -> counts", salary=[(1, 5000), (2, 5000)],
+     casa=[(1, 4000), (2, 4000)], bounces=[(4, 500), (2, 500)], state="moderate")
+case("bureau bounce pulled in W, returned before W -> ignored", salary=[(1, 5000), (2, 5000)],
+     casa=[(1, 4000), (2, 4000)], bounces=[(2, 500, 5)], state="high")
+case("bureau bounce without a return date -> not counted", salary=[(1, 5000), (2, 5000)],
+     casa=[(1, 4000), (2, 4000)], bounces=[(2, 500, None)], state="high")
 case("EOSB result is a diagnostic only", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
      eosb=2, state="high", eosb_flag=1)
 # ── Activity gate (S11) ──
@@ -238,7 +244,8 @@ ftr_schema = ("cif_id long, tran_date date, tran_dc string, tran_type string, re
 internal_salary = fc.build_internal_salary(df(
     rows["wmsal"], "cif_id long, week_number int, ft_last_salary_amount double, ft_days_since_salary_transaction int"))
 alert_schema = ("cif_id long, contract_type string, alert_description string, extract_date date,"
-                " bounced_cheque_amount double, alert_type_number int, salary_credit_amount double")
+                " bounced_cheque_amount double, alert_type_number int, salary_credit_amount double,"
+                " dt_of_return date")
 bureau_salary = feat_cif_bureau_salary_monthly.build(df(rows["alert"], alert_schema))
 casa_balance = fc.build_casa_balance(
     df(rows["casa"], "cif_id long, week_number int, ft_avg_casa_eod_balance_in_last_0_3_weeks_avg double"),

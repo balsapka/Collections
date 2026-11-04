@@ -275,8 +275,8 @@ def build_distress_signals(
 
     * ``distress_cheque`` / ``distress_dds`` — the bank's own returned cheques and DDS
       returns, across all the customer's CASA accounts (``feat_cif_returns_monthly``);
-    * ``distress_bureau`` — a new bureau-reported bounce (``feat_cif_bureau_bounces_monthly``
-      ``bounce_events``; a bounce repeated unchanged in later pulls counts once);
+    * ``distress_bureau`` — a bureau-reported bounce dated by its return date
+      (``feat_cif_bureau_bounces_monthly`` ``bounce_events``);
     * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet.
 
     Stops the run when the returns table starts after the earliest observation's window
