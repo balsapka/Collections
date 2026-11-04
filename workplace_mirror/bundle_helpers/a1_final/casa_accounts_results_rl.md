@@ -49,3 +49,6 @@ Which accounts are CASA in `prm_casa_transactions` / `prm_casa_return_events`:
 2. `101` only (the user's rule; drops the 830 CIFs' 13-character accounts);
 3. the exact scheme rule (49 CA + SA codes), which needs a `foracid` → `schm_code` bridge not in the
    catalog today.
+
+**Decided (user, 2026-11-04): option 3, the 49 CA + SA scheme codes.** Next: `sonnet_a1_casa_schemes_prompt.md`
+(find the account → scheme source, measure the exact rule on rl/cc 60_180), then the bundle.
