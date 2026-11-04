@@ -349,6 +349,22 @@ photo line numbers, `py_compile` and `ruff --select F,E9` clean.
 Still the old copy: `cc_raw_extract/pipeline.py` (the current one wires `build_cc_acct_windows` and
 `build_cc_billing`; to be photographed).
 
+## Handoffs 39–40 (A3 session): `cc_raw_extract/pipeline.py`, V1–V4 README excerpt (2026-11-04)
+
+- `crx_persona/cc_raw_extract/pipeline.py` (87 lines + trailing newline, replaces the October copy),
+  verbatim from `pics/claude_code_handoff_39.md`; `create_pipeline` on line 38, `py_compile` and ruff
+  clean. Five nodes; `build_cc_acct_windows` takes `crx_cc_spell_table`, `cc_spine`,
+  `params:cc_a3_history_floor_date`. End of file not confirmed (line 88 blank). The `cc_raw_extract`
+  package is now complete in the mirror.
+- `tmp_validation/a3_v1_v4/README.md`, lines 1, 34, 48–78 only →
+  `bundle_helpers/a3_final/v1_v4_readme_excerpt.md`. The other-axis columns used: A4
+  `crx_<p>_a4_deterioration` (`det_state`, `months_before_spell`, `history_months`, `n_prior_episodes`;
+  `clean_gap_before_current` not persisted), A2 `crx_<p>_a2_locatability.reachability_state`, A1
+  `crx_<p>_a1_ability.a1_state`; `prm_dcore_account_agreements` sits in `catalog_location.yml`.
+- `catalog_crx.yml` from line 290 is not needed (user, 2026-11-04): the A3 entries follow the file's
+  one pattern (`type: spark.SparkDataset`, parquet, `.../crx/<name>`, overwrite) and their names
+  are the pipeline outputs.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
