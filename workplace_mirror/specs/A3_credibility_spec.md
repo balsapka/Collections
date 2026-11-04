@@ -151,8 +151,12 @@ Measured, not assumed (V2, V3).
 ## Validations before the bundle
 
 Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`. Results (60_180):
-`v1_v4_summary_60_180.md`, review `v1_v4_review.md`. V1c rerun with the corrected allocation (user,
-2026-11-04): `sonnet_a3_v1c_rerun_prompt.md`; D-A3-11 and the Broken question wait on it.
+`v1_v4_summary_60_180.md`, review `v1_v4_review.md`. V1c rerun with the corrected allocation:
+`v1c_summary_60_180.md` (review: `v1_v4_review.md`, V1c). DCORE 'paid' is often not backed by card
+payments (CC settlement 22%). Before deciding D-A3-11, the user wants to know where that money is (user,
+2026-11-04): V1d, `sonnet_a3_v1d_missing_payments_prompt.md` (other card credits, Way4 last-payment
+fields, balance movement, FTR legs of the CIF's other accounts, lateness, partials, DCORE fields, and
+whether the delinquency behaves as if paid). The user also questions how strict the due date should be.
 
 
 - **V1 (DCORE instalments, Sonnet, no photos unless needed):** confirm the columns and meaning of
@@ -212,7 +216,7 @@ Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`. Results
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
-- Broken commitments (negative, cap or drop) and D-A3-11: pending the V1c rerun.
+- Broken commitments (negative, cap or drop) and D-A3-11 (incl. the due-date grace): pending V1d.
 - **CC sources (superseded by D-A3-18 for this bundle; kept as the later option).** Today `crx_cc_billing` / `crx_cc_balance` / `crx_cc_transactions` (`cc_raw_extract`)
   read `raw_*` inside crx_persona, re-implement the `prm_cc` derivations and are scoped by T0 windows,
   which breaks D5 and the §7 layer rule. Proposal pending photos: the CC primary pipeline owns the raw
