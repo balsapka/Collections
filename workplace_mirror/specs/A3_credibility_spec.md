@@ -172,6 +172,14 @@ Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`.
   30% / 50%, streak 2 / 4, Regular 1 / 3 of 3, record clean 70% / 90%, months due 2 / 4), one at a
   time; report the rows that change state.
 
+- **Later option, RL exact payments (user, 2026-11-04):** `comp_financial_tran_repos_dly` could give
+  dated payments into the loan account instead of the monthly `int_loan_master.total_paid`. That would
+  sharpen Dimension B / C, the promise-vs-ledger match (D-A3-11, today month-level for RL) and the RL
+  refusal test (D-A3-14). A delinquent loan account carries many administrative / internal postings
+  that are not customer payments, so it needs an EDA first to find the filter. Per the layer rule, it
+  would come in as a primary (`prm_loan_payments`, customer payments only), not a raw read in A3. Not
+  in this bundle unless decided.
+
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
