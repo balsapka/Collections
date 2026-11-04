@@ -1,6 +1,6 @@
-# Mirror bundle 14 — A1 — CASA = current and savings accounts by scheme code, bureau bounces by return date
+# Mirror bundle 14 — A1 — CASA = current and savings accounts by scheme code, bureau bounces by return date (rebuilt: B14 check fix)
 
-apply_bundle version: 7 · built 2026-11-04 from `5e21318..6249431` · source: 1 added, 15 replaced, 0 deleted · helpers: 0
+apply_bundle version: 7 · built 2026-11-04 from `5e21318..33fcc07` · source: 1 added, 15 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -10,10 +10,10 @@ block exactly as it is.
 
 ### In UAT
 
-**Step 1.** Work on a branch (the apply script refuses to run on main):
+**Step 1.** Continue on the branch of the earlier bundle (nothing uncommitted on it):
 
 ```bash
-git checkout -b feature/persona_redesign_b14
+git checkout feature/persona_redesign_b14 && git pull && git status --short
 ```
 
 **Step 2.** Create the folder, then save this file **raw** (GitHub → Raw → copy all) as `data/input/mirror_bundles/14_a1_casa_accounts_bounce_date.md`:
@@ -61,7 +61,7 @@ Then check:
 **Step 5.** Commit the source only, and push:
 
 ```bash
-git add src conf && git commit -m "A1: CASA accounts by scheme code (S16), bureau bounce by return date (S15), B14 check" && git push -u origin feature/persona_redesign_b14
+git add src conf && git commit -m "A1: B14 check fix (window lag as a column)" && git push
 ```
 
 **Undo** (before step 5) — puts every touched file back to the last commit:
@@ -3839,7 +3839,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/b14_check.py`
-action: add · new sha256 `7ad435e04a4e3a6b20edc5ac8f32634601af5d28e536376aaa641ee1862c4f43` · new trailing newline: yes
+action: add · new sha256 `d721a416635582a48aaf070bc7d8ada5943355cd7456fd64f6156f3017651635` · new trailing newline: yes
 
 New:
 
@@ -3881,6 +3881,10 @@ def _log(name: str, model_id: str, lines: list[str]) -> None:
     LOG.info("\n%s", "\n".join(block))
 
 
+def _n(count: int) -> str:
+    return str(count) if count >= 10 else "<10"
+
+
 def _table(df: DataFrame, *cols: str) -> list[str]:
     """Counts by ``cols`` with the share of all rows; under 10 shown as ``<10``."""
     rows = df.groupBy(*cols).count().orderBy(*cols).collect()
@@ -3888,7 +3892,7 @@ def _table(df: DataFrame, *cols: str) -> list[str]:
     return [
         "  "
         + " x ".join(f"{r[c]!s:<22}" for c in cols)
-        + f" {r['count'] if r['count'] >= 10 else '<10':>9}"
+        + f" {_n(r['count']):>9}"
         + f"  {100.0 * r['count'] / total:5.1f}%"
         for r in rows
     ]
@@ -4035,11 +4039,12 @@ def describe_a1_accounts(  # pylint: disable=too-many-arguments,too-many-positio
         f"{n_cifs} base CIFs; legs since {last} minus 12 months",
         "length x scheme_class: legs, CIFs",
         *[
-            f"  {r['length']!s:<4} {r['scheme_class']:<13} {r['legs']:>10} {r['cifs']:>8}"
+            f"  {r['length']!s:<4} {r['scheme_class']:<13} {_n(r['legs']):>10}"
+            f" {_n(r['cifs']):>8}"
             for r in by_class
         ],
         "top other schemes: schm_code, legs, CIFs",
-        *[f"  {r['schm_code']:<8} {r['legs']:>10} {r['cifs']:>8}" for r in top],
+        *[f"  {r['schm_code']:<8} {_n(r['legs']):>10} {_n(r['cifs']):>8}" for r in top],
         (
             f"CIFs with a CASA leg (new feat_cif_casa_activity_monthly) in 12 months: "
             f"{n_casa} ({100.0 * n_casa / max(n_cifs, 1):.1f}%)"
@@ -4073,7 +4078,8 @@ def _pull_rule(alerts: DataFrame) -> DataFrame:
     previous = F.lag("amount").over(Window.partitionBy(*key).orderBy("pull_date"))
     new = (F.col("amount") > 0) & (F.coalesce(previous, F.lit(0.0)) != F.col("amount"))
     return (
-        pulls.filter(new)
+        pulls.withColumn("_new", new)
+        .filter(F.col("_new"))
         .groupBy("cif_id", F.last_day("pull_date").alias("month_end"))
         .agg(F.count(F.lit(1)).alias("bounce_events"))
     )
