@@ -1,6 +1,6 @@
 # crx_persona code review and refactor: multi-agent workflow plan
 
-Status: **plan only, nothing run yet** (2026-11-04). The session that runs it reads this file,
+Status: **approved 2026-11-04, Phase 0 running** (recommended answers in §10 taken, A3 included). The session that runs it reads this file,
 `CLAUDE.local.md` and `DESIGN_REVIEW.md` §2, §6 and §7 first. The open questions in §10 must be
 answered before Phase 0 starts.
 
@@ -23,10 +23,27 @@ and is never applied silently.
 | **L — live, review and refactor** | `_common.py`, `scoring_engine.py`, `obs_base/`, `a1_ability/` (except `b14_check.py`), `cc_a1_ability/`, `rl_a1_ability/`, `a2_locatability/`, `cc_a2_locatability/pipeline.py`, `rl_a2_locatability/pipeline.py`, `_dpd_journey/`, `cc_a4_deterioration/`, `rl_a4_deterioration/` (except `b13_check.py`), `cc_full_history/`, `rl_full_history/`, the crx part of `catalog_crx.yml` and `pipeline_registry.py` | ~3,900 | full workflow |
 | **D — dead, delete rather than polish** | `cc_a2_locatability/nodes.py` + `constants.py` and `rl_a2_locatability/nodes.py` (orphaned since bundle 06; the wrappers call the engine) · `cc_departure_signature/` · `cc_payment_trajectory/` · `cc_utilisation/` (no consumer outside this T0 cluster) | ~7,000 | dead-code agent confirms each one; user approves the list (Q2) |
 | **K — kept for A3, frozen** | `cc_spell/`, `rl_spell_table/`, `rl_a4_spine/`, `_spine_utils.py`, `cc_raw_extract/` (A3 reads `crx_cc_balance/billing/transactions`), plus `build_rl_depart_spine` in `rl_departure_signature/nodes.py` (`rl_a4_spine` imports it) | — | not touched; may be moved only if a deletion requires it, keeping the same behaviour |
-| **X — out of scope** | `cc_a3_payment_credibility/`, `rl_a3_payment_credibility/` (DE-owned), `_dcore_codes.py` (only partly mirrored, read-only), `b13_check.py` / `b14_check.py` (removed by their cleanups), test modules (workplace Sonnet) | — | read only, for context |
+| **A — A3, design-in (user, 2026-11-04)** | `cc_a3_payment_credibility/`, `rl_a3_payment_credibility/`, `specs/A3_credibility_spec.md` (D-A3-1..21), `bundle_helpers/a3_final/` | ~4,200 today | reviewed and redesigned; edits go to `a3_handoff.md`, see below |
+| **X — out of scope** | `_dcore_codes.py` (only partly mirrored, read-only), `b13_check.py` / `b14_check.py` (removed by their cleanups), test modules (workplace Sonnet) | — | read only, for context |
 
 `rl_departure_signature/` is deleted except `build_rl_depart_spine`. That function moves into
-`rl_a4_spine/` unchanged, so A3 keeps its input.
+`rl_a4_spine/` unchanged, so A3 keeps its input until A3 is on the obs base (D-A3-1).
+
+**A3 in the review.** The A3 rebuild (obs-base grain, anchor from the A4 engine, one method per
+dimension, D-A3-1..21) is in progress in another session on `feature/persona_redesign`. Two writers
+on the same files is not allowed, so:
+- every agent reads the A3 spec and the A3 code;
+- S1 designs the **target A3 shape** on the refactored shared layer: an `a3_credibility/` engine
+  plus thin CC/RL wrappers, the same shape as A1/A2/A4. It names the shared helpers A3 needs (the
+  episode anchor from `_dpd_journey`, the DCORE window, the cycle ledger) and puts them in the
+  shared layer in this refactor;
+- all other A3 proposals (readability, Spark, Kedro, docstrings) are reviewed and scored like any
+  other, but are written to `a3_handoff.md` (diff-level, against the current A3 files) instead of
+  being applied;
+- the A3 session applies `a3_handoff.md` while building the A3 bundle; the new A3 then gets one
+  check pass against the frozen rubrics;
+- **"Fits A3 easily"** is a scored criterion for every reviewer (§4): a shared-layer change that
+  makes A3 harder is a blocking objection.
 
 ## 3. Hard rules (every agent's prompt includes them verbatim)
 
@@ -59,8 +76,8 @@ and is never applied silently.
    - They say what the code does now and why when that is not obvious.
    - No ticket or bundle history and no O-numbers.
    - Module docstrings name the run command and the inputs.
-8. **Tiers.** Tier K and X files are never edited. Tier L changes must not break imports from
-   A3 modules.
+8. **Tiers.** Tier K, A and X files are never edited here (A3 changes go to `a3_handoff.md`).
+   Tier L changes must not break imports from A3 modules.
 
 ## 4. Roles
 
@@ -267,8 +284,8 @@ end. A new finding also gets an O-number in `REVIEW_OBSERVATIONS.md`.
   - Each bundle ends with a cleanup prompt.
 - **Behaviour fixes.** Questions the user answers as "fix the code" ship in their own fix
   bundle, after the matching refactor bundle, with a D4 distribution and crosstab check.
-- **A3.** When the new A3 engine is written, it gets one review pass with the frozen rubrics
-  (S1, S4 and S5, then R-O), so it starts at the same standard.
+- **A3.** The A3 session ships its bundle with `a3_handoff.md` applied, after the shared bundle;
+  then one check pass with the frozen rubrics (S1, S4, S5, then R-O).
 
 ## 9. Folder layout and final deliverables
 
@@ -297,9 +314,7 @@ Planning artifacts are committed on the refactor branch. Code goes back to
 
 ## 10. Decisions needed before Phase 0
 
-1. **A3 timing.** Recommended: review A3 after its engine exists, with a single pass on the
-   frozen rubrics (§8). It is still being designed (V1d is open), and the DE's modules are out
-   of scope.
+1. **A3** (answered 2026-11-04): included as design-in (§2): reviewed, target shape built into the shared layer, A3 file edits handed to the A3 session.
 2. **Tier D deletion** (~7,000 lines: old A2 nodes, departure signatures, payment trajectory,
    utilisation). Recommended: delete in the first bundle, keep `build_rl_depart_spine` for A3,
    and leave `cc_raw_extract` and the spell tables until A3 moves off them (D5).
