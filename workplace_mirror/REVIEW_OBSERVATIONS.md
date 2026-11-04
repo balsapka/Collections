@@ -995,3 +995,35 @@ Sheet row 39: "3 or more separate dates without reaching the customer, no promis
 record, and no payment in the window." `_strong_negative_reason` adds `commitments_concluded == 0`
 (`nodes.py:1299`). Mostly redundant with "no plan on record", but it widens the gap between the sheet
 and the code.
+
+### O86 — `crx_cc_balance` is keyed on the balance `banking_date`, A3 joins it on the billing date (M, plausible)
+
+`cc_raw_extract/nodes.py:328-334, 390`: the balance extract outputs `observation_date = banking_date` (the
+snapshot date the `derive_*` functions group by), not `billing_date`. A3 joins it to the cycles on
+`(account_id, billing_date)` (`cc_a3_payment_credibility/nodes.py:658-665`). A cycle gets a due amount only
+if a balance snapshot sits exactly on its billing date. If snapshots are daily, the table is also much
+larger than A3 needs. Check: snapshots per contract per month, and the share of billing dates with a
+same-day snapshot.
+
+### O87 — `build_cc_transactions` ends with `.distinct()`, so identical real payments collapse (M, plausible)
+
+`cc_raw_extract/nodes.py:235-245`: the output has no transaction id. Two genuine payments on the same day,
+same amount and same description become one row, so A3's `payment_sum_in_cycle` under-counts them. Also,
+the payment filter (`txn_category == "payment"`) ignores `direction`, so whether reversals are netted
+depends on `TXN_CATEGORIES` (not in the mirror). Check: rows lost to `distinct`, and payment rows by
+`direction`.
+
+### O88 — `build_cc_billing` dedupes on `(contract, billing_date, due_date, dlq_level_m)` (L, plausible)
+
+`cc_raw_extract/nodes.py:472-479`: if a billing date has two rows that differ in `due_date` or
+`dlq_level_m`, both survive. `lead` then gives a zero-day "cycle" and a duplicate cycle row.
+`cc_full_history` dedupes the same source to one row per date (worst bucket). Under D-A3-3, A3 no longer
+needs `dlq_level_m` at all.
+
+### O89 — The extract windows are still T0-based (H for the refactor, confirmed)
+
+`build_cc_acct_windows` (`cc_raw_extract/nodes.py:67-131`) starts each window 12 months before the
+earliest non-censored spell's t0, or before the first spine date. Under D-A3-1 / D-A3-2 the window must
+cover 12 months (plus one cycle) before the latest spell start, through the last observation date,
+floored at `cc_a3_history_floor_date`. That anchor comes from A4 and can be years back at 180+.
+`build_cc_limits` keeps its own T0 window, but no A3 node reads it (only the T0-only packages do).

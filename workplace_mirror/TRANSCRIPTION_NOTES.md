@@ -335,6 +335,20 @@ Still missing: the `crx_cc_a3_*` / `crx_rl_a3_*` / `crx_rl_a4_spine` catalog ent
 appended. Review: `bundle_helpers/a3_final/v1_v4_review.md`. The A1 handoff 33 above is a different
 handoff (same number, other session).
 
+## Handoffs 36–38 (A3 session): `crx_persona/cc_raw_extract/` (2026-11-04)
+
+Written in chat from photos (`pics/claude_code_handoff_36/37/38.md`), copied verbatim; `def`s on the
+photo line numbers, `py_compile` and `ruff --select F,E9` clean.
+- `__init__.py` (14 lines + trailing newline; new in the mirror; its docstring still lists only three assets).
+- `_window_utils.py` (56; new): `prune_by_edp_load_date` 16, `scope_to_acct_window` 37. End of file not
+  confirmed (line 57 cut off).
+- `nodes.py` (487, replaces the October baseline): `build_cc_acct_windows` 67, `_as_contract_windows`
+  134, `build_cc_transactions` 141, `build_cc_limits` 248, `build_cc_balance` 318, `build_cc_billing`
+  402. End not confirmed (photos stop at 488). Line 254: the chat transcription showed a placeholder
+  glyph in "[min(T0) ? 12m, max(T0)]"; written as "−" (the old copy's character).
+Still the old copy: `cc_raw_extract/pipeline.py` (the current one wires `build_cc_acct_windows` and
+`build_cc_billing`; to be photographed).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
