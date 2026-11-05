@@ -206,3 +206,29 @@ Options: (a) A3 treats the anchor as unknown for history_cropped & starts_delinq
 Recommendation: (a), counted separately in D-A3-10; needs Q-05 settled first. | Impact: A4 unknown rows (large at 180+) and CC spells that began before 2024-01. Blocks: A3 bundle.
 Answer:
 ```
+
+## Added at round 1 triage (R-O)
+
+```
+Q-26 [A1, A4 outputs · a1_ability/classify.py `build_a1_ability`, _dpd_journey/states.py `assign_state`] (R-I N-16) A1 and A4 outputs carry no column saying which rule decided the state; A2 has `location_rule`.
+Now: A1 has `a1_unknown_reason` only (Unknown rows); A4 has the state only. An auditor must recompute the rule from the signal columns. | Expected: one `*_rule` idiom on every axis (A2 today, A3 planned).
+Options: (a) keep (b) add `a1_rule` (S-id of the points / distress / unknown path) and `det_rule` (Q0–Q4) in a fix bundle after the refactor bundles (new output columns: catalog schema, GRR workbook, tests change) (c) A4 only, since its tree is the hardest to recompute.
+Recommendation: (b), designed together with A3's rule column so the four axes match. | Impact: two new columns, no value changes; check = column present and its crosstab with the state. Blocks: none (not refactor work; PLAN §3 rule 1 and 5).
+Answer:
+```
+
+```
+Q-27 [shared · _common.py `window_agg(start=)`, A3] (S6-H02, restated for the shared helper) The shared window helper is inclusive at both ends (`start <= date <= observation_date`); A3 today reads DCORE `< observation_date`.
+Now: A2, A1 and `window_agg` are inclusive; A3's code is exclusive; D-A3-2 writes `[anchor, observation_date)`. | Expected: one convention for every axis.
+Options: (a) inclusive everywhere; D-A3-2 text changed to `[anchor, observation_date]` (b) exclusive for A3 only, as a private filter in A3 (no switch in the shared helper).
+Recommendation: (a). The same answer settles Q-22: answer once. | Impact: events on the last day of each month in A3. Blocks: A3 bundle.
+Answer:
+```
+
+```
+Q-28 [A3 · cc_a3_payment_credibility/nodes.py `_aggregate_disposition` (handoff S2-H-01)] Same-day, same-flag right-party contacts: which disposition wins?
+Now: `row_number()` over (date desc, refusal flag) leaves a tie on both undefined (any row; reruns can differ). The handoff's `max(struct(...))` picks the largest disposition string. | Spec: D-A3-19 says a refusal sorts first on the same day; no rule for two non-refusal or two refusal dispositions.
+Options: (a) accept the largest string (deterministic, arbitrary) (b) a named priority list of dispositions (c) keep the window as is.
+Recommendation: (a) for the A3 bundle, with the tie rule written in D-A3-19; (b) only if GRR names a priority. | Impact: rows with two dispositions of the same kind on the latest contact day; count it in the A3 bundle check. Blocks: A3 bundle (handoff S2-H-01).
+Answer:
+```

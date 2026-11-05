@@ -1,20 +1,6 @@
-# Round 1 status (paused 2026-11-05 by the user, to save usage)
+# Round 1 status
 
-| Specialist | State | Output |
-|---|---|---|
-| S1 architecture | stopped before writing | none — re-run |
-| S2 performance | stopped while running its gate check | `proposals/S2.md` (written; gate verification unfinished) |
-| S3 conventions | stopped near the end | `proposals/S3.md` (written; check it is complete) |
-| S4 readability | stopped before writing | none — re-run |
-| S6 correctness | done | `proposals/S6.md`: 12 Q (4 bugs, 8 ambiguities, max M) + 4 A3 handoff |
-| S7 dead code | done | `proposals/S7.md` + `S7.patch` (applies on `d1ad38a`; golden passes per S7) |
-
-Resume (`/review-council resume`): re-run S1 and S4 (agents `council-architecture`,
-`council-readability`, same round-1 prompts: input commit `d1ad38a`), finish S2's gate check,
-then merge (S7 → S1 → S3 → S2 → S4), S5 docstrings, gates, three reviews, triage, U1 questions.
-
-## Merge (2026-11-05)
-
-S1 and S4 re-run; S2 and S3 complete. Merged S7 → S1 → S3 → S2 → S4 (`merge_log.md`), gates green
-after three reverts (`gates.md`); questions in `../questions.md`, A3 items in `../a3_handoff.md`.
-Next: S5 docstrings on the merged tree, then the three reviews.
+Done 2026-11-05: specialists S1–S7, merge (`ac8cb77`), S5 docstrings (`5c24553`), reviews R-E / R-I /
+R-O, triage. Gates green on the merged tree (golden 79/79 identical, specs, lint no regression, smoke
+baseline-only). Next: U1 — user answers `questions.md` (Q-01..Q-28); then round 2 per
+`round_1/triage.md` (S4, S2, S1-lite, S5; S3 only if Q-15 = yes).
