@@ -12,17 +12,17 @@ from typing import Any
 from .core import journey_features
 
 STATE_RULES = {
-    "epd_max_history": 3,  # [business] months of history before the spell (blip incl.)
-    "epd_max_blips": 1,  # [business]
-    "straight_max_runup": 3,  # last clean month -> first month at 4
-    "stabilized_min_in_band": 5,  # [business] of the last 6 months within today's bucket ±1
-    "stabilized_long_run_months": 6,  # [business]
-    "stabilized_long_run_max_rise": 1,  # [business]
-    # [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
+    "epd_max_history": 3,  # Q1 [business] months of history before the spell (+ blip)
+    "epd_max_blips": 1,  # Q1 [business]
+    "straight_max_runup": 3,  # Q4 last clean month -> first month at 4
+    "stabilized_min_in_band": 5,  # Q2 [business] of last 6 months in today's bucket ±1
+    "stabilized_long_run_months": 6,  # Q2 [business]
+    "stabilized_long_run_max_rise": 1,  # Q2 [business]
+    # Q2 [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
     "stabilized_max_bucket": 7,
-    "repeat_min_prior_peak": 3,  # [business] earlier spell reached bucket 3 ...
-    "repeat_window_months": 12,  # [business] ... and ended <= 12 months before this one
-    "seasoned_min_months": 12,  # [business] months on book before the spell
+    "repeat_min_prior_peak": 3,  # Q3 [business] earlier spell reached bucket 3 ...
+    "repeat_window_months": 12,  # Q3 [business] ... and ended <= 12 months before
+    "seasoned_min_months": 12,  # Q4 [business] months on book before the spell
 }
 
 STATES = [
@@ -71,11 +71,19 @@ def _is_early_payment_default(f: dict[str, Any], history_blind: bool) -> bool:
     )
 
 
+def _is_repeat_delinquent(f: dict[str, Any]) -> bool:
+    """Q3: an earlier spell reached the peak bucket and ended within the window."""
+    return f["gap_prior_peak3"] <= STATE_RULES["repeat_window_months"]
+
+
+def _is_straight_roller(f: dict[str, Any]) -> bool:
+    """Q4: the run-up to bucket 4 took at most `straight_max_runup` months."""
+    return f["runup_len"] <= STATE_RULES["straight_max_runup"]
+
+
 # pylint: disable-next=too-many-return-statements
 def assign_state(
-    f: dict[str, Any],
-    cropped: bool,
-    restructure_blind_spot: bool = False,
+    f: dict[str, Any], cropped: bool, restructure_blind_spot: bool = False
 ) -> str:
     """One state per account, same tree and vocabulary in both segments. First 'yes' wins.
 
@@ -107,21 +115,16 @@ def assign_state(
     # oldest month is a real start, so fall through to the normal cascade.
     if f["starts_delinquent"] and history_blind:
         return "stabilized" if stab else "unknown"
-    # Q1
-    if _is_early_payment_default(f, history_blind):
+    if _is_early_payment_default(f, history_blind):  # Q1
         return "early_payment_default"
-    # Q2
-    if stab:
+    if stab:  # Q2
         return "stabilized"
-    # Q3
-    if f["gap_prior_peak3"] <= p["repeat_window_months"]:
+    if _is_repeat_delinquent(f):  # Q3
         return "repeat_delinquent"
-    # Q4
-    if f["runup_len"] <= p["straight_max_runup"]:
+    if _is_straight_roller(f):  # Q4
         if f["months_before_spell"] >= p["seasoned_min_months"] or history_blind:
             return "straight_roller_seasoned"
         return "straight_roller_early_life"
-    # else
     return "slow_roller"
 
 
