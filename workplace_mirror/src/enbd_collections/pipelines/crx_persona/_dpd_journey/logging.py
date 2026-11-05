@@ -16,6 +16,8 @@ from .params import JourneyParams
 LOG = logging.getLogger(__name__)
 
 
+# Logs the build_status counts and the gap, cycle-shift and invalid-row totals of
+# ``seq``: one extra aggregate job, run only when ``log_stats`` is set.
 def _log_sequence_stats(
     seq: DataFrame, scheme: BucketScheme, params: JourneyParams
 ) -> None:

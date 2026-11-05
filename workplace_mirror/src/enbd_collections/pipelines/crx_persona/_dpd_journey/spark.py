@@ -41,12 +41,9 @@ _SUBMODULES = (
 
 
 def _ship_by_value() -> None:
-    """Pickle every module of this package BY VALUE into the UDFs, so executors do not
-    need the Kedro project installed (cloudpickle >= 2.0, bundled with PySpark >= 3.3).
-    UDF closures reach build_history (history.py) and classify (states.py), not only
-    this module; left on pickle-by-reference they only "work" locally (shared sys.path)
-    and break on a real executor. If the project is installed on the executors this is
-    harmless."""
+    """Pickle every module of this package BY VALUE into the UDFs (cloudpickle >= 2.0),
+    so executors need not have the Kedro project: the UDF closures reach history.py and
+    states.py too, and by-reference pickling only works locally (shared sys.path)."""
     try:
         from pyspark import cloudpickle  # pylint: disable=import-outside-toplevel
 

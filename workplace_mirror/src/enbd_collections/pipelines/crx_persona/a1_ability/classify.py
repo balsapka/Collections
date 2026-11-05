@@ -35,8 +35,8 @@ CASA_MAX_FALL = 0.50  # S7
 CARD_PAYMENT_FLOOR = 500.0  # S8
 CARD_PAYMENT_ANCHOR_MULT = 1.0  # S8
 MIN_EVIDENCE_AMT = 1000.0  # smallest amount that counts as evidence (Weak, S5-S8)
-INCOME_POINTS = {"stable": 2, "weak": 1}
-LIQUIDITY_POINTS = {"adequate": 2, "weak": 1}
+INCOME_POINTS = {"stable": 2, "weak": 1}  # spec points table (GRR)
+LIQUIDITY_POINTS = {"adequate": 2, "weak": 1}  # same table
 
 DISPLAY_NAMES = {
     "high": "High",

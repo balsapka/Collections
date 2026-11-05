@@ -48,12 +48,8 @@ def _restructure_blind_spot(history: DataFrame) -> DataFrame:
 def build_cc_dpd_sequences(
     crx_cc_full_history: DataFrame, crx_persona: dict, model_id: str
 ) -> DataFrame:
-    """One row per CC account: gap-filled monthly bucket array (from the history floor
-    to persona_end_date) + audit columns + restructure_blind_spot_flag (1 if the
-    account's earliest billing row already has dlq_bucket >=
-    _RESTRUCTURE_DLQ_THRESHOLD).
-    See _dpd_journey.build_dpd_sequences.
-    """
+    """One row per CC account: _dpd_journey.build_dpd_sequences with the restructure
+    blind-spot flag of ``_restructure_blind_spot``."""
     require_columns(
         crx_cc_full_history,
         ["account_id", "billing_date", "dlq_bucket"],

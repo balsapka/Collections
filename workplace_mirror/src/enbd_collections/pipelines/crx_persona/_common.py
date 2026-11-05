@@ -191,8 +191,8 @@ def log_latest_month(
     """Log the ``col`` distribution of the latest observation month — the month of
     ``persona_end_date`` (one aggregate job; the month filter pushes down). A logging
     failure is a warning, never a failed run. ``latest_per_account`` counts each
-    account's latest row of that month once (A4 scores the spine's billing dates, which
-    can put two rows of a card in one month)."""
+    account's latest row of that month once (cc_spine has billing dates, so a card can
+    have two rows in a month; drop the option when cc_spine is month-end)."""
     month = F.trunc(F.lit(str(persona_end_date)), "month")
     try:
         latest = df.filter(F.trunc("observation_date", "month") == month)
