@@ -22,9 +22,8 @@ from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .._common import (
+    GONE_DARK_DAYS,
     GRAIN,
-    SEG_60_180,
-    SEG_180_PLUS,
     dcore_account_events,
     left_join_all,
     require_columns,
@@ -50,8 +49,6 @@ from .._dcore_codes import (
 # the last ticket, and none for at least SILENCE months before the observation date.
 TRAVEL_GAP_MONTHS = 3
 TRAVEL_SILENCE_MONTHS = 1
-# Non-Reachable (D-A2-20): the last this-many call days all failed, per segment.
-GONE_DARK_DAYS = {SEG_60_180: 3, SEG_180_PLUS: 6}
 WAY4_DECEASED_BLOCK = "D"  # block_code_2
 # Per-month evidence columns of feat_cif_location_monthly, latest as of the observation.
 LOCATION_EVIDENCE = [

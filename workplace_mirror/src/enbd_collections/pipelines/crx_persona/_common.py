@@ -44,6 +44,9 @@ MODEL_ID_SEGMENT = {
 # Months every axis looks back, the observation month included; the dry 180+ buckets
 # look further.
 WINDOW_MONTHS = {SEG_60_180: 3, SEG_180_PLUS: 6}
+# Failed call days in a row that make a customer gone dark: A2 Non-Reachable (D-A2-20),
+# A3's no-pickup diagnostic (D-A3-19).
+GONE_DARK_DAYS = {SEG_60_180: 3, SEG_180_PLUS: 6}
 
 
 def segment(model_id: str) -> str:
