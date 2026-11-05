@@ -208,6 +208,10 @@ def _gone_dark(streak: int, w_start: Column) -> Column:
     )
 
 
+def _reachable(w_start: Column) -> Column:  # D-A2-7: a contact in W
+    return F.col("last_contact_date") >= w_start
+
+
 def build_dcore_signals(  # pylint: disable=too-many-locals
     obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
 ) -> DataFrame:
@@ -263,7 +267,7 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
         .withColumn(
             "reachability_state",
             F.when(_gone_dark(streak, w_start), "non_reachable")
-            .when(F.col("last_contact_date") >= w_start, "reachable")
+            .when(_reachable(w_start), "reachable")
             .otherwise("unknown"),
         )
         .withColumn(
