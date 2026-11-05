@@ -155,15 +155,22 @@ failed but D-A3-19 already keeps them out of the state (diagnostic columns only)
 The central shared item (round 2 item 1, full text and A1 diff in `round_1/triage.md`). A3's state:
 
 ```python
+# D-A3-16 points (DE sheet rows). Dim A = commitments, Dim B = payments while delinquent,
+# Dim C = record before delinquency.
+COMMITMENT_POINTS = {"kept": 2, "partly_kept": 1}  # Dim A, D-A3-9 / D-A3-11
+DLQ_PAYMENT_POINTS = {"regular": 2, "some": 1}  # Dim B, D-A3-3 / D-A3-5
+PRE_DLQ_POINTS = {"clean": 1}  # Dim C, D-A3-2 / D-A3-13
+HIGH_FROM, MODERATE_FROM = 4, 1  # D-A3-16 cut-offs (GRR calibration: V4)
+
 SCORECARD = Scorecard(
     prefix="a3",
     dimensions=(
-        Dimension("commitments", "a3_commitments_level", {"kept": 2, "partly_kept": 1}, silent=("thin",)),
-        Dimension("dlq_payments", "a3_dlq_payment_level", {"regular": 2, "some": 1}, silent=("none",)),
-        Dimension("pre_dlq_record", "a3_pre_dlq_payment_level", {"clean": 1}, silent=("no_record",)),
+        Dimension("commitments", "a3_commitments_level", COMMITMENT_POINTS, silent=("thin",)),
+        Dimension("dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, silent=("none",)),
+        Dimension("pre_dlq_record", "a3_pre_dlq_payment_level", PRE_DLQ_POINTS, silent=("no_record",)),
     ),
     overrides=(BROKEN_OVERRIDE, Override("refusal", "a3_refusal_flag", DEMOTE)),  # order = priority
-    labels=STATE_LABELS,  # payment_credibility_{high,moderate,low,unknown}
+    labels=DISPLAY_NAMES,  # house label-map name, as A1; payment_credibility_{high,moderate,low,unknown}
     high_from=HIGH_FROM,
     moderate_from=MODERATE_FROM,
 )

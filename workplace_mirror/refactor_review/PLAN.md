@@ -277,6 +277,8 @@ end. A new finding also gets an O-number in `REVIEW_OBSERVATIONS.md`.
 
 ## 8. From the branch to the workplace
 
+**Superseded by `BUNDLE_PLAN.md` (round 3): two bundles, deletions first, then the refactor as one tested tree with a zero-difference check per axis. The list below is the original sketch.**
+
 - **Bundle sequence.** The Master proposes the split. The default runs lowest risk first, so
   that each PROD check isolates one axis:
   1. **Shared and deletion** (tier D removal, `_common.py`, `scoring_engine.py`, obs base,
