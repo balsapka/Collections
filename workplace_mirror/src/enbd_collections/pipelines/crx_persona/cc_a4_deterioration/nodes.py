@@ -26,14 +26,34 @@ from .._dpd_journey import CC, build_deterioration, build_dpd_sequences, journey
 _RESTRUCTURE_DLQ_THRESHOLD = 4
 
 
+def _restructure_blind_spot(history: DataFrame) -> DataFrame:
+    """``account_id``, ``restructure_blind_spot_flag``: 1 when the account's earliest
+    dated row is already at ``_RESTRUCTURE_DLQ_THRESHOLD`` or worse."""
+    # Earliest dated row; on a same-date tie the worst bucket wins, because the bucket
+    # is negated so the smallest struct is that row.
+    first = F.min(F.struct("obs_date", (-F.col("dlq_bucket")).alias("neg_bucket")))
+    return (
+        history.filter(F.col("dlq_bucket").isNotNull())
+        .groupBy("account_id")
+        .agg(first.alias("_first"))
+        .select(
+            "account_id",
+            (-F.col("_first.neg_bucket") >= _RESTRUCTURE_DLQ_THRESHOLD)
+            .cast("int")
+            .alias("restructure_blind_spot_flag"),
+        )
+    )
+
+
 def build_cc_dpd_sequences(
     crx_cc_full_history: DataFrame,
     crx_persona: dict,
     model_id: str,
 ) -> DataFrame:
-    """One row per CC account: gap-filled monthly bucket array (from the history floor to
-    persona_end_date) + audit columns + restructure_blind_spot_flag (1 if the account's
-    earliest billing row already has dlq_bucket >= _RESTRUCTURE_DLQ_THRESHOLD).
+    """One row per CC account: gap-filled monthly bucket array (from the history floor
+    to persona_end_date) + audit columns + restructure_blind_spot_flag (1 if the
+    account's earliest billing row already has dlq_bucket >=
+    _RESTRUCTURE_DLQ_THRESHOLD).
     See _dpd_journey.build_dpd_sequences.
     """
     require_columns(
@@ -45,24 +65,7 @@ def build_cc_dpd_sequences(
         "account_id", F.col("billing_date").alias("obs_date"), "dlq_bucket"
     )
 
-    # Earliest dated row per account; F.max is the deterministic tie-break on
-    # same-date conflicting rows.
-    history_dated = history.filter(F.col("dlq_bucket").isNotNull())
-    earliest_date = history_dated.groupBy("account_id").agg(
-        F.min("obs_date").alias("_first_date")
-    )
-    restructure = (
-        history_dated.join(earliest_date, on="account_id")
-        .filter(F.col("obs_date") == F.col("_first_date"))
-        .groupBy("account_id")
-        .agg(F.max("dlq_bucket").alias("_first_dlq_bucket"))
-        .select(
-            "account_id",
-            (F.col("_first_dlq_bucket") >= F.lit(_RESTRUCTURE_DLQ_THRESHOLD))
-            .cast("int")
-            .alias("restructure_blind_spot_flag"),
-        )
-    )
+    restructure = _restructure_blind_spot(history)
     return build_dpd_sequences(
         history, CC, journey_params(crx_persona, CC, model_id), restructure=restructure
     )
