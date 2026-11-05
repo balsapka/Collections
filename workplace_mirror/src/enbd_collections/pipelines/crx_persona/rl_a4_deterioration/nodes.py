@@ -30,7 +30,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from .._common import require_columns
+from .._common import require_columns, string_key
 from .._dpd_journey import (
     RL,
     build_deterioration,
@@ -66,8 +66,8 @@ def _edges(link: DataFrame) -> list[Edge]:
     rows = (
         link.filter(F.col(_LINK_ORIGINAL).isNotNull())
         .select(
-            F.trim(F.col(_LINK_ACCOUNT).cast("string")).alias("account"),
-            F.trim(F.col(_LINK_ORIGINAL).cast("string")).alias("original"),
+            string_key(link, _LINK_ACCOUNT).alias("account"),
+            string_key(link, _LINK_ORIGINAL).alias("original"),
             F.greatest(
                 F.col("restr_flagged_date").cast("date"),
                 F.col("orig_close_date").cast("date"),
@@ -138,7 +138,7 @@ def build_rl_full_history_linked(
 
     original = (
         int_loan_master.select(
-            F.trim(F.col("account_id").cast("string")).alias("original_id"),
+            string_key(int_loan_master).alias("original_id"),
             F.last_day(F.col("observation_date").cast("date")).alias("month_end_date"),
             F.col("dpd_bucket").cast("int").alias("dlq_bucket"),
             F.upper(F.col("account_status")).alias("_status"),
@@ -174,7 +174,7 @@ def _restructured(feature_retail_loans: DataFrame) -> DataFrame:
         "feature_retail_loans",
     )
     return feature_retail_loans.groupBy(
-        F.trim(F.col("account_id").cast("string")).alias("account_id")
+        string_key(feature_retail_loans).alias("account_id")
     ).agg(
         F.max(F.col("has_restructured_loan_flag").cast("int")).alias(
             "restructure_blind_spot_flag"
@@ -250,7 +250,7 @@ def build_rl_a4_deterioration(  # pylint: disable=too-many-arguments,too-many-po
     params = journey_params(crx_persona, RL, model_id)
     chains = F.broadcast(crx_rl_restructure_chains)
     spine = rl_spine.select(
-        F.trim(F.col("account_id").cast("string")).alias("account_id"),
+        string_key(rl_spine).alias("account_id"),
         F.col("observation_date").cast("date").alias("observation_date"),
     ).join(chains.select("account_id", "chain_known_date"), on="account_id", how="left")
     before_chain = F.coalesce(
