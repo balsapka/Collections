@@ -103,4 +103,5 @@ class Scorecard:  # pylint: disable=too-many-instance-attributes,too-many-locals
 
 def state_label(col: str, labels: Mapping[str, object]) -> Column:
     """The ``labels`` value of each ``col`` value; NULL for a value ``labels`` lacks."""
-    return F.create_map(*[F.lit(x) for kv in labels.items() for x in kv])[F.col(col)]
+    pairs = [F.lit(x) for pair in labels.items() for x in pair]
+    return F.create_map(*pairs)[F.col(col)]

@@ -39,7 +39,7 @@ from .._common import (
 # prm_casa_return_events reasons that count as distress; it also carries "RETURNS"
 # (POS refunds).
 CHEQUE_RETURN, DDS_RETURN = "CHEQUE RETURNS", "DDS Rejects/Reversal"
-BUREAU_BOUNCE = "BUREAU"  # the reason given to bureau-reported bounces (S15)
+REASON_BUREAU_BOUNCE = "BUREAU"  # the reason given to bureau-reported bounces (S15)
 # feat_cif_casa_activity_monthly lanes that are money the customer moved (S11): third-
 # party credits, transfers to others, cash, clearing, bill payments, card spend and
 # paying their own credit card. Not: own-account wash, the bank recovering the
@@ -51,7 +51,7 @@ CUSTOMER_LANES = ("economic", "card_spend", "card_payment")
 CASA_HELD_MONTHS = 12
 EOSB = "EOSB"  # in a DCORE result name: end-of-service benefits expected / received
 # Which source a salary row comes from, in ``build_income_signals``.
-INTERNAL, BUREAU = "int", "bur"
+SOURCE_INTERNAL, SOURCE_BUREAU = "int", "bur"
 
 
 def _cifs(obs_base: DataFrame) -> DataFrame:
@@ -166,7 +166,7 @@ def build_income_signals(
         "cif_id",
         "month_end",
         F.col("salary").alias("amount"),
-        F.lit(INTERNAL).alias("src"),
+        F.lit(SOURCE_INTERNAL).alias("src"),
     )
     bureau = bureau_salary.select("cif_id", "month_end", "bureau_salary")
     if loan_features is not None:
@@ -176,11 +176,11 @@ def build_income_signals(
             "cif_id",
             "month_end",
             F.col("bureau_salary").alias("amount"),
-            F.lit(BUREAU).alias("src"),
+            F.lit(SOURCE_BUREAU).alias("src"),
         )
     ).filter(F.col("month_end") >= F.lit(since))
     in_w = _month_index(F.col("month_end")) <= w
-    internal_rows = F.col("src") == INTERNAL
+    internal_rows = F.col("src") == SOURCE_INTERNAL
     return left_join_all(
         obs_base,
         [
@@ -322,7 +322,7 @@ def _distress_events(
     bounces are read from ``since`` (an ISO date) on."""
     events = bureau_bounces.filter(
         (F.col("bounce_events") > 0) & (F.col("month_end") >= F.lit(since))
-    ).select("cif_id", "month_end", F.lit(BUREAU_BOUNCE).alias("reason"))
+    ).select("cif_id", "month_end", F.lit(REASON_BUREAU_BOUNCE).alias("reason"))
     if payment_order is not None:
         require_columns(
             payment_order,
@@ -333,7 +333,7 @@ def _distress_events(
             payment_order.filter(F.col("reason_code").isNotNull()).select(
                 F.col("cif_id").cast("string").alias("cif_id"),
                 F.last_day(F.to_date("return_date")).alias("month_end"),
-                F.lit(BUREAU_BOUNCE).alias("reason"),
+                F.lit(REASON_BUREAU_BOUNCE).alias("reason"),
             )
         )
     return events.unionByName(
@@ -382,7 +382,7 @@ def build_distress_signals(
         w,
         _flag(CHEQUE_RETURN).alias("distress_cheque"),
         _flag(DDS_RETURN).alias("distress_dds"),
-        _flag(BUREAU_BOUNCE).alias("distress_bureau"),
+        _flag(REASON_BUREAU_BOUNCE).alias("distress_bureau"),
     )
     parts = ["distress_cheque", "distress_dds", "distress_bureau"]
     return (
