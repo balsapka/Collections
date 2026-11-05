@@ -24,23 +24,28 @@ def episode_start(obs_base: DataFrame, deterioration: DataFrame) -> DataFrame:
 
     ``episode_start`` is the first day of the month the current episode began, taken
     from the latest A4 row on or before the observation date in that month (CC: a
-    billing date). ``episode_left_censored`` is A4's ``left_censored``: the episode
-    already ran in the first month A4 used (history floor, truncation), so the true
-    onset may be earlier. Base rows A4 did not score get no row.
+    billing date). ``episode_left_censored``: A4 cropped the history (source start,
+    floor, truncation) and the episode already ran in its first kept month, so the true
+    onset may be earlier and the consumer treats the anchor as unknown (A3: Q-25); an
+    uncropped history delinquent from its first month has a true onset. Base rows A4
+    did not score get no row.
     """
     require_columns(
         deterioration,
-        [*GRAIN, "months_before_spell", "history_months", "left_censored"],
+        [*GRAIN, "months_before_spell", "history_months"]
+        + ["left_censored", "history_cropped"],
         "crx_<product>_a4_deterioration",
     )
+    # month index of the row (history_months - 1) minus the episode's first month's
     months_back = F.col("history_months") - 1 - F.col("months_before_spell")
+    censored = F.col("left_censored") & F.col("history_cropped")
     src = deterioration.select(
         string_key(deterioration).alias("account_id"),
         F.col("observation_date").cast("date").alias("a4_date"),
         F.add_months(F.trunc("observation_date", "month"), -months_back).alias(
             "episode_start"
         ),
-        F.col("left_censored").alias("episode_left_censored"),
+        censored.alias("episode_left_censored"),
     )
     return pit_latest(
         obs_base,
