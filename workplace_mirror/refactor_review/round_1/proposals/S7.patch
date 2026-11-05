@@ -1,0 +1,476 @@
+diff --git a/workplace_mirror/conf/base/catalog/catalog_crx.yml b/workplace_mirror/conf/base/catalog/catalog_crx.yml
+index ecd587d..fcaaeab 100644
+--- a/workplace_mirror/conf/base/catalog/catalog_crx.yml
++++ b/workplace_mirror/conf/base/catalog/catalog_crx.yml
+@@ -13,7 +13,8 @@
+ 
+ # -- T04c: T0-scoped CC raw DDI intermediates ----------------------------------
+ # Grain: (contract_id, observation_date) — one row per account per date.
+-# Built by crx_cc_raw_extract pipeline (T04c). Consumed by T04b, T05, T06.
++# Built by the crx_cc_raw_extract pipeline; the CC A3 pipeline reads crx_cc_transactions
++# and crx_cc_balance.
+ # Replaces prm_transaction / prm_limit / prm_balance primary-layer inputs,
+ # which are spine-scoped and lack history for cc_180_plus T0 windows.
+ crx_cc_transactions:
+@@ -90,157 +91,6 @@ crx_cc_a4_deterioration:
+   save_args:
+     mode: overwrite
+ 
+-# -- T04: CC Payment & Balance Trajectory Features ---------------------------
+-# Grain: (account_id, spell_id). One row per delinquency spell.
+-# All features anchored to T0 (from crx_cc_spell_table).
+-# W12 = [T0-365d, T0); H1 = older 9m; H2 = recent 3m.
+-# Blocked features (FILL-IN): min_pay_share_w12, months_since_full_pay_t0.
+-crx_cc_payment_trajectory:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_payment_trajectory"
+-  save_args:
+-    mode: overwrite
+-
+-# -- T05: CC Utilisation, Spend & Liquidity Features ------------------------
+-# Grain: (account_id, spell_id). One row per delinquency spell.
+-# All features anchored to T0 (from crx_cc_spell_table).
+-# W_pre truncation columns carried from crx_cc_payment_trajectory (T04b).
+-# Pass A: util_mean_h1/h2, util_t0, util_slope, util_accel (from prm_limit).
+-# Pass B: cash_adv_ramp, cash_adv_amt_share_h2, spend_taper_ratio,
+-#         spend_cliff_flag, spend_active_days_share_h2, txn_cnt_slope
+-#         (from prm_transaction).
+-crx_cc_utilisation_features:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_utilisation_features"
+-  save_args:
+-    mode: overwrite
+-
+-# -- T06: CC Departure Signature & History Shape Features -------------------
+-# Grain: (account_id, spell_id). One row per delinquency spell.
+-# All features anchored to T0 (from crx_cc_spell_table).
+-# Pass A: travel_mcc_flag_h2, foreign_txn_share_h2, last_txn_foreign_flag
+-#         (from prm_transaction; MCC codes 3000-3299, 4511, 4722)
+-# Pass B: casa_inflow_stop_gap_d, eosb_like_flag
+-#         (from comp_financial_tran_repos_dly; R20 scoped; schema-guarded)
+-# Pass C: prior_spell_cnt_24m, months_since_prior_spell, roll_speed_30/60_d
+-#         (from crx_cc_spell_table self-window; free reads)
+-# Pass D: tenure_at_t0_m, fee_velocity_life, fee_velocity_ratio_h2
+-#         (from prm_contract SCD2 + prm_turnovers PIT joins)
+-# Pass E: aecb_leverage_slope (OLS over int_bureau_pull_monthly [M0-24, M0))
+-# Pass F: relationship_breadth (from feat_product_holding PIT join)
+-# Always-NULL: foreign_login_flag (no geo login data), cross_prod_t0_gap_d,
+-#              simultaneous_default_flag (both blocked on T25)
+-
+-# -- T06 intermediates: modular pass checkpoints ------------------------------
+-# Each intermediate corresponds to one Kedro node. Re-run a single pass with:
+-#   kedro run --pipeline=crx_cc_departure_signature --from-nodes=build_crx_departure_pass_k
+-crx_cc_departure_spell_base:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_spell_base"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_contract_cif:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_contract_cif"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_a:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_a"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_b:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_b"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_c:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_c"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_d:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_d"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_e:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_e"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_f:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_f"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_g:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_g"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_h:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_h"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_h2:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_h2"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_i:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_i"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_j:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_j"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_pass_k:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_k"
+-  save_args:
+-    mode: overwrite
+-
+-crx_cc_departure_signature:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_signature"
+-  save_args:
+-    mode: overwrite
+-
+ # ── CC A2 Locatability (shared a2_locatability engine) ─────────────────────────
+ # Inputs: crx_cc_obs_base, feat_cif_location_monthly, dcore_prm_followup_outcomes,
+ #         prm_dcore_account_agreements, prm_contract, prm_client, feat_demographics_cif.
+@@ -403,9 +253,7 @@ crx_rl_spell_table:
+ 
+ # Spine-grain structural projection (windowed to persona_start_date / persona_end_date).
+ # Grain: (account_id, observation_date). Carries cif_id, spell_id, t0 (sourced from
+-# crx_rl_spell_table) — no classification columns. Built by rl_a4_spine pipeline,
+-# which reuses rl_departure_signature's build_rl_depart_spine (R14) so
+-# rl_a1_ability/rl_a2_locatability/rl_a3_payment_credibility need no changes.
++# crx_rl_spell_table) — no classification columns. Built by the rl_a4_spine pipeline.
+ # Filter point per TASKS_RL.md.
+ crx_rl_a4_spine:
+   type: spark.SparkDataset
+@@ -539,36 +387,6 @@ crx_rl_a1_ability_b14_check:
+   save_args:
+     mode: overwrite
+ 
+-# ── RL Departure Signature (RL-A2-2) ───────────────────────────────────────
+-
+-# Node 1: travel MCC hits from comp_financial_tran_repos_dly H2 window.
+-# Grain: (account_id, observation_date). Null = no H2 debit transactions.
+-crx_rl_depart_travel_mcc:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_depart_travel_mcc"
+-  save_args:
+-    mode: overwrite
+-
+-# Node 2: FX leakage (last_txn_foreign_flag) + digital login (foreign_login_flag).
+-# Grain: (account_id, observation_date).
+-crx_rl_depart_foreign_signals:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_depart_foreign_signals"
+-  save_args:
+-    mode: overwrite
+-
+-# Shipped RL departure signature — all 4 departure-trail signals at obs-date grain.
+-# Grain: (account_id, observation_date). Consumed by the RL A1 waterfall.
+-# travel_mcc_flag_h2/foreign_login_flag coalesced to 0; casa_inflow_stop_gap_d may be NULL.
+-crx_rl_departure_signature:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_departure_signature"
+-  save_args:
+-    mode: overwrite
+-
+ # ── RL A2 Locatability (shared a2_locatability engine) ─────────────────────────
+ # Inputs: crx_rl_obs_base, feat_cif_location_monthly, dcore_prm_followup_outcomes,
+ #         prm_dcore_account_agreements, prm_contract, prm_client, feat_demographics_cif.
+diff --git a/workplace_mirror/src/enbd_collections/pipeline_registry.py b/workplace_mirror/src/enbd_collections/pipeline_registry.py
+index 96c4137..7501f31 100644
+--- a/workplace_mirror/src/enbd_collections/pipeline_registry.py
++++ b/workplace_mirror/src/enbd_collections/pipeline_registry.py
+@@ -73,15 +73,6 @@ from enbd_collections.pipelines.crx_persona import (
+ from enbd_collections.pipelines.crx_persona import (
+     cc_raw_extract as crx_cc_raw_extract,
+ )
+-from enbd_collections.pipelines.crx_persona import (
+-    cc_payment_trajectory as crx_cc_payment_trajectory,
+-)
+-from enbd_collections.pipelines.crx_persona import (
+-    cc_utilisation as crx_cc_utilisation,
+-)
+-from enbd_collections.pipelines.crx_persona import (
+-    cc_departure_signature as crx_cc_departure,
+-)
+ from enbd_collections.pipelines.crx_persona import (
+     cc_a4_deterioration as crx_cc_a4_deterioration,
+ )
+@@ -110,9 +101,6 @@ from enbd_collections.pipelines.crx_persona import (
+ from enbd_collections.pipelines.crx_persona import (
+     rl_a3_payment_credibility as crx_rl_a3_payment_credibility,
+ )
+-from enbd_collections.pipelines.crx_persona import (
+-    rl_departure_signature as crx_rl_departure_signature,
+-)
+ from enbd_collections.pipelines import digital_login as dl
+ from enbd_collections.pipelines.location import pipeline as location_features
+ 
+@@ -231,9 +219,6 @@ def register_pipelines() -> dict[str, Pipeline]:
+         "crx_cc_spell_table": crx_cc_spell.create_pipeline(),
+         "crx_cc_full_history": crx_cc_full_history.create_pipeline(),
+         "crx_cc_raw_extract": crx_cc_raw_extract.create_pipeline(),
+-        "crx_cc_payment_trajectory": crx_cc_payment_trajectory.create_pipeline(),
+-        "crx_cc_utilisation_features": crx_cc_utilisation.create_pipeline(),
+-        "crx_cc_departure_signature": crx_cc_departure.create_pipeline(),
+         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
+         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
+         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
+@@ -257,7 +242,6 @@ def register_pipelines() -> dict[str, Pipeline]:
+         "crx_rl_a1_ability_b14_check": (
+             crx_rl_a1_ability.create_b14_check_pipeline()
+         ),
+-        "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
+         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
+         "crx_rl_a3_payment_credibility": crx_rl_a3_payment_credibility.create_pipeline(),
+         # -- Digital login (OMB) --------------------------------------------
+diff --git a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_common.py b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_common.py
+index da39e49..3860b8d 100644
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_common.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_common.py
+@@ -46,11 +46,6 @@ def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
+         raise ValueError(f"{source} is missing required columns {missing}")
+ 
+ 
+-def parse_yyyymmdd(col: str) -> Column:
+-    """``20260531`` (int or string) -> date."""
+-    return F.to_date(F.col(col).cast("string"), "yyyyMMdd")
+-
+-
+ def _window_start(anchor: Column, months: int) -> Column:
+     """First day of the last ``months`` calendar months, the anchor's month included."""
+     return F.add_months(F.trunc(anchor, "month"), 1 - months)
+diff --git a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/__init__.py b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/__init__.py
+index 2138b09..7857141 100644
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/__init__.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/__init__.py
+@@ -35,7 +35,7 @@ Nothing is dropped silently: every account in the history gets a sequences row w
+ `build_status`; the classifier keeps only status 'ok' and the segment's current buckets.
+ 
+ Package layout (readability split of the former flat _dpd_journey.py; no behavior change):
+-    constants.py  BucketScheme, CC, RL, SEGMENTS, MODEL_ID_SEGMENT
++    constants.py  BucketScheme, CC, RL, MODEL_ID_SEGMENT
+     params.py     PARAM_DEFAULTS, JourneyParams, journey_params()
+     _dates.py     _month_idx, _month_label, _month_col — shared by spark.py and logging.py
+                   so those two never need to import each other
+@@ -54,7 +54,7 @@ from __future__ import annotations
+ # module's name, so every caller/test import keeps working unchanged.
+ # pylint: disable=unused-import
+ from ._dates import _month_idx, _month_label
+-from .constants import CC, MODEL_ID_SEGMENT, RL, SEGMENTS, BucketScheme
++from .constants import CC, MODEL_ID_SEGMENT, RL, BucketScheme
+ from .core import (
+     H,
+     N,
+diff --git a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/constants.py b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/constants.py
+index 98ed9c1..72b903f 100644
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/constants.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_dpd_journey/constants.py
+@@ -25,12 +25,6 @@ class BucketScheme:
+ CC = BucketScheme("cc", offset=0, top=9, repair_jumps=True)
+ RL = BucketScheme("rl", offset=1, top=7, repair_jumps=False)
+ 
+-# Segments on the canonical scale.
+-SEGMENTS = {
+-    "60_180": (4, 5, 6, 7),  # CC native 4-7, RL native 3-6
+-    "180_plus": (8, 9),  # CC native 8-9, RL native 7
+-}
+-
+ # segment is fully determined by model_id — never an independently-settable override.
+ MODEL_ID_SEGMENT = {
+     "cc_60_180": "60_180",
+diff --git a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/nodes.py b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/nodes.py
+new file mode 100644
+index 0000000..fea3835
+--- /dev/null
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/nodes.py
+@@ -0,0 +1,89 @@
++"""RL A4 spine: the persona-window spine rows with their delinquency spell.
++
++Inputs: rl_spine, crx_rl_spell_table, params:crx_persona
++Output: crx_rl_a4_spine
++"""
++
++import logging
++
++from pyspark.sql import DataFrame
++from pyspark.sql import functions as F
++
++LOG = logging.getLogger(__name__)
++
++
++def build_rl_depart_spine(
++    rl_spine: DataFrame,
++    crx_rl_spell_table: DataFrame,
++    crx_persona: dict,
++) -> DataFrame:
++    """Build spell-scoped spine for departure signal computation (Node 0 of 5).
++
++    Mirrors steps 1–4 of build_rl_a4_spine_projection WITHOUT the A4 label join,
++    producing the raw spine grain used by all downstream departure nodes.
++
++    Join logic (mirrors join_spine_to_spell pattern from _spine_utils.py):
++        rl_spine["account_id"] == t0_table["account_id"]
++        AND t0 <= observation_date
++        AND spell_end IS NULL (always passes — open spell for RL)
++
++    Args:
++        rl_spine:           Model spine at (account_id, observation_date) grain.
++        crx_rl_spell_table: T0 anchor. Required cols: account_id, spell_id, t0,
++                            t0_censored_flag, spell_end, cif_id.
++        crx_persona:        Persona param dict with persona_start_date /
++                            persona_end_date.
++
++    Returns:
++        DataFrame at (account_id, observation_date) grain with cols::
++
++            cif_id           string  NULL if no active non-censored spell
++            account_id       string
++            observation_date date
++            spell_id         int     NULL if no active spell
++            t0               date    NULL if no active spell
++    """
++    persona_start_date = crx_persona["persona_start_date"]
++    persona_end_date = crx_persona["persona_end_date"]
++
++    # Step 1: non-censored active spells (spell_end IS NULL = current episode)
++    t0_filtered = crx_rl_spell_table.filter(
++        (F.col("t0_censored_flag") == 0) & F.col("spell_end").isNull()
++    ).select("account_id", "spell_id", "t0", "spell_end", "cif_id")
++
++    # Step 2: left-join spine to spell info (all spine rows preserved)
++    spine_for_join = (
++        rl_spine.drop("cif_id") if "cif_id" in rl_spine.columns else rl_spine
++    )
++    spine_with_t0 = spine_for_join.join(t0_filtered, on="account_id", how="left")
++
++    # Step 3: date filter — t0 <= observation_date (spell_end IS NULL always passes)
++    spine_filtered = spine_with_t0.filter(
++        F.col("t0").isNull() | (F.col("t0") <= F.col("observation_date"))
++    )
++
++    # Step 4: persona window filter
++    start_dt = F.to_date(F.lit(persona_start_date))
++    end_dt = F.to_date(F.lit(persona_end_date))
++    result = spine_filtered.filter(
++        (F.col("observation_date") >= start_dt) & (F.col("observation_date") <= end_dt)
++    )
++
++    n_rows = result.count()
++    n_with_spell = result.filter(F.col("spell_id").isNotNull()).count()
++    LOG.info(
++        "build_rl_depart_spine [%s → %s]: %d spine rows | with active spell: %d (%.1f%%)",
++        persona_start_date,
++        persona_end_date,
++        n_rows,
++        n_with_spell,
++        100.0 * n_with_spell / max(n_rows, 1),
++    )
++
++    return result.select(
++        F.col("cif_id").cast("string"),
++        F.col("account_id").cast("string"),
++        F.col("observation_date").cast("date"),
++        F.col("spell_id").cast("int"),
++        F.col("t0").cast("date"),
++    )
+diff --git a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/pipeline.py b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/pipeline.py
+index e444ce1..1306421 100644
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/pipeline.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/pipeline.py
+@@ -5,16 +5,13 @@ now-superseded CASA/EMI classification onto the spine. crx_rl_a4_spine is now
+ a pure structural join — (account_id, cif_id, observation_date, spell_id, t0),
+ decoupled from any A4 classifier, scoped by crx_rl_a4_deterioration instead.
+ 
+-Reuses rl_departure_signature's build_rl_depart_spine (R14 — identical logic,
+-already exercised by that pipeline) rather than re-deriving the same join.
+-
+ Run with:
+     kedro run --pipeline=crx_rl_a4_spine
+ """
+ 
+ from kedro.pipeline import Pipeline, node
+ 
+-from ..rl_departure_signature.nodes import build_rl_depart_spine
++from .nodes import build_rl_depart_spine
+ 
+ _TAGS = ["crx", "rl", "rl_a4_spine"]
+ 
+diff --git a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/scoring_engine.py b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/scoring_engine.py
+index 3847f1c..6d0e693 100644
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/scoring_engine.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/scoring_engine.py
+@@ -19,7 +19,7 @@ either axis wires these into its own node without restructuring joins.
+ """
+ 
+ from dataclasses import dataclass
+-from typing import Mapping, Sequence
++from typing import Mapping
+ 
+ from pyspark.sql import Column
+ from pyspark.sql import functions as F
+@@ -38,22 +38,6 @@ def points_from_level(level_col: Column, points_by_level: Mapping[str, int]) ->
+     return expr
+ 
+ 
+-def priority_reason(
+-    conditions: Mapping[str, Column], priority_high_to_low: Sequence[str]
+-) -> Column:
+-    """Pick the single highest-priority named condition that fires, else NULL.
+-
+-    ``conditions`` maps a reason name to its boolean Column. ``priority_high_to_low``
+-    must list every key in ``conditions``, most important first — when more
+-    than one condition fires for the same row, the first (highest-priority)
+-    match wins.
+-    """
+-    expr = F.lit(None).cast("string")
+-    for reason in reversed(priority_high_to_low):
+-        expr = F.when(conditions[reason], F.lit(reason)).otherwise(expr)
+-    return expr
+-
+-
+ @dataclass(frozen=True)
+ class StateLadder:
+     """A High/Moderate/Low(/Unknown) points ladder with a one-rung override demotion.
