@@ -46,11 +46,6 @@ def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
         raise ValueError(f"{source} is missing required columns {missing}")
 
 
-def parse_yyyymmdd(col: str) -> Column:
-    """``20260531`` (int or string) -> date."""
-    return F.to_date(F.col(col).cast("string"), "yyyyMMdd")
-
-
 def _window_start(anchor: Column, months: int) -> Column:
     """First day of the last ``months`` calendar months, the anchor's month included."""
     return F.add_months(F.trunc(anchor, "month"), 1 - months)
