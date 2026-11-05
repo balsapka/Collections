@@ -9,8 +9,8 @@ Shared helpers A3 can now import from the merged tier-L layer (round 1, S1): `_c
 `_common.window_start(months, anchor=None)`, `_common.window_agg(..., start=<base date column>)`,
 `_common.dcore_account_events`, `_common.segment` / `SEG_60_180` / `SEG_180_PLUS`,
 `_common.log_latest_month(..., latest_per_account=)`, `scoring_engine.state_label`,
-`scoring_engine.StateLadder`, `_dpd_journey.episode_start`. The target A3 shape (an
-`a3_credibility/` engine plus thin CC/RL wrappers) is in `round_1/proposals/S1.md`, "Target A3 shape".
+`scoring_engine.Scorecard` / `Dimension` / `Override` (round 2; replaced `StateLadder`), `_dpd_journey.episode_start`. The target A3 shape (an
+`a3_credibility/` engine plus thin CC/RL wrappers) is in `a3_target_shape.md`.
 
 Reviewer verdicts: pending (the round-1 reviews run after this merge); filled in at triage.
 

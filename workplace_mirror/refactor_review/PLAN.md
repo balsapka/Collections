@@ -1,6 +1,6 @@
 # crx_persona code review and refactor: multi-agent workflow plan
 
-Status: **round 1 done; U1 answered 2026-11-05 (all recommendations accepted); round 2 running** (recommended answers in §10 taken, A3 included). The session that runs it reads this file,
+Status: **signed off with recorded exceptions 2026-11-06 (D-3-3); see FINAL_REPORT.md and BUNDLE_PLAN.md** (recommended answers in §10 taken, A3 included). The session that runs it reads this file,
 `CLAUDE.local.md` and `DESIGN_REVIEW.md` §2, §6 and §7 first. The open questions in §10 must be
 answered before Phase 0 starts.
 
