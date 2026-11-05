@@ -16,7 +16,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from .._common import string_key
+from .._common import require_columns, string_key
 from ..scoring_engine import state_label
 from ._dates import _month_col, _month_idx
 from .constants import BucketScheme
@@ -134,13 +134,7 @@ def build_dpd_sequences(
         n_cycle_shift_moves, n_months_truncated, n_dup_month_rows, n_invalid_rows,
         legacy_drop (the old rule would have dropped it), restructure_blind_spot_flag
     """
-    missing = [
-        c for c in ("account_id", "obs_date", "dlq_bucket") if c not in history.columns
-    ]
-    if missing:
-        raise ValueError(
-            f"build_dpd_sequences: history is missing {missing}; has {sorted(history.columns)}"
-        )
+    require_columns(history, ["account_id", "obs_date", "dlq_bucket"], "A4 history")
     _ship_by_value()
     end_dt = F.to_date(F.lit(params.end_date))
     floor_idx = _month_idx(params.floor_date) if params.floor_date else None
