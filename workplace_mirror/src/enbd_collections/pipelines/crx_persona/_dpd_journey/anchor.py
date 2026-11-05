@@ -36,7 +36,7 @@ def episode_start(obs_base: DataFrame, deterioration: DataFrame) -> DataFrame:
         + ["left_censored", "history_cropped"],
         "crx_<product>_a4_deterioration",
     )
-    # month index of the row (history_months - 1) minus the episode's first month's
+    # months from the episode's first month to the row's month, back from history end
     months_back = F.col("history_months") - 1 - F.col("months_before_spell")
     censored = F.col("left_censored") & F.col("history_cropped")
     src = deterioration.select(

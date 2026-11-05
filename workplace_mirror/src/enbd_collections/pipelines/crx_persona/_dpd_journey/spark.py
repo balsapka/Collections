@@ -158,7 +158,8 @@ def build_dpd_sequences(
     params: JourneyParams,
     restructure: DataFrame | None = None,
 ) -> DataFrame:
-    """history: account_id, obs_date (date/timestamp), dlq_bucket (native int),
+    """Stage 1: monthly rows per account -> one shuffle -> `build_history` per account.
+    history: account_id, obs_date (date/timestamp), dlq_bucket (native int),
     optionally restructure_flag (0/1 per row; max over the account's rows).
     restructure: optional (account_id, restructure_blind_spot_flag), one row per account.
 
@@ -178,7 +179,7 @@ def build_dpd_sequences(
     fill, how = params.fill_straight_roll_gaps, params.on_unresolvable_gap
     max_inf = params.max_inferred_gap_months
 
-    def _udf(rows, first_raw, global_min):
+    def _udf(rows, first_raw, global_min):  # month rows, first month -> history struct
         if first_raw is None:
             return {"build_status": "no_valid_rows"}
         return build_history(
@@ -273,7 +274,8 @@ def build_deterioration(
     spine: DataFrame,
     log_states: bool = True,
 ) -> DataFrame:
-    """sequences: output of build_dpd_sequences (one row per account). spine: 2-column
+    """Stage 2: spine rows + sequences -> history cut at each row's month -> `classify`.
+    sequences: output of build_dpd_sequences (one row per account). spine: 2-column
     (account_id, observation_date) — one row per point-in-time state to classify, e.g.
     cc_spine/rl_spine already filtered to the run's model_id/DLQ-band scope. Classifies
     EVERY spine row, not one row per account: each row's billing history is the account's
@@ -298,6 +300,7 @@ def build_deterioration(
     repair = scheme.repair_jumps
     joined = _spine_rows_with_history(sequences, spine, params)
 
+    # in: buckets, truncation length, cropped, blind-spot flag; out: classify struct
     def _udf(buckets, trunc_len_, cropped, restructure_blind_spot):
         sl = list(buckets)[:trunc_len_]
         if not sl or max(sl[-1] + offset, 1) < 2:

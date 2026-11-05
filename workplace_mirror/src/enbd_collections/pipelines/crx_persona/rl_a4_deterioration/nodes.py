@@ -91,12 +91,11 @@ def _original_loan_months(
     the account's own row stays where months overlap.
     """
     in_history = F.broadcast(own.select("account_id").distinct())
-    chain_df, member_df = (
-        own.sparkSession.createDataFrame([tuple(r) for r in rows], schema).join(
-            in_history, on="account_id", how="leftsemi"
-        )
-        for rows, schema in ((chains, _CHAIN_SCHEMA), (members, _MEMBER_SCHEMA))
-    )
+    spark = own.sparkSession
+    chain_df = spark.createDataFrame([tuple(r) for r in chains], _CHAIN_SCHEMA)
+    member_df = spark.createDataFrame([tuple(r) for r in members], _MEMBER_SCHEMA)
+    chain_df = chain_df.join(in_history, on="account_id", how="leftsemi")
+    member_df = member_df.join(in_history, on="account_id", how="leftsemi")
     original = (
         int_loan_master.select(
             string_key(int_loan_master).alias("original_id"),
