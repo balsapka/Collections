@@ -46,6 +46,22 @@ on the same files is not allowed, so:
 - **"Fits A3 easily"** is a scored criterion for every reviewer (§4): a shared-layer change that
   makes A3 harder is a blocking objection.
 
+**A1 in the review (user, 2026-11-05).** A1 itself is being redesigned: liquidity is dry, High is
+rare, and the axis is driven mostly by salary. Alternatives are being sized in
+`bundle_helpers/a1_final/sonnet_a1_high_whatif_prompt.md`. The refactor keeps A1's behaviour but
+designs it so that each candidate (flow-based liquidity, internal Stable → High, other floors, new
+signal families, a pre-delinquency window on `episode_start`) plugs in as one signal builder,
+constant or ladder predicate. The design is in `a1_design_in.md`, and its gaps are round 2 items.
+
+**Axis stability (user, 2026-11-05).** Only **A4 and A2 are signed off and will not change**. A1
+(redesign being explored) and A3 (rebuild in progress) are still moving. So:
+- A4 and A2 get the full polish in every round and ship first, after the shared layer and the
+  deletions: bundle order shared + deletions → A4 → A2.
+- A1 and A3 get structure only: extension points, shared helpers, and no line-level polish of
+  rules that may be rewritten. A1's refactor ships with or just before its redesign bundle, not
+  on its own. A3's goes through `a3_handoff.md`.
+- Round 2 and 3 effort is spent on A4, A2 and the shared layer first.
+
 ## 3. Hard rules (every agent's prompt includes them verbatim)
 
 1. **No behaviour change.**
@@ -267,8 +283,8 @@ end. A new finding also gets an O-number in `REVIEW_OBSERVATIONS.md`.
      catalog and registry). PROD check: `kedro registry list` plus a run of each obs-base
      pipeline.
   2. **A4** (`_dpd_journey` and its wrappers).
-  3. **A1.**
-  4. **A2.**
+  3. **A2.**
+  4. **A1**, with or just before its redesign bundle (A1 still moving).
 - **PROD check for bundles 2–4.** A temporary node computes the old-vs-new crosstab of the axis
   output and the expected answer is **0 differing rows**. That is stronger than the usual D4
   distribution check because nothing is meant to change. Any difference becomes a question for
@@ -283,6 +299,12 @@ end. A new finding also gets an O-number in `REVIEW_OBSERVATIONS.md`.
   - Each bundle lists the renamed and removed public functions for the workplace Sonnet's test
     updates.
   - Each bundle ends with a cleanup prompt.
+- **Workplace state (user, 2026-11-05).** Bundle 14 (A1) is applied; only its cleanup is left
+  (remove `a1_ability/b14_check.py`, `create_b14_check_pipeline` in `a1_ability/pipeline.py` and its
+  `rl_a1_ability` import, the two registry entries and the `crx_*_a1_ability_b14_check` catalog
+  entries). The refactor branch mirrors that cleanup before the A1 bundle is built, so the bundle's
+  base is bundle 14 head + cleanup, as in the workplace. Same for the bundle 13 cleanup (A4) once
+  it is applied.
 - **Behaviour fixes.** Questions the user answers as "fix the code" ship in their own fix
   bundle, after the matching refactor bundle, with a D4 distribution and crosstab check.
 - **A3.** The A3 session ships its bundle with `a3_handoff.md` applied, after the shared bundle;

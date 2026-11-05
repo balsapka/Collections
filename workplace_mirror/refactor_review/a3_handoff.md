@@ -14,6 +14,28 @@ Shared helpers A3 can now import from the merged tier-L layer (round 1, S1): `_c
 
 Reviewer verdicts: pending (the round-1 reviews run after this merge); filled in at triage.
 
+## Status after the A3 design-in (S1, 2026-11-05)
+
+`a3_target_shape.md` supersedes S1.md's "Target A3 shape". The A3 rebuild replaces most functions
+these items touch, so most are now **superseded**: the intent is carried into the new engine, and the
+diff is no longer needed. R-O verdicts are in `round_1/reviews/R-O.md`.
+
+| Id | Status | Where the intent lands |
+|---|---|---|
+| S1-H1 | superseded | `_rl_string_key` goes with the RL adapter; `build_rl_a3_dues` / `_payments` use `_common.string_key` |
+| S1-H2 | **changed** | A3 declares a `scoring_engine.Scorecard` (round 2 item A3-1), not `StateLadder`; the Unknown gate is the Scorecard's "all dimensions silent, no override" (R-I's named-gate condition met) |
+| S1-H3 | superseded | the new `classify.build_a3_credibility` logs only through `log_latest_month`; list the dropped `a3_path` / total-rows log in the bundle notes |
+| S2-H-01 | carried | `signals._latest_rpc`: one `max(struct(day, not_refusal, disposition))` aggregate; tie rule = Q-28 (`DISPOSITION_RANK` if (b)) |
+| S3-A3-H1 | superseded (R-O: R-E's way) | dict inputs and one `TAGS` written once in `create_a3_pipeline`; tags follow Q-15 |
+| S3-A3-H2 / Q-20 | **settled by the spec** | "Open": all A3 sources are required (D2); `require_columns` in every node, no optional inputs |
+| S4-H1 | superseded | as S1-H1 |
+| S6-H01 | carried | `window_start` / `window_agg(start=)`; Dim B start = `add_months(episode_start, 1)` (`_onset_bounds`) |
+| S6-H02 | pending Q-22 / Q-27 | `signals._in_episode` |
+| S6-H03 | **changed** | round 2 item A3-3: `episode_left_censored = left_censored AND history_cropped`; A3 behaviour on those rows = Q-25 |
+| S6-H04 | deferred (R-O) | inline in `build_cc_a3_dues`; no shared helper |
+
+New entries required by D-A3-1..21 and the design-in are N-1 … N-6 at the end of this file.
+
 | Id | From | Title | Diff |
 |---|---|---|---|
 | S1-H1 | S1 | RL A3 uses `_common.string_key` | yes |
@@ -774,3 +796,61 @@ Impact: none if parameterised.
 ---
 
 Verdicts: R-E pending · R-I pending · R-O pending
+
+
+## New entries (S1, A3 design-in, 2026-11-05)
+
+## N-1  `_dcore_codes.REFUSING` split (D-A3-20)
+Files: `crx_persona/_dcore_codes.py:168-188` (tier X here; the A3 session ships it, A3 only uses these sets)
+Behaviour: A3 only, by decision D-A3-20 (refusal narrowed; dispute a diagnostic; hang-up to the avoidance diagnostics; `CUSTOMER MISBEHAVED` dropped).
+Diff (against the mirror copy; check `REFUSING` has no other importer first: today only A3):
+```diff
+-REFUSING = {
+-    "CUSTOMER HUNG UP",
+-    "CUSTOMER MISBEHAVED",
+-    "CUSTOMER_HUNG_UP",
+-    "DISPUTE",
+-    "KSA/DISPUTE",
+-    "KSA/REFUSE TO PAY",
+-    "REFUSE TO PAY",
+-    "REFUSED TO PAY",
+-    "REWRITE NOT AGREED",
+-}
++# A3 (D-A3-20): explicit refusal, the stated-intent negative.
++REFUSAL = {"KSA/REFUSE TO PAY", "REFUSE TO PAY", "REFUSED TO PAY", "REWRITE NOT AGREED"}
++# A3 diagnostic column only: a contested debt is not unwillingness.
++DISPUTE = {"DISPUTE", "KSA/DISPUTE"}
++# A3 avoidance diagnostic (D-A3-19): hang-up as the latest right-party contact.
++HUNG_UP = {"CUSTOMER HUNG UP", "CUSTOMER_HUNG_UP"}
+```
+The comment block above `REFUSING` (lines 168-177) goes with it. Every name stays in `RIGHT_PARTY_CONTACT`.
+
+## N-2  Parameters (D-A3-3)
+Files: `conf/base/parameters/parameters_crx_persona.yml:25-71`
+Change: delete `a3_dlq_payment_evidence_method`, `a3_pre_dlq_payment_evidence_method`,
+`rl_a3_dlq_payment_evidence_method`, `rl_a3_pre_dlq_payment_evidence_method` and their comment blocks;
+keep `cc_a3_history_floor_date` (D-A3-10). Parameter keys go by user decision (D-A3-3), so PLAN rule 5 is met.
+
+## N-3  Catalog (D-A3-3, design-in)
+Files: `catalog_crx.yml` (A3 block not fully photographed: needs the workplace copy)
+Change: drop the waterfall / bucket-movement datasets (3 per product); add `crx_<p>_a3_episode`,
+`crx_<p>_a3_instalments` (Q-32); `crx_<p>_a3_dues` / `_payments` stay memory datasets. Kept names:
+`crx_<p>_a3_commitment_signals`, `_strong_negative_signals`, `_dlq_payment_signals_single_payment_cycle_count`,
+`_pre_dlq_payment_signals_single_payment_cycle_count`, `crx_cc_a3_payment_cycles`, `crx_rl_a3_dlq_cycles`,
+`crx_<p>_a3_payment_credibility` (dropping the method suffix is a rename: ask at bundle time).
+
+## N-4  `build_cc_acct_windows` on the episode (D-A3-1, -18, O89)
+Files: `cc_raw_extract/nodes.py:67-131` (tier K; current workplace file needed, D-A3-18)
+Change: the per-account window starts at `min(episode_start) − 13 months` from `crx_cc_a3_episode`
+(12 months of Dim C plus one cycle), floored at `cc_a3_history_floor_date` minus 35 days, through the
+last observation date; `crx_cc_spell_table` is no longer read. No diff: the photographed copy predates the DE's work.
+
+## N-5  RL 24-month follow-up floor (O69)
+Files: `rl_a3_payment_credibility/nodes.py:183`
+Change: replaced by `constants.DCORE_MAX_MONTHS` in `_in_episode` and a params-derived partition floor, both products (Q-30).
+
+## N-6  Findings that disappear with the rebuild
+O66 (duplicate reason loop), O67 (ticket history), O68 (repeated docstring line, pylint pragma), O70–O76,
+O78, O79, O81, O82 (D-A3-8), O83, O85: the code they point at is not rebuilt. O77 → D-A3-10 check; O80
+→ P9; O84 → constants with sheet references; O86–O88 → the CC dues / payments wrapper (O87's `.distinct()`
+and O88's dedupe are in tier K `cc_raw_extract` and stay open for the A3 bundle).

@@ -232,3 +232,41 @@ Options: (a) accept the largest string (deterministic, arbitrary) (b) a named pr
 Recommendation: (a) for the A3 bundle, with the tie rule written in D-A3-19; (b) only if GRR names a priority. | Impact: rows with two dispositions of the same kind on the latest contact day; count it in the A3 bundle check. Blocks: A3 bundle (handoff S2-H-01).
 Answer:
 ```
+
+## Added by S1, A3 design-in (between rounds 1 and 2)
+
+From `a3_target_shape.md` §4. Each answer edits one named place in the A3 engine; none changes the
+shared layer. Q-20 is answered by the spec ("Open": all A3 sources are required, D2), so the A3
+rebuild uses `require_columns` everywhere.
+
+```
+Q-29 [A3 · a3_credibility/signals._paid_after (refusal, D-A3-5 / -14 / -20)] What is "a payment of at least 100 AED after the refusal"?
+Now: CC sums all card payments after the refusal day and, at 180+ only, compares the sum with 100 AED; RL uses Dimension B's any-payment flag. | Spec: D-A3-5 "a cycle with at least 100 AED"; D-A3-14 RL "total_paid >= 100 in a month after the refusal month"; D-A3-20 "no payment >= 100 AED followed it".
+Options: (a) payments dated after the refusal, summed per cycle (CC) / month (RL), one cycle or month >= 100 (b) all payments since the refusal summed, >= 100 (c) one single payment >= 100.
+Recommendation: (a), the D-A3-5 unit on both products. | Impact: refusal rows with several small payments after the refusal (4.4% fire today); count in the A3 bundle check. Blocks: A3 bundle.
+Answer:
+```
+
+```
+Q-30 [A3 · a3_credibility/signals._in_episode, constants.DCORE_MAX_MONTHS] Is the DCORE look-back capped at 180+?
+Now: CC reads all follow-up history from t0; RL floors it at persona_start − 24 months (O69, a performance guard). | Spec: D-A3-2 "[anchor, observation_date)" with no cap; at 180+ the anchor can be years back.
+Options: (a) no cap; the CC read stays unpruned (b) cap at N months (24 as RL today) for both products, which also gives a literal partition floor from params (no Spark action).
+Recommendation: (b) N = 24 if the bundle check shows few latest right-party contacts older than 24 months; otherwise (a). | Impact: 180+ refusals and plans older than N months. Blocks: A3 bundle.
+Answer:
+```
+
+```
+Q-31 [A3 · a3_credibility/signals._onset_bounds] Where does the onset cycle count, now that the anchor is a month?
+Now: the statement dated t0 (the cycle that made the account delinquent) is in neither dimension: Dimension B takes evidence > t0, Dimension C < t0. | Spec: DE sheet row 6 "split at onset"; D-A3-2 says nothing on the boundary cycle.
+Options: (a) in neither (Dim B from the month after the episode month, Dim C before it): today's result (b) in Dimension C (it is the last pre-onset payment) (c) in Dimension B.
+Recommendation: (a), no change. | Impact: one cycle per row at the boundary. Blocks: A3 bundle.
+Answer:
+```
+
+```
+Q-32 [A3 · node build_crx_<p>_a3_instalments; spec V1 "decide the layer"] Which layer feeds Dimension A?
+Now: A3 joins dcore_int_ptp / dcore_int_settlement (intermediate) with dcore_prm_promise_instalments / dcore_prm_settlement_schedule_instalments (primary) in one node, against "one layer per node". | Spec: V1 left the layer open.
+Options: (a) an A3 source node that mixes the two (D-A3-18 style, documented exception) (b) a DCORE primary (`dcore_prm_commitment_instalments`: agreement, plan type, plan start, due date, due / paid amount, status) in the DE-owned DCORE pipeline, read by A3.
+Recommendation: (b) if the DE can add it; (a) for this bundle otherwise. | Impact: none on values. Blocks: A3 bundle (wiring only).
+Answer:
+```
