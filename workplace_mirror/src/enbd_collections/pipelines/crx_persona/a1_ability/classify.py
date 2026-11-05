@@ -37,6 +37,7 @@ CARD_PAYMENT_ANCHOR_MULT = 1.0  # S8
 MIN_EVIDENCE_AMT = 1000.0  # smallest amount that counts as evidence (Weak, S5-S8)
 INCOME_POINTS = {"stable": 2, "weak": 1}  # spec points table (GRR)
 LIQUIDITY_POINTS = {"adequate": 2, "weak": 1}  # same table
+HIGH_FROM, MODERATE_FROM = 4, 2  # points for High / Moderate (spec s_high / s_mod)
 
 DISPLAY_NAMES = {
     "high": "High",
@@ -134,9 +135,10 @@ SCORECARD = Scorecard(
     prefix="a1",
     dimensions=tuple(dimension for _, dimension in FAMILIES),
     overrides=(Override("distress", "a1_distress_flag", DEMOTE),),  # S9
+    # state id = rung name; the display text is DISPLAY_NAMES
     labels={s: s for s in ("high", "moderate", "low", "unknown")},
-    high_from=4,
-    moderate_from=2,
+    high_from=HIGH_FROM,
+    moderate_from=MODERATE_FROM,
 )
 
 
@@ -160,6 +162,7 @@ def build_a1_ability(  # pylint: disable=too-many-locals
     ``bureau``, ``both`` or ``none``), ``a1_salary_stopped`` (internal salary in the
     prior window, none in the window).
     """
+    # join order follows the node inputs; output is the same (left joins on GRAIN)
     df = left_join_all(obs_base, [*signals.values(), anchor])
     amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
     w = window_months(model_id)
