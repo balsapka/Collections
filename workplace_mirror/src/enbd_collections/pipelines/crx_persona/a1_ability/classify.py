@@ -20,7 +20,7 @@ from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, left_join_all, log_latest_month, window_months
-from ..scoring_engine import StateLadder, points_from_level, state_label
+from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard, state_label
 
 # Thresholds (spec §3, S2–S12): the workbook's starting values, not tuned on PROD.
 # Keyed by window length W (3 months at 60–180, 6 at 180+, S10).
@@ -38,13 +38,16 @@ MIN_EVIDENCE_AMT = 1000.0  # smallest amount that counts as evidence (Weak, S5-S
 INCOME_POINTS = {"stable": 2, "weak": 1}
 LIQUIDITY_POINTS = {"adequate": 2, "weak": 1}
 
-_LADDER = StateLadder(
-    high="high",
-    moderate="moderate",
-    low="low",
-    unknown="unknown",
-    high_from_points=4,
-    moderate_from_points=2,
+SCORECARD = Scorecard(
+    prefix="a1",
+    dimensions=(
+        Dimension("income", "a1_income_level", INCOME_POINTS),
+        Dimension("liquidity", "a1_liquidity_level", LIQUIDITY_POINTS),
+    ),
+    overrides=(Override("distress", "a1_distress_flag", DEMOTE),),  # S9
+    labels={s: s for s in ("high", "moderate", "low", "unknown")},
+    high_from=4,
+    moderate_from=2,
 )
 DISPLAY_NAMES = {
     "high": "High",
@@ -163,20 +166,8 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
         .withColumn("a1_liquidity_level", liquidity_level(amt, w))
         .withColumn("a1_distress_flag", F.col("distress_flag") == 1)
     )
-    df = df.withColumn(
-        "a1_points_total",
-        points_from_level(F.col("a1_income_level"), INCOME_POINTS)
-        + points_from_level(F.col("a1_liquidity_level"), LIQUIDITY_POINTS),
-    )
-    unknown = (
-        (F.col("a1_points_total") == 0)
-        & ~F.col("a1_distress_flag")
-        & (F.coalesce(F.col("casa_active"), F.lit(0)) == 0)
-    )
-    df = df.withColumn(
-        "a1_state",
-        _LADDER.state(F.col("a1_points_total"), F.col("a1_distress_flag"), unknown),
-    )
+    no_casa_activity = F.coalesce(F.col("casa_active"), F.lit(0)) == 0  # S11
+    df = SCORECARD.score(df, unknown_also=no_casa_activity)
     unknown_reason = F.when(F.col("casa_held") == 1, "dormant_casa").otherwise(
         "no_casa"
     )
@@ -187,10 +178,10 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
         *GRAIN,
         "a1_state",
         state_label("a1_state", DISPLAY_NAMES).alias("a1_state_label"),
-        F.when(F.col("a1_state") == _LADDER.unknown, "no_signal")
+        F.when(F.col("a1_state") == "unknown", "no_signal")
         .otherwise("observed")
         .alias("a1_provenance"),
-        F.when(F.col("a1_state") == _LADDER.unknown, unknown_reason).alias(
+        F.when(F.col("a1_state") == "unknown", unknown_reason).alias(
             "a1_unknown_reason"
         ),
         "a1_income_level",

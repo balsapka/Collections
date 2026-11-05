@@ -1,81 +1,106 @@
-"""Points -> state-ladder primitives shared by the crx_persona axes.
+"""Points -> state scoring shared by the axes (A1; A3 next). An axis declares a
+``Scorecard`` (dimensions with points per level, thresholds, overrides, state labels)
+and builds its own level columns; ``Scorecard.score`` adds points, state, the override
+that fired and the reason. Imported by the axes; not run on its own."""
 
-N named point dimensions are summed to a total; a High/Moderate/Low(/Unknown) ladder
-turns the total into a state; an override condition demotes the state by exactly one
-rung (never stacks); a no-signal gate is checked first. Each axis supplies its own
-dimension logic, state labels and thresholds (A1: ``a1_ability.classify``); this module
-only owns the combination step.
+from __future__ import annotations
 
-Pure ``pyspark.sql.Column`` in, ``Column`` out, so an axis wires these into its own
-node without restructuring joins. Imported by the axes; not run on its own.
-"""
-
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
-from pyspark.sql import Column
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
-
-def points_from_level(level_col: Column, points_by_level: Mapping[str, int]) -> Column:
-    """Map a named level string column to its integer point value.
-
-    ``points_by_level`` is an equality lookup, not a ladder — order doesn't
-    matter. A level value not present in ``points_by_level`` (including NULL)
-    falls through to 0.
-    """
-    expr = F.lit(0)
-    for level, points in points_by_level.items():
-        expr = F.when(level_col == F.lit(level), F.lit(points)).otherwise(expr)
-    return expr
+DEMOTE, CAP, FORCE = "demote", "cap", "force"  # Override modes
+RUNGS = ("low", "moderate", "high")
 
 
 @dataclass(frozen=True)
-class StateLadder:
-    """A High/Moderate/Low(/Unknown) points ladder with a one-rung override demotion.
+class Dimension:
+    """A scored dimension: its ``level`` column, the points per level (others 0; may be
+    negative) and the ``silent`` levels that mean "no evidence" (the Unknown gate)."""
 
-    ``high_from_points`` / ``moderate_from_points`` are inclusive point
-    thresholds for the un-demoted ladder. An override (e.g. a distress flag,
-    a strong-negative reason) drops the computed level by exactly one rung —
-    High -> Moderate, Moderate -> Low — and never pushes below ``low``, the
-    ladder's floor. ``unknown`` is a separate gate, not reachable via points;
-    the caller decides when it fires (typically "no signal from any
-    dimension and no override") and passes that as ``is_unknown``.
+    name: str
+    level: str
+    points: Mapping[str, int]
+    silent: tuple[str, ...] = ("none",)
+
+
+@dataclass(frozen=True)
+class Override:
+    """A boolean ``flag`` column that, when true, moves the state: ``DEMOTE`` one rung
+    (never below Low), ``CAP`` at rung ``to``, or ``FORCE`` to rung ``to``."""
+
+    name: str
+    flag: str
+    mode: str = DEMOTE
+    to: str = "low"
+
+
+@dataclass(frozen=True)
+class Scorecard:  # pylint: disable=too-many-instance-attributes
+    """Points over ``dimensions`` -> High / Moderate / Low, overrides, an Unknown gate.
+
+    Rungs from the points total (``high_from`` / ``moderate_from``, inclusive); High
+    also needs ``high_min_dimensions`` dimensions with points, one in ``high_current``
+    if given, else Moderate. The first override whose flag is true, in declared order,
+    moves the rung (no stacking; a NULL flag does not fire). Unknown: every level silent
+    or NULL, no override, and ``unknown_also``. ``labels``: rung or "unknown" -> value.
     """
 
-    high: str
-    moderate: str
-    low: str
-    unknown: str
-    high_from_points: int
-    moderate_from_points: int
+    prefix: str
+    dimensions: tuple[Dimension, ...]
+    labels: Mapping[str, str]
+    high_from: int
+    moderate_from: int
+    overrides: tuple[Override, ...] = ()
+    high_min_dimensions: int = 0
+    high_current: tuple[str, ...] = ()
 
-    def state(
-        self, points_total: Column, has_override: Column, is_unknown: Column
-    ) -> Column:
-        """Combine points, the override boolean and the unknown gate into a state column.
-
-        Unknown is checked first and short-circuits the ladder. Otherwise:
-        High requires points >= high_from_points AND no override; Moderate
-        fires either on points >= moderate_from_points with no override, or
-        on points >= high_from_points WITH an override (the one-rung
-        demotion from High); everything else is Low.
-        """
-        return (
-            F.when(is_unknown, F.lit(self.unknown))
-            .when(
-                (points_total >= self.high_from_points) & (~has_override),
-                F.lit(self.high),
-            )
-            .when(
-                ((points_total >= self.moderate_from_points) & (~has_override))
-                | ((points_total >= self.high_from_points) & has_override),
-                F.lit(self.moderate),
-            )
-            .otherwise(F.lit(self.low))
+    def score(self, df: DataFrame, unknown_also: Column | None = None) -> DataFrame:
+        """``df`` + ``<prefix>_<dimension>_points``, ``_points_total``, ``_state``,
+        ``_override`` (the one that fired), ``_reason`` (it, else the top dimension)."""
+        p = self.prefix
+        pts = {
+            d.name: F.coalesce(state_label(d.level, d.points), F.lit(0))
+            for d in self.dimensions
+        }
+        total = sum(pts.values())
+        scored = sum((c > 0).cast("int") for c in pts.values())
+        high = (total >= self.high_from) & (scored >= self.high_min_dimensions)
+        if self.high_current:
+            high &= F.array_max(F.array(*[pts[n] for n in self.high_current])) > 0
+        rung = F.when(high, 2).when(total >= self.moderate_from, 1).otherwise(0)
+        fired = F.coalesce(
+            *[F.when(F.col(o.flag), F.lit(o.name)) for o in self.overrides],
+            F.lit(None).cast("string"),
+        )
+        for o in self.overrides:
+            to = F.lit(RUNGS.index(o.to))
+            moved = {DEMOTE: F.greatest(rung - 1, F.lit(0)), CAP: F.least(rung, to)}
+            rung = F.when(fired == o.name, moved.get(o.mode, to)).otherwise(rung)
+        unknown = F.lit(True) if unknown_also is None else unknown_also
+        unknown &= fired.isNull()
+        for d in self.dimensions:
+            unknown &= F.coalesce(F.col(d.level).isin(*d.silent), F.lit(True))
+        state = F.when(unknown, self.labels["unknown"])
+        for i in (2, 1):
+            state = state.when(rung == i, self.labels[RUNGS[i]])
+        ranked = [
+            F.struct(c.alias("pts"), F.lit(-i).alias("i"), F.lit(n).alias("n"))
+            for i, (n, c) in enumerate(pts.items())
+        ]
+        top = F.sort_array(F.array(*ranked), asc=False)[0]  # ties: declared order
+        return df.select(
+            "*",
+            *[c.alias(f"{p}_{n}_points") for n, c in pts.items()],
+            total.alias(f"{p}_points_total"),
+            state.otherwise(self.labels["low"]).alias(f"{p}_state"),
+            fired.alias(f"{p}_override"),
+            F.coalesce(fired, F.when(top["pts"] > 0, top["n"])).alias(f"{p}_reason"),
         )
 
 
-def state_label(col: str, labels: Mapping[str, str]) -> Column:
-    """The display label of each ``col`` value; NULL for a value ``labels`` lacks."""
+def state_label(col: str, labels: Mapping[str, object]) -> Column:
+    """The ``labels`` value of each ``col`` value; NULL for a value ``labels`` lacks."""
     return F.create_map(*[F.lit(x) for kv in labels.items() for x in kv])[F.col(col)]

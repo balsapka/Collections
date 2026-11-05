@@ -358,5 +358,37 @@ assert inc["A0"]["income_m2"] == 6000.0 == inc["A0"]["income_m1"], inc["A0"]
 assert inc["A0"]["income_m3"] is None and inc["A0"]["bureau_salary_w"] == 6000.0, inc["A0"]
 # a pull after the observation month never counts
 assert 7000.0 not in [inc["A1"][f"income_m{i}"] for i in range(1, 7)], inc["A1"]
-print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ dating, lanes, anchor, returns and loan salary checks)")
+# Scorecard: each override mode, the High gate, a NULL flag, override order, Unknown
+from enbd_collections.pipelines.crx_persona import scoring_engine as se  # noqa: E402
+
+DIMS = (se.Dimension("a", "a_level", {"x": 4, "y": 2}), se.Dimension("b", "b_level", {"x": 2}))
+LABELS = {r: r for r in (*se.RUNGS, "unknown")}
+
+
+def card(*overrides, **gate):
+    return se.Scorecard("t", DIMS, LABELS, 4, 2, overrides, **gate)
+
+
+demote, refuse = se.Override("d", "f1"), se.Override("r", "f2", se.FORCE, "high")
+sc_rows = [  # (a_level, b_level, f1, f2, scorecard, state, override, reason)
+    ("x", "none", False, False, card(demote), "high", None, "a"),
+    ("x", "none", True, False, card(demote), "moderate", "d", "d"),  # DEMOTE
+    ("y", "none", True, False, card(demote), "low", "d", "d"),
+    ("x", "none", True, False, card(se.Override("c", "f1", se.CAP, "moderate")), "moderate", "c", "c"),
+    ("y", "none", True, False, card(se.Override("c", "f1", se.CAP, "moderate")), "moderate", "c", "c"),
+    ("none", "none", False, True, card(demote, refuse), "high", "r", "r"),  # FORCE
+    ("x", "none", True, True, card(demote, refuse), "moderate", "d", "d"),  # first wins
+    ("x", "none", None, False, card(demote), "high", None, "a"),  # NULL flag: no fire
+    ("x", "none", False, False, card(high_min_dimensions=2), "moderate", None, "a"),
+    ("y", "x", False, False, card(high_min_dimensions=2), "high", None, "a"),  # tie: a first
+    ("y", "x", False, False, card(high_current=("b",)), "high", None, "a"),
+    ("x", "none", False, False, card(high_current=("b",)), "moderate", None, "a"),
+    ("none", None, False, False, card(demote), "unknown", None, None),
+    ("none", "none", True, False, card(demote), "low", "d", "d"),
+]
+sc_df = spark.createDataFrame([r[:4] for r in sc_rows], "a_level string, b_level string, f1 boolean, f2 boolean")
+for i, (*_, sc, state, override, reason) in enumerate(sc_rows):
+    got = sc.score(sc_df).collect()[i]
+    assert (got["t_state"], got["t_override"], got["t_reason"]) == (state, override, reason), (i, got)
+print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ dating, lanes, anchor, returns, loan salary and Scorecard checks)")
 sys.exit(1 if fails else 0)
