@@ -26,7 +26,7 @@ diff is no longer needed. R-O verdicts are in `round_1/reviews/R-O.md`.
 | S1-H2 | **changed** | A3 declares a `scoring_engine.Scorecard` (round 2 item A3-1), not `StateLadder`; the Unknown gate is the Scorecard's "all dimensions silent, no override" (R-I's named-gate condition met) |
 | S1-H3 | superseded | the new `classify.build_a3_credibility` logs only through `log_latest_month`; list the dropped `a3_path` / total-rows log in the bundle notes |
 | S2-H-01 | carried | `signals._latest_rpc`: one `max(struct(day, not_refusal, disposition))` aggregate; tie rule = Q-28 (`DISPOSITION_RANK` if (b)) |
-| S3-A3-H1 | superseded (R-O: R-E's way) | dict inputs and one `TAGS` written once in `create_a3_pipeline`; tags follow Q-15 |
+| S3-A3-H1 | superseded (R-O: R-E's way) | dict inputs and one `TAGS` written once in `create_a3_pipeline`; tags = the normalised set `[crx_persona, crx, a3, payment_credibility, persona_axis]` on every node (Q-15 answered yes; A1, A2, A4 and the full histories already use it), no pipeline-level tags |
 | S3-A3-H2 / Q-20 | **settled by the spec** | "Open": all A3 sources are required (D2); `require_columns` in every node, no optional inputs |
 | S4-H1 | superseded | as S1-H1 |
 | S6-H01 | carried | `window_start` / `window_agg(start=)`; Dim B start = `add_months(episode_start, 1)` (`_onset_bounds`) |
@@ -52,7 +52,7 @@ New entries required by D-A3-1..21 and the design-in are N-1 … N-6 at the end 
 
 Notes from the merge:
 - S4-H1 is the same change as S1-H1; S1-H1 carries the diff (`_common.string_key` now exists).
-- S3-A3-H1 also sets the A3 tags; tags wait for the user (Q-01 [Q-S3-1]), as the tier-L tag change S3-04 does.
+- S3-A3-H1 also sets the A3 tags to the normalised set; Q-15 is answered yes and the tier-L tag change (round 2, S3) is applied, so the A3 tags are no longer held. Run selection changes for CC: `crx_persona` now sits on the nodes, not the pipeline.
 - S3-A3-H2 waits for Q-S3-7; S6-H02 has a question for the user inside it (exclusive DCORE bound).
 
 Index of the 11 items above; each section below is the specialist's text, unchanged.

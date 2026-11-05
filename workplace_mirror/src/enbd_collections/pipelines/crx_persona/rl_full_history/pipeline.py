@@ -4,6 +4,8 @@ from kedro.pipeline import Pipeline, node
 
 from .nodes import build_rl_full_history
 
+TAGS = ["crx_persona", "crx", "full_history"]
+
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     """Single-node pipeline: [rl_spine, int_loan_master] → crx_rl_full_history.
@@ -29,8 +31,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 },
                 outputs="crx_rl_full_history",
                 name="build_crx_rl_full_history",
-                tags=["crx", "rl", "rl_b1"],
+                tags=TAGS,
             ),
         ],
-        tags=["crx_persona"],
     )

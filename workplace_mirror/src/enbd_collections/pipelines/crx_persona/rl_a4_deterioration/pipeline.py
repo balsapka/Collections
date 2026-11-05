@@ -26,6 +26,8 @@ from .nodes import (
     build_rl_linked_dpd_sequences,
 )
 
+TAGS = ["crx_persona", "crx", "a4", "deterioration", "persona_axis"]
+
 
 def _linked_node() -> node:
     return node(
@@ -37,7 +39,7 @@ def _linked_node() -> node:
         },
         outputs=["crx_rl_full_history_linked", "crx_rl_restructure_chains"],
         name="build_crx_rl_full_history_linked",
-        tags=["crx", "rl", "rl_a4_deterioration"],
+        tags=TAGS,
     )
 
 
@@ -52,7 +54,7 @@ def _sequences_node(output: str) -> node:
         },
         outputs=output,
         name=f"build_{output}",
-        tags=["crx", "rl", "rl_a4_deterioration"],
+        tags=TAGS,
     )
 
 
@@ -68,7 +70,7 @@ def _linked_sequences_node() -> node:
         },
         outputs="crx_rl_dpd_sequences_linked",
         name="build_crx_rl_dpd_sequences_linked",
-        tags=["crx", "rl", "rl_a4_deterioration"],
+        tags=TAGS,
     )
 
 
@@ -85,12 +87,12 @@ def _state_node(own: str, output: str) -> node:
         },
         outputs=output,
         name=f"build_{output}",
-        tags=["crx", "rl", "rl_a4_deterioration"],
+        tags=TAGS,
     )
 
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """Link the restructured loans, build both sequences, classify deterioration state."""
+    """Link restructured loans, build both sequences, classify the state."""
     return Pipeline(
         [
             _linked_node(),
@@ -98,7 +100,6 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
             _linked_sequences_node(),
             _state_node("crx_rl_dpd_sequences", "crx_rl_a4_deterioration"),
         ],
-        tags=["crx_persona"],
     )
 
 
@@ -123,8 +124,7 @@ def create_b13_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-a
                 ],
                 outputs=None,
                 name="compare_rl_a4_outputs",
-                tags=["crx", "rl", "rl_a4_deterioration"],
+                tags=TAGS,
             ),
         ],
-        tags=["crx_persona"],
     )

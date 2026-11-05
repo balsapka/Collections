@@ -14,9 +14,11 @@ from kedro.pipeline import Pipeline, node
 
 from .nodes import build_cc_a4_deterioration, build_cc_dpd_sequences
 
+TAGS = ["crx_persona", "crx", "a4", "deterioration", "persona_axis"]
+
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """2-node pipeline: build per-account DPD sequences, then classify deterioration state."""
+    """Build per-account DPD sequences, then classify the deterioration state."""
     return Pipeline(
         [
             node(
@@ -28,7 +30,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 },
                 outputs="crx_cc_dpd_sequences",
                 name="build_crx_cc_dpd_sequences",
-                tags=["crx", "cc", "cc_a4_deterioration"],
+                tags=TAGS,
             ),
             node(
                 func=build_cc_a4_deterioration,
@@ -40,8 +42,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 },
                 outputs="crx_cc_a4_deterioration",
                 name="build_crx_cc_a4_deterioration",
-                tags=["crx", "cc", "cc_a4_deterioration"],
+                tags=TAGS,
             ),
         ],
-        tags=["crx_persona"],
     )
