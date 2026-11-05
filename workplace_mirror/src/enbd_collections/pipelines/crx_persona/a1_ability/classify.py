@@ -10,8 +10,8 @@ Spec: ``workplace_mirror/specs/A1_ability_spec.md``.
   (no CASA with us, or a dormant one).
 
 Thresholds scale with ``liquidity_anchor_amt`` — what the customer must find now
-(CC 60–180: the oldest overdue bucket; RL: one instalment; NULL: flat floors only).
-Values are the workbook's starting values (sheet Thresholds), not yet tuned on PROD.
+(CC 60–180: the oldest overdue bucket; RL: one instalment; NULL: flat floors only,
+S1). Run through ``crx_cc_a1_ability`` / ``crx_rl_a1_ability``.
 """
 
 from __future__ import annotations
@@ -30,11 +30,11 @@ INCOME_FLOOR = 3000.0  # S2: salary floor (internal and bureau), AED
 INCOME_ANCHOR_MULT = 2.0  # S2: income must also cover this multiple of the anchor
 INCOME_MAX_FALL = 0.25  # S12: ... and is at most this share below the prior window
 CASA_FLOOR = 3000.0  # S7
-CASA_ANCHOR_MULT = 1.0
-CASA_MAX_FALL = 0.50
+CASA_ANCHOR_MULT = 1.0  # S7
+CASA_MAX_FALL = 0.50  # S7
 CARD_PAYMENT_FLOOR = 500.0  # S8
-CARD_PAYMENT_ANCHOR_MULT = 1.0
-MIN_EVIDENCE_AMT = 1000.0  # smallest amount that counts as any evidence (Weak)
+CARD_PAYMENT_ANCHOR_MULT = 1.0  # S8
+MIN_EVIDENCE_AMT = 1000.0  # smallest amount that counts as evidence (Weak, S5-S8)
 INCOME_POINTS = {"stable": 2, "weak": 1}
 LIQUIDITY_POINTS = {"adequate": 2, "weak": 1}
 
@@ -145,6 +145,7 @@ def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-
 ) -> DataFrame:
     """One A1 state per observation-base row, over ``model_id``'s window; logs the state
     distribution of the month of ``persona_end_date`` (the latest observation month).
+    Points: S2–S12; the unknown gate: S11; distress lowers the state one rung (S9).
 
     ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
     ``a1_unknown_reason`` says why a row is unknown: ``no_casa`` (no CASA leg or

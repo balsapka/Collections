@@ -147,9 +147,9 @@ def window_agg(  # pylint: disable=too-many-arguments
     observation month and the ``months - 1`` before it, up to the observation date.
 
     ``src`` holds ``key``, ``date_col`` and the columns ``aggs`` read. ``start`` names a
-    base date column that bounds each row's window from below as well (A3: the episode
-    start); ``aggs`` may read it. Returns ``GRAIN + aggs`` for base rows with at least
-    one row in the window.
+    base date column that bounds each row's window from below as well (A3, D-A3-2:
+    the episode start); ``aggs`` may read it. Returns ``GRAIN + aggs`` for base rows
+    with at least one row in the window.
     """
     obs = F.col("observation_date")
     lower = window_start(months)
@@ -165,7 +165,8 @@ def window_agg(  # pylint: disable=too-many-arguments
 
 
 def lookback_floor(base: DataFrame, months: int) -> str:
-    """ISO start of the earliest observation's ``months``-month window (partition floor)."""
+    """ISO start of the earliest observation's ``months``-month window (the partition
+    floor for a source read)."""
     first: date = base.agg(window_start(months, F.min("observation_date"))).first()[0]
     return first.isoformat()
 
@@ -277,7 +278,9 @@ def dcore_account_events(
 ) -> DataFrame:
     """DCORE events on the agreements of the base's accounts: ``account_id``,
     ``day``, ``action_code``, ``category``, ``name`` (upper-cased, trimmed, '' when
-    missing). Undated by the observation: the caller joins its rows and window."""
+    missing). Shared by A2 (D-A2-8: all history, one agreement per account) and A3
+    (D-A3-7: account level). Not dated by the observation: the caller joins its rows
+    and window."""
     require_columns(
         followup,
         ["agreement_id", "action_ts", "action_code", "result_category", "result_name"],

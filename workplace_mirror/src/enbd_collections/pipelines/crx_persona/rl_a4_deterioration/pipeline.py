@@ -1,4 +1,4 @@
-"""Kedro pipeline: RL-A4-3 — DPD-journey deterioration state for Retail Loans.
+"""Kedro pipeline: RL A4 deterioration state (retail loans).
 
 4-node pipeline:
     Node 1  build_rl_full_history_linked -> crx_rl_full_history_linked,
@@ -7,13 +7,13 @@
     Node 3  build_rl_linked_dpd_sequences -> crx_rl_dpd_sequences_linked
     Node 4  build_rl_a4_deterioration    -> crx_rl_a4_deterioration
 
-Requires crx_rl_full_history (RL-B1) to already be materialized.
+Requires crx_rl_full_history to already be materialized.
 
 Run with:
     kedro run --pipeline=crx_rl_a4_deterioration
 
-TEMPORARY (mirror bundle 13): create_b13_check_pipeline writes the new state to temporary
-entries and logs old vs new; removed by the bundle's cleanup.
+TEMPORARY: create_b13_check_pipeline writes the new state to temporary entries and logs
+old vs new; removed by its cleanup prompt.
 """
 
 from kedro.pipeline import Pipeline, node
@@ -103,7 +103,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
 
 
 def create_b13_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the new RL A4 into temporary entries, then old vs new (bundle 13)."""
+    """TEMPORARY: the new RL A4 into temporary entries, then old vs new."""
     return Pipeline(
         [
             _linked_node(),

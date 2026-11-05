@@ -3,7 +3,8 @@
 A4 scores each spine row on the account's monthly history up to that row's month; the
 episode (spell) is the last run of delinquent months in it (a cure back to current ends
 one) and starts ``months_before_spell`` months into that history. Axes that window on
-the episode read its start here instead of from a spell table.
+the episode read its start here instead of from a spell table (D-A3-2: the anchor is
+the latest episode start as of the observation date).
 """
 
 from __future__ import annotations

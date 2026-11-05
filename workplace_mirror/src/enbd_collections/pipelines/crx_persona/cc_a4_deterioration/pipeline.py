@@ -1,4 +1,4 @@
-"""Kedro pipeline: T43 — DPD-journey deterioration state for Credit Cards.
+"""Kedro pipeline: CC A4 deterioration state (credit cards).
 
 2-node pipeline:
     Node 1  build_cc_dpd_sequences       -> crx_cc_dpd_sequences

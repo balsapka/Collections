@@ -1,15 +1,14 @@
-"""CC full billing history (amended). Same output contract as before, plus cif_id:
-(account_id long, billing_date date, dlq_bucket int, cif_id) at grain
-(account_id, billing_date).
+"""CC full billing history: ``raw_stg_billing`` scoped to the run's ``cc_spine``.
 
-Changes vs the current node (see REVIEW_SPARK.md, findings F1-F3):
-  * a bucket that cannot be parsed from add_info becomes NULL explicitly — never "" cast to
-    int (an error under ANSI mode, the default from Spark 4);
-  * the same-date dedupe is deterministic: the worst (max) non-null bucket wins. Before,
-    dropDuplicates kept an arbitrary row, so two runs could disagree, and a NULL row could
-    beat a valid one;
-  * the history floor (2024-01, CC data quality) is NOT applied here: the full history is
-    kept so build_cc_dpd_sequences can tell a floor-cropped account from a new one.
+Output ``crx_cc_full_history`` at grain (account_id long, billing_date date) with
+``dlq_bucket`` int and ``cif_id`` from the spine. Run:
+``kedro run --pipeline=crx_cc_full_history`` (needs the spine of the model_id).
+
+* a bucket that cannot be parsed from ``add_info`` is NULL, never "" cast to int (an
+  error under ANSI mode, the default from Spark 4);
+* the same-date duplicate takes the worst (max) non-null bucket, so reruns agree;
+* no history floor here: ``build_cc_dpd_sequences`` applies it, so it can tell a
+  floor-cropped account from a new one.
 """
 
 from pyspark.sql import DataFrame
@@ -17,7 +16,7 @@ from pyspark.sql import functions as F
 
 from .._common import require_columns
 
-# Keep the existing constant if it differs: add_info carries "BS_PMT_CYCLE_DUE=<bucket>".
+# add_info carries "BS_PMT_CYCLE_DUE=<bucket>".
 _DPD_BUCKET_REGEX = r"BS_PMT_CYCLE_DUE=(\d+)"
 
 
@@ -39,7 +38,7 @@ def build_cc_full_history(raw_stg_billing: DataFrame, cc_spine: DataFrame) -> Da
         raw_stg_billing, ["contract_idt", "billing_date", "add_info"], "raw_stg_billing"
     )
     require_columns(cc_spine, ["contract_id", "cif_id"], "cc_spine")
-    # -- Step 1 (R20): scope to the spine, distinct leftsemi on the native contract id ----
+    # -- Step 1: scope to the spine, distinct leftsemi on the native contract id ----
     # Join BEFORE any cast to string (double "939877870.0" vs "939877870" zeroes the join).
     spine_keys = cc_spine.select(F.col("contract_id").alias("contract_idt")).distinct()
     raw_bucket = F.regexp_extract(F.col("add_info"), _DPD_BUCKET_REGEX, 1)

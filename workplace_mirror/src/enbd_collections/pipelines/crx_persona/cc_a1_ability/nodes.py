@@ -19,7 +19,7 @@ def build_cc_liquidity_anchor(
     obs_base: DataFrame, prm_balance: DataFrame, model_id: str
 ) -> DataFrame:
     """Amount in the oldest non-empty overdue bucket on the latest balance snapshot at
-    or before the observation date — what the customer must pay to stop the roll.
+    or before the observation date — what the customer must pay to stop the roll (S1).
 
     Only for the 60-180 segments: at 180+ the buckets no longer track what is due, so
     the anchor is NULL and A1 uses its flat floors. Also NULL (flat floors) when the

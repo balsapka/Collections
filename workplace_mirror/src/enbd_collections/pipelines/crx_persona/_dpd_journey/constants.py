@@ -12,9 +12,9 @@ class BucketScheme:
     name: str
     offset: int  # canonical = max(native + offset, 1)
     top: int  # highest native bucket (the cap)
-    repair_jumps: bool = True  # CC only: undo +2 billing-cycle jumps (_repair
-    # in core.py). RL has no such billing artifact (int_loan_master is one
-    # row/account/month) — a +2 jump there is always a genuine DPD move.
+    repair_jumps: bool = True  # CC only: undo +2 billing-cycle jumps (_repair in
+    # core.py). RL has no such billing artifact (int_loan_master is one row per
+    # account and month): a +2 jump there is a genuine DPD move (conformance D4).
 
     @property
     def canon_top(self) -> int:

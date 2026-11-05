@@ -1,4 +1,4 @@
-"""Kedro pipeline: crx_cc_full_history — full billing history (ad hoc, mirrors RL-B1)."""
+"""Kedro pipeline: crx_cc_full_history — full billing history of the CC spine."""
 
 from kedro.pipeline import Pipeline, node
 

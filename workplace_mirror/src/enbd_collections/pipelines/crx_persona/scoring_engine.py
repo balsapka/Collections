@@ -1,21 +1,13 @@
-"""Shared points -> state-ladder scoring primitives for crx_persona axes.
+"""Points -> state-ladder primitives shared by the crx_persona axes.
 
-Pulled out after confirming T31's A1 ability v2 (cc_a1_ability_v2) and the
-DE's A3 payment-credibility rewrite (cc_a3_payment_credibility) converged
-independently on the same shape: N named point dimensions summed to a total,
-a priority-ordered override condition that demotes the computed state by
-exactly one rung (never stacks), a High/Moderate/Low(/Unknown) ladder, and a
-no-signal gate checked first. Verified cell-by-cell against both real
-implementations (A1 v2's MECE map and A3's ``_a3_state_col``) before this was
-extracted.
+N named point dimensions are summed to a total; a High/Moderate/Low(/Unknown) ladder
+turns the total into a state; an override condition demotes the state by exactly one
+rung (never stacks); a no-signal gate is checked first. Each axis supplies its own
+dimension logic, state labels and thresholds (A1: ``a1_ability.classify``); this module
+only owns the combination step.
 
-Each axis supplies its own dimension logic, state label strings and point
-thresholds — this module only owns the combination step. No confidence
-scoring lives here; axes that need a confidence column derive it themselves
-from the state (as A3 already does).
-
-Pure ``pyspark.sql.Column`` in, ``Column`` out — no DataFrame coupling, so
-either axis wires these into its own node without restructuring joins.
+Pure ``pyspark.sql.Column`` in, ``Column`` out, so an axis wires these into its own
+node without restructuring joins. Imported by the axes; not run on its own.
 """
 
 from dataclasses import dataclass

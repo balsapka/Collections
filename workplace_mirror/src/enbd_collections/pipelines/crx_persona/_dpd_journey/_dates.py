@@ -1,10 +1,7 @@
-"""Month-arithmetic helpers, plain-Python and Spark-column alike.
+"""Month arithmetic for ``spark.py``, in plain Python and as Spark columns.
 
-`_month_col` is a Spark column expression, not a date-parsing helper like its neighbours —
-it lives here anyway (rather than in spark.py) so that both spark.py and logging.py can
-import it one-directionally from a common module. spark.py also calls into logging.py
-(build_dpd_sequences/build_deterioration trigger the stats logs), so if `_month_col` lived
-in spark.py, logging.py importing it back would make the two modules import each other.
+A month index is ``year * 12 + month - 1``, so the gap between two months is a
+subtraction.
 """
 
 from __future__ import annotations
@@ -28,4 +25,5 @@ def _month_label(d) -> str:
 
 
 def _month_col(c) -> F.Column:
+    """Spark column twin of ``_month_idx``."""
     return (F.year(c) * 12 + F.month(c) - 1).cast("int")

@@ -1,23 +1,29 @@
-"""RL-A4 — DPD-journey deterioration state for retail loans (thin wrappers on _dpd_journey).
+"""RL A4 — deterioration state for retail loans (wrappers on ``_dpd_journey``).
 
 Node 1 build_rl_full_history_linked  crx_rl_full_history + int_loan_master
                                      + int_loan_restructure_link
-                                     -> crx_rl_full_history_linked, crx_rl_restructure_chains
+                                     -> crx_rl_full_history_linked,
+                                        crx_rl_restructure_chains
 Node 2 build_rl_dpd_sequences        crx_rl_full_history + feature_retail_loans
                                      -> crx_rl_dpd_sequences
 Node 3 build_rl_linked_dpd_sequences crx_rl_full_history_linked + chains
-                                     + feature_retail_loans -> crx_rl_dpd_sequences_linked
-Node 4 build_rl_a4_deterioration     both sequences + chains -> crx_rl_a4_deterioration
+                                     + feature_retail_loans
+                                     -> crx_rl_dpd_sequences_linked
+Node 4 build_rl_a4_deterioration     both sequences + chains
+                                     -> crx_rl_a4_deterioration
+Run: ``kedro run --pipeline=crx_rl_a4_deterioration`` (needs crx_rl_full_history).
 
-RL buckets: 0 = 0 DPD, 1 = 1-30, 2 = 31-60, ..., 6 = 151-180, 7 = 180+ (cap). The engine maps
-them onto the CC scale (+1), so every rule and threshold is shared with CC. The 60-180
-segment is RL 3-6, the 180+ segment is RL 7. RL history is trusted in full (no floor).
+RL buckets: 0 = 0 DPD, 1 = 1-30, 2 = 31-60, ..., 6 = 151-180, 7 = 180+ (cap). The
+engine maps them onto the CC scale (+1), so every rule and threshold is shared with CC.
+The 60-180 segment is RL 3-6, the 180+ segment is RL 7. RL history is trusted in full
+(no floor).
 
 A restructure closes the old account and opens a new one. A matched new account gets the
 original loans' months in front of its own, from the month both the restructure flag and
 the closure have happened; before that month it keeps its own history, so nothing leaks
-from the future. A loan is restructured if feature_retail_loans.has_restructured_loan_flag
-says so; one with no original loan's months stays a blind spot.
+from the future (conformance D6). A loan is restructured if
+feature_retail_loans.has_restructured_loan_flag says so (D2); one with no original
+loan's months stays a blind spot.
 """
 
 from pyspark.sql import DataFrame
@@ -234,8 +240,8 @@ def build_rl_a4_deterioration(  # pylint: disable=too-many-arguments,too-many-po
 ) -> DataFrame:
     """One deterioration state per (account, rl_spine observation_date) row: this row's
     billing history truncated to its own date, classified by the same engine as
-    build_rl_dpd_sequences. rl_spine is already model_id/DLQ-band scoped by construction
-    (R20) -- no separate segment filter needed here.
+    build_rl_dpd_sequences. rl_spine is already scoped to the model_id's DLQ band, so no
+    segment filter is applied here.
 
     A row before its chain's ``chain_known_date`` reads the account's own history, every
     other row the linked one. Adds the ``chain_*`` columns of crx_rl_restructure_chains

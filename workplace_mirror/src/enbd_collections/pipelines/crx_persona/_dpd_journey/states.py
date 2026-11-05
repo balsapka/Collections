@@ -1,4 +1,9 @@
-"""The state tree (states.py, option B) — ONE tree for 60-180 and 180+."""
+"""The A4 state tree (METHODOLOGY.md option B): ONE tree for 60-180 and 180+.
+
+Rules Q0-Q4 and the thresholds in ``STATE_RULES`` follow the methodology; the code
+differs in D1 (Q0 needs history_blind) and D2 (restructured accounts are
+history_blind), see specs/A4_deterioration_conformance.md.
+"""
 
 from __future__ import annotations
 
@@ -90,22 +95,16 @@ def assign_state(
     else slow roller
     """
     p = STATE_RULES
-    # "Genuinely observed from a clean start" covers two distinct blind spots: a Stage-1
-    # window crop (floor date / unresolvable gap / dataset edge), OR a restructured account
-    # whose own first row is a fresh contract_id, not a fresh delinquency journey — the
-    # predecessor contract's history is invisible to this engine either way (R13). A normal
-    # (non-restructured) CC account structurally cannot observe its first-ever billing cycle
-    # already delinquent (DPD >= 2 requires a prior unpaid cycle to exist first); RL's
-    # native-bucket-1 start remains legitimate for a genuinely fresh, non-restructured loan.
+    # history_blind = the journey start is not observed: a Stage-1 crop (floor date,
+    # unresolvable gap, dataset edge) or a restructured account, whose first row is a
+    # fresh contract and not a fresh delinquency (conformance D1, D2). A CC account
+    # cannot start its first billing cycle delinquent; an RL loan can (native bucket 1,
+    # first EMI missed), so a delinquent start alone is not blindness.
     history_blind = cropped or restructure_blind_spot
     # Q2 stabilized — computed up front: both Q0 and the main sequence below consult it.
     stab = _is_stabilized(f)
-    # Q0 — only a confidence guard when history before the window is genuinely
-    # missing (history_blind). When history_blind=False we trust we've seen the
-    # whole observed journey, so a delinquent oldest month is not evidence of
-    # missing history (e.g. RL native bucket 1 = "1-30 DPD" already counts as
-    # delinquent for a loan that missed its very first EMI) — fall through to
-    # the normal cascade instead.
+    # Q0 fires only when history_blind; with the whole journey observed a delinquent
+    # oldest month is a real start, so fall through to the normal cascade.
     if f["starts_delinquent"] and history_blind:
         return "stabilized" if stab else "unknown"
     # Q1

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 
 def _legacy_drop(best: dict[int, tuple[int, int]]) -> bool:
-    """Would the old window-function rule have dropped this account? (any interior gap whose
-    neighbours differ in NATIVE value, after keeping the latest row per month). Lets the
-    first run reconcile with the old drop count."""
+    """Diagnostic: would the earlier window-function rule have dropped this account?
+    (any interior gap whose neighbours differ in NATIVE value, after keeping the latest
+    row per month)."""
     ms = sorted(best)
     return any(b - a > 1 and best[a][1] != best[b][1] for a, b in zip(ms, ms[1:]))
 

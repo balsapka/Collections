@@ -6,7 +6,7 @@ Needs, for the model_id (cc_60_180 / cc_180_plus): ``crx_cc_obs_base``,
 
     kedro run --pipeline=crx_cc_a1_ability
 
-TEMPORARY (mirror bundle 14): ``create_b14_check_pipeline`` — see
+TEMPORARY: ``create_b14_check_pipeline`` — see
 ``a1_ability/pipeline.py``.
 """
 
@@ -37,5 +37,5 @@ def create_pipeline(  # pylint: disable=unused-argument
 
 
 def create_b14_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the CC A1 check (bundle 14)."""
+    """TEMPORARY: the CC A1 check."""
     return _b14_check("cc", _ANCHOR)

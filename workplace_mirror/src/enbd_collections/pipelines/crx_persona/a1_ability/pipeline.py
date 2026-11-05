@@ -15,9 +15,9 @@
 Needs, for the model_id: the observation base, ``casa_primary``, ``casa_features``,
 ``bureau_salary_bounces`` and ``location_features`` (``prm_dcore_account_agreements``).
 
-TEMPORARY (mirror bundle 14): ``create_b14_check_pipeline`` runs the observation base and
+TEMPORARY: ``create_b14_check_pipeline`` runs the observation base and
 the same nodes, writes the axis to ``crx_<p>_a1_ability_b14_check`` and logs the check
-tables (``b14_check.py``). Removed by the bundle's cleanup.
+tables (``b14_check.py``). Removed by its cleanup prompt.
 """
 
 from kedro.pipeline import Pipeline, node

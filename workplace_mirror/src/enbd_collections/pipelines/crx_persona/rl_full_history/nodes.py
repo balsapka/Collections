@@ -1,13 +1,15 @@
-"""RL full monthly history (amended). Same output contract as before.
+"""RL full monthly history: ``int_loan_master`` scoped to the run's ``rl_spine``.
 
-Changes vs the current node (see REVIEW_SPARK.md, findings F4-F6):
-  * the spine key is cast to string SAFELY: a double/decimal account_id is cast to long
-    first (double -> string gives "1.23456789E8" and silently zeroes the leftsemi join —
-    the exact trap the CC node documents);
-  * the spine keys are broadcast: ~31k keys are tiny, and without the hint Spark may shuffle
-    the whole int_loan_master (all RL accounts x all months) for a sort-merge join;
-  * _log_stats is opt-in (params dpd_journey.log_stats): it runs extra jobs over the whole
-    output, and without a persist the node is computed twice.
+Output ``crx_rl_full_history`` at grain (account_id, month_end_date). Run:
+``kedro run --pipeline=crx_rl_full_history`` (needs the spine of the model_id).
+
+* the spine key is cast to string safely: a double/decimal account_id goes through
+  long first (double -> string gives "1.23456789E8" and silently empties the left-semi
+  join);
+* the spine keys are broadcast: they are tiny, and without the hint Spark may shuffle
+  the whole int_loan_master (all RL accounts x all months);
+* the stats log is opt-in (params dpd_journey.log_stats): it runs extra jobs over the
+  whole output.
 """
 
 import logging
@@ -52,7 +54,7 @@ def build_rl_full_history(
         ],
         "int_loan_master",
     )
-    # -- Step 1 (R20): scope to the spine (broadcast: the spine is model-sized) ----------
+    # -- Step 1: scope to the spine (broadcast: the spine is model-sized) ----------
     spine_keys = rl_spine.select(string_key(rl_spine).alias("account_id")).distinct()
     df = int_loan_master.join(F.broadcast(spine_keys), on="account_id", how="leftsemi")
 

@@ -1,6 +1,6 @@
 """A2 locatability state: location × reachability, with a deceased override.
 
-Spec: ``workplace_mirror/specs/A2_locatability_spec.md`` §6.
+Spec: ``workplace_mirror/specs/A2_locatability_spec.md`` §6 (D-A2-1, D-A2-9, D-A2-11).
 
     a2_state = deceased                              if any deceased source
              = <location_state>__<reachability_state> otherwise (9 values)

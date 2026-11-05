@@ -13,11 +13,10 @@ PARAM_DEFAULTS = {
     # CC only, TEMPORARY: billing history before this date has known data-quality issues.
     # Set to null once the source is fixed. RL history is trusted in full.
     "cc_history_floor_date": "2024-01-01",
-    # Independently overridable for the 180_plus segment (T43 2026-10-20 PROD run: the
-    # shared floor left 99.07% of the gt2y chargeoff-age vintage "unknown" — their journey
-    # start is almost always before the floor by construction). Defaults to the same value
-    # as cc_history_floor_date so today's output is unchanged; override to relax/remove the
-    # floor for 180_plus once the pre-2024 data-quality tradeoff is decided.
+    # Overridable for the 180_plus segment alone: the journey of most long charged-off
+    # accounts starts before the shared floor, which leaves them "unknown". Defaults to
+    # cc_history_floor_date; override to relax or remove the floor for 180_plus
+    # (conformance D5).
     "cc_history_floor_date_180_plus": "2024-01-01",
     "rl_history_floor_date": None,
     "on_unresolvable_gap": "truncate",  # "truncate" (keep months after the gap) or "drop"
@@ -50,8 +49,7 @@ def journey_params(
     segment is derived from model_id (_common.segment) — not an overridable param."""
     given = crx_persona.get("dpd_journey") or {}
     unknown = sorted(set(given) - set(PARAM_DEFAULTS))
-    # a stale key (e.g. the removed det_option, or a removed segment override) must not
-    # be silently ignored
+    # a stale key must not be silently ignored
     if unknown:
         raise ValueError(
             f"dpd_journey: unknown parameter(s) {unknown}; allowed {sorted(PARAM_DEFAULTS)}"

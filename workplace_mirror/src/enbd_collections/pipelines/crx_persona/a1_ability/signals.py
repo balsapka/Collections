@@ -139,11 +139,11 @@ def build_income_signals(
     model_id: str,
     loan_features: DataFrame | None = None,
 ) -> DataFrame:
-    """``income_m1 … income_m{2W}``: salary received per month — the larger of the
-    internal salary (``feat_cif_internal_salary_monthly``) and the bureau salary
-    (``feat_cif_bureau_salary_monthly``, carried one month forward); NULL: no salary that
-    month. Also the largest month per source: ``internal_salary_w`` / ``bureau_salary_w`` in
-    the window, ``internal_salary_prior`` in the prior window.
+    """``income_m1 … income_m{2W}`` (S3, S12, S14): salary received per month — the
+    larger of the internal salary (``feat_cif_internal_salary_monthly``) and the bureau
+    salary (``feat_cif_bureau_salary_monthly``, carried one month forward); NULL: no
+    salary that month. Also the largest month per source: ``internal_salary_w`` /
+    ``bureau_salary_w`` in the window, ``internal_salary_prior`` in the prior window.
 
     ``loan_features`` (RL only): ``feature_retail_loans``, whose latest-pull bureau salary
     joins the bureau salary.
@@ -212,10 +212,11 @@ def build_liquidity_signals(
     casa_activity: DataFrame,
     model_id: str,
 ) -> DataFrame:
-    """``casa_m1 … casa_m{2W}`` (``feat_cif_casa_balance_monthly``),
-    ``ext_card_payment_max`` (largest single payment to an external card in W),
-    ``casa_active`` (1: a leg in ``CUSTOMER_LANES`` in W) and ``casa_held`` (1: any CASA
-    leg or a positive balance in the last ``CASA_HELD_MONTHS`` months)."""
+    """``casa_m1 … casa_m{2W}`` (S7, ``feat_cif_casa_balance_monthly``),
+    ``ext_card_payment_max`` (S8: largest single payment to an external card in W),
+    ``casa_active`` (S11: a leg in ``CUSTOMER_LANES`` in W) and ``casa_held`` (any CASA
+    leg or a positive balance in the last ``CASA_HELD_MONTHS`` months). CASA means the
+    scheme-code accounts of S16."""
     require_columns(
         casa_balance,
         ["cif_id", "month_end", "casa_balance"],
@@ -339,12 +340,12 @@ def build_distress_signals(
     model_id: str,
     payment_order: DataFrame | None = None,
 ) -> DataFrame:
-    """``distress_flag`` and its parts in the window, each 0 / 1:
+    """``distress_flag`` (S9) and its parts in the window, each 0 / 1:
 
     * ``distress_cheque`` / ``distress_dds`` — the bank's own returned cheques and DDS
       returns, across all the customer's CASA accounts (``feat_cif_returns_monthly``);
     * ``distress_bureau`` — a bureau-reported bounce dated by its return date
-      (``feat_cif_bureau_bounces_monthly`` ``bounce_events``);
+      (``feat_cif_bureau_bounces_monthly`` ``bounce_events``, S15);
     * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet.
 
     Stops the run when the returns table starts after the earliest observation's window
@@ -385,9 +386,9 @@ def build_distress_signals(
 def build_eosb_signals(
     obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
 ) -> DataFrame:
-    """``eosb_flag``: 1 when a DCORE result on any of the customer's agreements names an
-    end-of-service benefit (EOSB expected / awaited / received) in the window. A
-    diagnostic only: it changes no level or state."""
+    """``eosb_flag`` (S13): 1 when a DCORE result on any of the customer's agreements
+    names an end-of-service benefit (EOSB expected / awaited / received) in the
+    window. A diagnostic only: it changes no level or state."""
     require_columns(
         followup,
         ["agreement_id", "action_ts", "result_name"],

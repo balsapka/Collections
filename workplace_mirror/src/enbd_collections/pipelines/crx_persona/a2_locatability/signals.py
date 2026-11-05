@@ -1,6 +1,7 @@
 """A2 locatability evidence at (account_id, observation_date), shared by CC and RL.
 
-Spec: ``workplace_mirror/specs/A2_locatability_spec.md``.
+Spec: ``workplace_mirror/specs/A2_locatability_spec.md``. Run through
+``crx_cc_a2_locatability`` / ``crx_rl_a2_locatability``.
 
 Observation dates are month ends; the window W is the observation month and the months
 before it (``_common.window_months``: 3 at 60–180, 6 at 180+). Evidence counts when dated
@@ -9,7 +10,8 @@ The latest evidence wins on both dimensions:
 
 * location     — ``feat_cif_location_monthly`` (logins, in-person card use, departure
                  notes, travel purchases; all of the customer's accounts);
-* reachability — DCORE calls on the scored account's agreement, all history (no T0);
+* reachability — DCORE calls on the scored account's agreement, all history up to the
+                 observation date (D-A2-8);
 * deceased     — DCORE results, Way4 block code ``D`` on any of the customer's cards,
                  the demographics flag.
 """
@@ -44,11 +46,11 @@ from .._dcore_codes import (
     SUCCESS_CATEGORY,
 )
 
-# Travel rule (L2): the latest UAE evidence at most this many months after the last
-# ticket, and none for at least SILENCE months before the observation date.
+# Travel rule (L2, D-A2-18): the latest UAE evidence at most this many months after
+# the last ticket, and none for at least SILENCE months before the observation date.
 TRAVEL_GAP_MONTHS = 3
 TRAVEL_SILENCE_MONTHS = 1
-# Non-Reachable: the last this-many call days all failed, per segment.
+# Non-Reachable (D-A2-20): the last this-many call days all failed, per segment.
 GONE_DARK_DAYS = {SEG_60_180: 3, SEG_180_PLUS: 6}
 WAY4_DECEASED_BLOCK = "D"  # block_code_2
 # Per-month evidence columns of feat_cif_location_monthly, latest as of the observation.
@@ -131,9 +133,11 @@ def build_location_signals(
     (``location_rule`` L1–L4), ``location_unknown_reason`` and the evidence behind it.
 
     L1 skip        the latest foreign evidence is on or after the latest UAE evidence
+                   (D-A2-3; the same day: foreign wins, D-A2-14)
     L2 skip        a travel purchase, the latest UAE evidence at most TRAVEL_GAP_MONTHS
                    after the last one (or none), and none for TRAVEL_SILENCE_MONTHS
-    L3 in_country  the latest UAE evidence is in W
+                   (D-A2-15, D-A2-18)
+    L3 in_country  the latest UAE evidence is in W (D-A2-3)
     L4 unknown     no_evidence · domestic_before_window
     """
     require_columns(
@@ -204,10 +208,11 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
 
     A call day is a day with an outbound call; it failed when every outbound call that
     day failed (``_dcore_codes.FAILED_CALL``) and no contact was confirmed. A contact
-    is an inbound call, an outbound call in category SUC, or a right-party result.
+    is an inbound call, an outbound call in category SUC, or a right-party result
+    (off-list codes: D-A2-17).
 
     non_reachable  the last ``gone_dark_days`` call days all failed, the oldest in W,
-                   and no contact since
+                   and no contact since (D-A2-7, D-A2-20)
     reachable      a contact in W
     unknown        no_dcore_record · no_contact_in_window
     """
@@ -281,9 +286,9 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
 def build_way4_deceased(
     obs_base: DataFrame, contracts: DataFrame, clients: DataFrame
 ) -> DataFrame:
-    """``way4_deceased_flag``: block code 2 = D on the latest ``prm_contract`` snapshot on
-    or before the observation date, on any of the customer's cards. Rows with a card
-    only."""
+    """``way4_deceased_flag`` (D-A2-9): block code 2 = D on the latest ``prm_contract``
+    snapshot on or before the observation date, on any of the customer's cards. Rows
+    with a card only."""
     require_columns(
         contracts,
         ["contract_id", "client_id", "observation_date", "block_code_2"],
@@ -326,9 +331,9 @@ def build_way4_deceased(
 def build_demographics_deceased(
     obs_base: DataFrame, demographics: DataFrame
 ) -> DataFrame:
-    """``demographics_deceased_flag``: ``ft_deceased_flag`` of the customer (a death is
-    permanent: the largest value per CIF, no date). Rows with a demographics record
-    only."""
+    """``demographics_deceased_flag`` (D-A2-9): ``ft_deceased_flag`` of the customer (a
+    death is permanent: the largest value per CIF, no date). Rows with a demographics
+    record only."""
     require_columns(
         demographics, ["cif_id", "ft_deceased_flag"], "feat_demographics_cif"
     )
