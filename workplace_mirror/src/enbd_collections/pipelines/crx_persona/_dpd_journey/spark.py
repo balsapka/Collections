@@ -115,30 +115,15 @@ def _idx_to_month_end(c) -> F.Column:
     )
 
 
-# pylint: disable-next=too-many-locals
-def build_dpd_sequences(
-    history: DataFrame,
-    scheme: BucketScheme,
-    params: JourneyParams,
-    restructure: DataFrame | None = None,
+def _monthly_rows_per_account(
+    history: DataFrame, scheme: BucketScheme, params: JourneyParams
 ) -> DataFrame:
-    """history: account_id, obs_date (date/timestamp), dlq_bucket (native int),
-    optionally restructure_flag (0/1 per row; max over the account's rows).
-    restructure: optional (account_id, restructure_blind_spot_flag), one row per account.
-
-    Returns ONE row per account (every account in `history`, with a build_status):
-        account_id, build_status, first_month, last_month (month-end dates),
-        history_months, dlq_buckets array<int> (native, oldest -> newest, gap-filled),
-        dpd_string (native digits, LEFTMOST = latest month — the bank's string convention),
-        history_cropped, n_gap_months_filled, n_gap_months_rolled, n_gap_months_inferred,
-        n_cycle_shift_moves, n_months_truncated, n_dup_month_rows, n_invalid_rows,
-        legacy_drop (the old rule would have dropped it), restructure_blind_spot_flag
-    """
-    require_columns(history, ["account_id", "obs_date", "dlq_bucket"], "A4 history")
-    _ship_by_value()
+    """One row per account: `_rows` (array of struct m, d, b: month index, day number,
+    native bucket; windowed and valid only), `_first_raw` and `n_invalid_rows`, plus
+    `_rf` if `history` has `restructure_flag`; `_global_min` is the first valid month
+    of the whole history."""
     end_dt = F.to_date(F.lit(params.end_date))
     floor_idx = _month_idx(params.floor_date) if params.floor_date else None
-
     m = _month_col(F.col("obs_date"))
     bucket = F.col("dlq_bucket").cast("int")
     valid = bucket.isNotNull() & bucket.between(0, scheme.top)
@@ -167,14 +152,34 @@ def build_dpd_sequences(
         aggs.append(F.max(F.col("restructure_flag").cast("int")).alias("_rf"))
     per_acc = h.groupBy("account_id").agg(*aggs)  # the one shuffle
     source_min = h.where(valid).agg(F.min(m).alias("_global_min"))  # 1 row
-    per_acc = per_acc.crossJoin(F.broadcast(source_min))
+    return per_acc.crossJoin(F.broadcast(source_min))
 
-    offset, fill, how = (
-        scheme.offset,
-        params.fill_straight_roll_gaps,
-        params.on_unresolvable_gap,
-    )
-    shift, max_inf = params.repair_cycle_shift, params.max_inferred_gap_months
+
+def build_dpd_sequences(
+    history: DataFrame,
+    scheme: BucketScheme,
+    params: JourneyParams,
+    restructure: DataFrame | None = None,
+) -> DataFrame:
+    """history: account_id, obs_date (date/timestamp), dlq_bucket (native int),
+    optionally restructure_flag (0/1 per row; max over the account's rows).
+    restructure: optional (account_id, restructure_blind_spot_flag), one row per account.
+
+    Returns ONE row per account (every account in `history`, with a build_status):
+        account_id, build_status, first_month, last_month (month-end dates),
+        history_months, dlq_buckets array<int> (native, oldest -> newest, gap-filled),
+        dpd_string (native digits, LEFTMOST = latest month — the bank's string convention),
+        history_cropped, n_gap_months_filled, n_gap_months_rolled, n_gap_months_inferred,
+        n_cycle_shift_moves, n_months_truncated, n_dup_month_rows, n_invalid_rows,
+        legacy_drop (the old rule would have dropped it), restructure_blind_spot_flag
+    """
+    require_columns(history, ["account_id", "obs_date", "dlq_bucket"], "A4 history")
+    _ship_by_value()
+    per_acc = _monthly_rows_per_account(history, scheme, params)
+
+    offset, shift = scheme.offset, params.repair_cycle_shift
+    fill, how = params.fill_straight_roll_gaps, params.on_unresolvable_gap
+    max_inf = params.max_inferred_gap_months
 
     def _udf(rows, first_raw, global_min):
         if first_raw is None:
@@ -234,7 +239,36 @@ def build_dpd_sequences(
     return out
 
 
-# pylint: disable-next=too-many-locals
+def _spine_rows_with_history(
+    sequences: DataFrame, spine: DataFrame, params: JourneyParams
+) -> DataFrame:
+    """Spine rows (account_id, observation_date) joined to the account's `ok` sequence
+    row, kept when the observation month lies in first_month..last_month. Adds
+    `_obs_idx` and `_trunc_len`, the number of history months up to that month."""
+    end_dt = F.to_date(F.lit(params.end_date))
+    seq = (
+        sequences.where(F.col("build_status") == "ok")
+        .withColumn("_first_idx", _month_col(F.col("first_month")))
+        .withColumn("_last_idx", _month_col(F.col("last_month")))
+        .withColumn("_key", string_key(sequences))
+    )
+    sp = spine.where(F.col("observation_date").cast("date") <= end_dt).select(
+        string_key(spine).alias("_key"),
+        F.col("observation_date").cast("date").alias("observation_date"),
+    )
+
+    # join on the safe string key only — account_id in the output keeps seq's own
+    # native type (long for CC, string for RL), never the stringified join key.
+    obs_idx = _month_col(F.col("observation_date"))
+    trunc_len = (obs_idx - F.col("_first_idx") + 1).cast("int")
+    return (
+        sp.join(seq, "_key", "inner")
+        .withColumn("_obs_idx", obs_idx)
+        .withColumn("_trunc_len", trunc_len)
+        .where((F.col("_trunc_len") >= 1) & (F.col("_obs_idx") <= F.col("_last_idx")))
+    )
+
+
 def build_deterioration(
     sequences: DataFrame,
     scheme: BucketScheme,
@@ -265,42 +299,14 @@ def build_deterioration(
     segment = params.segment
     offset, top = scheme.offset, scheme.canon_top
     repair = scheme.repair_jumps
-    end_dt = F.to_date(F.lit(params.end_date))
-
-    seq = (
-        sequences.where(F.col("build_status") == "ok")
-        .withColumn("_first_idx", _month_col(F.col("first_month")))
-        .withColumn("_last_idx", _month_col(F.col("last_month")))
-        .withColumn("_key", string_key(sequences))
-    )
-
-    sp = spine.where(F.col("observation_date").cast("date") <= end_dt).select(
-        string_key(spine).alias("_key"),
-        F.col("observation_date").cast("date").alias("observation_date"),
-    )
-
-    # join on the safe string key only — account_id in the output keeps seq's own
-    # native type (long for CC, string for RL), never the stringified join key.
-    joined = sp.join(seq, "_key", "inner")
-    obs_idx = _month_col(F.col("observation_date"))
-    trunc_len = (obs_idx - F.col("_first_idx") + 1).cast("int")
-    joined = (
-        joined.withColumn("_obs_idx", obs_idx)
-        .withColumn("_trunc_len", trunc_len)
-        .where((F.col("_trunc_len") >= 1) & (F.col("_obs_idx") <= F.col("_last_idx")))
-    )
+    joined = _spine_rows_with_history(sequences, spine, params)
 
     def _udf(buckets, trunc_len_, cropped, restructure_blind_spot):
         sl = list(buckets)[:trunc_len_]
         if not sl or max(sl[-1] + offset, 1) < 2:
             return None
         return classify(
-            sl,
-            bool(cropped),
-            offset,
-            top,
-            repair,
-            bool(restructure_blind_spot),
+            sl, bool(cropped), offset, top, repair, bool(restructure_blind_spot)
         )
 
     schema = _CLASSIFY_SCHEMA
