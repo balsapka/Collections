@@ -17,13 +17,6 @@ def _month_idx(d) -> int:
     return d.year * 12 + d.month - 1
 
 
-def _month_label(d) -> str:
-    """'YYYY Month' from a date-like value, e.g. 2026-08-31 -> '2026 August' —
-    human-readable logging only, never a machine-compared value."""
-    d = _dt.date.fromisoformat(str(d)[:10]) if not isinstance(d, _dt.date) else d
-    return d.strftime("%Y %B")
-
-
 def _month_col(c) -> F.Column:
     """Spark column twin of ``_month_idx``."""
     return (F.year(c) * 12 + F.month(c) - 1).cast("int")
