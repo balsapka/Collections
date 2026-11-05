@@ -119,6 +119,8 @@ Print `pyspark.__version__` (D-2-6). The A2 DCORE rewrite needs ≥ 3.1 (`F.fora
   - `_log_state_stats` → `log_state_stats`;
   - `_dpd_journey.__all__` and `_month_label` removed;
   - the A1 label constants are now `SOURCE_INTERNAL`, `SOURCE_BUREAU`, `REASON_BUREAU_BOUNCE`.
+  - new: `scoring_engine.LOW` / `MOD` / `HIGH`; A1 `HIGH_FROM` / `MODERATE_FROM`; A2 `_reachable`;
+    `_common.segment`, `string_key`, `dcore_account_events`, `GONE_DARK_DAYS`; `_dpd_journey.anchor.episode_start`.
 
 ## Later, not in these bundles
 
