@@ -13,6 +13,7 @@ from pyspark.sql import functions as F
 
 DEMOTE, CAP, FORCE = "demote", "cap", "force"  # Override modes
 RUNGS = ("low", "moderate", "high")
+LOW, MOD, HIGH = range(len(RUNGS))  # rung indices
 
 
 @dataclass(frozen=True)
@@ -70,21 +71,21 @@ class Scorecard:  # pylint: disable=too-many-instance-attributes,too-many-locals
         high = (total >= self.high_from) & (scored >= self.high_min_dimensions)
         if self.high_current:
             high &= F.array_max(F.array(*[pts[n] for n in self.high_current])) > 0
-        rung = F.when(high, 2).when(total >= self.moderate_from, 1).otherwise(0)
+        rung = F.when(high, HIGH).when(total >= self.moderate_from, MOD).otherwise(LOW)
         fired = F.coalesce(
             *[F.when(F.col(o.flag), F.lit(o.name)) for o in self.overrides],
             F.lit(None).cast("string"),
         )
         for o in self.overrides:
             to = F.lit(RUNGS.index(o.to))
-            moved = {DEMOTE: F.greatest(rung - 1, F.lit(0)), CAP: F.least(rung, to)}
-            rung = F.when(fired == o.name, moved.get(o.mode, to)).otherwise(rung)
+            moved = {DEMOTE: F.greatest(rung - 1, F.lit(LOW)), CAP: F.least(rung, to)}
+            rung = F.when(fired == o.name, {**moved, FORCE: to}[o.mode]).otherwise(rung)
         unknown = F.lit(True) if unknown_also is None else unknown_also
         unknown &= fired.isNull()
         for d in self.dimensions:
             unknown &= F.coalesce(F.col(d.level).isin(*d.silent), F.lit(True))
         state = F.when(unknown, self.labels["unknown"])
-        for i in (2, 1):
+        for i in (HIGH, MOD):
             state = state.when(rung == i, self.labels[RUNGS[i]])
         ranked = [
             F.struct(c.alias("pts"), F.lit(-i).alias("i"), F.lit(n).alias("n"))

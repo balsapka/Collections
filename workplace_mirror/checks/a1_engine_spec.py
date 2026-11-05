@@ -392,5 +392,10 @@ sc_df = spark.createDataFrame([r[:4] for r in sc_rows], "a_level string, b_level
 for i, (*_, sc, state, override, reason) in enumerate(sc_rows):
     got = sc.score(sc_df).collect()[i]
     assert (got["t_state"], got["t_override"], got["t_reason"]) == (state, override, reason), (i, got)
+try:  # a mistyped override mode raises instead of acting as FORCE
+    card(se.Override("m", "f1", "forse", "high")).score(sc_df)
+    raise AssertionError("mistyped override mode did not raise")
+except KeyError:
+    pass
 print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ dating, lanes, anchor, returns, loan salary and Scorecard checks)")
 sys.exit(1 if fails else 0)
