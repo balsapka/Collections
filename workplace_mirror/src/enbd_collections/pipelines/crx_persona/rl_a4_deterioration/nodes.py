@@ -80,6 +80,45 @@ def _edges(link: DataFrame) -> list[Edge]:
     return [Edge(*r) for r in rows]
 
 
+def _original_loan_months(
+    own: DataFrame, int_loan_master: DataFrame, chains: list, members: list
+) -> tuple[DataFrame, DataFrame]:
+    """Restructure chains: the originals' months to put in front of each account's own.
+
+    Returns (account_id, month_end_date, dlq_bucket) rows, and the chains table with
+    chain_months_added. Only chains of accounts in `own` are kept. Closed months are
+    dropped (their zero DPD would fake a cure), the worst bucket wins per month, and
+    the account's own row stays where months overlap.
+    """
+    in_history = F.broadcast(own.select("account_id").distinct())
+    chain_df, member_df = (
+        own.sparkSession.createDataFrame([tuple(r) for r in rows], schema).join(
+            in_history, on="account_id", how="leftsemi"
+        )
+        for rows, schema in ((chains, _CHAIN_SCHEMA), (members, _MEMBER_SCHEMA))
+    )
+    original = (
+        int_loan_master.select(
+            string_key(int_loan_master).alias("original_id"),
+            F.last_day(F.col("observation_date").cast("date")).alias("month_end_date"),
+            F.col("dpd_bucket").cast("int").alias("dlq_bucket"),
+            F.upper(F.col("account_status")).alias("_status"),
+        )
+        .join(F.broadcast(member_df), on="original_id")
+        .filter(F.coalesce(F.col("_status"), F.lit("")) != "CLOSED")
+        .groupBy("account_id", "month_end_date")
+        .agg(F.max("dlq_bucket").alias("dlq_bucket"))
+        .join(own, on=["account_id", "month_end_date"], how="left_anti")
+    )
+    added = original.groupBy("account_id").agg(
+        F.count(F.lit(1)).cast("int").alias("chain_months_added")
+    )
+    chain_out = chain_df.join(added, on="account_id", how="left").withColumn(
+        "chain_months_added", F.coalesce("chain_months_added", F.lit(0))
+    )
+    return original, chain_out
+
+
 def build_rl_full_history_linked(
     crx_rl_full_history: DataFrame,
     int_loan_master: DataFrame,
@@ -87,9 +126,6 @@ def build_rl_full_history_linked(
 ) -> tuple[DataFrame, DataFrame]:
     """Every spine account's history, with each matched restructured account's original
     loans re-keyed in front of its own months.
-
-    Original rows: closed months dropped (their zero DPD would fake a cure), the worst
-    bucket per month across originals, the account's own row kept where months overlap.
 
     Returns:
         crx_rl_full_history_linked: account_id, month_end_date, dlq_bucket.
@@ -110,59 +146,21 @@ def build_rl_full_history_linked(
     )
     require_columns(
         int_loan_master,
-        (
-            "account_id",
-            "observation_date",
-            "dpd_bucket",
-            "account_status",
-        ),
+        ("account_id", "observation_date", "dpd_bucket", "account_status"),
         "int_loan_master",
     )
     own = crx_rl_full_history.select(
-        "account_id",
-        F.last_day("month_end_date").alias("month_end_date"),
-        "dlq_bucket",
+        "account_id", F.last_day("month_end_date").alias("month_end_date"), "dlq_bucket"
     )
     edges = _edges(int_loan_restructure_link)
     chains, members = resolve_chains(edges, {e.account for e in edges})
-    spark = crx_rl_full_history.sparkSession
-    in_history = F.broadcast(own.select("account_id").distinct())
-
-    def frame(rows, schema):
-        return spark.createDataFrame([tuple(r) for r in rows], schema).join(
-            in_history, on="account_id", how="leftsemi"
-        )
-
-    chain_df = frame(chains, _CHAIN_SCHEMA)
-    member_df = frame(members, _MEMBER_SCHEMA)
-
-    original = (
-        int_loan_master.select(
-            string_key(int_loan_master).alias("original_id"),
-            F.last_day(F.col("observation_date").cast("date")).alias("month_end_date"),
-            F.col("dpd_bucket").cast("int").alias("dlq_bucket"),
-            F.upper(F.col("account_status")).alias("_status"),
-        )
-        .join(F.broadcast(member_df), on="original_id")
-        .filter(F.coalesce(F.col("_status"), F.lit("")) != "CLOSED")
-        .groupBy("account_id", "month_end_date")
-        .agg(F.max("dlq_bucket").alias("dlq_bucket"))
-        .join(own, on=["account_id", "month_end_date"], how="left_anti")
-    )
-    added = original.groupBy("account_id").agg(
-        F.count(F.lit(1)).cast("int").alias("chain_months_added")
-    )
-    chain_out = chain_df.join(added, on="account_id", how="left").withColumn(
-        "chain_months_added", F.coalesce("chain_months_added", F.lit(0))
-    )
+    original, chain_out = _original_loan_months(own, int_loan_master, chains, members)
     return own.unionByName(original), chain_out
 
 
 def _history(full_history: DataFrame) -> DataFrame:
     return full_history.select(
-        "account_id",
-        F.col("month_end_date").alias("obs_date"),
-        "dlq_bucket",
+        "account_id", F.col("month_end_date").alias("obs_date"), "dlq_bucket"
     )
 
 
