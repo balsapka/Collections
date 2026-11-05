@@ -290,7 +290,9 @@ def run(model_id):
         model_id,
         PERSONA["persona_end_date"],
         income=build_income_signals(o, internal_salary, bureau_salary, model_id),
-        liquidity=build_liquidity_signals(o, casa_balance, payments, activity, model_id),
+        liquidity=build_liquidity_signals(
+            o, casa_balance, payments, activity, model_id, crx_persona=PERSONA
+        ),
         distress=build_distress_signals(o, returns, bounces, model_id),
         eosb=build_eosb_signals(o, followup, agreements, model_id),
     ).collect()

@@ -67,6 +67,7 @@ def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
                     "ext_card_payments": "feat_cif_ext_card_payment_monthly",
                     "casa_activity": "feat_cif_casa_activity_monthly",
                     "model_id": "params:model_id",
+                    "crx_persona": "params:crx_persona",
                 },
                 outputs=f"{prefix}_liquidity_signals",
                 name=f"build_{prefix}_liquidity_signals",

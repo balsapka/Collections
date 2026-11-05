@@ -33,6 +33,7 @@ from .._common import (
     require_columns,
     window_agg,
     window_months,
+    window_start,
 )
 
 # prm_casa_return_events reasons that count as distress; it also carries "RETURNS"
@@ -205,12 +206,35 @@ def build_income_signals(
 # ── Liquidity and activity ────────────────────────────────────────────────────
 
 
-def build_liquidity_signals(
+def _casa_legs(casa_activity: DataFrame, casa_balance: DataFrame) -> DataFrame:
+    """CASA rows of both features by ``(cif_id, month_end)``: ``balance`` (NULL on an
+    activity leg), ``customer`` (1: a leg in ``CUSTOMER_LANES``, S11) and ``held`` (1: a
+    leg, or a positive balance)."""
+    return casa_activity.select(
+        "cif_id",
+        "month_end",
+        F.lit(None).cast(casa_balance.schema["casa_balance"].dataType).alias("balance"),
+        F.col("lane").isin(*CUSTOMER_LANES).cast("int").alias("customer"),
+        F.lit(1).alias("held"),
+    ).unionByName(
+        casa_balance.select(
+            "cif_id",
+            "month_end",
+            F.col("casa_balance").alias("balance"),
+            F.lit(0).alias("customer"),
+            (F.col("casa_balance") > 0).cast("int").alias("held"),
+        )
+    )
+
+
+def build_liquidity_signals(  # pylint: disable=too-many-arguments
     obs_base: DataFrame,
     casa_balance: DataFrame,
     ext_card_payments: DataFrame,
     casa_activity: DataFrame,
     model_id: str,
+    *,
+    crx_persona: dict,
 ) -> DataFrame:
     """``casa_m1 … casa_m{2W}`` (S7, ``feat_cif_casa_balance_monthly``),
     ``ext_card_payment_max`` (S8: largest single payment to an external card in W),
@@ -234,22 +258,15 @@ def build_liquidity_signals(
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
-    legs = casa_activity.select(
-        "cif_id",
-        "month_end",
-        F.lit(None).cast(casa_balance.schema["casa_balance"].dataType).alias("balance"),
-        F.col("lane").isin(*CUSTOMER_LANES).cast("int").alias("customer"),
-        F.lit(1).alias("held"),
-    ).unionByName(
-        casa_balance.select(
-            "cif_id",
-            "month_end",
-            F.col("casa_balance").alias("balance"),
-            F.lit(0).alias("customer"),
-            (F.col("casa_balance") > 0).cast("int").alias("held"),
-        )
+    # The obs base starts in the persona start month: no window reaches older rows.
+    first = F.lit(str(crx_persona["persona_start_date"])).cast("date")
+    legs = _casa_legs(casa_activity, casa_balance).filter(
+        F.col("month_end") >= window_start(CASA_HELD_MONTHS, first)
     )
+    payments = ext_card_payments.filter(F.col("month_end") >= window_start(w, first))
     in_w = _month_index(F.col("month_end")) <= w
+    casa_active = F.max(F.when((F.col("customer") == 1) & in_w, F.lit(1)))  # S11
+    casa_held = F.max(F.when(F.col("held") == 1, F.lit(1)))
     signals = left_join_all(
         obs_base,
         [
@@ -258,16 +275,11 @@ def build_liquidity_signals(
                 legs,
                 CASA_HELD_MONTHS,
                 *_by_month("balance", "casa", 2 * w),
-                F.max(F.when((F.col("customer") == 1) & in_w, F.lit(1))).alias(
-                    "casa_active"
-                ),
-                F.max(F.when(F.col("held") == 1, F.lit(1))).alias("casa_held"),
+                casa_active.alias("casa_active"),
+                casa_held.alias("casa_held"),
             ),
             _in_window(
-                obs,
-                ext_card_payments,
-                w,
-                F.max("max_payment").alias("ext_card_payment_max"),
+                obs, payments, w, F.max("max_payment").alias("ext_card_payment_max")
             ),
         ],
     )
