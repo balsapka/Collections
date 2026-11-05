@@ -1,6 +1,6 @@
 # crx_persona code review and refactor: multi-agent workflow plan
 
-Status: **approved 2026-11-04; rubrics approved and frozen at U0 2026-11-05; round 1 running** (recommended answers in §10 taken, A3 included). The session that runs it reads this file,
+Status: **round 1 done; U1 answered 2026-11-05 (all recommendations accepted); round 2 running** (recommended answers in §10 taken, A3 included). The session that runs it reads this file,
 `CLAUDE.local.md` and `DESIGN_REVIEW.md` §2, §6 and §7 first. The open questions in §10 must be
 answered before Phase 0 starts.
 
