@@ -286,13 +286,13 @@ def run(model_id):
     o = obs.filter(F.col("account_id").isin([a for a, e in expect.items() if e[2] == model_id]))
     return build_a1_ability(
         o,
-        build_income_signals(o, internal_salary, bureau_salary, model_id),
-        build_liquidity_signals(o, casa_balance, payments, activity, model_id),
-        build_distress_signals(o, returns, bounces, model_id),
-        build_eosb_signals(o, followup, agreements, model_id),
         build_cc_liquidity_anchor(o, balance, model_id),
         model_id,
         PERSONA["persona_end_date"],
+        income=build_income_signals(o, internal_salary, bureau_salary, model_id),
+        liquidity=build_liquidity_signals(o, casa_balance, payments, activity, model_id),
+        distress=build_distress_signals(o, returns, bounces, model_id),
+        eosb=build_eosb_signals(o, followup, agreements, model_id),
     ).collect()
 
 

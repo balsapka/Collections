@@ -38,17 +38,6 @@ MIN_EVIDENCE_AMT = 1000.0  # smallest amount that counts as evidence (Weak, S5-S
 INCOME_POINTS = {"stable": 2, "weak": 1}
 LIQUIDITY_POINTS = {"adequate": 2, "weak": 1}
 
-SCORECARD = Scorecard(
-    prefix="a1",
-    dimensions=(
-        Dimension("income", "a1_income_level", INCOME_POINTS),
-        Dimension("liquidity", "a1_liquidity_level", LIQUIDITY_POINTS),
-    ),
-    overrides=(Override("distress", "a1_distress_flag", DEMOTE),),  # S9
-    labels={s: s for s in ("high", "moderate", "low", "unknown")},
-    high_from=4,
-    moderate_from=2,
-)
 DISPLAY_NAMES = {
     "high": "High",
     "moderate": "Moderate",
@@ -136,36 +125,47 @@ def liquidity_level(anchor: Column, w: int) -> Column:
     return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
 
 
-def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+# A1's families: the function giving the level (anchor amount, window W), the dimension.
+FAMILIES = (
+    (income_level, Dimension("income", "a1_income_level", INCOME_POINTS)),
+    (liquidity_level, Dimension("liquidity", "a1_liquidity_level", LIQUIDITY_POINTS)),
+)
+SCORECARD = Scorecard(
+    prefix="a1",
+    dimensions=tuple(dimension for _, dimension in FAMILIES),
+    overrides=(Override("distress", "a1_distress_flag", DEMOTE),),  # S9
+    labels={s: s for s in ("high", "moderate", "low", "unknown")},
+    high_from=4,
+    moderate_from=2,
+)
+
+
+def build_a1_ability(  # pylint: disable=too-many-locals
     obs_base: DataFrame,
-    income: DataFrame,
-    liquidity: DataFrame,
-    distress: DataFrame,
-    eosb: DataFrame,
     anchor: DataFrame,
     model_id: str,
     persona_end_date: str,
+    **signals: DataFrame,
 ) -> DataFrame:
     """One A1 state per observation-base row, over ``model_id``'s window; logs the state
     distribution of the month of ``persona_end_date`` (the latest observation month).
     Points: S2–S12; the unknown gate: S11; distress lowers the state one rung (S9).
 
-    ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
+    ``signals`` (income, liquidity, distress, EOSB: ``GRAIN`` + columns) and ``anchor``
+    (``GRAIN + liquidity_anchor_amt``, product builder) are left-joined in that order.
     ``a1_unknown_reason`` says why a row is unknown: ``no_casa`` (no CASA leg or
-    positive balance with us in 12 months) or ``dormant_casa``. Diagnostics, which change
-    nothing: ``a1_eosb_flag`` (a DCORE end-of-service result in the window),
+    positive balance with us in 12 months) or ``dormant_casa``. Diagnostics, which
+    change nothing: ``a1_eosb_flag`` (a DCORE end-of-service result in the window),
     ``a1_income_source`` (who shows AED 1,000 or more in the window: ``internal``,
-    ``bureau``, ``both`` or ``none``), ``a1_salary_stopped`` (internal salary in the prior
-    window, none in the window).
+    ``bureau``, ``both`` or ``none``), ``a1_salary_stopped`` (internal salary in the
+    prior window, none in the window).
     """
-    df = left_join_all(obs_base, [income, liquidity, distress, eosb, anchor])
+    df = left_join_all(obs_base, [*signals.values(), anchor])
     amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
     w = window_months(model_id)
-    df = (
-        df.withColumn("a1_income_level", income_level(amt, w))
-        .withColumn("a1_liquidity_level", liquidity_level(amt, w))
-        .withColumn("a1_distress_flag", F.col("distress_flag") == 1)
-    )
+    for level, dimension in FAMILIES:
+        df = df.withColumn(dimension.level, level(amt, w))
+    df = df.withColumn("a1_distress_flag", F.col("distress_flag") == 1)
     no_casa_activity = F.coalesce(F.col("casa_active"), F.lit(0)) == 0  # S11
     df = SCORECARD.score(df, unknown_also=no_casa_activity)
     unknown_reason = F.when(F.col("casa_held") == 1, "dormant_casa").otherwise(
