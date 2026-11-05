@@ -18,7 +18,7 @@ The latest evidence wins on both dimensions:
 
 from __future__ import annotations
 
-from pyspark.sql import Column, DataFrame, Window
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from .._common import (
@@ -197,6 +197,19 @@ def gone_dark_days(model_id: str) -> int:
     return GONE_DARK_DAYS[segment(model_id)]
 
 
+def _gone_dark(streak: int, w_start: Column) -> Column:
+    """D-A2-7, D-A2-20: the last ``streak`` call days all failed, the oldest in W, and
+    no contact since. Reads ``_last_calls`` and ``last_contact_date``."""
+    oldest_call = F.array_min("_last_calls.day")
+    last_contact = F.col("last_contact_date")
+    return (
+        (F.size("_last_calls") == streak)
+        & F.forall("_last_calls", lambda call: call["failed"])
+        & (oldest_call >= w_start)
+        & (last_contact.isNull() | (last_contact < oldest_call))
+    )
+
+
 def build_dcore_signals(  # pylint: disable=too-many-locals
     obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
 ) -> DataFrame:
@@ -226,42 +239,33 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
     day = F.col("day")
     attempt = F.col("_attempt") == 1
     contact = F.col("_contact") == 1
-    # Attempt days, newest first: rank 1..n (other days sort last and are never read).
-    rank = F.row_number().over(
-        Window.partitionBy(*GRAIN).orderBy(F.when(attempt, day).desc_nulls_last())
-    )
-    last = attempt & (F.col("_rank") <= streak)
     failed = ~contact & (F.col("_all_failed") == 1)
-    summary = (
-        days.withColumn("_rank", rank)
-        .groupBy(*GRAIN)
-        .agg(
-            F.max(F.when(F.col("_deceased") == 1, day)).alias("dcore_deceased_date"),
-            F.max(F.when(F.col("_skip_trace") == 1, day)).alias("last_skip_trace_date"),
-            F.lit(1).alias("_dcore_record"),
-            F.max(F.when(contact, day)).alias("last_contact_date"),
-            F.max(F.when(attempt, day)).alias("last_attempt_date"),
-            F.count(F.when(attempt & (day >= w_start), day)).alias(
-                "attempt_days_in_window"
-            ),
-            F.count(F.when(last, day)).alias("_n_last"),
-            F.count(F.when(last & failed, day)).alias("_failed_last"),
-            F.min(F.when(last, day)).alias("_oldest_last"),
-        )
+    # The last ``streak`` call days, newest first; non-attempt days are never collected.
+    last_calls = F.slice(
+        F.sort_array(
+            F.collect_list(F.when(attempt, F.struct(day, failed.alias("failed")))),
+            asc=False,
+        ),
+        1,
+        streak,
     )
-    last_contact = F.col("last_contact_date")
-    gone_dark = (
-        (F.col("_n_last") == streak)
-        & (F.col("_failed_last") == streak)
-        & (F.col("_oldest_last") >= w_start)
-        & (last_contact.isNull() | (last_contact < F.col("_oldest_last")))
+    summary = days.groupBy(*GRAIN).agg(
+        F.max(F.when(F.col("_deceased") == 1, day)).alias("dcore_deceased_date"),
+        F.max(F.when(F.col("_skip_trace") == 1, day)).alias("last_skip_trace_date"),
+        F.lit(1).alias("_dcore_record"),
+        F.max(F.when(contact, day)).alias("last_contact_date"),
+        F.max(F.when(attempt, day)).alias("last_attempt_date"),
+        F.count(F.when(attempt & (day >= w_start), day)).alias(
+            "attempt_days_in_window"
+        ),
+        last_calls.alias("_last_calls"),
     )
     return (
         left_join_all(obs_base, [summary])
         .withColumn(
             "reachability_state",
-            F.when(gone_dark, "non_reachable")
-            .when(last_contact >= w_start, "reachable")
+            F.when(_gone_dark(streak, w_start), "non_reachable")
+            .when(F.col("last_contact_date") >= w_start, "reachable")
             .otherwise("unknown"),
         )
         .withColumn(
@@ -273,7 +277,7 @@ def build_dcore_signals(  # pylint: disable=too-many-locals
         .withColumn(
             "attempt_days_in_window", F.coalesce("attempt_days_in_window", F.lit(0))
         )
-        .drop("_dcore_record", "_n_last", "_failed_last", "_oldest_last")
+        .drop("_dcore_record", "_last_calls")
     )
 
 
