@@ -74,15 +74,6 @@ from enbd_collections.pipelines.crx_persona import (
     cc_raw_extract as crx_cc_raw_extract,
 )
 from enbd_collections.pipelines.crx_persona import (
-    cc_payment_trajectory as crx_cc_payment_trajectory,
-)
-from enbd_collections.pipelines.crx_persona import (
-    cc_utilisation as crx_cc_utilisation,
-)
-from enbd_collections.pipelines.crx_persona import (
-    cc_departure_signature as crx_cc_departure,
-)
-from enbd_collections.pipelines.crx_persona import (
     cc_a4_deterioration as crx_cc_a4_deterioration,
 )
 from enbd_collections.pipelines.crx_persona import (
@@ -109,9 +100,6 @@ from enbd_collections.pipelines.crx_persona import (
 )
 from enbd_collections.pipelines.crx_persona import (
     rl_a3_payment_credibility as crx_rl_a3_payment_credibility,
-)
-from enbd_collections.pipelines.crx_persona import (
-    rl_departure_signature as crx_rl_departure_signature,
 )
 from enbd_collections.pipelines import digital_login as dl
 from enbd_collections.pipelines.location import pipeline as location_features
@@ -231,9 +219,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_spell_table": crx_cc_spell.create_pipeline(),
         "crx_cc_full_history": crx_cc_full_history.create_pipeline(),
         "crx_cc_raw_extract": crx_cc_raw_extract.create_pipeline(),
-        "crx_cc_payment_trajectory": crx_cc_payment_trajectory.create_pipeline(),
-        "crx_cc_utilisation_features": crx_cc_utilisation.create_pipeline(),
-        "crx_cc_departure_signature": crx_cc_departure.create_pipeline(),
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
@@ -243,7 +228,9 @@ def register_pipelines() -> dict[str, Pipeline]:
         ),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
-        "crx_cc_a3_payment_credibility": crx_cc_a3_payment_credibility.create_pipeline(),
+        "crx_cc_a3_payment_credibility": (
+            crx_cc_a3_payment_credibility.create_pipeline()
+        ),
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
@@ -257,9 +244,10 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a1_ability_b14_check": (
             crx_rl_a1_ability.create_b14_check_pipeline()
         ),
-        "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
-        "crx_rl_a3_payment_credibility": crx_rl_a3_payment_credibility.create_pipeline(),
+        "crx_rl_a3_payment_credibility": (
+            crx_rl_a3_payment_credibility.create_pipeline()
+        ),
         # -- Digital login (OMB) --------------------------------------------
         "digital_login": dl.create_pipeline(),
         "location_features": location_features.create_pipeline(),

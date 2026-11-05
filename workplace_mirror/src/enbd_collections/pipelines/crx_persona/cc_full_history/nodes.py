@@ -15,6 +15,8 @@ Changes vs the current node (see REVIEW_SPARK.md, findings F1-F3):
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from .._common import require_columns
+
 # Keep the existing constant if it differs: add_info carries "BS_PMT_CYCLE_DUE=<bucket>".
 _DPD_BUCKET_REGEX = r"BS_PMT_CYCLE_DUE=(\d+)"
 
@@ -33,6 +35,10 @@ def build_cc_full_history(raw_stg_billing: DataFrame, cc_spine: DataFrame) -> Da
         DataFrame at grain (account_id, billing_date): account_id long, billing_date date,
         dlq_bucket int (NULL when add_info carries no bucket), cif_id (from the spine).
     """
+    require_columns(
+        raw_stg_billing, ["contract_idt", "billing_date", "add_info"], "raw_stg_billing"
+    )
+    require_columns(cc_spine, ["contract_id", "cif_id"], "cc_spine")
     # -- Step 1 (R20): scope to the spine, distinct leftsemi on the native contract id ----
     # Join BEFORE any cast to string (double "939877870.0" vs "939877870" zeroes the join).
     spine_keys = cc_spine.select(F.col("contract_id").alias("contract_idt")).distinct()

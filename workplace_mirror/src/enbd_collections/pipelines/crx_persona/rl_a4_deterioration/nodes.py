@@ -27,10 +27,10 @@ from pyspark.sql import types as T
 from .._common import require_columns
 from .._dpd_journey import (
     RL,
-    _log_state_stats,
     build_deterioration,
     build_dpd_sequences,
     journey_params,
+    log_state_stats,
 )
 from .chains import Edge, resolve_chains
 
@@ -117,11 +117,18 @@ def build_rl_full_history_linked(
         F.last_day("month_end_date").alias("month_end_date"),
         "dlq_bucket",
     )
-    accounts = [r[0] for r in own.select("account_id").distinct().collect()]
-    chains, members = resolve_chains(_edges(int_loan_restructure_link), accounts)
+    edges = _edges(int_loan_restructure_link)
+    chains, members = resolve_chains(edges, {e.account for e in edges})
     spark = crx_rl_full_history.sparkSession
-    chain_df = spark.createDataFrame([tuple(c) for c in chains], _CHAIN_SCHEMA)
-    member_df = spark.createDataFrame([tuple(m) for m in members], _MEMBER_SCHEMA)
+    in_history = F.broadcast(own.select("account_id").distinct())
+
+    def frame(rows, schema):
+        return spark.createDataFrame([tuple(r) for r in rows], schema).join(
+            in_history, on="account_id", how="leftsemi"
+        )
+
+    chain_df = frame(chains, _CHAIN_SCHEMA)
+    member_df = frame(members, _MEMBER_SCHEMA)
 
     original = (
         int_loan_master.select(
@@ -177,6 +184,11 @@ def build_rl_dpd_sequences(
 ) -> DataFrame:
     """One row per RL account: gap-filled monthly bucket array + audit columns +
     restructure_blind_spot_flag (the loan is restructured)."""
+    require_columns(
+        crx_rl_full_history,
+        ("account_id", "month_end_date", "dlq_bucket"),
+        "crx_rl_full_history",
+    )
     return build_dpd_sequences(
         _history(crx_rl_full_history),
         RL,
@@ -194,6 +206,11 @@ def build_rl_linked_dpd_sequences(
 ) -> DataFrame:
     """As build_rl_dpd_sequences on the linked history: an account with the original
     loans' months in front of its own is no longer a blind spot."""
+    require_columns(
+        crx_rl_full_history_linked,
+        ("account_id", "month_end_date", "dlq_bucket"),
+        "crx_rl_full_history_linked",
+    )
     stitched = crx_rl_restructure_chains.filter(F.col("chain_months_added") > 0).select(
         "account_id"
     )
@@ -223,6 +240,7 @@ def build_rl_a4_deterioration(  # pylint: disable=too-many-arguments,too-many-po
     A row before its chain's ``chain_known_date`` reads the account's own history, every
     other row the linked one. Adds the ``chain_*`` columns of crx_rl_restructure_chains
     and chain_stitched_flag (1 if this row's history has the original loans' months)."""
+    require_columns(rl_spine, ("account_id", "observation_date"), "rl_spine")
     params = journey_params(crx_persona, RL, model_id)
     chains = F.broadcast(crx_rl_restructure_chains)
     spine = rl_spine.select(
@@ -256,5 +274,5 @@ def build_rl_a4_deterioration(  # pylint: disable=too-many-arguments,too-many-po
             F.lit(False),
         ).cast("int"),
     )
-    _log_state_stats(out, params.end_date, RL, params)
+    log_state_stats(out, params.end_date, RL, params)
     return out

@@ -6,8 +6,7 @@ Everything else (evidence, levels, points, state) is the shared ``a1_ability`` e
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, pit_latest, require_columns
-from .._dpd_journey import MODEL_ID_SEGMENT
+from .._common import GRAIN, SEG_60_180, pit_latest, require_columns, segment
 
 # OVD_k holds the amount k cycles overdue (DPD bucket k+1): OVD_01 1-30 … OVD_06
 # 151-180 DPD. OVD_07 (181-210) and the catch-all OVD_08 (211+) never anchor.
@@ -26,7 +25,7 @@ def build_cc_liquidity_anchor(
     the anchor is NULL and A1 uses its flat floors. Also NULL (flat floors) when the
     snapshot is missing or stale, or every bucket is empty.
     """
-    if MODEL_ID_SEGMENT[model_id] != "60_180":
+    if segment(model_id) != SEG_60_180:
         return obs_base.select(
             *GRAIN, F.lit(None).cast("double").alias("liquidity_anchor_amt")
         )

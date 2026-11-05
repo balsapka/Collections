@@ -24,17 +24,3 @@ class BucketScheme:
 
 CC = BucketScheme("cc", offset=0, top=9, repair_jumps=True)
 RL = BucketScheme("rl", offset=1, top=7, repair_jumps=False)
-
-# Segments on the canonical scale.
-SEGMENTS = {
-    "60_180": (4, 5, 6, 7),  # CC native 4-7, RL native 3-6
-    "180_plus": (8, 9),  # CC native 8-9, RL native 7
-}
-
-# segment is fully determined by model_id — never an independently-settable override.
-MODEL_ID_SEGMENT = {
-    "cc_60_180": "60_180",
-    "cc_180_plus": "180_plus",
-    "rl_60_180": "60_180",
-    "rl_180_plus": "180_plus",
-}

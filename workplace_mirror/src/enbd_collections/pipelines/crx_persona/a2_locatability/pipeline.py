@@ -21,12 +21,13 @@ from .signals import (
     build_way4_deceased,
 )
 
+TAGS = ["crx_persona", "crx", "a2", "locatability", "persona_axis"]
+
 
 def create_a2_pipeline(product: str, output: str) -> Pipeline:
     """Signal nodes and the state node of ``product``'s A2 axis, written to ``output``."""
     obs = f"crx_{product}_obs_base"
     prefix = f"crx_{product}_a2"
-    tags = ["crx_persona", "crx", "a2", "locatability", "persona_axis"]
     return Pipeline(
         [
             node(
@@ -38,7 +39,7 @@ def create_a2_pipeline(product: str, output: str) -> Pipeline:
                 },
                 outputs=f"{prefix}_location_signals",
                 name=f"build_{prefix}_location_signals",
-                tags=tags,
+                tags=TAGS,
             ),
             node(
                 func=build_dcore_signals,
@@ -50,7 +51,7 @@ def create_a2_pipeline(product: str, output: str) -> Pipeline:
                 },
                 outputs=f"{prefix}_dcore_signals",
                 name=f"build_{prefix}_dcore_signals",
-                tags=tags,
+                tags=TAGS,
             ),
             node(
                 func=build_way4_deceased,
@@ -61,14 +62,14 @@ def create_a2_pipeline(product: str, output: str) -> Pipeline:
                 },
                 outputs=f"{prefix}_way4_deceased",
                 name=f"build_{prefix}_way4_deceased",
-                tags=tags,
+                tags=TAGS,
             ),
             node(
                 func=build_demographics_deceased,
                 inputs={"obs_base": obs, "demographics": "feat_demographics_cif"},
                 outputs=f"{prefix}_demographics_deceased",
                 name=f"build_{prefix}_demographics_deceased",
-                tags=tags,
+                tags=TAGS,
             ),
             node(
                 func=build_a2_locatability,
@@ -83,7 +84,7 @@ def create_a2_pipeline(product: str, output: str) -> Pipeline:
                 },
                 outputs=output,
                 name=f"build_{prefix}_locatability",
-                tags=tags,
+                tags=TAGS,
             ),
         ],
     )

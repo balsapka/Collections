@@ -20,7 +20,7 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
         [
             node(
                 func=build_cc_full_history,
-                inputs=["raw_stg_billing", "cc_spine"],
+                inputs={"raw_stg_billing": "raw_stg_billing", "cc_spine": "cc_spine"},
                 outputs="crx_cc_full_history",
                 name="build_crx_cc_full_history",
                 tags=["crx", "cc", "full_history"],

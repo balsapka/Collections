@@ -35,7 +35,7 @@ Nothing is dropped silently: every account in the history gets a sequences row w
 `build_status`; the classifier keeps only status 'ok' and the segment's current buckets.
 
 Package layout (readability split of the former flat _dpd_journey.py; no behavior change):
-    constants.py  BucketScheme, CC, RL, SEGMENTS, MODEL_ID_SEGMENT
+    constants.py  BucketScheme, CC, RL (MODEL_ID_SEGMENT lives in _common)
     params.py     PARAM_DEFAULTS, JourneyParams, journey_params()
     _dates.py     _month_idx, _month_label, _month_col — shared by spark.py and logging.py
                   so those two never need to import each other
@@ -44,6 +44,7 @@ Package layout (readability split of the former flat _dpd_journey.py; no behavio
     history.py    Stage 1: build_history (not reference-constrained, free to decompose)
     spark.py      Stage 1/2 Spark orchestration (build_dpd_sequences, build_deterioration)
     logging.py    the two stats logs
+    anchor.py     episode_start: the current episode's start per observation (A3)
 This module re-exports everything reachable on the old flat module — no caller/test import
 needs to change.
 """
@@ -52,13 +53,14 @@ from __future__ import annotations
 
 # This module's whole job is re-exporting the package's submodules under the old flat
 # module's name, so every caller/test import keeps working unchanged.
-# pylint: disable=unused-import
+from .._common import MODEL_ID_SEGMENT
 from ._dates import _month_idx, _month_label
-from .constants import CC, MODEL_ID_SEGMENT, RL, SEGMENTS, BucketScheme
+from .anchor import episode_start
+from .constants import CC, RL, BucketScheme
 from .core import (
+    NO_PRIOR,
     H,
     N,
-    NO_PRIOR,
     P,
     R,
     _glitches,
@@ -69,7 +71,7 @@ from .core import (
     journey_features,
 )
 from .history import _legacy_drop, build_history
-from .logging import LOG, _log_sequence_stats, _log_state_stats
+from .logging import LOG, _log_sequence_stats, log_state_stats
 from .params import PARAM_DEFAULTS, JourneyParams, journey_params
 from .spark import (
     _CLASSIFY_SCHEMA,
@@ -78,8 +80,49 @@ from .spark import (
     _idx_to_month_end,
     _month_col,
     _ship_by_value,
-    _string_key,
     build_deterioration,
     build_dpd_sequences,
 )
 from .states import DISPLAY_NAMES, STATE_RULES, STATES, assign_state, classify
+
+__all__ = [
+    "BucketScheme",
+    "CC",
+    "DISPLAY_NAMES",
+    "H",
+    "JourneyParams",
+    "LOG",
+    "MODEL_ID_SEGMENT",
+    "N",
+    "NO_PRIOR",
+    "P",
+    "PARAM_DEFAULTS",
+    "R",
+    "RL",
+    "STATES",
+    "STATE_RULES",
+    "_CLASSIFY_SCHEMA",
+    "_FEATURES",
+    "_HISTORY_SCHEMA",
+    "_glitches",
+    "_idx_to_month_end",
+    "_legacy_drop",
+    "_log_sequence_stats",
+    "log_state_stats",
+    "_mean",
+    "_month_col",
+    "_month_idx",
+    "_month_label",
+    "_repair",
+    "_runs",
+    "_ship_by_value",
+    "assign_state",
+    "build_deterioration",
+    "build_dpd_sequences",
+    "build_history",
+    "classify",
+    "encode",
+    "episode_start",
+    "journey_features",
+    "journey_params",
+]

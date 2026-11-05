@@ -15,6 +15,7 @@ key alone to relax/remove the floor for 180_plus without touching the 60_180 run
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from .._common import require_columns
 from .._dpd_journey import CC, build_deterioration, build_dpd_sequences, journey_params
 
 # Mirrors cc_spell/nodes.py's _RESTRUCTURE_DLQ_THRESHOLD: an account whose earliest
@@ -34,6 +35,11 @@ def build_cc_dpd_sequences(
     Derived directly from crx_cc_full_history — no spell-table dependency.
     See _dpd_journey.build_dpd_sequences.
     """
+    require_columns(
+        crx_cc_full_history,
+        ["account_id", "billing_date", "dlq_bucket"],
+        "crx_cc_full_history",
+    )
     history = crx_cc_full_history.select(
         "account_id", F.col("billing_date").alias("obs_date"), "dlq_bucket"
     )
@@ -73,6 +79,7 @@ def build_cc_a4_deterioration(
     build_cc_dpd_sequences. cc_spine is already model_id/DLQ-band scoped by construction
     (R20) -- no separate segment filter needed here. See _dpd_journey.build_deterioration.
     """
+    require_columns(cc_spine, ["contract_id", "observation_date"], "cc_spine")
     spine = cc_spine.select(
         F.col("contract_id").alias("account_id"), "observation_date"
     )

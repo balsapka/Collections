@@ -15,6 +15,27 @@ def _legacy_drop(best: dict[int, tuple[int, int]]) -> bool:
     return any(b - a > 1 and best[a][1] != best[b][1] for a, b in zip(ms, ms[1:]))
 
 
+def _shift_cycle_bills(by_month: dict[int, list[tuple[int, int]]]) -> int:
+    """Step 1 of build_history: give a month's extra bill to the empty month next to it.
+    Edits ``by_month`` in place; returns the number of bills moved."""
+    moves = 0
+    lo, hi = min(by_month), max(by_month)
+    for m in sorted(by_month):
+        obs = sorted(set(by_month[m]))
+        days = sorted({d for d, _ in obs})
+        if len(days) < 2:
+            continue
+        if lo < m - 1 and m - 1 not in by_month:
+            by_month[m - 1] = [x for x in obs if x[0] == days[0]]
+            by_month[m] = [x for x in obs if x[0] != days[0]]
+            moves += 1
+        elif m + 1 < hi and m + 1 not in by_month:
+            by_month[m + 1] = [x for x in obs if x[0] == days[-1]]
+            by_month[m] = [x for x in obs if x[0] != days[-1]]
+            moves += 1
+    return moves
+
+
 # pylint: disable-next=too-many-locals
 def _fill_gaps(
     vals: list,
@@ -65,7 +86,7 @@ def _fill_gaps(
     return vals, filled, rolled, inferred, cut, False
 
 
-# pylint: disable-next=too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
+# pylint: disable-next=too-many-positional-arguments,too-many-locals
 def build_history(
     rows,
     first_raw_idx: int,
@@ -117,20 +138,7 @@ def build_history(
 
     # Step 1: billing-cycle shift.
     if repair_cycle_shift:
-        lo, hi = min(by_month), max(by_month)
-        for m in sorted(by_month):
-            obs = sorted(set(by_month[m]))
-            days = sorted({d for d, _ in obs})
-            if len(days) < 2:
-                continue
-            if lo < m - 1 and m - 1 not in by_month:
-                by_month[m - 1] = [x for x in obs if x[0] == days[0]]
-                by_month[m] = [x for x in obs if x[0] != days[0]]
-                out["n_cycle_shift_moves"] += 1
-            elif m + 1 < hi and m + 1 not in by_month:
-                by_month[m + 1] = [x for x in obs if x[0] == days[-1]]
-                by_month[m] = [x for x in obs if x[0] != days[-1]]
-                out["n_cycle_shift_moves"] += 1
+        out["n_cycle_shift_moves"] = _shift_cycle_bills(by_month)
 
     # Step 2: one value per month (latest day, then worst bucket).
     best = {m: max(v) for m, v in by_month.items()}

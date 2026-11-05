@@ -16,10 +16,12 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
+from .._common import string_key
+from ..scoring_engine import state_label
 from ._dates import _month_col, _month_idx
 from .constants import BucketScheme
 from .history import build_history
-from .logging import _log_sequence_stats, _log_state_stats
+from .logging import _log_sequence_stats, log_state_stats
 from .params import JourneyParams
 from .states import DISPLAY_NAMES, classify
 
@@ -105,18 +107,6 @@ _CLASSIFY_SCHEMA = T.StructType(
     [T.StructField("det_state", T.StringType())]
     + [T.StructField(n, t) for n, t in _FEATURES if t is not None]
 )
-
-
-def _string_key(df: DataFrame, col: str = "account_id") -> F.Column:
-    """Safe string-cast join key — a Double/Decimal account_id cast straight to string
-    renders as "1.23456789E8" and silently zeroes an == join. Same helper as
-    rl_full_history/nodes.py._string_key (R18 — duplicated, not imported: that is a
-    private helper in an unrelated pipeline module with no stability contract)."""
-    dtype = df.schema[col].dataType
-    c = F.col(col)
-    if isinstance(dtype, (T.DoubleType, T.FloatType, T.DecimalType)):
-        c = c.cast("long")
-    return F.trim(c.cast("string"))
 
 
 def _idx_to_month_end(c) -> F.Column:
@@ -287,11 +277,11 @@ def build_deterioration(
         sequences.where(F.col("build_status") == "ok")
         .withColumn("_first_idx", _month_col(F.col("first_month")))
         .withColumn("_last_idx", _month_col(F.col("last_month")))
-        .withColumn("_key", _string_key(sequences, "account_id"))
+        .withColumn("_key", string_key(sequences))
     )
 
     sp = spine.where(F.col("observation_date").cast("date") <= end_dt).select(
-        _string_key(spine, "account_id").alias("_key"),
+        string_key(spine).alias("_key"),
         F.col("observation_date").cast("date").alias("observation_date"),
     )
 
@@ -330,7 +320,6 @@ def build_deterioration(
         ),
     ).where(F.col("_s").isNotNull())
 
-    labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
     feat_cols = [
         F.col(f"_s.{f.name}").alias(f.name)
         for f in schema.fields
@@ -340,7 +329,7 @@ def build_deterioration(
         F.col("account_id"),
         F.col("observation_date"),
         F.col("_s.det_state").alias("det_state"),
-        labels[F.col("_s.det_state")].alias("det_state_label"),
+        state_label("_s.det_state", DISPLAY_NAMES).alias("det_state_label"),
         F.lit(segment).alias("det_segment"),
         F.element_at("dlq_buckets", F.col("_trunc_len")).alias("current_bucket"),
         F.col("n_gap_months_filled"),
@@ -351,12 +340,8 @@ def build_deterioration(
         F.col("restructure_blind_spot_flag"),
         F.current_timestamp().alias("computed_at"),
     )
-    # Always-on, like every other persona axis's own state-distribution log
-    # (cc_a2_locatability_v2/cc_a3_payment_credibility's own _log_*_stats) — not
-    # gated behind log_stats, which here only controls the heavier Stage 1
-    # build_dpd_sequences telemetry above. The month filter inside _log_state_stats
-    # pushes down through the join, so this does not force materialization of the
-    # full point-in-time result.
+    # Always on, as on every axis (_common.log_latest_month); log_stats only gates the
+    # Stage 1 telemetry above. The month filter pushes down through the join.
     if log_states:  # False: the caller unions two runs and logs the result
-        _log_state_stats(out, params.end_date, scheme, params)
+        log_state_stats(out, params.end_date, scheme, params)
     return out

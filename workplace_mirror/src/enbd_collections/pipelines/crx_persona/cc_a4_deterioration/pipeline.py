@@ -21,23 +21,23 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
         [
             node(
                 func=build_cc_dpd_sequences,
-                inputs=[
-                    "crx_cc_full_history",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
+                inputs={
+                    "crx_cc_full_history": "crx_cc_full_history",
+                    "crx_persona": "params:crx_persona",
+                    "model_id": "params:model_id",
+                },
                 outputs="crx_cc_dpd_sequences",
                 name="build_crx_cc_dpd_sequences",
                 tags=["crx", "cc", "cc_a4_deterioration"],
             ),
             node(
                 func=build_cc_a4_deterioration,
-                inputs=[
-                    "crx_cc_dpd_sequences",
-                    "cc_spine",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
+                inputs={
+                    "crx_cc_dpd_sequences": "crx_cc_dpd_sequences",
+                    "cc_spine": "cc_spine",
+                    "crx_persona": "params:crx_persona",
+                    "model_id": "params:model_id",
+                },
                 outputs="crx_cc_a4_deterioration",
                 name="build_crx_cc_a4_deterioration",
                 tags=["crx", "cc", "cc_a4_deterioration"],

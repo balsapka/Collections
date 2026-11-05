@@ -12,3 +12,9 @@
 Resume (`/review-council resume`): re-run S1 and S4 (agents `council-architecture`,
 `council-readability`, same round-1 prompts: input commit `d1ad38a`), finish S2's gate check,
 then merge (S7 → S1 → S3 → S2 → S4), S5 docstrings, gates, three reviews, triage, U1 questions.
+
+## Merge (2026-11-05)
+
+S1 and S4 re-run; S2 and S3 complete. Merged S7 → S1 → S3 → S2 → S4 (`merge_log.md`), gates green
+after three reverts (`gates.md`); questions in `../questions.md`, A3 items in `../a3_handoff.md`.
+Next: S5 docstrings on the merged tree, then the three reviews.

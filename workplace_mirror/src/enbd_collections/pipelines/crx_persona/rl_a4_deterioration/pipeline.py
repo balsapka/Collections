@@ -30,11 +30,11 @@ from .nodes import (
 def _linked_node() -> node:
     return node(
         func=build_rl_full_history_linked,
-        inputs=[
-            "crx_rl_full_history",
-            "int_loan_master",
-            "int_loan_restructure_link",
-        ],
+        inputs={
+            "crx_rl_full_history": "crx_rl_full_history",
+            "int_loan_master": "int_loan_master",
+            "int_loan_restructure_link": "int_loan_restructure_link",
+        },
         outputs=["crx_rl_full_history_linked", "crx_rl_restructure_chains"],
         name="build_crx_rl_full_history_linked",
         tags=["crx", "rl", "rl_a4_deterioration"],
@@ -44,12 +44,12 @@ def _linked_node() -> node:
 def _sequences_node(output: str) -> node:
     return node(
         func=build_rl_dpd_sequences,
-        inputs=[
-            "crx_rl_full_history",
-            "feature_retail_loans",
-            "params:crx_persona",
-            "params:model_id",
-        ],
+        inputs={
+            "crx_rl_full_history": "crx_rl_full_history",
+            "feature_retail_loans": "feature_retail_loans",
+            "crx_persona": "params:crx_persona",
+            "model_id": "params:model_id",
+        },
         outputs=output,
         name=f"build_{output}",
         tags=["crx", "rl", "rl_a4_deterioration"],
@@ -59,13 +59,13 @@ def _sequences_node(output: str) -> node:
 def _linked_sequences_node() -> node:
     return node(
         func=build_rl_linked_dpd_sequences,
-        inputs=[
-            "crx_rl_full_history_linked",
-            "crx_rl_restructure_chains",
-            "feature_retail_loans",
-            "params:crx_persona",
-            "params:model_id",
-        ],
+        inputs={
+            "crx_rl_full_history_linked": "crx_rl_full_history_linked",
+            "crx_rl_restructure_chains": "crx_rl_restructure_chains",
+            "feature_retail_loans": "feature_retail_loans",
+            "crx_persona": "params:crx_persona",
+            "model_id": "params:model_id",
+        },
         outputs="crx_rl_dpd_sequences_linked",
         name="build_crx_rl_dpd_sequences_linked",
         tags=["crx", "rl", "rl_a4_deterioration"],
@@ -75,14 +75,14 @@ def _linked_sequences_node() -> node:
 def _state_node(own: str, output: str) -> node:
     return node(
         func=build_rl_a4_deterioration,
-        inputs=[
-            own,
-            "crx_rl_dpd_sequences_linked",
-            "crx_rl_restructure_chains",
-            "rl_spine",
-            "params:crx_persona",
-            "params:model_id",
-        ],
+        inputs={
+            "crx_rl_dpd_sequences": own,
+            "crx_rl_dpd_sequences_linked": "crx_rl_dpd_sequences_linked",
+            "crx_rl_restructure_chains": "crx_rl_restructure_chains",
+            "rl_spine": "rl_spine",
+            "crx_persona": "params:crx_persona",
+            "model_id": "params:model_id",
+        },
         outputs=output,
         name=f"build_{output}",
         tags=["crx", "rl", "rl_a4_deterioration"],

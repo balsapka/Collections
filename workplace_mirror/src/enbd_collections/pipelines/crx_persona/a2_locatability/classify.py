@@ -10,12 +10,11 @@ Both dimensions are kept on every row, deceased included, so each can be used al
 
 from __future__ import annotations
 
-from itertools import chain
-
-from pyspark.sql import Column, DataFrame
+from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, left_join_all, log_latest_month
+from ..scoring_engine import state_label
 from .signals import LOCATION_EVIDENCE
 
 LOCATION_LABELS = {"skip": "Skip", "in_country": "In Country", "unknown": "Unknown"}
@@ -41,10 +40,6 @@ _OUTPUT = [
     "attempt_days_in_window",
     "last_skip_trace_date",
 ]
-
-
-def _label(col: str, labels: dict[str, str]) -> Column:
-    return F.create_map(*[F.lit(x) for x in chain(*labels.items())])[F.col(col)]
 
 
 def build_a2_locatability(  # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -83,8 +78,8 @@ def build_a2_locatability(  # pylint: disable=too-many-arguments,too-many-positi
             F.when(deceased, "Deceased").otherwise(
                 F.concat_ws(
                     " – ",
-                    _label("location_state", LOCATION_LABELS),
-                    _label("reachability_state", REACHABILITY_LABELS),
+                    state_label("location_state", LOCATION_LABELS),
+                    state_label("reachability_state", REACHABILITY_LABELS),
                 )
             ),
         )

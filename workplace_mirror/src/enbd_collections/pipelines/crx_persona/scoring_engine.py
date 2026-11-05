@@ -19,7 +19,7 @@ either axis wires these into its own node without restructuring joins.
 """
 
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Mapping
 
 from pyspark.sql import Column
 from pyspark.sql import functions as F
@@ -35,22 +35,6 @@ def points_from_level(level_col: Column, points_by_level: Mapping[str, int]) -> 
     expr = F.lit(0)
     for level, points in points_by_level.items():
         expr = F.when(level_col == F.lit(level), F.lit(points)).otherwise(expr)
-    return expr
-
-
-def priority_reason(
-    conditions: Mapping[str, Column], priority_high_to_low: Sequence[str]
-) -> Column:
-    """Pick the single highest-priority named condition that fires, else NULL.
-
-    ``conditions`` maps a reason name to its boolean Column. ``priority_high_to_low``
-    must list every key in ``conditions``, most important first — when more
-    than one condition fires for the same row, the first (highest-priority)
-    match wins.
-    """
-    expr = F.lit(None).cast("string")
-    for reason in reversed(priority_high_to_low):
-        expr = F.when(conditions[reason], F.lit(reason)).otherwise(expr)
     return expr
 
 
@@ -98,3 +82,8 @@ class StateLadder:
             )
             .otherwise(F.lit(self.low))
         )
+
+
+def state_label(col: str, labels: Mapping[str, str]) -> Column:
+    """The display label of each ``col`` value; NULL for a value ``labels`` lacks."""
+    return F.create_map(*[F.lit(x) for kv in labels.items() for x in kv])[F.col(col)]

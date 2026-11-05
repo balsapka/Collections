@@ -5,16 +5,13 @@ now-superseded CASA/EMI classification onto the spine. crx_rl_a4_spine is now
 a pure structural join — (account_id, cif_id, observation_date, spell_id, t0),
 decoupled from any A4 classifier, scoped by crx_rl_a4_deterioration instead.
 
-Reuses rl_departure_signature's build_rl_depart_spine (R14 — identical logic,
-already exercised by that pipeline) rather than re-deriving the same join.
-
 Run with:
     kedro run --pipeline=crx_rl_a4_spine
 """
 
 from kedro.pipeline import Pipeline, node
 
-from ..rl_departure_signature.nodes import build_rl_depart_spine
+from .nodes import build_rl_depart_spine
 
 _TAGS = ["crx", "rl", "rl_a4_spine"]
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from .core import journey_features
 
 STATE_RULES = {
@@ -11,7 +13,8 @@ STATE_RULES = {
     "stabilized_min_in_band": 5,  # [business] of the last 6 months within today's bucket ±1
     "stabilized_long_run_months": 6,  # [business]
     "stabilized_long_run_max_rise": 1,  # [business]
-    "stabilized_max_bucket": 7,  # [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
+    # [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
+    "stabilized_max_bucket": 7,
     "repeat_min_prior_peak": 3,  # [business] earlier spell reached bucket 3 ...
     "repeat_window_months": 12,  # [business] ... and ended <= 12 months before this one
     "seasoned_min_months": 12,  # [business] months on book before the spell
@@ -38,9 +41,34 @@ DISPLAY_NAMES = {
 }
 
 
-# pylint: disable-next=too-many-return-statements,too-many-arguments
+def _is_stabilized(f: dict[str, Any]) -> bool:
+    """Q2: 60-180 only, five of the last six months within today's bucket +-1, or a long
+    run since first reaching 4 that has risen by at most one bucket."""
+    p = STATE_RULES
+    return f["b_now"] <= p["stabilized_max_bucket"] and (
+        f["last6_in_band"] >= p["stabilized_min_in_band"]
+        or (
+            f["months_since_4"] >= p["stabilized_long_run_months"]
+            and f["chg_6m"] <= p["stabilized_long_run_max_rise"]
+        )
+    )
+
+
+def _is_early_payment_default(f: dict[str, Any], history_blind: bool) -> bool:
+    """Q1: the spell follows a short, clean history, with no payment in it."""
+    p = STATE_RULES
+    return (
+        f["months_before_spell"] <= p["epd_max_history"]
+        and f["n_blips"] <= p["epd_max_blips"]
+        and f["n_prior_episodes"] == 0
+        and f["spell_pay_events"] == 0
+        and not history_blind
+    )
+
+
+# pylint: disable-next=too-many-return-statements
 def assign_state(
-    f: dict,
+    f: dict[str, Any],
     cropped: bool,
     restructure_blind_spot: bool = False,
 ) -> str:
@@ -71,13 +99,7 @@ def assign_state(
     # native-bucket-1 start remains legitimate for a genuinely fresh, non-restructured loan.
     history_blind = cropped or restructure_blind_spot
     # Q2 stabilized — computed up front: both Q0 and the main sequence below consult it.
-    stab = f["b_now"] <= p["stabilized_max_bucket"] and (
-        f["last6_in_band"] >= p["stabilized_min_in_band"]
-        or (
-            f["months_since_4"] >= p["stabilized_long_run_months"]
-            and f["chg_6m"] <= p["stabilized_long_run_max_rise"]
-        )
-    )
+    stab = _is_stabilized(f)
     # Q0 — only a confidence guard when history before the window is genuinely
     # missing (history_blind). When history_blind=False we trust we've seen the
     # whole observed journey, so a delinquent oldest month is not evidence of
@@ -87,13 +109,7 @@ def assign_state(
     if f["starts_delinquent"] and history_blind:
         return "stabilized" if stab else "unknown"
     # Q1
-    if (
-        f["months_before_spell"] <= p["epd_max_history"]
-        and f["n_blips"] <= p["epd_max_blips"]
-        and f["n_prior_episodes"] == 0
-        and f["spell_pay_events"] == 0
-        and not history_blind
-    ):
+    if _is_early_payment_default(f, history_blind):
         return "early_payment_default"
     # Q2
     if stab:

@@ -23,7 +23,11 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
         [
             node(
                 func=build_rl_full_history,
-                inputs=["rl_spine", "int_loan_master", "params:crx_persona"],
+                inputs={
+                    "rl_spine": "rl_spine",
+                    "int_loan_master": "int_loan_master",
+                    "crx_persona": "params:crx_persona",
+                },
                 outputs="crx_rl_full_history",
                 name="build_crx_rl_full_history",
                 tags=["crx", "rl", "rl_b1"],
