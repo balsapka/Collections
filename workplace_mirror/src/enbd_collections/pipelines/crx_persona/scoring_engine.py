@@ -38,7 +38,7 @@ class Override:
 
 
 @dataclass(frozen=True)
-class Scorecard:  # pylint: disable=too-many-instance-attributes
+class Scorecard:  # pylint: disable=too-many-instance-attributes,too-many-locals
     """Points over ``dimensions`` -> High / Moderate / Low, overrides, an Unknown gate.
 
     Rungs from the points total (``high_from`` / ``moderate_from``, inclusive); High
