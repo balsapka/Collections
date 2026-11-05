@@ -114,12 +114,10 @@ def pit_latest(  # pylint: disable=too-many-arguments
     agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
     """
     anchor = F.col("observation_date") if anchor is None else anchor
-    before = (
-        F.col("_d") <= F.col("_anchor") if inclusive else F.col("_d") < F.col("_anchor")
-    )
-    cond = before
+    row_date, anchor_date = F.col("_d"), F.col("_anchor")
+    cond = row_date <= anchor_date if inclusive else row_date < anchor_date
     if max_age_months is not None:
-        cond = cond & (F.col("_d") >= window_start(max_age_months, F.col("_anchor")))
+        cond = cond & (row_date >= window_start(max_age_months, anchor_date))
     latest = F.max(F.struct("_d", *value_cols))
     return (
         base.select(*GRAIN, key, anchor.alias("_anchor"))

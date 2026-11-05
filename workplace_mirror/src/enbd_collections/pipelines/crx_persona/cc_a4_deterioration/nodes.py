@@ -46,9 +46,7 @@ def _restructure_blind_spot(history: DataFrame) -> DataFrame:
 
 
 def build_cc_dpd_sequences(
-    crx_cc_full_history: DataFrame,
-    crx_persona: dict,
-    model_id: str,
+    crx_cc_full_history: DataFrame, crx_persona: dict, model_id: str
 ) -> DataFrame:
     """One row per CC account: gap-filled monthly bucket array (from the history floor
     to persona_end_date) + audit columns + restructure_blind_spot_flag (1 if the

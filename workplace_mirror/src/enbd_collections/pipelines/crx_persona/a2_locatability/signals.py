@@ -99,10 +99,8 @@ def _latest_evidence(obs: DataFrame, location_features: DataFrame) -> DataFrame:
 def _location_rule(window: int) -> Column:
     """The first of the rules L1–L4 that fires (see ``build_location_signals``);
     ``window`` is W in months."""
-    uae, foreign, travel = (
-        F.col("last_uae_date"),
-        F.col("last_foreign_date"),
-        F.col("last_travel_date"),
+    uae, foreign, travel = map(
+        F.col, ("last_uae_date", "last_foreign_date", "last_travel_date")
     )
     obs_date = F.col("observation_date")
     return (
