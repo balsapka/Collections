@@ -27,3 +27,6 @@ D-1-10 | Revert S4-09 (A4 wrapper steps `_original_loan_months`, `_restructure_b
 D-1-11 | Revert S2-06 (CC A4 restructure flag as one aggregate) | gate 2: `cc_a4_deterioration/nodes.py` gains a ruff finding (E501, new 89-char comment); re-submit in round 2 | Master (gate) | S2-06
 
 D-1-12 | S4-05 keeps S2-05's pruning: `_distress_events` takes `since`; S4-09's CC part had been re-based onto S2-06 before both were reverted | earlier stage wins; intent of both kept | Master (merge) | S4-05, S2-05
+
+D-2-1 | Round 2 runs specialists sequentially, each editing the branch directly and committing after the gates, in stage order S1 → S3 → S2 → S4 → S5; no merge agent | items are small and overlap in files; saves the merge pass and avoids parallel Spark load | Master | —
+D-2-2 | A1 gets structure only in round 2 (Scorecard rewrite, FAMILIES table, label constants); no line-level polish of A1 rules (A1 redesign in flight) | axis stability (user, 2026-11-05) | Master | R-O triage A1 items
