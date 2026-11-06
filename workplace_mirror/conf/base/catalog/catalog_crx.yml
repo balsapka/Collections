@@ -264,15 +264,6 @@ crx_rl_a4_spine:
   save_args:
     mode: overwrite
 
-# TEMPORARY (refactor bundle R-A): the spine rebuilt by the R-A check pipeline.
-# Remove the entry, the pipeline and its HDFS folder after the check.
-crx_rl_a4_spine_ra_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_spine_ra_check"
-  save_args:
-    mode: overwrite
-
 # ── RL A4 deterioration: DPD journey (one shuffle + per-account Python engine) ──
 # Built from crx_rl_full_history by the shared crx_persona/_dpd_journey/ package
 # (RL scheme; CC uses the same package with its own scheme).
