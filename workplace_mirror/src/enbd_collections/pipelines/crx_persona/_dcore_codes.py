@@ -163,28 +163,25 @@ DECEASED = frozenset(
     }
 )
 
-# Explicit refusal signals – result names where confirmed right-party contact was
-# made but the customer explicitly refused, hung up, or disputed.
-# Subset of RIGHT_PARTY_CONTACT (every entry here also confirms contact).
-# Excludes settlement-seeking behaviour (engagement) and autodialler intermediates.
-#
-# Drives refusing_n counter → non_cooperative state (confirmed contact + refusal).
-#
-# Matching must normalise the source column first:
-#   result_name_upper = F.upper(F.trim(F.col("result_name")))
-#   result_name_upper.isin(REFUSING)
-#
-# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
-REFUSING = {
-    "CUSTOMER HUNG UP",
-    "CUSTOMER MISBEHAVED",
-    "CUSTOMER_HUNG_UP",
-    "DISPUTE",
-    "KSA/DISPUTE",
+# A3 (D-A3-20): explicit refusal, the stated-intent negative. Every name below also
+# confirms right-party contact (RIGHT_PARTY_CONTACT). Values upper-cased and trimmed.
+REFUSAL = {
     "KSA/REFUSE TO PAY",
     "REFUSE TO PAY",
     "REFUSED TO PAY",
     "REWRITE NOT AGREED",
+}
+
+# A3 diagnostic column only: a contested debt is not unwillingness to pay.
+DISPUTE = {
+    "DISPUTE",
+    "KSA/DISPUTE",
+}
+
+# A3 avoidance diagnostic (D-A3-19): hang-up as the latest right-party contact.
+HUNG_UP = {
+    "CUSTOMER HUNG UP",
+    "CUSTOMER_HUNG_UP",
 }
 
 # Ringing no-answer signals – phone rang at the customer end but was not answered.

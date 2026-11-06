@@ -193,18 +193,31 @@ crx_cc_a1_ability:
   save_args:
     mode: overwrite
 
-# ── A3 Payment Credibility (T27) ────────────────────────────────────────────
-# Grain: (account_id, spell_id). observation_date = coalesce(spell_end, current_date()).
-# a3_state_v1 ∈ {payment_credibility_high, payment_credibility_moderate,
-#               payment_credibility_low, payment_credibility_unknown}
-# Schema guards on dcore_feat_ptp and dcore_feat_settlement — if either is empty
-# or missing required columns, commitment signals emit NULL and state falls through
-# to payment_credibility_unknown.
+# ── CC A3 Payment Credibility (shared a3_credibility engine) ──────────────────
+# Grain: (account_id, observation_date), month ends, persona months (crx_cc_obs_base).
+# a3_state ∈ {payment_credibility_high, payment_credibility_moderate,
+#             payment_credibility_low, payment_credibility_unknown}.
+# crx_cc_a3_episode: the episode anchor from A4; crx_cc_a3_instalments: the DCORE promise
+# instalments of the base's accounts. Spec: workplace_mirror/specs/A3_credibility_spec.md.
 
 crx_cc_a3_commitment_signals:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_commitment_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_episode:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_episode"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_instalments:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_instalments"
   save_args:
     mode: overwrite
 
@@ -399,9 +412,8 @@ crx_rl_a2_locatability:
   save_args:
     mode: overwrite
 
-# ── RL A3 Payment Credibility (RL-A3-1) ─────────────────────────────────────
-# Node 1 intermediate: DCORE commitment signals, 24m partition floor applied to
-# dcore_prm_followup_outcomes. Schema matches crx_cc_a3_commitment_signals.
+# ── RL A3 Payment Credibility (shared a3_credibility engine) ──────────────────
+# Grain and states as CC (crx_rl_obs_base).
 crx_rl_a3_commitment_signals:
   type: spark.SparkDataset
   file_format: parquet
@@ -409,10 +421,20 @@ crx_rl_a3_commitment_signals:
   save_args:
     mode: overwrite
 
-# Node 2: shipped A3 payment credibility axis. Grain: (account_id, observation_date).
-# a3_state_v1 ∈ {payment_credibility_high, payment_credibility_moderate,
-# payment_credibility_low, payment_credibility_unknown}.
-# Produced by build_a3_payment_credibility (CC function imported directly — domain-agnostic).
+crx_rl_a3_episode:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_episode"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_instalments:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_instalments"
+  save_args:
+    mode: overwrite
+
 crx_rl_a3_payment_credibility:
   type: spark.SparkDataset
   file_format: parquet
@@ -489,5 +511,35 @@ crx_rl_a1_ability_rf_check:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_rf_check"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (A3 bundle): the new A3 on the latest month, both judges (the A3 check).
+# Remove these entries, check.py, the check pipelines and the HDFS folders after the check.
+crx_cc_a3_check_payments:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_check_payments"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_check_dcore:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_check_dcore"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_check_payments:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_check_payments"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_check_dcore:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_check_dcore"
   save_args:
     mode: overwrite

@@ -1,49 +1,21 @@
-"""T04c — CRX CC Raw Extract nodes.
+"""CRX CC raw extract nodes: window-scoped Way4 extracts for A3.
 
 # pylint: disable=too-many-locals
-# Rationale: build functions, each with per-account window scoping and schema
-# derivations. Logic is self-contained within each function.
 
-Five build functions:
-
-    build_cc_acct_windows : shared per-account [acct_start, acct_end] window,
-                            forward edge anchored to cc_spine — computed once
-                            here instead of independently inside each of the
-                            three consumers below (same cc_spine/
-                            crx_cc_spell_table groupBy was previously
-                            recomputed 3x per pipeline run).
-    build_cc_transactions : window-scoped transaction history with enriched schema
-                            (replaces _load_t0_scoped_transactions + prm_cc
-                            derivations; consumed by T04b, T05, T06, A3 Dimension B/C)
-    build_cc_limits       : T0-scoped credit-limit snapshots pivoted by type_code
-                            (replaces prm_limit; consumed by T05)
-    build_cc_balance      : window-scoped minimum_due/stmt_balance/total_due billing
-                            history (replaces _load_t0_scoped_balance; consumed by
-                            T04b, A3 Dimension B/C)
+    build_cc_acct_windows : per-account [acct_start, acct_end] window from the A3
+                            episode anchor (A4) and the observation rows; persisted
+                            once, read by the three extracts below.
+    build_cc_transactions : window-scoped transaction history with the prm_cc
+                            derivations (A3 payments).
+    build_cc_limits       : credit-limit snapshots pivoted by type_code, on its own
+                            spell-table window (no persona reader at present).
+    build_cc_balance      : window-scoped minimum_due / overdue buckets / total_due
+                            (A3 dues).
     build_cc_billing      : window-scoped billing-cycle header (billing_date, due_date,
-                            next_billing_date, dlq_level_m) — new, consumed by A3
-                            Dimension B/C.
-
-build_cc_transactions, build_cc_balance and build_cc_billing all consume
-build_cc_acct_windows' output (crx_cc_acct_windows):
-    acct_start = add_months(trunc(min(t0), 'month'), -12)
-    acct_end   = max(cc_spine.observation_date) for that account, falling back to
-                 trunc(max(t0), 'month') when the account has no cc_spine rows.
-computed over non-censored spells in crx_cc_spell_table; spine accounts without one
-get acct_start = max(params:cc_a3_history_floor_date, min spine obs - 12 months) so A3
-has payment cycles for them too (see build_cc_acct_windows). The forward edge is anchored
-to cc_spine (not t0) so post-T0 observation dates are retained — needed for A3
-Dimension B ("payments in delinquency"), which looks at the window after onset.
-This can only add rows relative to the old trunc(max(t0),'month') bound, since
-cc_spine.observation_date is always >= t0 for an active account — pre-T0 rows and
-values are unaffected.
-
-build_cc_limits keeps the original T0-anchored (no post-T0) window — it is not
-needed past onset by any current consumer, so it computes its own window inline
-rather than consuming crx_cc_acct_windows.
+                            next_billing_date) (A3 cycles).
 
 Quality filter (transactions + limits): primary_entry_idt != 0, org == 100.
-Type cast: contract_idt (double → long) at the DDI raw boundary.
+Type cast: contract_idt (double -> long) at the DDI raw boundary.
 """
 
 from pyspark.sql import DataFrame, Window
@@ -58,6 +30,7 @@ from enbd_collections.nodes.utils.config import (
     POST_BLOCK_X_SENTINEL_DATE,
     TXN_CATEGORIES,
 )
+from enbd_collections.pipelines.crx_persona._dpd_journey.anchor import episode_start
 from enbd_collections.pipelines.crx_persona.cc_raw_extract._window_utils import (
     prune_by_edp_load_date,
     scope_to_acct_window,
@@ -65,69 +38,47 @@ from enbd_collections.pipelines.crx_persona.cc_raw_extract._window_utils import 
 
 
 def build_cc_acct_windows(
-    crx_cc_spell_table: DataFrame,
-    cc_spine: DataFrame,
-    history_floor_date: str = None,
+    crx_cc_obs_base: DataFrame,
+    crx_cc_a4_deterioration: DataFrame,
+    history_floor_date: str,
 ) -> DataFrame:
-    """Shared per-account [acct_start, acct_end] window, forward edge anchored to cc_spine.
+    """Shared per-account [acct_start, acct_end] window for the A3 extracts.
 
-    Accounts with a non-censored spell (unchanged from the original T0-only window):
-    acct_start = add_months(trunc(min(t0), 'month'), -12).
-    acct_end   = max(cc_spine.observation_date) for the account; falls back to
-    trunc(max(t0), 'month') when the account has no cc_spine rows, so the window
-    never shrinks relative to the pre-widening behaviour.
-
-    Spine-only accounts (no non-censored spell: first billing row already delinquent,
-    ~60% of the 180+ stock) also get a window, so A3 Dimension B has payment cycles for
-    them. acct_start = add_months(trunc(min(cc_spine.observation_date), 'month'), -12),
-    never earlier than history_floor_date (params:cc_a3_history_floor_date) when set;
-    acct_end = max(cc_spine.observation_date). These windows lie inside the raw-scan
-    bound set by the spell accounts, and the other consumers of the extract
-    (payment_trajectory, utilisation, departure_signature) reach it only through
-    non-censored spells, so the added accounts do not change their results.
+    acct_start covers 12 months plus one cycle before the earliest episode start the
+    account's observation rows have (A3 Dimension C, D-A3-2), and at least 13 months
+    before its first observation (A3 Dimensions A and B); never before
+    history_floor_date minus 35 days (the statement just before the floor).
+    acct_end = the account's last observation date.
 
     Persisted once and consumed by build_cc_transactions, build_cc_balance and
-    build_cc_billing — avoids recomputing the same crx_cc_spell_table/cc_spine
-    aggregation three times per pipeline run.
+    build_cc_billing.
 
     Args:
-        crx_cc_spell_table: Required cols: account_id, t0, t0_censored_flag.
-        cc_spine: Required cols: contract_id, observation_date.
-        history_floor_date: ISO date or None. Lower bound for spine-only accounts.
+        crx_cc_obs_base: account_id, observation_date, cif_id.
+        crx_cc_a4_deterioration: the A4 rows the episode anchor is read from.
+        history_floor_date: ISO date (params:cc_a3_history_floor_date).
 
     Returns:
         DataFrame with columns (account_id, acct_start, acct_end).
     """
-    spell_windows = (
-        crx_cc_spell_table.filter(F.col("t0_censored_flag") == 0)
+    episodes = episode_start(crx_cc_obs_base, crx_cc_a4_deterioration)
+    first = (
+        crx_cc_obs_base.join(
+            episodes, on=["account_id", "observation_date"], how="left"
+        )
         .groupBy("account_id")
         .agg(
-            F.add_months(F.trunc(F.min("t0"), "month"), -12).alias("_spell_start"),
-            F.trunc(F.max("t0"), "month").alias("_acct_end_fallback"),
+            F.least(
+                F.min("episode_start"), F.trunc(F.min("observation_date"), "month")
+            ).alias("_first"),
+            F.max("observation_date").alias("acct_end"),
         )
     )
-
-    spine_windows = cc_spine.groupBy(F.col("contract_id").alias("account_id")).agg(
-        F.add_months(F.trunc(F.min("observation_date"), "month"), -12).alias(
-            "_spine_start"
-        ),
-        F.max("observation_date").alias("_spine_max_obs"),
-    )
-
-    spine_only_start = F.col("_spine_start")
-    if history_floor_date:
-        spine_only_start = F.greatest(
-            F.lit(str(history_floor_date)).cast(DateType()), spine_only_start
-        )
-
-    return (
-        spell_windows.join(spine_windows, on="account_id", how="full_outer")
-        .withColumn("acct_start", F.coalesce(F.col("_spell_start"), spine_only_start))
-        .withColumn(
-            "acct_end",
-            F.coalesce(F.col("_spine_max_obs"), F.col("_acct_end_fallback")),
-        )
-        .select("account_id", "acct_start", "acct_end")
+    floor = F.date_sub(F.lit(str(history_floor_date)).cast(DateType()), 35)
+    return first.select(
+        "account_id",
+        F.greatest(F.add_months(F.col("_first"), -13), floor).alias("acct_start"),
+        "acct_end",
     )
 
 
@@ -144,9 +95,7 @@ def build_cc_transactions(
 ) -> DataFrame:
     """Extract window-scoped CC transaction history with enriched schema.
 
-    Scope: per-account window from crx_cc_acct_windows (build_cc_acct_windows) —
-    see module docstring for why the forward edge is cc_spine-anchored rather
-    than T0-anchored.
+    Scope: per-account window from crx_cc_acct_windows (build_cc_acct_windows).
     Partition pruning: raw_transaction is filtered on edp_load_date — the actual
     Hive partition column — to the global [min(acct_start), max(acct_end)] bound
     (computed from crx_cc_acct_windows) widened by +/-EDP_LOAD_DATE_BUFFER_MONTHS

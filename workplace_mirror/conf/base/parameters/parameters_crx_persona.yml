@@ -20,61 +20,19 @@ crx_persona: "${globals:crx_persona}"
 # as crx_persona above.
 model_id: "${globals:model_id}"
 
-# A3 payment credibility - which payment-evidence method SHIPS for each
-# dimension. All methods are always computed; this only picks the shipped one.
-# The others stay as shadow columns (a3_*_<method>) for cross-checking.
-
-# Dimension B (payments while delinquent). "Some" vs "none" (and the refusal /
-# no_response strong negatives) look back 12 months at 180+ DPD (3 months at 61-180);
-# "regular" keeps 3 months (61-180) / 6 months (180+). Options for what counts:
-#   "single_payment_cycle_count" (default) - counts cycles where ONE payment >= 100%
-#                                of that cycle's due_amount_m; 2+ of 3 months
-#                                (61-180 DPD) or 3+ of 6 months (180+ DPD) =
-#                                regular. A lumpsum counts once.
-#   "payment_sum_waterfall"    - old method: payments summed and walked down
-#                                the overdue buckets; one lumpsum can clear
-#                                several months
-#   "dpd_bucket_movement"      - infers it from DPD-bucket improvement between
-#                                consecutive billing cycles
-a3_dlq_payment_evidence_method: "single_payment_cycle_count"
-
-# Dimension C (payments before delinquency). Options:
-#   "single_payment_cycle_count" (default) - counts months where that month's
-#                                payment >= 100% of its due amount (no summing
-#                                across months, no waterfall)
-#   "dpd_bucket_movement"      - infers it from DPD-bucket movement between
-#                                consecutive billing cycles
-a3_pre_dlq_payment_evidence_method: "single_payment_cycle_count"
-
-# Retail Loans (RL) A3 payment credibility - same idea as the two keys above,
-# but separate keys so a CC config change never moves RL. All approaches are
-# always computed; these only pick the shipped one.
-
-# RL Dimension B (payments while delinquent). Same windows as CC: "some"/"none" and the
-# strong negatives look back 12 months in the 180+ band (3 months otherwise); "regular"
-# keeps 3 / 6 months. Options for what counts:
-#   "single_payment_cycle_count" (default) - counts months where the month's cash
-#                                (total_paid) >= 100% of its EMI; 2+ of 3 months
-#                                (61-180 DPD band) or 3+ of 6 months (180+) =
-#                                regular. A large payment counts once.
-#   "payment_sum_waterfall"    - floor(sum of the window's cash / EMI); one large
-#                                payment can credit several months (a division,
-#                                RL has no bucket walk)
-#   "dpd_bucket_movement"      - infers it from month-over-month bucket movement
-rl_a3_dlq_payment_evidence_method: "single_payment_cycle_count"
-
-# RL Dimension C (payments before delinquency). Options:
-#   "single_payment_cycle_count" (default) - counts months where the month's cash >= 100%
-#                                of its EMI
-#   "dpd_bucket_movement"      - month counts as paid when its own month-end bucket
-#                                is 0
-rl_a3_pre_dlq_payment_evidence_method: "single_payment_cycle_count"
+# A3 payment credibility - who decides that a promise instalment was kept (TEMPORARY,
+# until the choice is made from the bundle check; then this key and the losing option go):
+#   "payments" - the payments since the plan start reach the cumulative due by the grace
+#                cutoff (CC: the first statement on or after the due date; RL: the end
+#                of the next month)
+#   "dcore"    - DCORE's own paid / overdue flags (paid amount >= due amount)
+a3_kept_by: "payments"
 
 # CC A3 payment credibility - earliest billing date A3 reads (TEMPORARY).
 # Billing has no rows 2021-01..2023-12 (balance/transaction: 2019-2021), so history
-# before this date is not used by Dimension B or C, and the raw extract gives every
-# spine account a window starting here (crx_cc_acct_windows). Set to null once the
+# before this date is not used by A3, and the raw extract windows never start more than
+# 35 days before it (crx_cc_acct_windows). Set to null once the
 # source backfill lands. Separate from A4's dpd_journey.cc_history_floor_date, so
-# relaxing A4's floor for the 180+ vintage never moves A3. The spell table and
-# crx_cc_full_history are NOT floored (other pipelines read them).
+# relaxing A4's floor for the 180+ vintage never moves A3. crx_cc_full_history is NOT
+# floored (A4 reads it).
 cc_a3_history_floor_date: "2024-01-01"
