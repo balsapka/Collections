@@ -83,6 +83,9 @@ from enbd_collections.pipelines.crx_persona import (
     cc_a1_ability as crx_cc_a1_ability,
 )
 from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
+
+# TEMPORARY (refactor bundle R-B): zero-difference checks.
+from enbd_collections.pipelines.crx_persona import rf_check as crx_rf_check
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
 )
@@ -232,6 +235,13 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         # TEMPORARY (refactor bundle R-A): spine check; removed by the bundle's cleanup.
         "crx_rl_a4_spine_ra_check": crx_rl_a4_spine.create_ra_check_pipeline(),
+        # TEMPORARY (refactor bundle R-B): zero-difference checks; removed by the cleanup.
+        "crx_cc_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("cc"),
+        "crx_cc_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("cc"),
+        "crx_cc_a1_rf_check": crx_rf_check.create_a1_rf_check_pipeline("cc"),
+        "crx_rl_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("rl"),
+        "crx_rl_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("rl"),
+        "crx_rl_a1_rf_check": crx_rf_check.create_a1_rf_check_pipeline("rl"),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
