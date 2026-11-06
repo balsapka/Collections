@@ -7,16 +7,11 @@ decoupled from any A4 classifier, scoped by crx_rl_a4_deterioration instead.
 
 Run with:
     kedro run --pipeline=crx_rl_a4_spine
-
-TEMPORARY (refactor bundle R-A): ``create_ra_check_pipeline`` rebuilds the spine into
-``crx_rl_a4_spine_ra_check`` and compares it with ``crx_rl_a4_spine``; removed by the
-bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
 
 from .nodes import build_rl_depart_spine
-from .ra_check import compare_rl_a4_spine
 
 _TAGS = ["crx", "rl", "rl_a4_spine"]
 
@@ -38,24 +33,3 @@ def _spine_node(output: str) -> node:
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     """One-node pipeline: rl_spine + crx_rl_spell_table -> crx_rl_a4_spine."""
     return Pipeline([_spine_node("crx_rl_a4_spine")], tags=["crx_persona"])
-
-
-def create_ra_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the spine into crx_rl_a4_spine_ra_check, then old vs new (bundle R-A)."""
-    return Pipeline(
-        [
-            _spine_node("crx_rl_a4_spine_ra_check"),
-            node(
-                func=compare_rl_a4_spine,
-                inputs={
-                    "old": "crx_rl_a4_spine",
-                    "new": "crx_rl_a4_spine_ra_check",
-                    "model_id": "params:model_id",
-                },
-                outputs=None,
-                name="compare_crx_rl_a4_spine_ra",
-                tags=_TAGS,
-            ),
-        ],
-        tags=["crx_persona"],
-    )

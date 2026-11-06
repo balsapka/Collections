@@ -4,6 +4,6 @@ Inputs: rl_spine, crx_rl_spell_table
 Output: crx_rl_a4_spine
 """
 
-from .pipeline import create_pipeline, create_ra_check_pipeline
+from .pipeline import create_pipeline
 
-__all__ = ["create_pipeline", "create_ra_check_pipeline"]
+__all__ = ["create_pipeline"]

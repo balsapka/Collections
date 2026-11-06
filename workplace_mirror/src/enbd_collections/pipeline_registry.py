@@ -233,8 +233,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
-        # TEMPORARY (refactor bundle R-A): spine check; removed by the bundle's cleanup.
-        "crx_rl_a4_spine_ra_check": crx_rl_a4_spine.create_ra_check_pipeline(),
         # TEMPORARY (refactor bundle R-B): zero-difference checks; removed by the cleanup.
         "crx_cc_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("cc"),
         "crx_cc_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("cc"),
