@@ -11,14 +11,10 @@ Requires crx_rl_full_history (RL-B1) to already be materialized.
 
 Run with:
     kedro run --pipeline=crx_rl_a4_deterioration
-
-TEMPORARY (mirror bundle 13): create_b13_check_pipeline writes the new state to temporary
-entries and logs old vs new; removed by the bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
 
-from .b13_check import compare_rl_a4_outputs
 from .nodes import (
     build_rl_a4_deterioration,
     build_rl_dpd_sequences,
@@ -97,34 +93,6 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
             _sequences_node("crx_rl_dpd_sequences"),
             _linked_sequences_node(),
             _state_node("crx_rl_dpd_sequences", "crx_rl_a4_deterioration"),
-        ],
-        tags=["crx_persona"],
-    )
-
-
-def create_b13_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the new RL A4 into temporary entries, then old vs new (bundle 13)."""
-    return Pipeline(
-        [
-            _linked_node(),
-            _sequences_node("crx_rl_dpd_sequences_b13_check"),
-            _linked_sequences_node(),
-            _state_node(
-                "crx_rl_dpd_sequences_b13_check", "crx_rl_a4_deterioration_b13_check"
-            ),
-            node(
-                func=compare_rl_a4_outputs,
-                inputs=[
-                    "crx_rl_a4_deterioration",
-                    "crx_rl_a4_deterioration_b13_check",
-                    "feature_retail_loans",
-                    "rl_spine",
-                    "params:model_id",
-                ],
-                outputs=None,
-                name="compare_rl_a4_outputs",
-                tags=["crx", "rl", "rl_a4_deterioration"],
-            ),
         ],
         tags=["crx_persona"],
     )

@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from pyspark.sql import SparkSession  # noqa: E402
 
 from enbd_collections.pipelines.crx_persona.rl_a4_deterioration import (  # noqa: E402
-    create_b13_check_pipeline,
     create_pipeline,
 )
 from enbd_collections.pipelines.crx_persona.rl_a4_deterioration.chains import (  # noqa: E402
@@ -150,7 +149,6 @@ def check_nodes(spark: SparkSession) -> None:
 def main() -> None:
     check_chains()
     assert len(create_pipeline().nodes) == 4
-    assert len(create_b13_check_pipeline().nodes) == 5
     spark = (
         SparkSession.builder.master("local[2]")
         .config("spark.ui.enabled", "false")

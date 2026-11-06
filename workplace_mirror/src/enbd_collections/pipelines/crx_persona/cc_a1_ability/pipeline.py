@@ -5,15 +5,11 @@ Needs, for the model_id (cc_60_180 / cc_180_plus): ``crx_cc_obs_base``,
 ``casa_primary``, ``casa_features``, ``bureau_salary_bounces`` and ``location_features``.
 
     kedro run --pipeline=crx_cc_a1_ability
-
-TEMPORARY (mirror bundle 14): ``create_b14_check_pipeline`` — see
-``a1_ability/pipeline.py``.
 """
 
 from kedro.pipeline import Pipeline, node
 
 from ..a1_ability.pipeline import TAGS, create_a1_pipeline
-from ..a1_ability.pipeline import create_b14_check_pipeline as _b14_check
 from .nodes import build_cc_liquidity_anchor
 
 _ANCHOR = node(
@@ -34,8 +30,3 @@ def create_pipeline(  # pylint: disable=unused-argument
 ) -> Pipeline:
     """The CC A1 axis written to ``output``."""
     return create_a1_pipeline("cc", output, _ANCHOR)
-
-
-def create_b14_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the CC A1 check (bundle 14)."""
-    return _b14_check("cc", _ANCHOR)
