@@ -35,7 +35,7 @@ Nothing is dropped silently: every account in the history gets a sequences row w
 `build_status`; the classifier keeps only status 'ok' and the segment's current buckets.
 
 Package layout (readability split of the former flat _dpd_journey.py; no behavior change):
-    constants.py  BucketScheme, CC, RL, SEGMENTS, MODEL_ID_SEGMENT
+    constants.py  BucketScheme, CC, RL, MODEL_ID_SEGMENT
     params.py     PARAM_DEFAULTS, JourneyParams, journey_params()
     _dates.py     _month_idx, _month_label, _month_col — shared by spark.py and logging.py
                   so those two never need to import each other
@@ -54,7 +54,7 @@ from __future__ import annotations
 # module's name, so every caller/test import keeps working unchanged.
 # pylint: disable=unused-import
 from ._dates import _month_idx, _month_label
-from .constants import CC, MODEL_ID_SEGMENT, RL, SEGMENTS, BucketScheme
+from .constants import CC, MODEL_ID_SEGMENT, RL, BucketScheme
 from .core import (
     H,
     N,

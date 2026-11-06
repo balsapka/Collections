@@ -13,7 +13,8 @@
 
 # -- T04c: T0-scoped CC raw DDI intermediates ----------------------------------
 # Grain: (contract_id, observation_date) — one row per account per date.
-# Built by crx_cc_raw_extract pipeline (T04c). Consumed by T04b, T05, T06.
+# Built by the crx_cc_raw_extract pipeline; the CC A3 pipeline reads crx_cc_transactions
+# and crx_cc_balance.
 # Replaces prm_transaction / prm_limit / prm_balance primary-layer inputs,
 # which are spine-scoped and lack history for cc_180_plus T0 windows.
 crx_cc_transactions:
@@ -87,157 +88,6 @@ crx_cc_a4_deterioration:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a4_deterioration"
-  save_args:
-    mode: overwrite
-
-# -- T04: CC Payment & Balance Trajectory Features ---------------------------
-# Grain: (account_id, spell_id). One row per delinquency spell.
-# All features anchored to T0 (from crx_cc_spell_table).
-# W12 = [T0-365d, T0); H1 = older 9m; H2 = recent 3m.
-# Blocked features (FILL-IN): min_pay_share_w12, months_since_full_pay_t0.
-crx_cc_payment_trajectory:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_payment_trajectory"
-  save_args:
-    mode: overwrite
-
-# -- T05: CC Utilisation, Spend & Liquidity Features ------------------------
-# Grain: (account_id, spell_id). One row per delinquency spell.
-# All features anchored to T0 (from crx_cc_spell_table).
-# W_pre truncation columns carried from crx_cc_payment_trajectory (T04b).
-# Pass A: util_mean_h1/h2, util_t0, util_slope, util_accel (from prm_limit).
-# Pass B: cash_adv_ramp, cash_adv_amt_share_h2, spend_taper_ratio,
-#         spend_cliff_flag, spend_active_days_share_h2, txn_cnt_slope
-#         (from prm_transaction).
-crx_cc_utilisation_features:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_utilisation_features"
-  save_args:
-    mode: overwrite
-
-# -- T06: CC Departure Signature & History Shape Features -------------------
-# Grain: (account_id, spell_id). One row per delinquency spell.
-# All features anchored to T0 (from crx_cc_spell_table).
-# Pass A: travel_mcc_flag_h2, foreign_txn_share_h2, last_txn_foreign_flag
-#         (from prm_transaction; MCC codes 3000-3299, 4511, 4722)
-# Pass B: casa_inflow_stop_gap_d, eosb_like_flag
-#         (from comp_financial_tran_repos_dly; R20 scoped; schema-guarded)
-# Pass C: prior_spell_cnt_24m, months_since_prior_spell, roll_speed_30/60_d
-#         (from crx_cc_spell_table self-window; free reads)
-# Pass D: tenure_at_t0_m, fee_velocity_life, fee_velocity_ratio_h2
-#         (from prm_contract SCD2 + prm_turnovers PIT joins)
-# Pass E: aecb_leverage_slope (OLS over int_bureau_pull_monthly [M0-24, M0))
-# Pass F: relationship_breadth (from feat_product_holding PIT join)
-# Always-NULL: foreign_login_flag (no geo login data), cross_prod_t0_gap_d,
-#              simultaneous_default_flag (both blocked on T25)
-
-# -- T06 intermediates: modular pass checkpoints ------------------------------
-# Each intermediate corresponds to one Kedro node. Re-run a single pass with:
-#   kedro run --pipeline=crx_cc_departure_signature --from-nodes=build_crx_departure_pass_k
-crx_cc_departure_spell_base:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_spell_base"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_contract_cif:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_contract_cif"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_a:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_a"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_b:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_b"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_c:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_c"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_d:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_d"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_e:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_e"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_f:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_f"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_g:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_g"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_h:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_h"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_h2:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_h2"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_i:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_i"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_j:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_j"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_pass_k:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_pass_k"
-  save_args:
-    mode: overwrite
-
-crx_cc_departure_signature:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_departure_signature"
   save_args:
     mode: overwrite
 
@@ -394,9 +244,7 @@ crx_rl_spell_table:
 
 # Spine-grain structural projection (windowed to persona_start_date / persona_end_date).
 # Grain: (account_id, observation_date). Carries cif_id, spell_id, t0 (sourced from
-# crx_rl_spell_table) — no classification columns. Built by rl_a4_spine pipeline,
-# which reuses rl_departure_signature's build_rl_depart_spine (R14) so
-# rl_a1_ability/rl_a2_locatability/rl_a3_payment_credibility need no changes.
+# crx_rl_spell_table) — no classification columns. Built by the rl_a4_spine pipeline.
 # Filter point per TASKS_RL.md.
 crx_rl_a4_spine:
   type: spark.SparkDataset
@@ -502,36 +350,6 @@ crx_rl_a1_ability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability"
-  save_args:
-    mode: overwrite
-
-# ── RL Departure Signature (RL-A2-2) ───────────────────────────────────────
-
-# Node 1: travel MCC hits from comp_financial_tran_repos_dly H2 window.
-# Grain: (account_id, observation_date). Null = no H2 debit transactions.
-crx_rl_depart_travel_mcc:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_depart_travel_mcc"
-  save_args:
-    mode: overwrite
-
-# Node 2: FX leakage (last_txn_foreign_flag) + digital login (foreign_login_flag).
-# Grain: (account_id, observation_date).
-crx_rl_depart_foreign_signals:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_depart_foreign_signals"
-  save_args:
-    mode: overwrite
-
-# Shipped RL departure signature — all 4 departure-trail signals at obs-date grain.
-# Grain: (account_id, observation_date). Consumed by the RL A1 waterfall.
-# travel_mcc_flag_h2/foreign_login_flag coalesced to 0; casa_inflow_stop_gap_d may be NULL.
-crx_rl_departure_signature:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_departure_signature"
   save_args:
     mode: overwrite
 
