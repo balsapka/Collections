@@ -1,6 +1,6 @@
 # Mirror bundle 16 — Refactor R-B — shared layer, A4, A2 and A1 refactored (no output change, zero-difference checks)
 
-apply_bundle version: 7 · built 2026-11-06 from `7bdba03..611b23c` · source: 2 added, 30 replaced, 0 deleted · helpers: 0
+apply_bundle version: 7 · built 2026-11-06 from `5bb2b39..20cd588` · source: 2 added, 30 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -166,7 +166,7 @@ assistant in UAT.
 ## Files
 
 ### FILE: `conf/base/catalog/catalog_crx.yml`
-action: replace · base sha256 `ba11c14cedca684fcf059a49af8dad836833ffd6be4defc62c3b0aee9c5c886f` · base trailing newline: yes · new sha256 `e18964a6fb14fa407109ec96b1c22b6246f215d8bc4a684079b0b8a692e5402b` · new trailing newline: yes
+action: replace · base sha256 `95d4e7078f5efe4fad409baed6267c273ca0307f5c66d1016ff554921235ebe4` · base trailing newline: yes · new sha256 `3b408aaccf18990a01815ea878c0ddbcc25bd519b7e0219ef75c1d46c7bfa8ed` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -423,15 +423,6 @@ crx_rl_a4_spine:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_spine"
-  save_args:
-    mode: overwrite
-
-# TEMPORARY (refactor bundle R-A): the spine rebuilt by the R-A check pipeline.
-# Remove the entry, the pipeline and its HDFS folder after the check.
-crx_rl_a4_spine_ra_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_spine_ra_check"
   save_args:
     mode: overwrite
 
@@ -856,15 +847,6 @@ crx_rl_a4_spine:
   save_args:
     mode: overwrite
 
-# TEMPORARY (refactor bundle R-A): the spine rebuilt by the R-A check pipeline.
-# Remove the entry, the pipeline and its HDFS folder after the check.
-crx_rl_a4_spine_ra_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_spine_ra_check"
-  save_args:
-    mode: overwrite
-
 # ── RL A4 deterioration: DPD journey (one shuffle + per-account Python engine) ──
 # Built from crx_rl_full_history by the shared crx_persona/_dpd_journey/ package
 # (RL scheme; CC uses the same package with its own scheme).
@@ -1099,7 +1081,7 @@ crx_rl_a1_ability_rf_check:
 `````
 
 ### FILE: `src/enbd_collections/pipeline_registry.py`
-action: replace · base sha256 `91b45276a70a044eb43afb0b435b31c91cfd10289bd515156b8f9387c393c305` · base trailing newline: yes · new sha256 `1edce01c80ff19cb0616abbe4e79104d427558f41d751c4cc570475c56642c25` · new trailing newline: yes
+action: replace · base sha256 `8827cfc5dbee6c498c4b2efc9cc3326330dcaf28e741420d95370ae1dfb01624` · base trailing newline: yes · new sha256 `4b71caca3a3e89cf3f8678d5414152e9498a42c02f7ebddd4edf83cdb39bcb57` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -1334,8 +1316,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
-        # TEMPORARY (refactor bundle R-A): spine check; removed by the bundle's cleanup.
-        "crx_rl_a4_spine_ra_check": crx_rl_a4_spine.create_ra_check_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
@@ -1593,8 +1573,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
-        # TEMPORARY (refactor bundle R-A): spine check; removed by the bundle's cleanup.
-        "crx_rl_a4_spine_ra_check": crx_rl_a4_spine.create_ra_check_pipeline(),
         # TEMPORARY (refactor bundle R-B): zero-difference checks; removed by the cleanup.
         "crx_cc_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("cc"),
         "crx_cc_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("cc"),
