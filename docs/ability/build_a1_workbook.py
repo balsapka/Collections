@@ -4,8 +4,9 @@
 
 The rules follow ``workplace_mirror/specs/A1_ability_spec.md``. Every worked example is run
 through the reference rules below and the build FAILS if an example no longer gets the level
-or state it illustrates. Results are entry cells (pale yellow) from the bundle 12 check of
-31 Aug 2026 (cards and loans, 61–180 and 180+). Shares are formulas.
+or state it illustrates. Results are entry cells (pale yellow) for 31 Aug 2026: the 61–180 states
+and Unknown reasons from the bundle 14 check, everything else from the bundle 12 check (income
+and liquidity are unchanged by bundle 14; 180+ was not re-checked). Shares are formulas.
 """
 from __future__ import annotations
 
@@ -94,15 +95,17 @@ def chip(s: Sheet, col: int, tone: str, label: str | None = None, span: int = 1)
     return s.text(col, label or LABEL[tone], span=span, bold=True, color=ink, fill=fill, align=MID)
 
 
-# --- results (check of 31 Aug 2026, bundle 12) --------------------------------------------
+# --- results (31 Aug 2026: 61–180 states from the bundle 14 check, the rest bundle 12) -----
 RESULTS_DATE = "31 Aug 2026"
 BOOKS = ["Credit cards 61–180", "Retail loans 61–180", "Credit cards 180+", "Retail loans 180+"]
 TOTALS = (19292, 3985, 318663, 55371)  # accounts, in the order of BOOKS
 RL_PRODUCTS = ["Personal Loans", "Personal Cash Loans", "Auto"]
+STATE_TOTALS = {"61–180 DPD": (19292, 3985, 1397, 1224, 1364),
+                "180+ DPD": (318663, 55371, 33862, 10306, 11203)}
 STATE_BLOCKS = [  # (DPD, first row on the Results sheet, rows: state, cards, loans, loan products)
-    ("61–180 DPD", 6, [
-        ("high", 46, 10, 6, 3, 1), ("moderate", 2798, 362, 99, 138, 125),
-        ("low", 5688, 1835, 595, 604, 636), ("unknown", 10760, 1778, 697, 479, 602),
+    ("61–180 DPD", 6, [  # bundle 14 logged only Unknown by product
+        ("high", 45, 11, None, None, None), ("moderate", 2769, 354, None, None, None),
+        ("low", 5568, 1783, None, None, None), ("unknown", 10910, 1837, 705, 492, 640),
     ]),
     ("180+ DPD", 14, [
         ("high", 111, 17, 11, 3, 3), ("moderate", 19907, 1987, 748, 781, 458),
@@ -128,11 +131,6 @@ DETAIL = [  # counts in the order of BOOKS; None = does not apply
          848, 80, 4691, 430),
         ("Weak · window total not reached", "moderate", 923, 157, 5432, 798),
     ]),
-    ("The 25% rule (kept, to review with GRR; 'Validation'): Stable income with and without it", [
-        ("Stable income today", "high", 2996, 371, 21237, 1994),
-        ("Weak only because of the 25% rule (AECB in the window)", "moderate", 848, 80, 4691, 430),
-        ("Stable income if the rule were removed", "high", 3844, 451, 25928, 2424),
-    ]),
     ("Liquidity: the arm that fired", [
         ("Adequate · CASA balance (no external card payment)", "high", 142, 46, 583, 255),
         ("Adequate · with an external card payment (card or CASA arm)", "high", 54, 11, 72, 10),
@@ -141,14 +139,11 @@ DETAIL = [  # counts in the order of BOOKS; None = does not apply
         ("None · a card payment below AED 1,000", "unknown", 49, 14, 19, 9),
         ("None · no CASA balance or card payment", "unknown", 18705, 3609, 317226, 54671),
     ]),
-    ("Distress in the window", [
-        ("No distress", "moderate", 17609, 3260, 310349, 53383),
-        ("Bureau bounce only", "low", 490, 283, 4104, 636),
-        ("Cheque return only", "low", 449, 189, 1310, 415),
-        ("Direct-debit return only", "low", 596, 184, 2558, 796),
-        ("Two or more kinds", "low", 148, 69, 342, 141),
+    ("Distress in the window (61–180: bundle 14, loans ≈; 180+: bundle 12)", [
+        ("No distress", "moderate", 17497, 3224, 310349, 53383),
+        ("A cheque return, direct-debit return or bureau bounce", "low", 1795, 761, 8314, 1988),
     ]),
-    ("High and Moderate: the combination that gave the state", [
+    ("High and Moderate: the combination that gave the state (bundle 12)", [
         ("High · Stable income, Adequate liquidity", "high", 46, 10, 111, 17),
         ("Moderate · Stable income, no liquidity", "moderate", 2597, 273, 19197, 1664),
         ("Moderate · no income, Adequate liquidity", "moderate", 89, 23, 436, 193),
@@ -157,24 +152,19 @@ DETAIL = [  # counts in the order of BOOKS; None = does not apply
         ("Moderate · Weak income, Adequate liquidity", "moderate", 21, 4, 30, 13),
         ("Moderate · 4 points with distress", "moderate", 16, 4, 22, 8),
     ]),
-    ("Low: why", [
+    ("Low: why (bundle 12)", [
         ("1 point (mostly Weak income, nothing else)", "low", 2164, 557, 10672, 1496),
         ("0 points, an active CASA where money does not stay", "low", 2049, 649, 1937, 572),
         ("0 points with distress", "low", 1153, 539, 5560, 1417),
         ("2–3 points with distress", "low", 322, 90, 1822, 308),
     ]),
-    ("Unknown: why", [
-        ("Dormant CASA: no customer money movement in the window", "unknown", 6716, 1778, 38743, 13542),
+    ("Unknown: why (61–180: bundle 14; 180+: bundle 12)", [
+        ("Dormant CASA: no customer money movement in the window", "unknown", 5993, 1313, 38743, 13542),
         ("No CASA with us (no transaction or positive balance in 12 months)", "unknown",
-         4044, 0, 239911, 36032),
+         4917, 524, 239911, 36032),
     ]),
 ]
 SUMMARIES = [
-    ("CASA relationship", [
-        ("Active: customer moved money in the window", "high", 3631, 1332, 4744, 1419),
-        ("Dormant: holds a CASA, no customer movement", "unknown", 9125, 2653, 49500, 16917),
-        ("No CASA with us", "unknown", 6536, 0, 264419, 37035),
-    ]),
     ("Internal salary: latest month with AED 1,000 or more", [
         ("In the window", "high", 440, 205, 613, 149),
         ("4–6 months ago (in the window at 180+)", "moderate", 3094, 1146, None, None),
@@ -191,12 +181,6 @@ SUMMARIES = [
         ("Alert rows, never a salary", "unknown", 7693, 2325, 150930, 21760),
         ("No alert row", "unknown", 1138, 144, 89007, 26156),
     ]),
-    ("Salary evidence from either source", [
-        ("In the window", "high", 4223, 656, 29764, 3105),
-        ("Only older", "moderate", 12253, 2604, 58107, 7684),
-        ("None: no internal salary in 24 months, no AECB salary alert", "unknown",
-         2816, 725, 230792, 44582),
-    ]),
     ("Salary stopped: internal salary in the prior window, none in the window", [
         ("Stopped · no income in the window", "low", 2673, 1019, 2480, 1059),
         ("Stopped · Weak on AECB salary", "moderate", 208, 76, 347, 119),
@@ -208,9 +192,6 @@ SUMMARIES = [
         ("AED 1,000–3,000", "moderate", 254, 193, 596, 274),
         ("Under AED 1,000", "low", 4775, 1410, 23929, 7237),
         ("No balance", "unknown", 14021, 2224, 293362, 47453),
-    ]),
-    ("End-of-service result from collections, in the window (does not change the state)", [
-        ("Yes", "unknown", 25, 12, 18, 15),
     ]),
 ]
 CROSS_COLS = ["AECB in window", "AECB 4–6 m", "AECB 7–12 m", "AECB 13+ m", "Never"]
@@ -269,30 +250,74 @@ TREND = {  # month: (accounts, high, moderate, low, unknown %)
     },
 }
 NOTES = [
-    "AECB salary alerts arrive only when something changes, so no alert means nothing is known, "
-    "not that the salary stopped. Pulls every 2 months would give every customer a value and "
-    "would show a stop as a pull with no salary. How much this shapes the result: 'AECB coverage'.",
-    "Fewer alerts in the window than before is not a fall: with no salary with us, the 25% check "
-    "compares the level of the months with a value. A real fall in level stays Weak (848 card and "
-    "80 loan accounts at 61–180 reach the window total but fall more than 25%). The rule is kept "
-    "for now and will be reviewed with GRR: evidence and options on 'Validation'.",
-    "The AECB salary lifts most of Moderate: 93% of card and 75% of loan Moderate at 61–180 is "
-    "Stable income with no liquidity, mostly AECB. It separates payers well, but an AECB "
-    "Stable customer pays less often than an internal Stable one ('Validation').",
-    "The AECB amount is taken as accurate on the pull date. It rarely equals the internal salary "
-    "where both exist, and what it looks back over is not yet known.",
+    "The state rests almost entirely on income, and income mostly on AECB salary alerts: "
+    "'Weaknesses'.",
+    "CASA = current and savings accounts only (WM's 49 scheme codes). Loan accounts, term "
+    "deposits and other schemes do not count, so 524 loan Unknowns at 61–180 now have no CASA "
+    "with us (413 of them Auto).",
     "Cards 61–180: Moderate falls from 19.9% in January to 14.5% in August while the book grows by "
-    "a third; Unknown rises 3.6 points in August. The raw alert feed misses 6 and 31 August and is "
-    "thin on 24 August, which can explain part of the August rise.",
-    "At 180+ about 9 in 10 accounts are Unknown: most no longer hold a CASA with us (86% of the "
-    "card Unknowns). Cards at 180+ have no amount due, so the floors are flat (Stable needs AED "
-    "9,000 over six months).",
-    "Every loan customer at 61–180 shows a CASA transaction, so No CASA never fires there and all "
-    "their Unknowns are dormant. The transaction can be just the bank collecting the instalment.",
-    "Loan thresholds are higher: one instalment (median AED 2,389 at 61–180) against the card's "
-    "oldest overdue amount (median AED 837), so a loan salary must cover more to count as Stable.",
-    "Internal salary and balances cover the PRB, PSB and PB segments (95% of card customers). "
-    "Internal salary history starts in September 2024.",
+    "a third. The raw alert feed misses 6 and 31 August and is thin on 24 August.",
+    "At 180+ about 9 in 10 accounts are Unknown: most no longer hold a CASA with us. Cards at 180+ "
+    "have no amount due, so the floors are flat (Stable needs AED 9,000 over six months).",
+    "Loan thresholds are higher: one instalment (median AED 2,389) against the card's oldest "
+    "overdue amount (median AED 837).",
+    "Loan products at 61–180: the bundle 14 check gave only Unknown by product (blank cells).",
+]
+WEAK_BLOCKS = [  # counts in the order of BOOKS (bundle 12, except where named)
+    ("Liquidity: almost never confirmed", [
+        ("Adequate", "high", 196, 57, 655, 265),
+        ("Weak", "moderate", 342, 305, 763, 426),
+        ("None", "unknown", 18754, 3623, 317245, 54680),
+        ("Highest monthly CASA balance in the window AED 3,000 or more", "high", 242, 158, 776, 407),
+    ]),
+    ("Income: Stable, and where it comes from", [
+        ("Stable income", "high", 2996, 371, 21237, 1994),
+        ("Stable on an AECB salary alone", "moderate", 2778, 317, 20827, 1927),
+        ("Stable with an internal salary", "high", 218, 54, 410, 67),
+        ("Any internal salary of AED 1,000 or more in the window", "high", 440, 205, 613, 149),
+    ]),
+    ("What the states rest on", [
+        ("High (61–180: bundle 14)", "high", 45, 11, 111, 17),
+        ("Moderate · Stable income, no liquidity", "moderate", 2597, 273, 19197, 1664),
+        ("Moderate · resting on an AECB salary alone", "moderate", 2525, 268, 19113, 1708),
+        ("Unknown · no CASA with us (61–180: bundle 14)", "unknown", 4917, 524, 239911, 36032),
+    ]),
+]
+WEAK_FINDINGS = [
+    ("Liquidity is dry", "Liquidity is Adequate for 1.0% of card and 1.4% of loan accounts at 61–180, "
+     "and 0.2–0.5% at 180+. The bank sweeps CASA balances against overdue amounts (GRR), so a "
+     "balance shows whether a sweep happened, not whether the customer can pay. External card "
+     "payments are rare (118 card, 39 loan accounts)."),
+    ("High is rare by construction", "High needs Stable income and Adequate liquidity. With "
+     "liquidity dry, High is 0.2–0.3% of the books at 61–180 and 0.03% at 180+, whatever the "
+     "customer's income."),
+    ("The state is an income signal", "93% of card and 75% of loan Moderate at 61–180 is Stable "
+     "income with no liquidity at all. Low is mostly Weak income, or distress. The two-dimension map "
+     "works as one dimension."),
+    ("Income is mainly bureau", "93% of card and 85% of loan Stable income at 61–180 comes from an "
+     "AECB salary alone (97–98% at 180+). Only 2.3% of card and 5.1% of loan accounts had an "
+     "internal salary in the window."),
+    ("And the bureau source is thin", "The alert table sends a row only when the salary changes; "
+     "a pull counts for its month and the next. A steady salary often never alerts, a stop is "
+     "mostly an empty closure alert. AECB Stable cards cure 14.4% against 33.0% for internal "
+     "Stable ('Validation'). The richer AECB tables cannot yet be linked to our customers."),
+    ("No CASA means a ceiling", "Without a CASA with us there is no internal salary and no "
+     "liquidity, so the best state is Moderate, on an AECB salary. That is 4,917 card and 524 loan "
+     "Unknowns at 61–180 (loans mostly Auto)."),
+    ("The scale itself works", "States rank payment and cure in order; High cures 33.6% against "
+     "16.3% for Moderate, and internal Stable customers cure like High. The weakness is coverage, "
+     "not the ranking."),
+]
+WEAK_DIRECTIONS = [
+    ("Liquidity from flows", "Money moving through the account (credits, own spending) survives "
+     "a sweep; a balance does not."),
+    ("Independent evidence", "Score income, inflows, spending and other products with us as "
+     "separate families, so High needs agreement between them rather than one salary signal. "
+     "Signals only from windows ending at the scoring date (GRR)."),
+    ("Frequent bureau salary", "GRR's feed of AECB pulls every 2 months, with the last level "
+     "carried until the next pull or a stop ('AECB coverage')."),
+    ("Bureau link", "Linking the AECB report tables to our customers would add obligations "
+     "elsewhere and the customer's standing with other lenders."),
 ]
 AECB_BLOCKS = [  # counts in the order of BOOKS
     ("Accounts whose state rests on an AECB salary alone (no internal salary in the window)", [
@@ -318,13 +343,6 @@ AECB_BLOCKS = [  # counts in the order of BOOKS
         ("High + Moderate today (S0)", "moderate", 2844, 372, 20018, 2004),
         ("High + Moderate (S6)", "moderate", 3902, None, 23983, None),
         ("High + Moderate (S12)", "moderate", 4265, None, 25824, None),
-    ]),
-    ("Today's Unknown by its latest AECB salary alert (cards only)", [
-        ("In the window", "unknown", 101, None, 306, None),
-        ("4–24 months ago: too old (7–24 at 180+)", "moderate", 4017, None, 18065, None),
-        ("25 or more months ago", "unknown", 607, None, 25869, None),
-        ("Alert rows, never a salary alert", "unknown", 5090, None, 145558, None),
-        ("No alert row", "unknown", 945, None, 88856, None),
     ]),
 ]
 AECB_TODAY_VS_FREQUENT = [  # topic, today, with pulls every 2 months
@@ -466,8 +484,8 @@ def overview(wb: Workbook) -> None:
             s.ws.row_dimensions[s.r].height = 22
             s.r += 1
         s.r += 1
-    s.note("Rules: 'Logic'. Which rule gave each state: 'Results detail'. What we can see of the "
-           "customer: 'Results summaries'.")
+    s.note("Rules: 'Logic'. Why High is rare and the state is mostly a bureau-salary signal: "
+           "'Weaknesses'. Which rule gave each state: 'Results detail'.")
     s.ws.freeze_panes = "A4"
 
 
@@ -544,16 +562,18 @@ def logic(wb: Workbook) -> None:
         ("One amount per month", "The larger of internal and AECB, never the sum.", "Each month."),
     ])
     table("Distress", ["Source", "Rule", "Timing"], [
-        ("Cheque / DDS return", "A returned cheque or direct debit on any CASA of the customer.",
-         "The month of the return."),
-        ("Bureau bounce", "A new bounced amount on a pull; repeated unchanged it counts once.",
-         "The pull's month."),
+        ("Cheque / DDS return", "A returned cheque or direct debit on any current or savings "
+                                "account of the customer.", "The month of the return."),
+        ("Bureau bounce", "A bounced cheque reported by AECB; one per day, the largest amount.",
+         "The day it was returned."),
     ])
     table("Customer money movement (the activity gate)", ["", "Transactions", ""], [
         ("Counts", "Transfers in and out, remittances, cash, clearing, bill payments, card spend, "
                    "paying their own credit card.", ""),
         ("Does not count", "The bank recovering the customer's loan instalment, transfers between "
                            "their own accounts, fees, interest, reversals.", ""),
+        ("Which accounts", "Current and savings accounts only (WM's 49 scheme codes); loan "
+                           "accounts, term deposits and other schemes do not count.", ""),
     ])
     s.ws.freeze_panes = "A4"
 
@@ -720,10 +740,11 @@ def results(wb: Workbook) -> None:
                 s.text(3 + 2 * j, share, color=MUTED).number_format = "0.0%"
             s.r += 1
         s.text(1, "Total", bold=True)
-        for j in range(len(heads)):
-            L = get_column_letter(2 + 2 * j)
-            s.text(2 + 2 * j, f'=IF(COUNT({L}{first}:{L}{total - 1})=0,"",SUM({L}{first}:{L}{total - 1}))',
-                   bold=True).number_format = "#,##0"
+        for j, n in enumerate(STATE_TOTALS[dpd]):
+            counts = [r[1 + j] for r in rows]
+            if None not in counts and sum(counts) != n:
+                raise SystemExit(f"{dpd} {heads[j]}: states add to {sum(counts)}, total {n}")
+            s.text(2 + 2 * j, n, bold=True, color="0000FF", fill=INPUT_FILL).number_format = "#,##0"
             s.text(3 + 2 * j, None)
         s.r += 1
     s.section("Reading the results")
@@ -735,6 +756,23 @@ def results(wb: Workbook) -> None:
     s.note("Which rule gave each state: 'Results detail'. Coverage of salary, CASA and bureau: "
            "'Results summaries'. How the states pay and cure: 'Validation'.")
     s.ws.freeze_panes = "B4"
+
+
+def weaknesses(wb: Workbook) -> None:
+    s = _blocks(wb, "Weaknesses", f"Why High is rare and the state is mostly a bureau-salary signal, "
+                                  f"{RESULTS_DATE}. Shares are of all accounts of the book.",
+                WEAK_BLOCKS)
+    for title, rows in (("Findings", WEAK_FINDINGS), ("Directions being explored", WEAK_DIRECTIONS)):
+        s.section(title)
+        s.header(["", "Finding" if rows is WEAK_FINDINGS else "Idea"], [1, s.last - 1])
+        for k, v in rows:
+            s.text(1, k, bold=True, align=MID)
+            s.text(2, v, span=s.last - 1, align=MID)
+            _fit(s.ws, s.r, [(v, s.width(2, s.last))])
+            s.r += 1
+    s.r += 1
+    s.note("Bundle 12 counts unless a row says bundle 14; income and liquidity did not change in "
+           "bundle 14. Payment and cure rates: 'Validation'.")
 
 
 def detail(wb: Workbook) -> None:
@@ -814,7 +852,7 @@ def validation(wb: Workbook) -> None:
 
 def aecb(wb: Workbook) -> None:
     s = _blocks(wb, "AECB coverage", f"How thin AECB data shapes the result, and what frequent pulls "
-                                     f"would change, {RESULTS_DATE}. Shares are of all accounts of "
+                                     f"would change, {RESULTS_DATE} (bundle 12). Shares are of all accounts of "
                                      "the book.", AECB_BLOCKS)
     s.section("Today against pulls every 2 months")
     s.header(["", "Today (alerts)", "With pulls every 2 months"], [1, 4, 4])
@@ -851,7 +889,8 @@ def _chart(s: Sheet, title: str, head: int, months: int) -> None:
 
 def trend(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Results trend"), [12, 12] + [11] * len(STATES))
-    s.title("Results trend", "Share of accounts per state by month, Jan–Aug 2026 (month ends).")
+    s.title("Results trend", "Share of accounts per state by month, Jan–Aug 2026 (month ends), "
+                             "bundle 12: before bundle 14, which moved 2–3% of 61–180 accounts.")
     first_rows = []
     for i, (title, months) in enumerate(TREND.items()):
         s.section(title, gap=0 if i == 0 else 4)
@@ -885,12 +924,13 @@ def build(out: pathlib.Path) -> pathlib.Path:
     thresholds(wb)
     examples(wb)
     results(wb)
+    weaknesses(wb)
     detail(wb)
     summaries(wb)
     trend(wb)
     validation(wb)
     aecb(wb)
-    order = ["Overview", "Logic", "Thresholds", "Examples", "Results", "Results detail",
+    order = ["Overview", "Logic", "Thresholds", "Examples", "Results", "Weaknesses", "Results detail",
              "Results summaries", "Salary sources", "AECB coverage", "Results trend", "Validation"]
     wb._sheets = [wb[name] for name in order]  # pylint: disable=protected-access
     wb.calculation.fullCalcOnLoad = True
