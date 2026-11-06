@@ -228,6 +228,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
+        # TEMPORARY (refactor bundle R-A): spine check; removed by the bundle's cleanup.
+        "crx_rl_a4_spine_ra_check": crx_rl_a4_spine.create_ra_check_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
