@@ -101,3 +101,39 @@ Source: `v1_v4_summary_60_180.md` (cc_60_180 19,292 accounts, rl_60_180 3,985, l
   the ledger is still unmeasured; the bundle check gives it directly from the new output.
 - `HISTORICAL PROMISE TO PAY` never occurs; `RETAIN PTP` 26 agreements per model; `EOSB_PTP_DOCUMENTS`
   immaterial. The PTP name sets need no change.
+
+## V1d: where the DCORE 'paid' money is (2026-11-06, `v1d_summary_60_180.md`)
+
+- **The ledger is complete; the money isn't hidden.** None of the alternative routes adds material
+  money to G1 (DCORE paid, ledger not kept by due + 5 d):
+  - H1 other card credits: 0; `.distinct()` (O87) 0.9% of settlement G1.
+  - H2 Way4 last payment: 99.9% match a ledger payment, same amount, same day.
+  - H3 balance drop without a payment: 0, so there's no waiver or write-off signature.
+  - H4 other accounts: the CASA card-payment rate is the same in G1, G2 and G3 (11.5% / 13.5% / 12.8%),
+    so there's no uplift; other cards 0.7%.
+- **G1 is late or partial money.**
+  - Settlement G1 eventually pays in full in 73.7%: 6–15 d 10.1%, 16–30 d 16.7%, 31–60 d 27.7%,
+    > 60 d 19.2%. At the cut-off 70.5% have paid 50–99%.
+  - PTP G1 eventually pays in full in 61.8%, but 97.6% had paid nothing by the cut-off.
+- **What DCORE 'paid' means:**
+  - PTP: stamped before the due date with the exact due amount (98–99% of G1), i.e. ahead of the money.
+  - Settlement: "paid eventually", 76.5% more than 5 days late.
+  - Either way it is not "kept by the due date".
+- **Outcome.**
+  - PTP G1 behaves like G2 (2-cycle roll 40.6% vs 45.2%; G3 78.9%).
+  - Settlement G1 sits between G2 and G3 (roll 17.7% vs 9.4% / 53.0%). Late payers are not as good as
+    on-time payers, but far from non-payers.
+  - Two oddities to keep in mind: cured = 0 in every group within 2 cycles, and the 2-cycle rows sum to
+    only ~90%.
+- **RL:** FTR credit legs on the loan account don't reproduce `total_paid` (all MISCELLANEOUS), so RL
+  stays month-level. `last_payment_date` is the only day-level field (null in 25% of settlement G1).
+- **Reading for D-A3-11:**
+  - Judge kept / broken by payments. The ledger misses nothing, and DCORE's 'paid' is either premature
+    (PTP) or late-tolerant (settlement).
+  - The real choice is the grace period. A grace up to the next statement (~30 days), consistent with
+    D-A3-8 ("paid as billed" = before the next statement), would move ~27% of settlement G1 (6–30 d)
+    and ~26% of PTP G1 (16–30 d) to kept. Longer grace lets in the 31–60 d group, which is 28% of
+    settlement G1.
+  - A partial class (50–99% paid) is possible but adds a level; Dimension A's Partly kept already
+    covers mixed records at plan level.
+  - V1e must use the chosen grace for its payment judge (J2).
