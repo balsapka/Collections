@@ -1,6 +1,6 @@
 # Mirror bundle 17 — A3 — payment credibility on one engine (decisions D-A3-1..21; both promise judges for comparison)
 
-apply_bundle version: 7 · built 2026-11-06 from `20cd588..d1eee74` · source: 7 added, 12 replaced, 4 deleted · helpers: 0
+apply_bundle version: 7 · built 2026-11-06 from `8e57673..d05e763` · source: 7 added, 12 replaced, 4 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -150,7 +150,7 @@ assistant in UAT.
 ## Files
 
 ### FILE: `conf/base/catalog/catalog_crx.yml`
-action: replace · base sha256 `3b408aaccf18990a01815ea878c0ddbcc25bd519b7e0219ef75c1d46c7bfa8ed` · base trailing newline: yes · new sha256 `3b1686f143e5c24cfd24862f8a25646bc23c4322e47f354e7fae7bbf8409fa63` · new trailing newline: yes
+action: replace · base sha256 `d433ffc0d5a5db93b3ae82cb008d0b81b583d19a715001922e54bdacace33089` · base trailing newline: yes · new sha256 `ce8dccf20cb2ec66fb7d87f241ca17efe7f546e66e9229838c4bf037dfc64633` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -565,78 +565,6 @@ crx_rl_a3_payment_credibility:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_payment_credibility"
-  save_args:
-    mode: overwrite
-
-# TEMPORARY (refactor bundle R-B): outputs of the zero-difference check pipelines.
-# Remove these entries, rf_check.py, the registry lines and the HDFS folders after the check.
-crx_cc_full_history_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_full_history_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_a4_deterioration_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a4_deterioration_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_obs_base_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_obs_base_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_a2_locatability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_locatability_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_a1_ability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_full_history_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_full_history_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_a4_deterioration_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_obs_base_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_obs_base_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_a2_locatability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_locatability_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_a1_ability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_rf_check"
   save_args:
     mode: overwrite
 `````
@@ -1079,78 +1007,6 @@ crx_rl_a3_payment_credibility:
   save_args:
     mode: overwrite
 
-# TEMPORARY (refactor bundle R-B): outputs of the zero-difference check pipelines.
-# Remove these entries, rf_check.py, the registry lines and the HDFS folders after the check.
-crx_cc_full_history_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_full_history_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_a4_deterioration_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a4_deterioration_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_obs_base_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_obs_base_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_a2_locatability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a2_locatability_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_cc_a1_ability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_full_history_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_full_history_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_a4_deterioration_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_obs_base_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_obs_base_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_a2_locatability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a2_locatability_rf_check"
-  save_args:
-    mode: overwrite
-
-crx_rl_a1_ability_rf_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_rf_check"
-  save_args:
-    mode: overwrite
-
 # TEMPORARY (A3 bundle): the new A3 on the latest month, both judges (the A3 check).
 # Remove these entries, check.py, the check pipelines and the HDFS folders after the check.
 crx_cc_a3_check_payments:
@@ -1314,7 +1170,7 @@ cc_a3_history_floor_date: "2024-01-01"
 `````
 
 ### FILE: `src/enbd_collections/pipeline_registry.py`
-action: replace · base sha256 `4b71caca3a3e89cf3f8678d5414152e9498a42c02f7ebddd4edf83cdb39bcb57` · base trailing newline: yes · new sha256 `937c108417f16911e44387839970cf91766977f6b0255aefe533e555b21d48c9` · new trailing newline: yes
+action: replace · base sha256 `019325f81c26e1b090cb161e291597f37814e7076091dec9b8cb804149cfb25c` · base trailing newline: yes · new sha256 `8ff2a70216938240380e5c89ec6fb48d7b33111fb6c09f8ba51bb5025a0ff7c1` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -1405,8 +1261,6 @@ from enbd_collections.pipelines.crx_persona import (
 )
 from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
 
-# TEMPORARY (refactor bundle R-B): zero-difference checks.
-from enbd_collections.pipelines.crx_persona import rf_check as crx_rf_check
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
 )
@@ -1554,13 +1408,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
-        # TEMPORARY (refactor bundle R-B): zero-difference checks; removed by the cleanup.
-        "crx_cc_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("cc"),
-        "crx_cc_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("cc"),
-        "crx_cc_a1_rf_check": crx_rf_check.create_a1_rf_check_pipeline("cc"),
-        "crx_rl_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("rl"),
-        "crx_rl_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("rl"),
-        "crx_rl_a1_rf_check": crx_rf_check.create_a1_rf_check_pipeline("rl"),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
@@ -1671,8 +1518,6 @@ from enbd_collections.pipelines.crx_persona import (
 )
 from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
 
-# TEMPORARY (refactor bundle R-B): zero-difference checks.
-from enbd_collections.pipelines.crx_persona import rf_check as crx_rf_check
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
 )
@@ -1822,13 +1667,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
-        # TEMPORARY (refactor bundle R-B): zero-difference checks; removed by the cleanup.
-        "crx_cc_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("cc"),
-        "crx_cc_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("cc"),
-        "crx_cc_a1_rf_check": crx_rf_check.create_a1_rf_check_pipeline("cc"),
-        "crx_rl_a4_rf_check": crx_rf_check.create_a4_rf_check_pipeline("rl"),
-        "crx_rl_a2_rf_check": crx_rf_check.create_a2_rf_check_pipeline("rl"),
-        "crx_rl_a1_rf_check": crx_rf_check.create_a1_rf_check_pipeline("rl"),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
