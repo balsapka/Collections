@@ -1,20 +1,28 @@
-"""The state tree (states.py, option B) — ONE tree for 60-180 and 180+."""
+"""The A4 state tree (METHODOLOGY.md option B): ONE tree for 60-180 and 180+.
+
+Rules Q0-Q4 and the thresholds in ``STATE_RULES`` follow the methodology; the code
+differs in D1 (Q0 needs history_blind) and D2 (restructured accounts are
+history_blind), see specs/A4_deterioration_conformance.md.
+"""
 
 from __future__ import annotations
+
+from typing import Any
 
 from .core import journey_features
 
 STATE_RULES = {
-    "epd_max_history": 3,  # [business] months of history before the spell (blip incl.)
-    "epd_max_blips": 1,  # [business]
-    "straight_max_runup": 3,  # last clean month -> first month at 4
-    "stabilized_min_in_band": 5,  # [business] of the last 6 months within today's bucket ±1
-    "stabilized_long_run_months": 6,  # [business]
-    "stabilized_long_run_max_rise": 1,  # [business]
-    "stabilized_max_bucket": 7,  # [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
-    "repeat_min_prior_peak": 3,  # [business] earlier spell reached bucket 3 ...
-    "repeat_window_months": 12,  # [business] ... and ended <= 12 months before this one
-    "seasoned_min_months": 12,  # [business] months on book before the spell
+    "epd_max_history": 3,  # Q1 [business] months of history before the spell (+ blip)
+    "epd_max_blips": 1,  # Q1 [business]
+    "straight_max_runup": 3,  # Q4 last clean month -> first month at 4
+    "stabilized_min_in_band": 5,  # Q2 [business] of last 6 months in today's bucket ±1
+    "stabilized_long_run_months": 6,  # Q2 [business]
+    "stabilized_long_run_max_rise": 1,  # Q2 [business]
+    # Q2 [business] canonical: CC 7 / RL 6 = 151-180 DPD. Never at 180+.
+    "stabilized_max_bucket": 7,
+    "repeat_min_prior_peak": 3,  # Q3 [business] earlier spell reached bucket 3 ...
+    "repeat_window_months": 12,  # Q3 [business] ... and ended <= 12 months before
+    "seasoned_min_months": 12,  # Q4 [business] months on book before the spell
 }
 
 STATES = [
@@ -38,11 +46,44 @@ DISPLAY_NAMES = {
 }
 
 
-# pylint: disable-next=too-many-return-statements,too-many-arguments
+def _is_stabilized(f: dict[str, Any]) -> bool:
+    """Q2: 60-180 only, five of the last six months within today's bucket +-1, or a long
+    run since first reaching 4 that has risen by at most one bucket."""
+    p = STATE_RULES
+    return f["b_now"] <= p["stabilized_max_bucket"] and (
+        f["last6_in_band"] >= p["stabilized_min_in_band"]
+        or (
+            f["months_since_4"] >= p["stabilized_long_run_months"]
+            and f["chg_6m"] <= p["stabilized_long_run_max_rise"]
+        )
+    )
+
+
+def _is_early_payment_default(f: dict[str, Any], history_blind: bool) -> bool:
+    """Q1: the spell follows a short, clean history, with no payment in it."""
+    p = STATE_RULES
+    return (
+        f["months_before_spell"] <= p["epd_max_history"]
+        and f["n_blips"] <= p["epd_max_blips"]
+        and f["n_prior_episodes"] == 0
+        and f["spell_pay_events"] == 0
+        and not history_blind
+    )
+
+
+def _is_repeat_delinquent(f: dict[str, Any]) -> bool:
+    """Q3: an earlier spell reached the peak bucket and ended within the window."""
+    return f["gap_prior_peak3"] <= STATE_RULES["repeat_window_months"]
+
+
+def _is_straight_roller(f: dict[str, Any]) -> bool:
+    """Q4: the run-up to bucket 4 took at most `straight_max_runup` months."""
+    return f["runup_len"] <= STATE_RULES["straight_max_runup"]
+
+
+# pylint: disable-next=too-many-return-statements
 def assign_state(
-    f: dict,
-    cropped: bool,
-    restructure_blind_spot: bool = False,
+    f: dict[str, Any], cropped: bool, restructure_blind_spot: bool = False
 ) -> str:
     """One state per account, same tree and vocabulary in both segments. First 'yes' wins.
 
@@ -62,51 +103,28 @@ def assign_state(
     else slow roller
     """
     p = STATE_RULES
-    # "Genuinely observed from a clean start" covers two distinct blind spots: a Stage-1
-    # window crop (floor date / unresolvable gap / dataset edge), OR a restructured account
-    # whose own first row is a fresh contract_id, not a fresh delinquency journey — the
-    # predecessor contract's history is invisible to this engine either way (R13). A normal
-    # (non-restructured) CC account structurally cannot observe its first-ever billing cycle
-    # already delinquent (DPD >= 2 requires a prior unpaid cycle to exist first); RL's
-    # native-bucket-1 start remains legitimate for a genuinely fresh, non-restructured loan.
+    # history_blind = the journey start is not observed: a Stage-1 crop (floor date,
+    # unresolvable gap, dataset edge) or a restructured account, whose first row is a
+    # fresh contract and not a fresh delinquency (conformance D1, D2). A CC account
+    # cannot start its first billing cycle delinquent; an RL loan can (native bucket 1,
+    # first EMI missed), so a delinquent start alone is not blindness.
     history_blind = cropped or restructure_blind_spot
     # Q2 stabilized — computed up front: both Q0 and the main sequence below consult it.
-    stab = f["b_now"] <= p["stabilized_max_bucket"] and (
-        f["last6_in_band"] >= p["stabilized_min_in_band"]
-        or (
-            f["months_since_4"] >= p["stabilized_long_run_months"]
-            and f["chg_6m"] <= p["stabilized_long_run_max_rise"]
-        )
-    )
-    # Q0 — only a confidence guard when history before the window is genuinely
-    # missing (history_blind). When history_blind=False we trust we've seen the
-    # whole observed journey, so a delinquent oldest month is not evidence of
-    # missing history (e.g. RL native bucket 1 = "1-30 DPD" already counts as
-    # delinquent for a loan that missed its very first EMI) — fall through to
-    # the normal cascade instead.
+    stab = _is_stabilized(f)
+    # Q0 fires only when history_blind; with the whole journey observed a delinquent
+    # oldest month is a real start, so fall through to the normal cascade.
     if f["starts_delinquent"] and history_blind:
         return "stabilized" if stab else "unknown"
-    # Q1
-    if (
-        f["months_before_spell"] <= p["epd_max_history"]
-        and f["n_blips"] <= p["epd_max_blips"]
-        and f["n_prior_episodes"] == 0
-        and f["spell_pay_events"] == 0
-        and not history_blind
-    ):
+    if _is_early_payment_default(f, history_blind):  # Q1
         return "early_payment_default"
-    # Q2
-    if stab:
+    if stab:  # Q2
         return "stabilized"
-    # Q3
-    if f["gap_prior_peak3"] <= p["repeat_window_months"]:
+    if _is_repeat_delinquent(f):  # Q3
         return "repeat_delinquent"
-    # Q4
-    if f["runup_len"] <= p["straight_max_runup"]:
+    if _is_straight_roller(f):  # Q4
         if f["months_before_spell"] >= p["seasoned_min_months"] or history_blind:
             return "straight_roller_seasoned"
         return "straight_roller_early_life"
-    # else
     return "slow_roller"
 
 

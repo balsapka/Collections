@@ -15,8 +15,9 @@ _LOAN_MAX_AGE_M = 1
 def build_rl_liquidity_anchor(
     obs_base: DataFrame, int_loan_master: DataFrame
 ) -> DataFrame:
-    """One EMI — ``installment_due_amount`` on the loan's snapshot in the observation
-    month. NULL (flat floors) when the snapshot is missing or the EMI is not positive.
+    """One EMI (S1): ``installment_due_amount`` on the loan's snapshot in the
+    observation month. NULL (flat floors) when the snapshot is missing or the EMI is not
+    positive.
     """
     require_columns(
         int_loan_master,

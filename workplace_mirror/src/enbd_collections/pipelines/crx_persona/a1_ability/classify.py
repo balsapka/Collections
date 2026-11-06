@@ -10,8 +10,8 @@ Spec: ``workplace_mirror/specs/A1_ability_spec.md``.
   (no CASA with us, or a dormant one).
 
 Thresholds scale with ``liquidity_anchor_amt`` — what the customer must find now
-(CC 60–180: the oldest overdue bucket; RL: one instalment; NULL: flat floors only).
-Values are the workbook's starting values (sheet Thresholds), not yet tuned on PROD.
+(CC 60–180: the oldest overdue bucket; RL: one instalment; NULL: flat floors only,
+S1). Run through ``crx_cc_a1_ability`` / ``crx_rl_a1_ability``.
 """
 
 from __future__ import annotations
@@ -20,29 +20,25 @@ from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, left_join_all, log_latest_month, window_months
-from ..scoring_engine import StateLadder, points_from_level
+from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard, state_label
 
-MIN_MONTHS = {3: 2, 6: 3}  # CASA: months of the window (by its length) that qualify
-F_INC = 3000.0  # salary floor (internal and bureau), AED
-K_INC = 2.0  # income must also cover this multiple of the anchor
-# Stable income: the window's salary total covers this many monthly floors (S12) …
-INC_FLOORS = {3: 2, 6: 3}
-D_INC = 0.25  # … and is at most this share below the prior window's total
-F_CASA = 3000.0
-K_CASA = 1.0
-D_CASA = 0.50
-F_PAY = 500.0
-K_PAY = 1.0
-DEMIN = 1000.0  # smallest amount that counts as any evidence
+# Thresholds (spec §3, S2–S12): the workbook's starting values, not tuned on PROD.
+# Keyed by window length W (3 months at 60–180, 6 at 180+, S10).
+CASA_MIN_MONTHS = {3: 2, 6: 3}  # S7: months of the window the CASA must be at its floor
+STABLE_INCOME_FLOORS = {3: 2, 6: 3}  # S12: the window's salary covers this many floors
+INCOME_FLOOR = 3000.0  # S2: salary floor (internal and bureau), AED
+INCOME_ANCHOR_MULT = 2.0  # S2: income must also cover this multiple of the anchor
+INCOME_MAX_FALL = 0.25  # S12: ... and is at most this share below the prior window
+CASA_FLOOR = 3000.0  # S7
+CASA_ANCHOR_MULT = 1.0  # S7
+CASA_MAX_FALL = 0.50  # S7
+CARD_PAYMENT_FLOOR = 500.0  # S8
+CARD_PAYMENT_ANCHOR_MULT = 1.0  # S8
+MIN_EVIDENCE_AMT = 1000.0  # smallest amount that counts as evidence (Weak, S5-S8)
+INCOME_POINTS = {"stable": 2, "weak": 1}  # spec points table (GRR)
+LIQUIDITY_POINTS = {"adequate": 2, "weak": 1}  # same table
+HIGH_FROM, MODERATE_FROM = 4, 2  # points for High / Moderate (spec s_high / s_mod)
 
-_LADDER = StateLadder(
-    high="high",
-    moderate="moderate",
-    low="low",
-    unknown="unknown",
-    high_from_points=4,
-    moderate_from_points=2,
-)
 DISPLAY_NAMES = {
     "high": "High",
     "moderate": "Moderate",
@@ -64,6 +60,11 @@ def _count_at_least(cols: list[Column], floor: Column) -> Column:
     return sum((F.coalesce(c, F.lit(0.0)) >= floor).cast("int") for c in cols)
 
 
+def _shows_evidence(col: str) -> Column:
+    """The column holds an amount of at least ``MIN_EVIDENCE_AMT`` (NULL: no)."""
+    return F.coalesce(F.col(col), F.lit(0.0)) >= MIN_EVIDENCE_AMT
+
+
 def _mean(cols: list[Column], missing_is_zero: bool) -> Column:
     """Mean over the months; a month without data counts as 0 (income) or is skipped
     (balances)."""
@@ -75,7 +76,7 @@ def _mean(cols: list[Column], missing_is_zero: bool) -> Column:
 
 
 def _not_weakening(
-    prefix: str, max_drop: float, missing_is_zero: bool, w: int
+    prefix: str, max_drop: float, *, missing_is_zero: bool, w: int
 ) -> Column:
     """The window's average is not more than ``max_drop`` below the prior window's (true
     when there is no prior window to compare with)."""
@@ -93,17 +94,17 @@ def income_level(anchor: Column, w: int) -> Column:
     the fall compares the level of the months with a value, because AECB alerts arrive
     only on a change and a month without one says nothing."""
     last = _months("income", _window(w)[0])
-    floor = F.greatest(F.lit(F_INC), K_INC * anchor)
+    floor = F.greatest(F.lit(INCOME_FLOOR), INCOME_ANCHOR_MULT * anchor)
     total = sum(F.coalesce(c, F.lit(0.0)) for c in last)
-    internal = F.greatest(
-        F.coalesce(F.col("internal_salary_w"), F.lit(0.0)),
-        F.coalesce(F.col("internal_salary_prior"), F.lit(0.0)),
+    has_internal_salary = _shows_evidence("internal_salary_w") | _shows_evidence(
+        "internal_salary_prior"
     )
     holding = F.when(
-        internal < DEMIN, _not_weakening("income", D_INC, False, w)
-    ).otherwise(_not_weakening("income", D_INC, True, w))
-    stable = (total >= INC_FLOORS[w] * floor) & holding
-    weak = _count_at_least(last, F.lit(DEMIN)) > 0
+        has_internal_salary,
+        _not_weakening("income", INCOME_MAX_FALL, missing_is_zero=True, w=w),
+    ).otherwise(_not_weakening("income", INCOME_MAX_FALL, missing_is_zero=False, w=w))
+    stable = (total >= STABLE_INCOME_FLOORS[w] * floor) & holding
+    weak = _count_at_least(last, F.lit(MIN_EVIDENCE_AMT)) > 0
     return F.when(stable, "stable").when(weak, "weak").otherwise("none")
 
 
@@ -111,73 +112,79 @@ def liquidity_level(anchor: Column, w: int) -> Column:
     """adequate / weak / none over a ``w``-month window (spec S7, S8)."""
     last = _months("casa", _window(w)[0])
     payment = F.coalesce(F.col("ext_card_payment_max"), F.lit(0.0))
-    casa_floor = F.greatest(F.lit(F_CASA), K_CASA * anchor)
-    casa_ok = (_count_at_least(last, casa_floor) >= MIN_MONTHS[w]) & _not_weakening(
-        "casa", D_CASA, False, w
+    casa_floor = F.greatest(F.lit(CASA_FLOOR), CASA_ANCHOR_MULT * anchor)
+    casa_ok = (
+        _count_at_least(last, casa_floor) >= CASA_MIN_MONTHS[w]
+    ) & _not_weakening("casa", CASA_MAX_FALL, missing_is_zero=False, w=w)
+    adequate = casa_ok | (
+        payment
+        >= F.greatest(F.lit(CARD_PAYMENT_FLOOR), CARD_PAYMENT_ANCHOR_MULT * anchor)
     )
-    adequate = casa_ok | (payment >= F.greatest(F.lit(F_PAY), K_PAY * anchor))
-    weak = (_count_at_least(last, F.lit(DEMIN)) > 0) | (payment >= DEMIN)
+    weak = (_count_at_least(last, F.lit(MIN_EVIDENCE_AMT)) > 0) | (
+        payment >= MIN_EVIDENCE_AMT
+    )
     return F.when(adequate, "adequate").when(weak, "weak").otherwise("none")
 
 
-def build_a1_ability(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+# A1's families: the function giving the level (anchor amount, window W), the dimension.
+FAMILIES = (
+    (income_level, Dimension("income", "a1_income_level", INCOME_POINTS)),
+    (liquidity_level, Dimension("liquidity", "a1_liquidity_level", LIQUIDITY_POINTS)),
+)
+SCORECARD = Scorecard(
+    prefix="a1",
+    dimensions=tuple(dimension for _, dimension in FAMILIES),
+    overrides=(Override("distress", "a1_distress_flag", DEMOTE),),  # S9
+    # state id = rung name; the display text is DISPLAY_NAMES
+    labels={s: s for s in ("high", "moderate", "low", "unknown")},
+    high_from=HIGH_FROM,
+    moderate_from=MODERATE_FROM,
+)
+
+
+def build_a1_ability(  # pylint: disable=too-many-locals
     obs_base: DataFrame,
-    income: DataFrame,
-    liquidity: DataFrame,
-    distress: DataFrame,
-    eosb: DataFrame,
     anchor: DataFrame,
     model_id: str,
     persona_end_date: str,
+    **signals: DataFrame,
 ) -> DataFrame:
     """One A1 state per observation-base row, over ``model_id``'s window; logs the state
     distribution of the month of ``persona_end_date`` (the latest observation month).
+    Points: S2–S12; the unknown gate: S11; distress lowers the state one rung (S9).
 
-    ``anchor`` carries ``GRAIN + liquidity_anchor_amt`` (product-specific builder).
+    ``signals`` (income, liquidity, distress, EOSB: ``GRAIN`` + columns) and ``anchor``
+    (``GRAIN + liquidity_anchor_amt``, product builder) are left-joined in that order.
     ``a1_unknown_reason`` says why a row is unknown: ``no_casa`` (no CASA leg or
-    positive balance with us in 12 months) or ``dormant_casa``. Diagnostics, which change
-    nothing: ``a1_eosb_flag`` (a DCORE end-of-service result in the window),
+    positive balance with us in 12 months) or ``dormant_casa``. Diagnostics, which
+    change nothing: ``a1_eosb_flag`` (a DCORE end-of-service result in the window),
     ``a1_income_source`` (who shows AED 1,000 or more in the window: ``internal``,
-    ``bureau``, ``both`` or ``none``), ``a1_salary_stopped`` (internal salary in the prior
-    window, none in the window).
+    ``bureau``, ``both`` or ``none``), ``a1_salary_stopped`` (internal salary in the
+    prior window, none in the window).
     """
-    df = left_join_all(obs_base, [income, liquidity, distress, eosb, anchor])
+    # join order follows the node inputs; output is the same (left joins on GRAIN)
+    df = left_join_all(obs_base, [*signals.values(), anchor])
     amt = F.coalesce(F.col("liquidity_anchor_amt"), F.lit(0.0))  # missing → flat floors
     w = window_months(model_id)
-    df = (
-        df.withColumn("a1_income_level", income_level(amt, w))
-        .withColumn("a1_liquidity_level", liquidity_level(amt, w))
-        .withColumn("a1_distress_flag", F.col("distress_flag") == 1)
-    )
-    df = df.withColumn(
-        "a1_points_total",
-        points_from_level(F.col("a1_income_level"), {"stable": 2, "weak": 1})
-        + points_from_level(F.col("a1_liquidity_level"), {"adequate": 2, "weak": 1}),
-    )
-    unknown = (
-        (F.col("a1_points_total") == 0)
-        & ~F.col("a1_distress_flag")
-        & (F.coalesce(F.col("casa_active"), F.lit(0)) == 0)
-    )
-    df = df.withColumn(
-        "a1_state",
-        _LADDER.state(F.col("a1_points_total"), F.col("a1_distress_flag"), unknown),
-    )
+    for level, dimension in FAMILIES:
+        df = df.withColumn(dimension.level, level(amt, w))
+    df = df.withColumn("a1_distress_flag", F.col("distress_flag") == 1)
+    no_casa_activity = F.coalesce(F.col("casa_active"), F.lit(0)) == 0  # S11
+    df = SCORECARD.score(df, unknown_also=no_casa_activity)
     unknown_reason = F.when(F.col("casa_held") == 1, "dormant_casa").otherwise(
         "no_casa"
     )
-    labels = F.create_map(*[F.lit(x) for kv in DISPLAY_NAMES.items() for x in kv])
-    internal_w = F.coalesce(F.col("internal_salary_w"), F.lit(0.0)) >= DEMIN
-    bureau_w = F.coalesce(F.col("bureau_salary_w"), F.lit(0.0)) >= DEMIN
-    internal_prior = F.coalesce(F.col("internal_salary_prior"), F.lit(0.0)) >= DEMIN
+    internal_w = _shows_evidence("internal_salary_w")
+    bureau_w = _shows_evidence("bureau_salary_w")
+    internal_prior = _shows_evidence("internal_salary_prior")
     out = df.select(
         *GRAIN,
         "a1_state",
-        labels[F.col("a1_state")].alias("a1_state_label"),
-        F.when(F.col("a1_state") == _LADDER.unknown, "no_signal")
+        state_label("a1_state", DISPLAY_NAMES).alias("a1_state_label"),
+        F.when(F.col("a1_state") == "unknown", "no_signal")
         .otherwise("observed")
         .alias("a1_provenance"),
-        F.when(F.col("a1_state") == _LADDER.unknown, unknown_reason).alias(
+        F.when(F.col("a1_state") == "unknown", unknown_reason).alias(
             "a1_unknown_reason"
         ),
         "a1_income_level",

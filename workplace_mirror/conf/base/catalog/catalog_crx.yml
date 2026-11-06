@@ -3,7 +3,7 @@
 #
 # All assets created by the T03+ persona-axis pipeline live here, under the
 # 'crx_' prefix. This separation makes the abandon path clean:
-#   rm conf/base/catalog_crx.yml
+#   rm conf/base/catalog/catalog_crx.yml
 #   rm -r src/enbd_collections/pipelines/crx_persona/
 #   revert the one-line addition to pipeline_registry.py
 #
@@ -38,7 +38,7 @@ crx_cc_balance:
   save_args:
     mode: overwrite
 
-# -- CC Full Billing History (ad hoc, no task card, mirrors RL-B1) -----------
+# -- CC full billing history ------------------------------------------------
 # Grain: (account_id, billing_date) — one row per billing cycle.
 # Full history, no date window — built straight from raw_stg_billing (dlq_bucket
 # parsed from add_info), leftsemi-scoped to cc_spine.
@@ -61,13 +61,11 @@ crx_cc_spell_table:
   save_args:
     mode: overwrite
 
-# -- T43/P8: CC A4 Deterioration — DPD journey (native PySpark, one shuffle +
-# per-account Python engine) -------------------------------------------------
-# Port of docs/deterioration_states/dpd_states's journey_features/assign_states
-# onto crx_cc_full_history, via the shared crx_persona/_dpd_journey.py module
-# (CC scheme) — same module the RL build uses with the RL scheme. Decoupled from
-# crx_cc_spell_table — restructure_blind_spot_flag is derived directly from
-# crx_cc_full_history (see cc_a4_deterioration/nodes.py).
+# -- CC A4 deterioration: DPD journey (one shuffle + per-account Python engine) --
+# Built from crx_cc_full_history by the shared crx_persona/_dpd_journey/ package
+# (CC scheme; RL uses the same package with its own scheme).
+# restructure_blind_spot_flag is derived from crx_cc_full_history alone
+# (see cc_a4_deterioration/nodes.py).
 
 # Intermediate — one row per account: build_status + gap-filled monthly
 # dlq_buckets array<int> (oldest -> newest, native buckets) + audit columns.
@@ -262,13 +260,9 @@ crx_rl_a4_spine_ra_check:
   save_args:
     mode: overwrite
 
-# ── RL A4 Deterioration — DPD journey (RL-A4-3, one-shuffle + per-account
-# Python engine) ─────────────────────────────────────────────────────────────
-# Port of docs/deterioration_states/dpd_states's journey_features/
-# assign_states onto RL's own bucket numbering, via the shared
-# crx_persona/_dpd_journey.py module (RL scheme) — same module the CC build
-# uses with the CC scheme. Unrelated to the superseded CASA/EMI-based A4
-# classifier (formerly rl_a4_class, removed).
+# ── RL A4 deterioration: DPD journey (one shuffle + per-account Python engine) ──
+# Built from crx_rl_full_history by the shared crx_persona/_dpd_journey/ package
+# (RL scheme; CC uses the same package with its own scheme).
 
 # Intermediate — one row per account: build_status + gap-filled monthly
 # dlq_buckets array<int> (oldest -> newest, native buckets) + audit columns.
