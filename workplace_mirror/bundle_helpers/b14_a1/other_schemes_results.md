@@ -157,3 +157,7 @@ Source: `tmp_validation/a1_other_schemes/summary.md` in the workplace, transcrib
   068 / 069 / 149 share accounts) with 0 legs on either base today.
 - The 65k / 61k in B14 ACCOUNTS vs 84,850 / 86,436 here: different populations (B14 = 12 months back
   from the run date; here A1's window to 2026-08-31). Not a conflict.
+
+## Decision (user, 2026-11-06)
+
+Stick to WM's 49 codes: none of the schemes above is added, none of the 49 is removed. Bundle 14 stands as built.
