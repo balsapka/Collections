@@ -193,15 +193,6 @@ crx_cc_a1_ability:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 14): the new output written by the b14 check pipeline.
-# Remove the entry, the pipeline and its HDFS folder after the check.
-crx_cc_a1_ability_b14_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability_b14_check"
-  save_args:
-    mode: overwrite
-
 # ── A3 Payment Credibility (T27) ────────────────────────────────────────────
 # Grain: (account_id, spell_id). observation_date = coalesce(spell_end, current_date()).
 # a3_state_v1 ∈ {payment_credibility_high, payment_credibility_moderate,
@@ -310,22 +301,6 @@ crx_rl_dpd_sequences_linked:
   save_args:
     mode: overwrite
 
-# TEMPORARY (mirror bundle 13): the sequences of the b13 check.
-crx_rl_dpd_sequences_b13_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_dpd_sequences_b13_check"
-  save_args:
-    mode: overwrite
-
-# TEMPORARY (mirror bundle 13): the new output written by the b13 check pipeline.
-crx_rl_a4_deterioration_b13_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_deterioration_b13_check"
-  save_args:
-    mode: overwrite
-
 # ── RL A1 ability (shared a1_ability engine) ────────────────────────────────
 # Signal tables at (account_id, observation_date) and the axis crx_rl_a1_ability:
 # a1_state in {high, moderate, low, unknown}; a1_state_label in {High, Moderate, Low,
@@ -369,15 +344,6 @@ crx_rl_a1_ability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability"
-  save_args:
-    mode: overwrite
-
-# TEMPORARY (mirror bundle 14): the new output written by the b14 check pipeline.
-# Remove the entry, the pipeline and its HDFS folder after the check.
-crx_rl_a1_ability_b14_check:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability_b14_check"
   save_args:
     mode: overwrite
 

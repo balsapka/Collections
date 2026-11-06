@@ -13,7 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from enbd_collections.pipelines.crx_persona._common import window_agg  # noqa: E402
 from enbd_collections.pipelines.crx_persona._dpd_journey import episode_start  # noqa
 from enbd_collections.pipelines.crx_persona.rl_a4_deterioration import (  # noqa: E402
-    create_b13_check_pipeline,
     create_pipeline,
 )
 from enbd_collections.pipelines.crx_persona.rl_a4_deterioration.chains import (  # noqa: E402
@@ -204,7 +203,6 @@ def check_nodes(spark: SparkSession) -> DataFrame:
 def main() -> None:
     check_chains()
     assert len(create_pipeline().nodes) == 4
-    assert len(create_b13_check_pipeline().nodes) == 5
     spark = (
         SparkSession.builder.master("local[2]")
         .config("spark.ui.enabled", "false")

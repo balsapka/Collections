@@ -371,6 +371,13 @@ Still the old copy: `cc_raw_extract/pipeline.py` (the current one wires `build_c
   `bundle_helpers/a3_final/v1c_summary_60_180.md`. Tables ragged at lines 70–71 and 82–85, as in the
   source. The three inconsistencies the transcriber flagged reconcile (review, V1c section).
 
+## Handoff 44 (A3 session): V1d summary (2026-11-06)
+
+- `tmp_validation/a3_v1_v4/summary_v1d.md`, lines 1–84 (3 overlapping photos, chat transcription) →
+  `bundle_helpers/a3_final/v1d_summary_60_180.md`. Group sizes match V1c (G1 + G2 = DCORE paid: CC PTP
+  667, settlement 5,840; G2 / paid = 69.0% / 34.7%, V1c's +5 d rates). The 2-cycle outcome rows do not
+  sum to 100 (e.g. CC PTP G1 93.2%), as printed. Handoff 45 (A1 other schemes) is the A1 session's.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

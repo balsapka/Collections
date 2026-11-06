@@ -216,7 +216,25 @@ whether the delinquency behaves as if paid). The user also questions how strict 
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
-- Broken commitments (negative, cap or drop) and D-A3-11 (incl. the due-date grace): pending V1d.
+- D-A3-11 (incl. the due-date grace): pending V1d.
+- **Broken commitments, proposal (user, 2026-11-05): Broken scores negative points and leaves the
+  strong-negative list; refusal stays the only strong negative.** Today Broken scores 0 and fires a
+  negative; without A the maximum is 3 points (< High's 4), so it always means Low, even for a regular
+  payer ("cap at Low" = keep). Dropping the negative alone would make Broken score like Thin. Promise
+  points become Kept 2 / Partly kept 1 / Thin 0 / Broken −1 (or −2). Once Broken is in the points it
+  fails strong-negative test 1 (adds nothing the points do not carry). The weight is picked by V1e
+  (`sonnet_a3_v1e_broken_weight_prompt.md`: today / drop / −1 / −2, under both judges; next-3-month
+  outcome of Broken vs Thin at the same B + C points). Broken with −1:
+
+  | B + C points | Today | Drop | −1 | −2 |
+  |---|---|---|---|---|
+  | 0 | Low | Low | Low | Low |
+  | 1 (Some, or Clean only) | Low | Moderate | Low | Low |
+  | 2 (Regular, or Some + Clean) | Low | Moderate | Moderate | Low |
+  | 3 (Regular + Clean) | Low | Moderate | Moderate | Moderate |
+
+  Fallback if GRR finds the points opaque: grade from a trust (Kept / Partly / Thin / Broken) × flow
+  (strong / some / none) table instead of summed points.
 - **CC sources (superseded by D-A3-18 for this bundle; kept as the later option).** Today `crx_cc_billing` / `crx_cc_balance` / `crx_cc_transactions` (`cc_raw_extract`)
   read `raw_*` inside crx_persona, re-implement the `prm_cc` derivations and are scoped by T0 windows,
   which breaks D5 and the §7 layer rule. Proposal pending photos: the CC primary pipeline owns the raw
