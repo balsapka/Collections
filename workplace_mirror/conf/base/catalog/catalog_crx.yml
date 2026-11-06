@@ -13,10 +13,19 @@
 
 # -- T04c: T0-scoped CC raw DDI intermediates ----------------------------------
 # Grain: (contract_id, observation_date) — one row per account per date.
-# Built by the crx_cc_raw_extract pipeline; the CC A3 pipeline reads crx_cc_transactions
-# and crx_cc_balance.
+# Built by the crx_cc_raw_extract pipeline; the CC A3 pipeline reads crx_cc_transactions,
+# crx_cc_balance and crx_cc_billing.
 # Replaces prm_transaction / prm_limit / prm_balance primary-layer inputs,
 # which are spine-scoped and lack history for cc_180_plus T0 windows.
+# Grain: (account_id). The per-account [acct_start, acct_end] window of the CC raw
+# extracts, from the A3 episode anchor (build_cc_acct_windows).
+crx_cc_acct_windows:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_acct_windows"
+  save_args:
+    mode: overwrite
+
 crx_cc_transactions:
   type: spark.SparkDataset
   file_format: parquet
@@ -35,6 +44,15 @@ crx_cc_balance:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_balance"
+  save_args:
+    mode: overwrite
+
+# Grain: (contract_id, observation_date): one row per billing cycle, with due_date and
+# next_billing_date (the next statement). A3 builds its cycles from it.
+crx_cc_billing:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_billing"
   save_args:
     mode: overwrite
 
