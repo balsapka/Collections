@@ -243,7 +243,7 @@ whether the delinquency behaves as if paid). The user also questions how strict 
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
-- D-A3-11: V1d back (2026-11-06, `v1d_summary_60_180.md`): the ledger is complete, DCORE 'paid' is premature (PTP) or late (settlement). Both options ship in bundle 17 for the comparison; proposal: payments, grace to the next statement.
+- D-A3-11: V1d back (2026-11-06, `v1d_summary_60_180.md`): the ledger is complete, DCORE 'paid' is premature (PTP) or late (settlement). Both options ship in bundle 17 for the comparison; proposal: payments, grace to the next statement. Open with it: the payments judge's cumulative rule breaks a settlement instalment that sits behind an earlier miss (V1d cascade addendum, `v1d_cascade_cc_60_180.md`: 65% of CC settlement G1 is behind an earlier miss, 72% pays its own amount by the cut-off); the user applies bundle 17 as is (2026-11-06) and reads the effect from the check (`A3 COMMITMENTS`, `A3 BROKEN`) before choosing.
 - **Broken commitments, proposal (user, 2026-11-05): Broken scores negative points and leaves the
   strong-negative list; refusal stays the only strong negative.** Today Broken scores 0 and fires a
   negative; without A the maximum is 3 points (< High's 4), so it always means Low, even for a regular
