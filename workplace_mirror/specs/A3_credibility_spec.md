@@ -148,6 +148,33 @@ Measured, not assumed (V2, V3).
   commitments) should open to regular payments plus a clean record. Both are for the GRR calibration,
   not this bundle.
 
+- **D-A3-22: council answers taken into the engine** (user, 2026-11-05, refactor review
+  `questions.md`): anchor = the first day of the episode month (Q-11); rows A4 does not score are
+  Unknown, `a3_unknown_reason = no_episode` (Q-12); calendar-month windows (Q-13); DCORE windows
+  inclusive at the observation date (Q-22 / Q-27); a censored anchor (A4 cropped the history and the
+  episode ran from its first kept month) counts as unknown: windows from the observation lookback,
+  Dimension C No record, `pre_dlq_reason = censored` (Q-25); same-day ties on the latest right-party
+  contact: a non-refusal counts as later, then the largest disposition (Q-28); "a payment of 100 AED
+  after the refusal" = one cycle (CC) / month (RL) with 100 AED or more paid after the refusal day
+  (Q-29); DCORE read at most 24 months back, both products, the bundle check reports the refusals the
+  cap removes (Q-30); the onset cycle is in neither B nor C (Q-31); the instalments are an A3 source
+  node (Q-32 (a), until the DE adds a DCORE primary).
+- **D-A3-23: Broken scores −1 and is not a strong negative; refusal is the only one** (proposal
+  2026-11-05, in bundle 17). The weight (today's override / 0 / −1 / −2) is reported by the bundle
+  check's `A3 BROKEN` block; V1e part 2 (outcome) can still confirm it.
+
+## Bundle 17 (built 2026-11-06)
+
+`bundles/17_a3_credibility_engine.md`, on `611b23c..bf3b141` (branch `refactor/a3_stage`), after the
+refactor bundles 15 (dead code) and 16 (shared layer, A4, A2, A1). Engine `a3_credibility/`
+(constants, sources, signals, classify, pipeline) with CC / RL wrappers that build only the dues and
+payments; spec test `checks/a3_engine_spec.py` (72-cell map, both judges, grace, windows, contacts,
+instalments, Kedro runs of both products, the check). **Both D-A3-11 options ship**
+(`params:a3_kept_by`: `payments` with grace to the first statement on or after the due date (CC) /
+the end of the next month (RL), or `dcore`); the check `crx_<p>_a3_check` scores the latest month
+both ways against today's output. The user picks the judge from the check blocks; the losing option
+and the parameter then go in a small follow-up bundle.
+
 ## Validations before the bundle
 
 Prompt for V1–V4: `bundle_helpers/a3_final/sonnet_a3_v1_v4_prompt.md`. Results (60_180):
@@ -216,7 +243,7 @@ whether the delinquency behaves as if paid). The user also questions how strict 
 ## Open (asked 2026-11-03)
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
-- D-A3-11 (incl. the due-date grace): pending V1d.
+- D-A3-11: V1d back (2026-11-06, `v1d_summary_60_180.md`): the ledger is complete, DCORE 'paid' is premature (PTP) or late (settlement). Both options ship in bundle 17 for the comparison; proposal: payments, grace to the next statement.
 - **Broken commitments, proposal (user, 2026-11-05): Broken scores negative points and leaves the
   strong-negative list; refusal stays the only strong negative.** Today Broken scores 0 and fires a
   negative; without A the maximum is 3 points (< High's 4), so it always means Low, even for a regular
