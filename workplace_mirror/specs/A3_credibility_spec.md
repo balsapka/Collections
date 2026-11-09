@@ -22,6 +22,10 @@ customer will pay on this debt. Two kinds of evidence:
 
 Not A3: capacity to pay (A1), reachability / location (A2), the DPD path itself (A4).
 
+Dimension A and Dimension B differ in time as well as in kind (user, 2026-11-09): A characterises the
+customer's trustworthiness over the whole episode (up to 12 months), B establishes recency (the last 3
+months, 6 at 180+). A payment rule for A that only re-reads recent payments repeats B.
+
 A **strong negative** earns its place only when all four hold:
 1. it adds evidence the points do not already carry;
 2. the data behind it is reliable;

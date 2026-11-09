@@ -61,7 +61,10 @@ Q6 Does it carry its own information? The risk: a sufficient payment after a pro
    cycle Dimension B already counts. For the latest month, crosstab the new Dimension A level (ladder
    below) with Dimension B (regular / some / none) and Dimension C; report the share of paid events
    whose payment cycle is also a Dimension B qualifying cycle; and the rows where the new A disagrees
-   with B (A kept & B none, A broken & B regular).
+   with B (A kept & B none, A broken & B regular). Split all of Q6 by event age: cutoff inside
+   Dimension B's regular window (the last 3 months at 60_180, 6 at 180+) vs older. The user's framing:
+   A measures trustworthiness over the episode (up to 12 months), B recency, so overlap is expected
+   in the recent events and A's own information in the older ones; say whether the data agree.
 Q7 Levels. Apply bundle 17's ladder to events (Kept: >= 2 concluded and >= 80% paid; Broken: the last 3
    all broken, or >= 2 concluded and < 40% paid; Partly kept: >= 1 paid; else Thin) in two readings:
    partial = broken, and partial = half a paid event. Crosstab each with bundle 17's payments level and
