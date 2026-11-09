@@ -243,18 +243,24 @@ def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
     base = create_a3_pipeline(
         product, f"{p}_check_payments", dues, payments, kept_by="payments"
     )
+
+    def ns(
+        name: str,
+    ) -> str:  # a check-only dataset name (no dots: Kedro reserves them)
+        return f"{NS}__{name}"
+
+    final = f"{p}_check_payments"
     inputs = {i for i in base.inputs() if not i.startswith("params:")} - {obs}
     params = {i for i in base.all_inputs() if i.startswith("params:")}
+    # Every intermediate gets an explicit check name, so the namespace only prefixes
+    # the node names.
     scoped = pipeline(
         base,
         namespace=NS,
-        inputs={**{i: i for i in inputs}, obs: f"{NS}.obs_latest"},
-        outputs={f"{p}_check_payments": f"{p}_check_payments"},
+        inputs={**{i: i for i in inputs}, obs: ns("obs_latest")},
+        outputs={o: o if o == final else ns(o) for o in base.all_outputs()},
         parameters=params,
     )
-
-    def ns(name: str) -> str:
-        return f"{NS}.{name}"
 
     signals = {
         "episode": ns(f"{p}_episode"),
