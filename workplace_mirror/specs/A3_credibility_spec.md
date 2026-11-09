@@ -148,6 +148,13 @@ Measured, not assumed (V2, V3).
   commitments) should open to regular payments plus a clean record. Both are for the GRR calibration,
   not this bundle.
 
+- **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
+  `bundle_helpers/b17_a3/a3_check_review.md`). An instalment is kept when the payments since the plan
+  start reach the plan's cumulative due by the first statement on or after the due date (CC) / the end
+  of the next month (RL). The two judges agree on 96.2% (CC) / 97.2% (RL) of states; DCORE credited
+  twice the kept instalments on CC (427 Highs rest only on it). The cumulative rule's cascade adds 1.8%
+  Broken on CC (accepted for now). The `dcore` option and `params:a3_kept_by` go in the next A3
+  bundle.
 - **D-A3-22: council answers taken into the engine** (user, 2026-11-05, refactor review
   `questions.md`): anchor = the first day of the episode month (Q-11); rows A4 does not score are
   Unknown, `a3_unknown_reason = no_episode` (Q-12); calendar-month windows (Q-13); DCORE windows
