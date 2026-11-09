@@ -8,4 +8,9 @@ from .signals import (
     build_dlq_payment_signals,
     build_pre_dlq_payment_signals,
 )
-from .sources import build_a3_episode, build_cycle_ledger, build_instalments
+from .sources import (
+    build_a3_episode,
+    build_cycle_ledger,
+    build_instalments,
+    build_promise_events,
+)

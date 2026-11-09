@@ -20,14 +20,6 @@ crx_persona: "${globals:crx_persona}"
 # as crx_persona above.
 model_id: "${globals:model_id}"
 
-# A3 payment credibility - who decides that a promise instalment was kept (TEMPORARY,
-# until the choice is made from the bundle check; then this key and the losing option go):
-#   "payments" - the payments since the plan start reach the cumulative due by the grace
-#                cutoff (CC: the first statement on or after the due date; RL: the end
-#                of the next month)
-#   "dcore"    - DCORE's own paid / overdue flags (paid amount >= due amount)
-a3_kept_by: "payments"
-
 # CC A3 payment credibility - earliest billing date A3 reads (TEMPORARY).
 # Billing has no rows 2021-01..2023-12 (balance/transaction: 2019-2021), so history
 # before this date is not used by A3, and the raw extract windows never start more than

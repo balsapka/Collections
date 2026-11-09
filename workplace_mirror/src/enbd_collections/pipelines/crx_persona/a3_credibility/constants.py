@@ -1,23 +1,23 @@
 """A3 payment credibility: thresholds, windows and the Scorecard (spec
 ``specs/A3_credibility_spec.md``; "row n" = the DE sheet "A3 framework")."""
 
-from .._common import SEG_180_PLUS, SEG_60_180
+from .._common import SEG_60_180, SEG_180_PLUS
 from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard
 
-# ── Dimension A: promises kept (D-A3-9, D-A3-11, D-A3-16) ─────────────────────
-COMMITMENT_MONTHS = 12  # instalments due in the last 12 months of this episode (row 19)
-MIN_CONCLUDED = 2  # concluded instalments before a rate counts (row 74)
+# ── Dimension A: promises kept (D-A3-9, D-A3-16, D-A3-25) ─────────────────────
+COMMITMENT_MONTHS = 12  # promise events in the last 12 months of this episode (row 19)
+MIN_CONCLUDED = 2  # concluded promises before a rate counts (row 74)
 KEPT_RATE = 0.80  # Kept from (row 75)
 BROKEN_RATE = 0.40  # Broken below (row 76)
 BROKEN_STREAK = 3  # Broken when the last 3 concluded were all broken (row 77)
-# Who decides that an instalment was kept: "payments" (the money arrived within the
-# grace) or "dcore" (DCORE's paid amount reaches the due). TEMPORARY choice, compared in
-# the bundle check; the losing option goes.
-KEPT_BY = ("payments", "dcore")
-# Grace after the due date (payments judge): CC up to the first statement on or after
-# the due date (the "paid as billed" clock, D-A3-8); RL to the end of the next month.
-GRACE = {"cc": "next_statement", "rl": "next_month_end"}
-CC_GRACE_FALLBACK_D = 31  # no statement yet after the due date
+FOLLOWUP_RUN_DAYS = 7  # follow-up promises less than 8 days apart are one event
+MATCH_DAYS = 7  # a follow-up promise within 7 days of a DCORE plan is that plan
+# The deadline a promise is judged by (GRR): CC the next statement after the promise
+# day, however close; RL the end of the next month (RL cash is known by month only).
+# The alternative is 30 days from the promise ("30_days"; RL "30_days_month_end").
+DEADLINES = ("next_statement", "next_month_end", "30_days", "30_days_month_end")
+PROMISE_DEADLINE = {"cc": "next_statement", "rl": "next_month_end"}
+STATEMENT_FALLBACK_D = 31  # no statement after the promise day yet: 31 days
 
 # ── Dimension B: payments while delinquent (D-A3-3, -5, -6) ───────────────────
 QUALIFYING_SHARE = 1.0  # a cycle qualifies at 100% of one month's due (row 80)
@@ -39,7 +39,7 @@ CYCLE_MAX_DAYS = 62  # a longer "cycle" spans missing statements: dropped
 FLOOR_LOOKBACK_DAYS = 35  # keep the statement just before the history floor
 BUCKET08_BASELINE_MONTHS = 12  # months of positive minimum due averaged (D-A3-12)
 
-# ── State (D-A3-16, -19, -20, proposal 2026-11-05: Broken -1) ─────────────────
+# ── State (D-A3-16, -19, -20, -22, -24) ───────────────────────────────────────────────
 DISPLAY_NAMES = {
     "high": "payment_credibility_high",
     "moderate": "payment_credibility_moderate",
@@ -49,7 +49,7 @@ DISPLAY_NAMES = {
 COMMITMENT_POINTS = {"kept": 2, "partly_kept": 1, "broken": -1}
 DLQ_PAYMENT_POINTS = {"regular": 2, "some": 1}
 PRE_DLQ_POINTS = {"clean": 1}
-HIGH_FROM, MODERATE_FROM = 4, 1
+HIGH_FROM, MODERATE_FROM = 4, 2  # D-A3-24
 
 SCORECARD = Scorecard(
     prefix="a3",

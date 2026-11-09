@@ -215,8 +215,9 @@ crx_cc_a1_ability:
 # Grain: (account_id, observation_date), month ends, persona months (crx_cc_obs_base).
 # a3_state ∈ {payment_credibility_high, payment_credibility_moderate,
 #             payment_credibility_low, payment_credibility_unknown}.
-# crx_cc_a3_episode: the episode anchor from A4; crx_cc_a3_instalments: the DCORE promise
-# instalments of the base's accounts. Spec: workplace_mirror/specs/A3_credibility_spec.md.
+# crx_cc_a3_episode: the episode anchor from A4; crx_cc_a3_instalments: the DCORE plan
+# instalments; crx_cc_a3_promise_events: the promise events judged by payment.
+# Spec: workplace_mirror/specs/A3_credibility_spec.md.
 
 crx_cc_a3_commitment_signals:
   type: spark.SparkDataset
@@ -236,6 +237,13 @@ crx_cc_a3_instalments:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_instalments"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_promise_events:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_promise_events"
   save_args:
     mode: overwrite
 
@@ -444,9 +452,47 @@ crx_rl_a3_instalments:
   save_args:
     mode: overwrite
 
+crx_rl_a3_promise_events:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_promise_events"
+  save_args:
+    mode: overwrite
+
 crx_rl_a3_payment_credibility:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_payment_credibility"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (A3 bundle 20): the new A3 on the latest month, GRR's deadline and 30 days
+# (the A3 check). Remove these entries, check.py, the check pipelines and the HDFS
+# folders after the check.
+crx_cc_a3_check_grr:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_check_grr"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_check_30d:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_check_30d"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_check_grr:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_check_grr"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_check_30d:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_check_30d"
   save_args:
     mode: overwrite

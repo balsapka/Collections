@@ -10,11 +10,6 @@ before it, so the onset cycle is in neither.
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql import Window
-
-from enbd_collections.nodes.features.dcore._feat_dcore_utils import (
-    instalment_amount_flags,
-)
 
 from .. import _dcore_codes as codes
 from .._common import (
@@ -30,11 +25,9 @@ from .constants import (
     ANY_PAYMENT_MONTHS,
     BROKEN_RATE,
     BROKEN_STREAK,
-    CC_GRACE_FALLBACK_D,
     CLEAN_SHARE,
     COMMITMENT_MONTHS,
     DCORE_MAX_MONTHS,
-    KEPT_BY,
     KEPT_RATE,
     MIN_CONCLUDED,
     MIN_PAYMENT_AED,
@@ -61,94 +54,32 @@ def _base(episode: DataFrame) -> DataFrame:
 # ── Dimension A: promises kept ────────────────────────────────────────────────
 
 
-def _grace_cutoff(instalments: DataFrame, dues: DataFrame, grace: str) -> DataFrame:
-    """``instalments`` + ``cutoff``: the last day a payment still keeps the instalment."""
-    if grace == "next_month_end":
-        return instalments.withColumn("cutoff", F.last_day(F.add_months("due_date", 1)))
-    statements = dues.select("account_id", F.col("cycle_end").alias("_stmt")).distinct()
-    first = (
-        instalments.select("account_id", "due_date")
-        .distinct()
-        .join(statements, on="account_id")
-        .filter(F.col("_stmt") >= F.col("due_date"))
-        .groupBy("account_id", "due_date")
-        .agg(F.min("_stmt").alias("cutoff"))
-    )
-    return instalments.join(
-        first, on=["account_id", "due_date"], how="left"
-    ).withColumn(
-        "cutoff", F.coalesce("cutoff", F.date_add("due_date", CC_GRACE_FALLBACK_D))
-    )
+def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame:
+    """Dimension A: kept / partly kept / thin / broken (D-A3-9, D-A3-25).
 
-
-def _covered(instalments: DataFrame, payments: DataFrame) -> DataFrame:
-    """``instalments`` + ``covered_date``: the day payments since the plan start first
-    reach the plan's cumulative due up to and including the instalment (V1c rule)."""
-    plan = Window.partitionBy("plan_id").orderBy("due_date", "due_amount")
-    inst = instalments.withColumn("_n", F.row_number().over(plan)).withColumn(
-        "cum_due",
-        F.sum(F.coalesce("due_amount", F.lit(0.0))).over(
-            plan.rowsBetween(Window.unboundedPreceding, 0)
-        ),
-    )
-    running = (
-        Window.partitionBy("plan_id", "_n")
-        .orderBy("pay_date")
-        .rangeBetween(Window.unboundedPreceding, 0)
-    )
-    hit = (
-        inst.select("account_id", "plan_id", "_n", "plan_start", "cum_due")
-        .join(payments.select("account_id", "pay_date", "amount"), on="account_id")
-        .filter(F.col("pay_date") >= F.col("plan_start"))
-        .withColumn("_paid", F.sum("amount").over(running))
-        .filter(F.col("_paid") >= F.col("cum_due"))
-        .groupBy("plan_id", "_n")
-        .agg(F.min("pay_date").alias("covered_date"))
-    )
-    return inst.join(hit, on=["plan_id", "_n"], how="left")
-
-
-def build_commitment_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-    episode: DataFrame,
-    instalments: DataFrame,
-    payments: DataFrame,
-    dues: DataFrame,
-    kept_by: str,
-    grace: str,
-) -> DataFrame:
-    """Dimension A: kept / partly kept / thin / broken (D-A3-9, D-A3-11).
-
-    Instalments due in ``[max(episode start, last 12 months), observation date]``.
-    ``kept_by="payments"``: kept when payments reach the cumulative due by the grace
-    cutoff; concluded once kept or past the cutoff. ``kept_by="dcore"``: DCORE's own
-    paid / overdue flags. Broken: the last 3 concluded all broken (a broken instalment
-    ranks first on a shared due date), or at least 2 concluded and under 40% kept.
+    Promise events (``build_promise_events``) dated in ``[max(episode start, last 12
+    months), observation date]``, concluded once their cutoff is on or before the
+    observation date. Kept: paid; partial counts as not kept. Broken: the last 3
+    concluded all not kept (a broken event ranks first on a shared day), or at least 2
+    concluded and under 40% kept. Kept: at least 2 concluded and 80% kept.
     """
-    if kept_by not in KEPT_BY:
-        raise ValueError(f"a3_kept_by must be one of {KEPT_BY}, got {kept_by!r}")
-    if kept_by == "payments":
-        instalments = _covered(_grace_cutoff(instalments, dues, grace), payments)
     base = _base(episode)
     lower = F.greatest(window_start(COMMITMENT_MONTHS), F.col("_anchor"))
-    rows = base.join(instalments, on="account_id").filter(
-        (F.col("due_date") >= lower) & (F.col("due_date") <= F.col("observation_date"))
-    )
-    if kept_by == "payments":
-        obs = F.col("observation_date")
-        kept = F.col("covered_date") <= F.least("cutoff", obs)
-        concluded = kept | (F.col("cutoff") <= obs)
-    else:
-        is_paid, _, is_overdue = instalment_amount_flags()
-        kept, concluded = is_paid, is_paid | is_overdue
-    rows = rows.withColumn("_kept", F.coalesce(kept, F.lit(False))).withColumn(
-        "_concluded", F.coalesce(concluded, F.lit(False))
+    obs = F.col("observation_date")
+    rows = (
+        base.join(events, on="account_id")
+        .filter((F.col("event_date") >= lower) & (F.col("event_date") <= obs))
+        .withColumn("_concluded", F.col("promise_cutoff") <= obs)
+        .withColumn("_kept", F.col("_concluded") & (F.col("promise_outcome") == "paid"))
     )
     last = F.slice(
         F.sort_array(
             F.collect_list(
                 F.when(
                     F.col("_concluded"),
-                    F.struct("due_date", (~F.col("_kept")).cast("int").alias("broken")),
+                    F.struct(
+                        "event_date", (~F.col("_kept")).cast("int").alias("broken")
+                    ),
                 )
             ),
             asc=False,
@@ -158,9 +89,10 @@ def build_commitment_signals(  # pylint: disable=too-many-arguments,too-many-pos
     )
     agg = rows.groupBy(*GRAIN).agg(
         F.sum(F.col("_concluded").cast("int")).alias("commitments_concluded"),
-        F.sum((F.col("_concluded") & F.col("_kept")).cast("int")).alias(
-            "commitments_kept"
-        ),
+        F.sum(F.col("_kept").cast("int")).alias("commitments_kept"),
+        F.sum(
+            (F.col("_concluded") & (F.col("promise_outcome") == "partial")).cast("int")
+        ).alias("commitments_partial"),
         F.size(F.filter(last, lambda x: x["broken"] == 1)).alias(
             "commitments_last_broken_n"
         ),
@@ -177,17 +109,21 @@ def build_commitment_signals(  # pylint: disable=too-many-arguments,too-many-pos
         .when(ok >= 1, "partly_kept")
         .otherwise("thin")
     )
+    counts = [
+        "commitments_concluded",
+        "commitments_kept",
+        "commitments_partial",
+        "commitments_last_broken_n",
+    ]
     return (
         base.join(agg, on=list(GRAIN), how="left")
-        .fillna(
-            0,
-            ["commitments_concluded", "commitments_kept", "commitments_last_broken_n"],
-        )
+        .fillna(0, counts)
         .select(
             *GRAIN,
             lower.alias("commitments_window_start"),
             "commitments_concluded",
             "commitments_kept",
+            "commitments_partial",
             rate.alias("commitments_kept_rate"),
             "commitments_last_broken_n",
             level.alias("a3_commitments_level"),
@@ -308,7 +244,7 @@ def build_pre_dlq_payment_signals(episode: DataFrame, ledger: DataFrame) -> Data
 # ── Contacts: refusal and the diagnostics ─────────────────────────────────────
 
 _DISPOSITIONS = [  # first match wins
-    ("paid", codes.PAYMENT_CONFIRMED),
+    ("paid", codes.PAYMENT_REPORTED),
     ("refusal", codes.REFUSAL),
     ("dispute", codes.DISPUTE),
     ("hung_up", codes.HUNG_UP),

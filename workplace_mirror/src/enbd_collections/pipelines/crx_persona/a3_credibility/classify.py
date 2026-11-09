@@ -12,11 +12,12 @@ OUTPUT_COLUMNS = [
     "cif_id",
     "episode_start",
     "episode_left_censored",
-    "a3_kept_by",
+    "a3_promise_deadline",
     # Dimension A
     "commitments_window_start",
     "commitments_concluded",
     "commitments_kept",
+    "commitments_partial",
     "commitments_kept_rate",
     "commitments_last_broken_n",
     "a3_commitments_level",
@@ -61,18 +62,18 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     dlq_payments: DataFrame,
     pre_dlq: DataFrame,
     contacts: DataFrame,
-    kept_by: str,
+    deadline: str,
     persona_end_date: str,
 ) -> DataFrame:
-    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20).
+    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24).
 
-    High from 4 points, Moderate from 1, else Low; a refusal takes one rung off. Unknown:
+    High from 4 points, Moderate from 2, else Low; a refusal takes one rung off. Unknown:
     no evidence in any dimension and no refusal, or no episode anchor (Q-12,
     ``a3_unknown_reason``).
     """
     df = left_join_all(
         episode, [episode, commitments, dlq_payments, pre_dlq, contacts]
-    ).withColumn("a3_kept_by", F.lit(kept_by))
+    ).withColumn("a3_promise_deadline", F.lit(deadline))
     scored = SCORECARD.score(df)
     no_episode = F.col("episode_start").isNull()
     unknown = DISPLAY_NAMES["unknown"]

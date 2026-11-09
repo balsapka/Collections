@@ -1,8 +1,5 @@
-"""A3 source nodes shared by both products: the episode anchor, the cycle ledger and
-the DCORE promise instalments."""
-
-from pyspark.sql import DataFrame
-from pyspark.sql import functions as F
+"""A3 source nodes shared by both products: the episode anchor, the cycle ledger, the
+DCORE plans and the promise events."""
 
 from enbd_collections.nodes.features.dcore._feat_dcore_utils import (
     null_cancelled_instalment_fields,
@@ -11,9 +8,19 @@ from enbd_collections.nodes.utils.config_dcore import (
     PTP_INSTALMENT_STATUS_CANCELLED,
     SETTLEMENT_INSTALMENT_STATUS_CANCELLED,
 )
+from pyspark.sql import DataFrame, Window
+from pyspark.sql import functions as F
 
-from .._common import GRAIN, require_columns, scoped, string_key
+from .. import _dcore_codes as codes
+from .._common import GRAIN, dcore_account_events, require_columns, scoped, string_key
 from .._dpd_journey.anchor import episode_start
+from .constants import (
+    DEADLINES,
+    FOLLOWUP_RUN_DAYS,
+    MATCH_DAYS,
+    MIN_PAYMENT_AED,
+    STATEMENT_FALLBACK_D,
+)
 
 DUES = ["account_id", "cycle_start", "cycle_end", "due_amount", "billed_amount"]
 PAYMENTS = ["account_id", "pay_from", "pay_date", "amount"]
@@ -152,4 +159,179 @@ def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional
             F.col("due_amount").cast("double").alias("due_amount"),
             F.col("payment_amount").cast("double").alias("payment_amount"),
         )
+    )
+
+
+# ── Promise events (D-A3-25) ──────────────────────────────────────────────────
+
+EVENTS = [
+    "account_id",
+    "event_date",
+    "event_kind",
+    "event_source",
+    "event_name",
+    "plan_id",
+    "promise_cutoff",
+    "promise_amount",
+    "promise_paid_amount",
+    "promise_outcome",
+]
+
+
+def _followup_promises(
+    obs_base: DataFrame, followup: DataFrame, agreements: DataFrame
+) -> DataFrame:
+    """Follow-up promise runs per account: rows less than 8 days after the previous one
+    belong to the same run, dated (and named) at its first row."""
+    rows = (
+        dcore_account_events(obs_base, followup, agreements)
+        .where(F.col("name").isin(*sorted(codes.PROMISE_EVENT)))
+        .select("account_id", "day", "name")
+        .distinct()
+    )
+    order = Window.partitionBy("account_id").orderBy("day", "name")
+    gap = F.datediff("day", F.lag("day").over(order))
+    new_run = F.when(gap.isNull() | (gap > FOLLOWUP_RUN_DAYS), 1).otherwise(0)
+    first = F.min(F.struct("day", "name"))
+    return (
+        rows.withColumn(
+            "_run", F.sum(new_run).over(order.rowsBetween(Window.unboundedPreceding, 0))
+        )
+        .groupBy("account_id", "_run")
+        .agg(first["day"].alias("fu_date"), first["name"].alias("event_name"))
+        .drop("_run")
+    )
+
+
+def _consolidate(plans: DataFrame, promises: DataFrame) -> DataFrame:
+    """One event per DCORE plan and per follow-up promise no plan claims. A plan takes
+    its nearest follow-up promise within 7 days (each promise at most once): the event
+    keeps the plan's date and the promise's name (``matched``)."""
+    pairs = (
+        plans.select("account_id", "plan_id", "event_date")
+        .join(promises, on="account_id")
+        .withColumn("_dist", F.abs(F.datediff("fu_date", "event_date")))
+        .where(F.col("_dist") <= MATCH_DAYS)
+    )
+    for key, tie in ((["plan_id"], "fu_date"), (["fu_date"], "plan_id")):
+        nearest = Window.partitionBy("account_id", *key).orderBy("_dist", tie)
+        pairs = pairs.withColumn("_r", F.row_number().over(nearest)).where("_r = 1")
+    table = plans.join(
+        pairs.select("account_id", "plan_id", "event_name"),
+        on=["account_id", "plan_id"],
+        how="left",
+    ).select(
+        "account_id",
+        "event_date",
+        F.when(F.col("event_name").isNotNull(), "matched")
+        .otherwise("table_only")
+        .alias("event_kind"),
+        F.col("plan_type").alias("event_source"),
+        "event_name",
+        "plan_id",
+    )
+    alone = promises.join(
+        pairs.select("account_id", "fu_date"), on=["account_id", "fu_date"], how="anti"
+    ).select(
+        "account_id",
+        F.col("fu_date").alias("event_date"),
+        F.lit("followup_only").alias("event_kind"),
+        F.lit("followup").alias("event_source"),
+        "event_name",
+        F.lit(None).cast("string").alias("plan_id"),
+    )
+    return table.unionByName(alone)
+
+
+def _cutoff(events: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
+    """``events`` + ``promise_cutoff``: the last day a payment still counts."""
+    day = F.col("event_date")
+    fixed = {
+        "next_month_end": F.last_day(F.add_months(day, 1)),
+        "30_days": F.date_add(day, 30),
+        "30_days_month_end": F.last_day(F.date_add(day, 30)),
+    }
+    if deadline in fixed:
+        return events.withColumn("promise_cutoff", fixed[deadline])
+    if deadline != "next_statement":
+        raise ValueError(f"promise deadline must be one of {DEADLINES}, got {deadline}")
+    nxt = (
+        events.select("account_id", "event_date")
+        .distinct()
+        .join(dues.select("account_id", "cycle_end"), on="account_id")
+        .where(F.col("cycle_end") > day)
+        .groupBy("account_id", "event_date")
+        .agg(F.min("cycle_end").alias("promise_cutoff"))
+    )
+    return events.join(nxt, on=["account_id", "event_date"], how="left").withColumn(
+        "promise_cutoff",
+        F.coalesce("promise_cutoff", F.date_add(day, STATEMENT_FALLBACK_D)),
+    )
+
+
+def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    obs_base: DataFrame,
+    followup: DataFrame,
+    agreements: DataFrame,
+    instalments: DataFrame,
+    dues: DataFrame,
+    payments: DataFrame,
+    deadline: str,
+) -> DataFrame:
+    """Promise events of the base's accounts, judged by payment (D-A3-25). ``EVENTS``.
+
+    Events: every non-cancelled PTP and settlement plan (dated at its start) and every
+    follow-up promise run (``_dcore_codes.PROMISE_EVENT``) no plan claims
+    (``event_kind`` matched / table_only / followup_only). Judged once: the payments
+    after the event day up to ``promise_cutoff`` (``deadline``, ``PROMISE_DEADLINE``)
+    against ``promise_amount``, the due of the cycle open on the event day (the last
+    known one, at least 100 AED). Paid: they reach it; partial: 100 AED or more; else
+    none. RL cash is dated at the month end, so the event month's cash counts in full.
+    """
+    plans = instalments.select(
+        "account_id", "plan_id", "plan_type", F.col("plan_start").alias("event_date")
+    ).distinct()
+    events = _cutoff(
+        _consolidate(plans, _followup_promises(obs_base, followup, agreements)),
+        dues,
+        deadline,
+    )
+    keys = ["account_id", "event_date"]
+    due = (
+        events.select(*keys)
+        .distinct()
+        .join(dues.select("account_id", "cycle_start", "due_amount"), on="account_id")
+        .where(F.col("cycle_start") <= F.col("event_date"))
+        .groupBy(*keys)
+        .agg(F.max(F.struct("cycle_start", "due_amount"))["due_amount"].alias("_due"))
+    )
+    after = (F.col("pay_date") > F.col("event_date")) | (
+        (F.col("pay_date") == F.col("event_date"))
+        & (F.col("pay_from") < F.col("pay_date"))
+    )
+    paid = (
+        events.select(*keys, "promise_cutoff")
+        .distinct()
+        .join(
+            payments.select("account_id", "pay_from", "pay_date", "amount"),
+            "account_id",
+        )
+        .where(after & (F.col("pay_date") <= F.col("promise_cutoff")))
+        .groupBy(*keys, "promise_cutoff")
+        .agg(F.sum("amount").alias("promise_paid_amount"))
+    )
+    amount = F.greatest(F.coalesce("_due", F.lit(0.0)), F.lit(float(MIN_PAYMENT_AED)))
+    got = F.coalesce("promise_paid_amount", F.lit(0.0))
+    return (
+        events.join(due, on=keys, how="left")
+        .join(paid, on=[*keys, "promise_cutoff"], how="left")
+        .withColumn("promise_amount", amount)
+        .withColumn("promise_paid_amount", got)
+        .withColumn(
+            "promise_outcome",
+            F.when(got >= F.col("promise_amount"), "paid")
+            .when(got >= MIN_PAYMENT_AED, "partial")
+            .otherwise("none"),
+        )
+        .select(*EVENTS)
     )

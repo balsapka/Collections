@@ -2,9 +2,8 @@
 
     JAVA_HOME=/opt/homebrew/opt/openjdk@17 python workplace_mirror/checks/a3_engine_spec.py
 
-DCORE's helpers are not mirrored; they are stubbed with the definitions V1 confirmed
-(paid: paid amount >= due amount; overdue: due before the observation and not paid;
-status C: cancelled).
+DCORE's helpers are not mirrored; the cancelled-instalment rule is stubbed (status C:
+cancelled).
 """
 
 # pylint: disable=wrong-import-position,import-outside-toplevel
@@ -35,20 +34,12 @@ def _stub_dcore() -> None:
         module(name)
     utils = module("enbd_collections.nodes.features.dcore._feat_dcore_utils")
 
-    def instalment_amount_flags():
-        paid = F.col("payment_amount") >= F.col("due_amount")
-        overdue = (F.col("due_date") < F.col("observation_date")) & ~F.coalesce(
-            paid, F.lit(False)
-        )
-        return F.coalesce(paid, F.lit(False)), ~paid, overdue
-
     def null_cancelled_instalment_fields(df, status):
         cancelled = F.col("instalment_status") == status
         for c in ("due_date", "due_amount", "payment_amount"):
             df = df.withColumn(c, F.when(cancelled, None).otherwise(F.col(c)))
         return df
 
-    utils.instalment_amount_flags = instalment_amount_flags
     utils.null_cancelled_instalment_fields = null_cancelled_instalment_fields
     cfg = module("enbd_collections.nodes.utils.config_dcore")
     cfg.PTP_INSTALMENT_STATUS_CANCELLED = cfg.SETTLEMENT_INSTALMENT_STATUS_CANCELLED = (
@@ -65,6 +56,7 @@ from enbd_collections.pipelines.crx_persona.a3_credibility import (  # noqa: E40
     build_dlq_payment_signals,
     build_instalments,
     build_pre_dlq_payment_signals,
+    build_promise_events,
 )
 from enbd_collections.pipelines.crx_persona.a3_credibility.constants import (  # noqa: E402
     SCORECARD,
@@ -76,6 +68,7 @@ spark = (
     SparkSession.builder.master("local[2]")
     .config("spark.ui.enabled", "false")
     .config("spark.sql.shuffle.partitions", "4")
+    .config("spark.driver.memory", "2g")
     .getOrCreate()
 )
 spark.sparkContext.setLogLevel("ERROR")
@@ -114,9 +107,9 @@ def reference(a, b, c, refusal):
     if (a, b, c, refusal) == ("thin", "none", "no_record", False):
         return "unknown"
     pts = LEVELS_A[a] + LEVELS_B[b] + LEVELS_C[c]
-    if pts >= 4:
-        return "moderate" if refusal else "high"
-    return "moderate" if pts >= 1 and not refusal else "low"
+    rungs = ["low", "moderate", "high"]
+    rung = 2 if pts >= 4 else 1 if pts >= 2 else 0  # Moderate from 2 (D-A3-24)
+    return rungs[max(rung - refusal, 0)]
 
 
 combos = [
@@ -140,119 +133,190 @@ for r in SCORECARD.score(cells).collect():
     )
     check(f"map {key}", r["a3_state"], f"payment_credibility_{reference(*key)}")
 
-# ── 2. Dimension A: both judges, grace, window ────────────────────────────────
-# Statements on the 5th; cycle (5th, next 5th]. P1: PTP 500 due 2026-07-20, paid 2026-07-30
-# (late, before the 2026-08-05 statement) -> kept by payments; DCORE says overdue.
-# P2: settlement 3 x 300 due 06-10, 07-10, 08-10; payments 300 on 06-08, 300 on 07-25 and
-# the PTP's 500 (payments are the account's, not the plan's) -> all three covered.
-# P3: PTP before the episode (excluded by the window).
+# ── 2. Dimension A: promise events judged by payment, deadlines, window ────────
+# CC statements on the 5th; cycle (5th, next 5th], one month's due 100 (A: 300 in the cycle
+# from 07-05). A: follow-up promises 06-20 + 06-24 (one run, no plan) paid 120 on 06-30
+# by the 07-05 statement -> paid; PTP plan 07-10 + a salary promise on 07-14 (matched),
+# 150 paid on 07-20 against 300 -> partial; promise 08-20 not concluded (statement 09-05);
+# SOFTPTP is no event; a settlement from 02-01 is before the episode. B: promise 05-03, paid
+# 200 on 05-10, after the 05-05 statement -> none (GRR), paid within 30 days. K: two
+# promises, each paid by its statement -> kept. M: plan 06-10 takes the nearer of two
+# promise runs (06-14), 06-05 stays alone; neither is paid -> broken (2 concluded, 0
+# kept).
+# Bk: three promises never paid -> broken (streak).
 stmts = [D(2026, m, 5) for m in range(1, 10)]
+
+
+def fu(rows):
+    return df(
+        [(a, f"{d} 10:00:00", "OC", "PTP", n) for a, d, n in rows],
+        "agreement_id string, action_ts string, action_code string, "
+        "result_category string, result_name string",
+    ).withColumn("action_ts", F.to_timestamp("action_ts"))
+
+
+def plan_rows(rows):
+    return df(
+        [(a, pid, pid.split(":")[0], d, d, 100.0, None) for a, pid, d in rows],
+        "account_id string, plan_id string, plan_type string, plan_start date, "
+        "due_date date, due_amount double, payment_amount double",
+    )
+
+
+A_ACCTS = ["A", "B", "K", "M", "Bk"]
 dues = df(
-    [("A", s, n, 100.0, 100.0) for s, n in zip(stmts, stmts[1:])],
+    [
+        (a, s, n, 300.0 if (a, s) == ("A", D(2026, 7, 5)) else 100.0, 100.0)
+        for a in A_ACCTS
+        for s, n in zip(stmts, stmts[1:])
+    ],
     "account_id string, cycle_start date, cycle_end date, due_amount double, "
     "billed_amount double",
 )
 pays = df(
     [
-        ("A", D(2026, 7, 30), D(2026, 7, 30), 500.0),
-        ("A", D(2026, 6, 8), D(2026, 6, 8), 300.0),
-        ("A", D(2026, 7, 25), D(2026, 7, 25), 300.0),
+        ("A", D(2026, 6, 30), D(2026, 6, 30), 120.0),
+        ("A", D(2026, 7, 20), D(2026, 7, 20), 150.0),
+        ("B", D(2026, 5, 10), D(2026, 5, 10), 200.0),
+        ("K", D(2026, 5, 20), D(2026, 5, 20), 150.0),
+        ("K", D(2026, 6, 20), D(2026, 6, 20), 150.0),
     ],
     "account_id string, pay_from date, pay_date date, amount double",
 )
-inst = df(
+a_followup = fu(
     [
-        ("A", "ptp:1", "ptp", D(2026, 7, 1), D(2026, 7, 20), 500.0, None),
-        (
-            "A",
-            "settlement:2",
-            "settlement",
-            D(2026, 5, 15),
-            D(2026, 6, 10),
-            300.0,
-            300.0,
-        ),
-        (
-            "A",
-            "settlement:2",
-            "settlement",
-            D(2026, 5, 15),
-            D(2026, 7, 10),
-            300.0,
-            300.0,
-        ),
-        (
-            "A",
-            "settlement:2",
-            "settlement",
-            D(2026, 5, 15),
-            D(2026, 8, 10),
-            300.0,
-            None,
-        ),
-        ("A", "ptp:3", "ptp", D(2026, 1, 1), D(2026, 2, 1), 100.0, None),
-    ],
-    "account_id string, plan_id string, plan_type string, plan_start date, due_date date, "
-    "due_amount double, payment_amount double",
+        ("A", "2026-06-20", "PROMISE TO PAY"),
+        ("A", "2026-06-24", "PROMISE TO PAY SCHEDULED"),
+        ("A", "2026-07-14", "CODE25 WILL PAY AT SALARY"),
+        ("A", "2026-07-25", "SOFTPTP"),
+        ("A", "2026-08-20", "PROMISE TO PAY"),
+        ("B", "2026-05-03", "PROMISE TO PAY"),
+        ("K", "2026-05-10", "PROMISE TO PAY"),
+        ("K", "2026-06-10", "WILL PAY AT SALARY"),
+        ("M", "2026-06-05", "PROMISE TO PAY"),
+        ("M", "2026-06-14", "PROMISE TO PAY"),
+        ("Bk", "2026-05-10", "PROMISE TO PAY"),
+        ("Bk", "2026-06-10", "PROMISE TO PAY"),
+        ("Bk", "2026-07-10", "PROMISE TO PAY"),
+    ]
 )
-ep = episode([("A", D(2026, 4, 1), False)])
-a_pay = build_commitment_signals(
-    ep, inst, pays, dues, "payments", "next_statement"
-).first()
-check("A payments concluded", a_pay["commitments_concluded"], 4)
-check("A payments kept", a_pay["commitments_kept"], 4)
-check("A payments level", a_pay["a3_commitments_level"], "kept")
-a_dc = build_commitment_signals(ep, inst, pays, dues, "dcore", "next_statement").first()
-check("A dcore concluded", a_dc["commitments_concluded"], 4)  # 08-10 overdue at OBS
-check("A dcore kept", a_dc["commitments_kept"], 2)
-check("A dcore level", a_dc["a3_commitments_level"], "partly_kept")
-# Broken: three PTPs never paid, all past their cutoff.
-inst_b = df(
+a_agreements = df([(a, a) for a in A_ACCTS], "account_id string, agreement_id string")
+inst = plan_rows(
     [
-        ("B", f"ptp:{i}", "ptp", D(2026, m, 1), D(2026, m, 15), 200.0, None)
-        for i, m in enumerate((5, 6, 7))
-    ],
-    "account_id string, plan_id string, plan_type string, plan_start date, "
-    "due_date date, due_amount double, payment_amount double",
+        ("A", "ptp:1", D(2026, 7, 10)),
+        ("A", "settlement:2", D(2026, 2, 1)),
+        ("M", "ptp:5", D(2026, 6, 10)),
+    ]
 )
-b = build_commitment_signals(
-    episode([("B", D(2026, 4, 1), False)]),
-    inst_b,
-    pays,
-    dues,
-    "payments",
-    "next_statement",
-).first()
+ep = episode([(a, D(2026, 4, 1), False) for a in A_ACCTS])
+obs_a = ep.select("account_id", "observation_date", "cif_id")
+
+
+def events_for(deadline):
+    return build_promise_events(
+        obs_a, a_followup, a_agreements, inst, dues, pays, deadline
+    )
+
+
+ev = events_for("next_statement")
 check(
-    "A broken streak",
-    (b["commitments_last_broken_n"], b["a3_commitments_level"]),
-    (3, "broken"),
-)
-# RL grace: due 06-15, cash in July (month end) keeps it; cash only in August does not.
-rl_inst = df(
+    "events A",
+    sorted(
+        (str(r["event_date"]), r["event_kind"], r["event_name"], r["promise_outcome"])
+        for r in ev.where("account_id = 'A'").collect()
+    ),
     [
-        ("R", "ptp:1", "ptp", D(2026, 6, 1), D(2026, 6, 15), 1000.0, None),
-        ("S", "ptp:2", "ptp", D(2026, 6, 1), D(2026, 6, 15), 1000.0, None),
+        ("2026-02-01", "table_only", None, "none"),
+        ("2026-06-20", "followup_only", "PROMISE TO PAY", "paid"),
+        ("2026-07-10", "matched", "CODE25 WILL PAY AT SALARY", "partial"),
+        ("2026-08-20", "followup_only", "PROMISE TO PAY", "none"),
     ],
-    "account_id string, plan_id string, plan_type string, plan_start date, "
-    "due_date date, due_amount double, payment_amount double",
+)
+check(
+    "events M",
+    sorted(
+        (str(r["event_date"]), r["event_kind"])
+        for r in ev.where("account_id = 'M'").collect()
+    ),
+    [("2026-06-05", "followup_only"), ("2026-06-10", "matched")],
+)
+check(
+    "cutoff A 07-10",
+    [
+        str(r["promise_cutoff"])
+        for r in ev.where("account_id = 'A' AND event_date = '2026-07-10'").collect()
+    ],
+    ["2026-08-05"],
+)
+sig = build_commitment_signals(ep, ev)
+check(
+    "A counts",
+    [
+        (r["commitments_concluded"], r["commitments_kept"], r["commitments_partial"])
+        for r in sig.where("account_id = 'A'").collect()
+    ],
+    [(2, 1, 1)],
+)
+check(
+    "A levels (next statement)",
+    by_account(sig, "a3_commitments_level"),
+    {"A": "partly_kept", "B": "thin", "K": "kept", "M": "broken", "Bk": "broken"},
+)
+sig30 = build_commitment_signals(ep, events_for("30_days"))
+check(
+    "B level (30 days)", by_account(sig30, "a3_commitments_level")["B"], "partly_kept"
+)
+# RL, end of the next month: cash dated at the month end. R: promise 06-15, July cash ->
+# paid; S: only August cash -> none; T: June cash counts (same month); U: promise on
+# 06-30, June cash dated 06-30 counts.
+rl_accts = ["R", "S", "T", "U"]
+rl_dues = df(
+    [
+        (
+            a,
+            D(2026, m, 1) - dt.timedelta(days=1),
+            D(2026, m + 1, 1) - dt.timedelta(days=1),
+            1000.0,
+            1000.0,
+        )
+        for a in rl_accts
+        for m in range(1, 9)
+    ],
+    "account_id string, cycle_start date, cycle_end date, due_amount double, "
+    "billed_amount double",
 )
 rl_pays = df(
     [
         ("R", D(2026, 7, 1), D(2026, 7, 31), 1000.0),
         ("S", D(2026, 8, 1), D(2026, 8, 31), 1000.0),
+        ("T", D(2026, 6, 1), D(2026, 6, 30), 1000.0),
+        ("U", D(2026, 6, 1), D(2026, 6, 30), 1000.0),
     ],
     "account_id string, pay_from date, pay_date date, amount double",
 )
-rl = build_commitment_signals(
-    episode([("R", D(2026, 4, 1), False), ("S", D(2026, 4, 1), False)]),
-    rl_inst,
+rl_ev = build_promise_events(
+    episode([(a, D(2026, 4, 1), False) for a in rl_accts]).select(
+        "account_id", "observation_date", "cif_id"
+    ),
+    fu(
+        [
+            ("R", "2026-06-15", "PROMISE TO PAY"),
+            ("S", "2026-06-15", "PROMISE TO PAY"),
+            ("T", "2026-06-15", "PROMISE TO PAY"),
+            ("U", "2026-06-30", "PROMISE TO PAY"),
+        ]
+    ),
+    df([(a, a) for a in rl_accts], "account_id string, agreement_id string"),
+    plan_rows([]),
+    rl_dues,
     rl_pays,
-    dues,
-    "payments",
     "next_month_end",
 )
-check("A RL grace", by_account(rl, "commitments_kept"), {"R": 1, "S": 0})
+check(
+    "RL outcomes",
+    by_account(rl_ev, "promise_outcome"),
+    {"R": "paid", "S": "none", "T": "paid", "U": "paid"},
+)
 
 # ── 3-4. Dimensions B and C on the ledger ─────────────────────────────────────
 # Months (result statement = month end). X: episode 2026-05; cycles ending 06..08 paid in
@@ -305,9 +369,13 @@ check("C W reason", by_account(c, "pre_dlq_reason")["W"], "censored")
 # Ledger: payments land in (cycle_start, cycle_end].
 lg = build_cycle_ledger(dues, pays)
 check(
-    "ledger 07-05..08-05",
-    [r["paid_amount"] for r in lg.collect() if r["cycle_end"] == D(2026, 8, 5)],
-    [800.0],
+    "ledger A 07-05..08-05",
+    [
+        r["paid_amount"]
+        for r in lg.collect()
+        if r["cycle_end"] == D(2026, 8, 5) and r["account_id"] == "A"
+    ],
+    [150.0],
 )
 
 # ── 5. Contacts ───────────────────────────────────────────────────────────────
@@ -323,6 +391,7 @@ fu_rows += [
     ("R4", "2026-07-01 11:00:00", "OC", "SUC", "PROMISE TO PAY"),
     ("D1", "2026-07-01 10:00:00", "OC", "SUC", "DISPUTE"),
     ("H1", "2026-07-01 10:00:00", "OC", "SUC", "CUSTOMER HUNG UP"),
+    ("P1", "2026-07-01 10:00:00", "OC", "SUC", "PARTIALLY PAID"),
 ]
 fu_rows += [
     ("H1", f"2026-07-{d:02d} 10:00:00", "OC", "UNS", "RINGING NO REPLY")
@@ -333,7 +402,7 @@ followup = df(
     "agreement_id string, action_ts string, action_code string, "
     "result_category string, result_name string",
 ).withColumn("action_ts", F.to_timestamp("action_ts"))
-accts = ["R1", "R2", "R3", "R4", "R5", "D1", "H1"]
+accts = ["R1", "R2", "R3", "R4", "R5", "D1", "H1", "P1"]
 agreements = df([(a, a) for a in accts], "account_id string, agreement_id string")
 ep_ct = episode([(a, D(2026, 4, 1), False) for a in accts])
 c_dues = df(
@@ -368,9 +437,11 @@ check(
         "R5": False,
         "D1": False,
         "H1": False,
+        "P1": False,
     },
 )
 check("R4 latest", by_account(ct, "last_rpc_disposition")["R4"], "ptp")
+check("P1 latest", by_account(ct, "last_rpc_disposition")["P1"], "paid")
 check("dispute", by_account(ct, "a3_dispute_flag")["D1"], True)
 check(
     "hung up / no pickup",
@@ -381,21 +452,26 @@ check(
     (True, True),
 )
 
-# ── 6. State: a refusal demotes, no episode is Unknown ────────────────────────
-ep_s = episode([("A", D(2026, 4, 1), False), ("N", None, None)])
+# ── 6. State: Moderate from 2, a refusal demotes, no episode is Unknown ────────
+ep_s = episode(
+    [("K", D(2026, 4, 1), False), ("A", D(2026, 4, 1), False), ("N", None, None)]
+)
 st = build_a3_credibility(
     ep_s,
-    build_commitment_signals(ep_s, inst, pays, dues, "payments", "next_statement"),
+    build_commitment_signals(ep_s, ev),
     build_dlq_payment_signals(ep_s, ledger, "cc_60_180"),
     build_pre_dlq_payment_signals(ep_s, ledger),
     build_contact_signals(ep_s, followup, agreements, inst, pays, dues, "cc_60_180"),
-    "payments",
+    "next_statement",
     "2026-08-31",
 )
 check("state N", by_account(st, "a3_unknown_reason")["N"], "no_episode")
 check(
-    "state A", by_account(st, "a3_state")["A"], "payment_credibility_moderate"
-)  # kept 2, no B/C
+    "state K / A",
+    (by_account(st, "a3_state")["K"], by_account(st, "a3_state")["A"]),
+    ("payment_credibility_moderate", "payment_credibility_low"),
+)  # kept 2 / partly kept 1, no B or C
+check("deadline column", by_account(st, "a3_promise_deadline")["K"], "next_statement")
 
 # ── 7. Instalments: cancelled plans and instalments drop out ──────────────────
 obs_i = df(
@@ -428,7 +504,7 @@ check(
     [("ptp:1", "2026-07-20"), ("settlement:5", "2026-06-10")],
 )
 
-# ── 8. Kedro: both product pipelines end to end, both judges ──────────────────
+# ── 8. Kedro: both product pipelines end to end ──────────────────
 from kedro.io import DataCatalog, MemoryDataset  # noqa: E402
 from kedro.runner import SequentialRunner  # noqa: E402
 
@@ -507,31 +583,91 @@ for product, make, inputs, model in [
     ("cc", cc_pipeline, cc_in, "cc_60_180"),
     ("rl", rl_pipeline, rl_in, "rl_60_180"),
 ]:
-    for judge in ("payments", "dcore"):
-        pipe = make()
-        data = {
-            **shared,
-            **inputs,
-            "params:model_id": model,
-            "params:a3_kept_by": judge,
+    pipe = make()
+    data = {**shared, **inputs, "params:model_id": model}
+    cat = DataCatalog(
+        {n: MemoryDataset(v, copy_mode="assign") for n, v in data.items()}
+        | {n: MemoryDataset(copy_mode="assign") for n in pipe.all_outputs()}
+    )
+    SequentialRunner().run(pipe, cat)
+    out = cat.load(f"crx_{product}_a3_payment_credibility")
+    got = {
+        r["account_id"]: (r["a3_state"], r["a3_refusal_flag"], r["a3_promise_deadline"])
+        for r in out.collect()
+    }
+    check(f"kedro {product} rows", sorted(got), ["A", "N"])
+    check(f"kedro {product} N", got["N"][0], "payment_credibility_unknown")
+    check(f"kedro {product} A refusal (paid after)", got["A"][1], False)
+    check(
+        f"kedro {product} deadline",
+        got["A"][2],
+        {"cc": "next_statement", "rl": "next_month_end"}[product],
+    )
+    check(
+        f"kedro {product} promises concluded",
+        by_account(out, "commitments_concluded")["A"],
+        1,
+    )
+
+# ── 9. TEMPORARY (A3 bundle 20): the check pipelines run and log every block ──
+import logging  # noqa: E402
+
+from enbd_collections.pipelines.crx_persona.a3_credibility import (  # noqa: E402
+    check as a3_check,
+)
+from enbd_collections.pipelines.crx_persona.cc_a3_payment_credibility import (  # noqa: E402
+    create_check_pipeline as cc_check,
+)
+from enbd_collections.pipelines.crx_persona.rl_a3_payment_credibility import (  # noqa: E402
+    create_check_pipeline as rl_check,
+)
+
+logged = []
+handler = logging.Handler()
+handler.emit = lambda record: logged.append(record.getMessage())
+logging.getLogger(a3_check.__name__).addHandler(handler)
+logging.getLogger(a3_check.__name__).setLevel(logging.INFO)
+old_out = df(
+    [
+        ("A", OBS, "payment_credibility_moderate", 1, False, "broken", 2, "ptp"),
+        ("N", OBS, "payment_credibility_unknown", 0, False, "thin", 0, None),
+    ],
+    "account_id string, observation_date date, a3_state string, a3_points_total int, "
+    "a3_refusal_flag boolean, a3_commitments_level string, "
+    "commitments_concluded int, last_rpc_disposition string",
+)
+for product, make, inputs, model in [
+    ("cc", cc_check, cc_in, "cc_60_180"),
+    ("rl", rl_check, rl_in, "rl_60_180"),
+]:
+    pipe = make()
+    data = {
+        **shared,
+        **inputs,
+        "params:model_id": model,
+        f"crx_{product}_a3_payment_credibility": old_out,
+    }
+    cat = DataCatalog(
+        {
+            n: MemoryDataset(v, copy_mode="assign")
+            for n, v in data.items()
+            if n in pipe.inputs()
         }
-        cat = DataCatalog(
-            {n: MemoryDataset(v, copy_mode="assign") for n, v in data.items()}
-            | {n: MemoryDataset(copy_mode="assign") for n in pipe.all_outputs()}
-        )
-        SequentialRunner().run(pipe, cat)
-        out = cat.load(f"crx_{product}_a3_payment_credibility")
-        got = {
-            r["account_id"]: (
-                r["a3_state"],
-                r["a3_commitments_level"],
-                r["a3_refusal_flag"],
-            )
-            for r in out.collect()
-        }
-        check(f"kedro {product} {judge} rows", sorted(got), ["A", "N"])
-        check(f"kedro {product} {judge} N", got["N"][0], "payment_credibility_unknown")
-        check(f"kedro {product} {judge} A refusal (paid after)", got["A"][2], False)
+        | {n: MemoryDataset(copy_mode="assign") for n in pipe.all_outputs()}
+    )
+    SequentialRunner().run(pipe, cat)
+    spark.catalog.clearCache()  # one long session: free the CC run first
+blocks = [m.split("===")[1].strip() for m in logged]
+check(
+    "check blocks",
+    sorted(set(blocks)),
+    sorted(
+        f"{b} START" for b in ["A3 OUTPUT", "A3 PROMISES", "A3 LEVELS", "A3 CONTACTS"]
+    ),
+)
+check("check old Moderate from 2", "state old_m2:\n  low: 1 (50.0%)" in logged[0], True)
+check("check GRR vs 30 days", "low | moderate: 1" in logged[0], True)
+print("\n\n".join(logged[:4]))
 
 print("\n".join(FAILS) if FAILS else "a3 engine spec: all checks pass")
 sys.exit(1 if FAILS else 0)

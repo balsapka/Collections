@@ -276,3 +276,37 @@ PAYMENT_CONFIRMED = {
     "ACCOUNT PAID",
     "CUSTOMER MADE PAYMENT",
 }
+
+# A3 promise events (D-A3-25): a commitment to pay logged in the follow-up, any action
+# code. Explicit promises and promises to pay at salary; SOFTPTP, re-affirmations
+# (RETAIN PTP), arrangements (judged from their settlement record) and payment reports
+# are not events. EOSB_PTP_DOCUMENTS and HISTORICAL PROMISE TO PAY are near-empty.
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+PROMISE_EVENT = frozenset(
+    {
+        "CODE25 WILL PAY AT SALARY",
+        "DIGITAL COLLECT  PTP SUBSCRIBED",
+        "EOSB_PTP_DOCUMENTS",
+        "HISTORICAL PROMISE TO PAY",
+        "KSA/CUSTOMER WILL PAY AT SALARY",
+        "KSA/PROMISE TO PAY",
+        "PROMISE TO PAY",
+        "PROMISE TO PAY PARTIALLY",
+        "PROMISE TO PAY SCHEDULED",
+        "WILL PAY AT SALARY",
+    }
+)
+
+# A3: a payment reported as made by the customer or DCORE (confirmed, partial or
+# claimed), not a promise. Drives the "paid" contact disposition.
+# Values: upper-cased, leading/trailing whitespace stripped, sorted ASC.
+PAYMENT_REPORTED = frozenset(
+    PAYMENT_CONFIRMED
+    | {
+        "CLAIMS MADE PAYMENT",
+        "CUSTOMER KEPT PROMISE MADE",
+        "KSA/PAID AMOUNT",
+        "KSA/PARTIAL PAYMENT",
+        "PARTIALLY PAID",
+    }
+)
