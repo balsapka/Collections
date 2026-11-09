@@ -159,6 +159,26 @@ Measured, not assumed (V2, V3).
   60–180 states: CC 1.3 / 14.5 / 71.8 / 12.4 (High / Moderate / Low / Unknown), RL 1.6 / 24.0 / 67.6 /
   6.9. Ships in the next A3 bundle (`MODERATE_FROM = 2`).
 
+- **D-A3-25: Dimension A = promise events judged by a sufficient payment, on GRR's deadline**
+  (user, 2026-11-09, from V1f / V1g, `bundle_helpers/a3_final/thresholds_v1f_review.md`;
+  replaces D-A3-11's instalment rule, ships in bundle 20).
+  - Events: every non-cancelled PTP and settlement plan (dated at its start), plus every
+    follow-up promise (`_dcore_codes.PROMISE_EVENT`: promise to pay, scheduled, digital collect,
+    pay at salary; any action code) that no plan claims. Follow-up promises less than 8 days
+    apart are one event, dated at the first; a plan takes its nearest follow-up promise within
+    7 days, each at most once. SOFTPTP, RETAIN PTP, arrangement names without a plan and payment
+    reports are not events. Account level.
+  - Judged once: payments after the event day up to the deadline against the due of the cycle
+    open on the event day (the last known one, at least 100 AED). Paid: they reach it; partial:
+    100 AED or more (counts as not kept); else none. Concluded once the deadline is on or before
+    the observation date.
+  - Deadline (GRR): CC the next statement after the event day, however close (no statement yet:
+    31 days); RL the end of the next month (cash is month-level; the event month's cash counts
+    in full). The 30-day alternative (V1g: higher AUC, CC 0.740 vs 0.714) is built in
+    (`PROMISE_DEADLINE`) and logged by the bundle check, pending GRR.
+  - The ladder and points are unchanged (Kept 2 / Partly kept 1 / Thin 0 / Broken −1).
+  - Contact disposition: payment reports (`_dcore_codes.PAYMENT_REPORTED`) read `paid`.
+
 - **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
   `bundle_helpers/b17_a3/a3_check_review.md`). An instalment is kept when the payments since the plan
   start reach the plan's cumulative due by the first statement on or after the due date (CC) / the end
