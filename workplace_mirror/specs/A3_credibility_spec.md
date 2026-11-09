@@ -260,6 +260,14 @@ whether the delinquency behaves as if paid). The user also questions how strict 
   180+). Exploration V1f, `bundle_helpers/a3_final/sonnet_a3_v1f_promise_events_prompt.md`: the
   follow-up promise set, coverage gain, outcome by payment vs bucket movement, overlap with Dimension
   B, levels, and which ranks next-3-month outcomes better. Bundle 17's instalment rule is the baseline.
+  V1f back 2026-11-09 for 60_180 (`bundle_helpers/a3_final/v1f_summary_60_180.md`, review
+  `thresholds_v1f_review.md`): follow-up promises raise coverage (33.5% vs 23.3% CC accounts) and are
+  paid as often as table plans, but the payment reading depends on the grace window's length (a fixed
+  window is needed), bucket movement adds nothing independent at 60–180, and A overlaps B in the
+  recent months (A's own information is in older events). 180+ not run.
+- **Moderate threshold (2026-11-09, what-if `threshold_whatif_summary_60_180.md`):** Moderate from 2
+  moves 51.5% CC / 42.4% RL to Low, 85% of the CC movers having only a clean pre-delinquency record.
+  Decision pending.
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
 - D-A3-11: V1d back (2026-11-06, `v1d_summary_60_180.md`): the ledger is complete, DCORE 'paid' is premature (PTP) or late (settlement). Both options ship in bundle 17 for the comparison; proposal: payments, grace to the next statement. Open with it: the payments judge's cumulative rule breaks a settlement instalment that sits behind an earlier miss (V1d cascade addendum, `v1d_cascade_cc_60_180.md`: 65% of CC settlement G1 is behind an earlier miss, 72% pays its own amount by the cut-off); the user applies bundle 17 as is (2026-11-06) and reads the effect from the check (`A3 COMMITMENTS`, `A3 BROKEN`) before choosing.
