@@ -37,23 +37,34 @@ Decided, to follow
   least 100 AED (D-A3-5).
 
 Questions (each gets a short answer with the key numbers)
-Q1 Follow-up result names. Which result names in dcore_prm_followup_outcomes are a promise to pay or an
-   arrangement (vs a payment claim, a confirmation of a past payment, or plan admin)? Start from
-   _dcore_codes.PROMISE_TO_PAY and RETAIN_PTP; list every name with counts (events, accounts) in the
-   window, by action_code, and propose the promise set. For each promise name: share of its events with
-   a PTP / settlement table record on the same agreement within 7 / 30 days (before or after), and
-   share standalone (no table record).
-Q2 Promise events. Build the event set: table plans (PTP start / settlement start) plus follow-up
-   promises; a follow-up promise within 7 days of a table plan is the same event (report 7 and 30).
-   Report events per account (0 / 1 / 2 / 3+), the share of accounts with at least one event vs at
-   least one concluded instalment today (bundle 17), and how many accounts move out of Thin.
+Q1 Every result name, classified. List every result_name that occurs in dcore_prm_followup_outcomes
+   for the model's agreements (and in stg_dcore_mst_result / the result master, if it has a catalog
+   entry) with counts in the Dimension A window and overall: rows, agreements, accounts, by action_code.
+   Classify each name with the proposed classes P1 / P2 / P3 / A1 / A2 / R / K / I / D / N / not about
+   paying (the table is in workplace_mirror/bundle_helpers/a3_final/dcore_promise_names_assessment.md,
+   section 2; copy it into the README). List every name that occurs but is not in that table, with
+   counts and your proposed class. Flag any class assignment the data contradicts (e.g. a "promise"
+   name logged mostly after a payment).
+Q2 Consolidated promise events (the rules are in the same file, section 3):
+   - follow-up events: P1, P2, P3, A2 names, any action code; rows on one agreement within 7 days of
+     each other are one event, dated at the first;
+   - table events: non-cancelled PTPs (promise start, else event date) and settlement plans (event
+     date);
+   - match a follow-up event to a table event on the same agreement within +/- 7 days (nearest, each
+     at most once); A1 names are matched to settlement records the same way.
+   Report: the match-distance distribution (0, 1-3, 4-7, 8-30, > 30 days, none); matched / table-only /
+   follow-up-only counts by class and name; events per account (0 / 1 / 2 / 3+); the share of accounts
+   with at least one event vs at least one concluded instalment today (bundle 17); how many accounts
+   move out of Thin. Repeat the collapse and the match with 30 days and say what changes.
 Q3 Reference date. A table PTP has a due date, a follow-up promise only its day. Judge each event
    against (a) the event day and (b) the due date where one exists; report how often the two give a
    different outcome.
 Q4 Outcome by payment. Per event: paid (payments in (reference date, cutoff] >= the minimum payable due
-   of the cycle the cutoff closes), partial (>= 100 AED but below it), none. Shares by event source
-   (PTP table, settlement table, follow-up only) and plan type; settlement plans: per instalment and
-   per plan.
+   of the cycle the cutoff closes), partial (>= 100 AED but below it), none. Shares by event kind
+   (matched / table-only / follow-up only), class and plan type; settlement plans: per instalment and
+   per plan. Are follow-up-only events paid at a rate close to matched ones (then they are real
+   promises the tables miss)? Also DCORE's own reading: the share of events with a K name (kept /
+   payment confirmation) in their grace window, crosstabbed with the payment outcome.
 Q5 Outcome by DPD movement. Per event: the bucket at the statement / month end before the reference
    date against the one at the cutoff: improved / held / rolled (CC 08 accumulates; say how you treat
    it). Crosstab with Q4. How close is "held or improved" to "paid", by segment (60_180 vs 180+)?
@@ -83,11 +94,11 @@ population, no looped plan chains, no row-level collect, check PartitionFilters 
 Work in a new tracked folder tmp_validation/a3_v1f/ and commit only that.
 
 Deliverables
-1. Snippet + README_v1f.md (tables, columns and the proposed promise set with your reasons), pushed from
-   UAT.
+1. Snippet + README_v1f.md (tables, columns, the classification table with every added name and your
+   reasons), pushed from UAT.
 2. The user runs it in PROD per model_id and commits results_v1f_<model_id>.md.
 3. Back in UAT: summary_v1f.md, under 80 lines: one line per question per model with the key numbers;
-   the promise set; then a verdict in one paragraph: can Dimension A be built this way reliably,
+   the final promise set (names and classes, with their counts); then a verdict in one paragraph: can Dimension A be built this way reliably,
    is the payment reading or the bucket-movement reading better (and at 180+), and what it adds over
    Dimension B.
 ````
