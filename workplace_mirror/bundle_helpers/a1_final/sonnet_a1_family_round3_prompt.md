@@ -323,7 +323,8 @@ data).
     behind it.
   - The user runs it in PROD, switching `model_id` in `conf/dev/globals_dev.yml` and back, and
     commits the results.
-- **Summary.** Back in UAT, append a "Round 3" section to `summary.md`, per model_id. Keep it short:
+- **Summary.** Back in UAT, write a **new file** `summary_r3.md`, one section per model_id. Leave
+  `summary.md` (rounds 1–2) unchanged. Keep it short:
   - **Cheques.** What `CHQ RTN` / `CHQ NO` legs are, how much was counted in round 2, and in which
     family.
   - **Labels.** Which existing classifications were reusable.
