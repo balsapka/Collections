@@ -1,6 +1,6 @@
-# Mirror bundle 20 — A3 — promise events judged by payment on GRR's deadline, Moderate from 2
+# Mirror bundle 20 — A3 — promise events judged by payment on GRR's deadline over 12 months, Moderate from 2
 
-apply_bundle version: 7 · built 2026-11-09 from `58df544..75f0626` · source: 1 added, 14 replaced, 0 deleted · helpers: 0
+apply_bundle version: 7 · built 2026-11-09 from `58df544..8f9d69e` · source: 1 added, 14 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -43,7 +43,7 @@ Then check: `kedro registry list | grep a3` lists `crx_cc_a3_check` and `crx_rl_
 **Step 5.** Commit the source only, and push:
 
 ```bash
-git add src conf && git commit -m "A3: promise events judged by payment on GRR's deadline, Moderate from 2 (bundle 20)" && git push
+git add src conf && git commit -m "A3: promise events judged by payment on GRR's deadline over 12 months, Moderate from 2 (bundle 20)" && git push
 ```
 
 **Undo** (before step 5) — puts every touched file back to the last commit:
@@ -91,20 +91,21 @@ assistant in UAT.
 
 ## What this bundle does
 
-**What this bundle does.** Changes A3 payment credibility's Dimension A to GRR's promise events judged by a sufficient payment, moves the Moderate cut-off to 2 points, and removes the DCORE judge option. Apply on top of bundles 17–19 and bundle 17's cleanup.
+**What this bundle does.** Changes A3 payment credibility's Dimension A to GRR's promise events judged by a sufficient payment over the last 12 months, moves the Moderate cut-off to 2 points, and removes the DCORE judge option. Apply on top of bundles 17–19 and bundle 17's cleanup.
 
-**What changes in the logic** (spec `specs/A3_credibility_spec.md`, D-A3-24, D-A3-25):
+**What changes in the logic** (spec `specs/A3_credibility_spec.md`, D-A3-24, D-A3-25, D-A3-26):
 - **Promises (Dimension A) are promise events, judged by payment.**
   - **Events:** every non-cancelled PTP and settlement plan (dated at its start), plus every follow-up promise (`_dcore_codes.PROMISE_EVENT`: promise to pay, scheduled, digital collect, pay at salary) that no plan claims. Follow-up promises less than 8 days apart are one event; a plan takes its nearest follow-up promise within 7 days.
   - **Judged once:** paid when the payments after the event day reach the due of the cycle open on that day (at least 100 AED) by the deadline. Partial: 100 AED or more but below it (counts as not kept). Otherwise none.
   - **Deadline (GRR):** CC the next statement after the promise, however close; RL the end of the next month. One constant (`PROMISE_DEADLINE`); the 30-day alternative is built in and runs in the check.
-  - The ladder is unchanged (Kept / Partly kept / Thin / Broken on the last 12 months of the episode); points Kept 2, Partly 1, Thin 0, Broken −1.
+  - **Window:** the last 12 months up to the observation date, regardless of the episode start (was: from the episode start), so promises from an earlier delinquency episode count. Contacts and the refusal flag stay on the current episode.
+  - The ladder is unchanged (Kept / Partly kept / Thin / Broken); points Kept 2, Partly 1, Thin 0, Broken −1.
 - **Moderate from 2 points** (was 1), High from 4; a refusal still takes one rung off.
 - **Contact disposition:** payment reports (partially paid, claims made payment, KSA paid / partial payment, customer kept promise made) now read `paid`, not `ptp` (diagnostic only; the refusal rule is unchanged).
 
 **Code:** `a3_credibility/sources.py` gains `build_promise_events` (new dataset `crx_<p>_a3_promise_events`); `build_commitment_signals` reads the events; the DCORE judge, `KEPT_BY`, `GRACE` and `params:a3_kept_by` go. Output: `a3_kept_by` becomes `a3_promise_deadline`, `commitments_partial` is added. `_dcore_codes` gains `PROMISE_EVENT` and `PAYMENT_REPORTED`.
 
-**Check** (temporary, `a3_credibility/check.py`, pipelines `crx_<p>_a3_check`): the latest month through the new engine with GRR's deadline (`crx_<p>_a3_check_grr`) and with 30 days (`crx_<p>_a3_check_30d`), against bundle 17's real output. Blocks: `A3 OUTPUT` (state old / old at Moderate from 2 / GRR / 30 days, crosstabs), `A3 PROMISES` (events by kind and source, outcomes, follow-up names, accounts with a concluded promise), `A3 LEVELS` (Dimension A levels and crosstabs), `A3 CONTACTS` (refusal and disposition old × new).
+**Check** (temporary, `a3_credibility/check.py`, pipelines `crx_<p>_a3_check`): the impact of the bundle on the latest month, step by step, against bundle 17's real output: `old` (bundle 17) → `old_m2` (Moderate from 2) → `grr_ep` (promise events, GRR's deadline, the episode window) → `grr` (as shipped, 12 months; `crx_<p>_a3_check_grr`), plus `d30` (30 days; `crx_<p>_a3_check_30d`). Blocks: `A3 OUTPUT` (each state, then one crosstab per step with the share changed: whole bundle, thresholds, promise events, 12-month window, 30 days instead of GRR), `A3 PROMISES` (events by kind and source, outcomes, events concluded before the episode start, follow-up names, accounts with a concluded promise), `A3 LEVELS` (Dimension A levels per variant and per step), `A3 CONTACTS` (refusal and disposition old × new).
 
 ## Instructions for the workplace assistant
 
@@ -2346,15 +2347,22 @@ from .sources import (
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a3_credibility/check.py`
-action: add · new sha256 `d3e5fdc1ab55249d7dc4f79491977808a27514096fc9502edd0f5aa872803e79` · new trailing newline: yes
+action: add · new sha256 `d9489a656f41c60a0e2116d1c8842b51a56c87d871fe0ca720eceda96f38f61e` · new trailing newline: yes
 
 New:
 
 `````python
-"""TEMPORARY (A3 bundle 20): the new A3 on the latest month, with promise events judged
-by GRR's deadline and by 30 days, against the A3 output persisted before the bundle
-(bundle 17: instalments, Moderate from 1). Logs ``A3 OUTPUT``, ``A3 PROMISES``,
-``A3 LEVELS``, ``A3 CONTACTS``. Removed by the bundle's cleanup.
+"""TEMPORARY (A3 bundle 20): the impact of the bundle on the latest month, against the A3
+output persisted before it (bundle 17: instalments, Moderate from 1). Variants:
+
+- ``old``: bundle 17 as persisted; ``old_m2``: its points with Moderate from 2;
+- ``grr_ep``: promise events, GRR's deadline, the episode window (bundle 17's);
+- ``grr``: as shipped (12 months regardless of the episode, D-A3-26);
+- ``d30``: as shipped with the 30-day deadline.
+
+old -> old_m2 is the threshold step, old_m2 -> grr_ep the events, grr_ep -> grr the
+window. Logs ``A3 OUTPUT``, ``A3 PROMISES``, ``A3 LEVELS``, ``A3 CONTACTS``. Removed by
+the bundle's cleanup.
 
     kedro run --pipeline=crx_<p>_a3_check
 """
@@ -2369,7 +2377,7 @@ from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .classify import build_a3_credibility
-from .constants import HIGH_FROM, MODERATE_FROM
+from .constants import HIGH_FROM, MODERATE_FROM, PROMISE_DEADLINE
 from .pipeline import TAGS, create_a3_pipeline
 from .signals import build_commitment_signals
 from .sources import build_promise_events
@@ -2388,6 +2396,22 @@ def latest_month(obs_base: DataFrame, persona_end_date: str) -> DataFrame:
     """The base rows of persona_end_date's month."""
     month = F.trunc(F.lit(str(persona_end_date)), "month")
     return obs_base.filter(F.trunc("observation_date", "month") == month)
+
+
+def episode_events(events: DataFrame, episode: DataFrame) -> DataFrame:
+    """Events on or after the episode start (bundle 17's window; censored: no bound)."""
+    start = episode.select(
+        "account_id",
+        F.when(
+            ~F.coalesce(F.col("episode_left_censored"), F.lit(False)),
+            F.col("episode_start"),
+        ).alias("_start"),
+    )
+    return (
+        events.join(start, "account_id", "left")
+        .where(F.col("_start").isNull() | (F.col("event_date") >= F.col("_start")))
+        .drop("_start")
+    )
 
 
 def _counts(df: DataFrame, cols: list[str], total: int) -> list[str]:
@@ -2414,6 +2438,7 @@ def _short(state: Column) -> Column:
 
 def compare_a3(
     old: DataFrame,
+    grr_ep: DataFrame,
     grr: DataFrame,
     d30: DataFrame,
     events_grr: DataFrame,
@@ -2423,8 +2448,8 @@ def compare_a3(
 ) -> None:
     """The check blocks (latest month). The inputs are checkpointed first: the event
     tables are in memory, and every count would otherwise rebuild them."""
-    grr, d30, events_grr, events_30d = (
-        df.localCheckpoint() for df in (grr, d30, events_grr, events_30d)
+    grr_ep, grr, d30, events_grr, events_30d = (
+        df.localCheckpoint() for df in (grr_ep, grr, d30, events_grr, events_30d)
     )
     month = F.trunc(F.lit(str(persona_end_date)), "month")
     newest = F.row_number().over(
@@ -2456,25 +2481,54 @@ def compare_a3(
         F.col("last_rpc_disposition").alias("new_disp"),
         F.col("a3_refusal_flag").alias("new_refusal"),
     )
+    ep = grr_ep.select(
+        "account_id",
+        _short(F.col("a3_state")).alias("grr_ep"),
+        F.col("a3_commitments_level").alias("grr_ep_level"),
+        F.col("commitments_concluded").alias("grr_ep_concluded"),
+    )
     f = d30.select(
         "account_id",
         _short(F.col("a3_state")).alias("d30"),
         F.col("a3_commitments_level").alias("d30_level"),
         F.col("commitments_concluded").alias("d30_concluded"),
     )
-    both = g.join(f, "account_id").join(o, "account_id", "left").localCheckpoint()
+    both = (
+        g.join(ep, "account_id")
+        .join(f, "account_id")
+        .join(o, "account_id", "left")
+        .localCheckpoint()
+    )
     n = both.count()
     head = [f"model_id: {model_id}", f"rows new: {n}, old matched: {o.count()}"]
 
     lines = list(head)
-    for col in ("old", "old_m2", "grr", "d30"):
+    for col in ("old", "old_m2", "grr_ep", "grr", "d30"):
         lines += [f"state {col}:"] + _counts(both, [col], n)
-    lines += ["old (Moderate from 2) x new (GRR):"]
-    lines += _counts(both, ["old_m2", "grr"], n)
-    lines += ["new GRR x new 30 days:"] + _counts(both, ["grr", "d30"], n)
+    for a, b, what in (
+        ("old", "grr", "whole bundle"),
+        ("old", "old_m2", "thresholds"),
+        ("old_m2", "grr_ep", "promise events"),
+        ("grr_ep", "grr", "12-month window"),
+        ("grr", "d30", "30 days instead of GRR"),
+    ):
+        moved = both.where(~F.col(a).eqNullSafe(F.col(b))).count()
+        lines += [
+            f"{a} x {b} ({what}), changed {moved} ({100 * moved / max(n, 1):.1f}%):"
+        ]
+        lines += _counts(both, [a, b], n)
     _block("A3 OUTPUT", lines)
 
-    win = g.select("account_id", "observation_date", "commitments_window_start")
+    start = F.when(
+        ~F.coalesce(F.col("episode_left_censored"), F.lit(False)),
+        F.col("episode_start"),
+    )
+    win = grr.select(
+        "account_id",
+        "observation_date",
+        "commitments_window_start",
+        start.alias("_start"),
+    )
     lines = list(head)
     for name, ev in (("GRR", events_grr), ("30 days", events_30d)):
         e = (
@@ -2493,6 +2547,13 @@ def compare_a3(
         lines += [f"[{name}] concluded: {c}, outcome by kind:"]
         lines += _counts(concluded, ["event_kind", "promise_outcome"], c)
         if name == "GRR":
+            pre = concluded.where(F.col("event_date") < F.col("_start"))
+            n_acc = pre.select("account_id").distinct().count()
+            lines.append(
+                "[GRR] concluded before the episode start (12-month window only): "
+                f"{pre.count()} events, {n_acc} accounts; by outcome:"
+            )
+            lines += _counts(pre, ["promise_outcome"], c)
             lines += ["[GRR] follow-up names (events in the window):"]
             lines += _counts(
                 e.where(F.col("event_name").isNotNull()), ["event_name"], m
@@ -2503,6 +2564,7 @@ def compare_a3(
             f"{k} {both.where(F.col(c) > 0).count()}"
             for k, c in (
                 ("old", "old_concluded"),
+                ("GRR episode window", "grr_ep_concluded"),
                 ("GRR", "grr_concluded"),
                 ("30 days", "d30_concluded"),
             )
@@ -2511,11 +2573,15 @@ def compare_a3(
     _block("A3 PROMISES", lines)
 
     lines = list(head)
-    for col in ("old_level", "grr_level", "d30_level"):
+    for col in ("old_level", "grr_ep_level", "grr_level", "d30_level"):
         lines += [f"{col}:"] + _counts(both, [col], n)
-    lines += ["old level x GRR level:"] + _counts(both, ["old_level", "grr_level"], n)
-    lines += ["GRR level x 30 days level:"]
-    lines += _counts(both, ["grr_level", "d30_level"], n)
+    for a, b in (
+        ("old_level", "grr_level"),
+        ("old_level", "grr_ep_level"),
+        ("grr_ep_level", "grr_level"),
+        ("grr_level", "d30_level"),
+    ):
+        lines += [f"{a} x {b}:"] + _counts(both, [a, b], n)
     _block("A3 LEVELS", lines)
 
     lines = head + ["refusal old x new:"]
@@ -2527,7 +2593,8 @@ def compare_a3(
 
 def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
     """The latest month through the A3 engine in the ``a3_check`` namespace (nothing real
-    is overwritten): GRR's deadline (the shipped one) and 30 days, then the blocks."""
+    is overwritten): as shipped, with the episode window, with 30 days; then the
+    blocks."""
     p = f"crx_{product}_a3"
     obs = f"crx_{product}_obs_base"
     final = f"{p}_check_grr"
@@ -2550,6 +2617,38 @@ def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
         parameters=params,
     )
     d30 = DEADLINE_30D[product]
+    grr = PROMISE_DEADLINE[product]
+
+    def state(tag: str, events: str, deadline: str, output: str) -> list:
+        """Commitments from ``events``, then the A3 state with them."""
+        return [
+            node(
+                func=build_commitment_signals,
+                inputs={"episode": ns(f"{p}_episode"), "events": events},
+                outputs=ns(f"commitments_{tag}"),
+                name=f"{p}_check_commitments_{tag}",
+                tags=TAGS,
+            ),
+            node(
+                func=partial(build_a3_credibility, deadline=deadline),
+                inputs={
+                    "episode": ns(f"{p}_episode"),
+                    "commitments": ns(f"commitments_{tag}"),
+                    "dlq_payments": ns(
+                        f"{p}_dlq_payment_signals_single_payment_cycle_count"
+                    ),
+                    "pre_dlq": ns(
+                        f"{p}_pre_dlq_payment_signals_single_payment_cycle_count"
+                    ),
+                    "contacts": ns(f"{p}_strong_negative_signals"),
+                    "persona_end_date": "params:crx_persona.persona_end_date",
+                },
+                outputs=output,
+                name=f"{p}_check_state_{tag}",
+                tags=TAGS,
+            ),
+        ]
+
     extra = [
         node(
             func=latest_month,
@@ -2561,6 +2660,17 @@ def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
             name=f"{p}_check_latest",
             tags=TAGS,
         ),
+        node(
+            func=episode_events,
+            inputs={
+                "events": ns(f"{p}_promise_events"),
+                "episode": ns(f"{p}_episode"),
+            },
+            outputs=ns("promise_events_ep"),
+            name=f"{p}_check_events_ep",
+            tags=TAGS,
+        ),
+        *state("ep", ns("promise_events_ep"), grr, ns("state_ep")),
         node(
             func=partial(build_promise_events, deadline=d30),
             inputs={
@@ -2575,38 +2685,12 @@ def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
             name=f"{p}_check_events_30d",
             tags=TAGS,
         ),
-        node(
-            func=build_commitment_signals,
-            inputs={
-                "episode": ns(f"{p}_episode"),
-                "events": ns("promise_events_30d"),
-            },
-            outputs=ns("commitments_30d"),
-            name=f"{p}_check_commitments_30d",
-            tags=TAGS,
-        ),
-        node(
-            func=partial(build_a3_credibility, deadline=d30),
-            inputs={
-                "episode": ns(f"{p}_episode"),
-                "commitments": ns("commitments_30d"),
-                "dlq_payments": ns(
-                    f"{p}_dlq_payment_signals_single_payment_cycle_count"
-                ),
-                "pre_dlq": ns(
-                    f"{p}_pre_dlq_payment_signals_single_payment_cycle_count"
-                ),
-                "contacts": ns(f"{p}_strong_negative_signals"),
-                "persona_end_date": "params:crx_persona.persona_end_date",
-            },
-            outputs=f"{p}_check_30d",
-            name=f"{p}_check_state_30d",
-            tags=TAGS,
-        ),
+        *state("30d", ns("promise_events_30d"), d30, f"{p}_check_30d"),
         node(
             func=compare_a3,
             inputs={
                 "old": f"{p}_payment_credibility",
+                "grr_ep": ns("state_ep"),
                 "grr": final,
                 "d30": f"{p}_check_30d",
                 "events_grr": ns(f"{p}_promise_events"),
@@ -3253,7 +3337,7 @@ def create_a3_pipeline(
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a3_credibility/signals.py`
-action: replace · base sha256 `eb8613bac8883b24600fddaafe8803c09dbbd8806b6761ae8f4adf829666021c` · base trailing newline: yes · new sha256 `a86164b4b611aa204b4a03617daa78c15d174631f375e5982238c95bd6979cdb` · new trailing newline: yes
+action: replace · base sha256 `eb8613bac8883b24600fddaafe8803c09dbbd8806b6761ae8f4adf829666021c` · base trailing newline: yes · new sha256 `ab3b282d9aecc152141ccda1826754749d2c8246aaef2667d132aedbcf90099a` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3797,16 +3881,17 @@ def _base(episode: DataFrame) -> DataFrame:
 
 
 def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame:
-    """Dimension A: kept / partly kept / thin / broken (D-A3-9, D-A3-25).
+    """Dimension A: kept / partly kept / thin / broken (D-A3-9, -25, -26).
 
-    Promise events (``build_promise_events``) dated in ``[max(episode start, last 12
-    months), observation date]``, concluded once their cutoff is on or before the
+    Promise events (``build_promise_events``) dated in the last 12 months up to the
+    observation date, earlier delinquency episodes included (trustworthiness, not this
+    episode only), concluded once their cutoff is on or before the
     observation date. Kept: paid; partial counts as not kept. Broken: the last 3
     concluded all not kept (a broken event ranks first on a shared day), or at least 2
     concluded and under 40% kept. Kept: at least 2 concluded and 80% kept.
     """
-    base = _base(episode)
-    lower = F.greatest(window_start(COMMITMENT_MONTHS), F.col("_anchor"))
+    base = episode.select(*GRAIN)
+    lower = window_start(COMMITMENT_MONTHS)
     obs = F.col("observation_date")
     rows = (
         base.join(events, on="account_id")

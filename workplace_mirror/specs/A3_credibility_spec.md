@@ -23,7 +23,7 @@ customer will pay on this debt. Two kinds of evidence:
 Not A3: capacity to pay (A1), reachability / location (A2), the DPD path itself (A4).
 
 Dimension A and Dimension B differ in time as well as in kind (user, 2026-11-09): A characterises the
-customer's trustworthiness over the whole episode (up to 12 months), B establishes recency (the last 3
+customer's trustworthiness over the last 12 months, earlier episodes included (D-A3-26), B establishes recency (the last 3
 months, 6 at 180+). A payment rule for A that only re-reads recent payments repeats B.
 
 A **strong negative** earns its place only when all four hold:
@@ -81,7 +81,8 @@ Measured, not assumed (V2, V3).
 - **D-A3-9: commitments counted once, from the instalments** (user, 2026-11-03, provisional on V1).
   Kept / concluded counts and the broken streak come from one rule over the PTP and settlement
   instalments: concluded = due on or before the observation date and paid or overdue (pending ones
-  do not count), window = `[max(latest spell start, obs − 12 m), obs]` (spec rows 19, 76; O75, O83).
+  do not count), window = `[max(latest spell start, obs − 12 m), obs]` (spec rows 19, 76; O75, O83;
+  the window is the last 12 months since D-A3-26).
   `dcore_feat_ptp` / `dcore_feat_settlement` are no longer read.
 
 - **D-A3-10: keep `cc_a3_history_floor_date` (2024-01-01) and measure it** (user, 2026-11-03, O77).
@@ -178,6 +179,14 @@ Measured, not assumed (V2, V3).
     (`PROMISE_DEADLINE`) and logged by the bundle check, pending GRR.
   - The ladder and points are unchanged (Kept 2 / Partly kept 1 / Thin 0 / Broken −1).
   - Contact disposition: payment reports (`_dcore_codes.PAYMENT_REPORTED`) read `paid`.
+
+- **D-A3-26: Dimension A's window = the last 12 months, regardless of the episode start** (user,
+  2026-11-09; ships in bundle 20). A characterises trustworthiness, so promises from an earlier
+  episode within 12 months count (`[obs − 12 m, obs]`, calendar months). This departs from D6 for
+  Dimension A only: contacts and the refusal flag stay on the current episode, B on recency. Accepted
+  overlaps: with C (a repeat delinquent's earlier episode can cost in both) and a little with B. The
+  bundle 20 check measures it (state / level with the episode window vs 12 months, events before the
+  episode start) before the logic is final.
 
 - **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
   `bundle_helpers/b17_a3/a3_check_review.md`). An instalment is kept when the payments since the plan
