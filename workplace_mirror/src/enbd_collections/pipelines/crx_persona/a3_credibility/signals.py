@@ -55,16 +55,17 @@ def _base(episode: DataFrame) -> DataFrame:
 
 
 def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame:
-    """Dimension A: kept / partly kept / thin / broken (D-A3-9, D-A3-25).
+    """Dimension A: kept / partly kept / thin / broken (D-A3-9, -25, -26).
 
-    Promise events (``build_promise_events``) dated in ``[max(episode start, last 12
-    months), observation date]``, concluded once their cutoff is on or before the
+    Promise events (``build_promise_events``) dated in the last 12 months up to the
+    observation date, earlier delinquency episodes included (trustworthiness, not this
+    episode only), concluded once their cutoff is on or before the
     observation date. Kept: paid; partial counts as not kept. Broken: the last 3
     concluded all not kept (a broken event ranks first on a shared day), or at least 2
     concluded and under 40% kept. Kept: at least 2 concluded and 80% kept.
     """
-    base = _base(episode)
-    lower = F.greatest(window_start(COMMITMENT_MONTHS), F.col("_anchor"))
+    base = episode.select(*GRAIN)
+    lower = window_start(COMMITMENT_MONTHS)
     obs = F.col("observation_date")
     rows = (
         base.join(events, on="account_id")

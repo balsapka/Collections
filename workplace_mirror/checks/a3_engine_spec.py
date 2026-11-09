@@ -138,7 +138,8 @@ for r in SCORECARD.score(cells).collect():
 # from 07-05). A: follow-up promises 06-20 + 06-24 (one run, no plan) paid 120 on 06-30
 # by the 07-05 statement -> paid; PTP plan 07-10 + a salary promise on 07-14 (matched),
 # 150 paid on 07-20 against 300 -> partial; promise 08-20 not concluded (statement 09-05);
-# SOFTPTP is no event; a settlement from 02-01 is before the episode. B: promise 05-03, paid
+# SOFTPTP is no event; a settlement from 02-01, before the 04-01 episode, is in the window
+# (D-A3-26), unpaid -> 3 concluded, 1 kept -> broken; one from 2025-08-01 is outside. B: promise 05-03, paid
 # 200 on 05-10, after the 05-05 statement -> none (GRR), paid within 30 days. K: two
 # promises, each paid by its statement -> kept. M: plan 06-10 takes the nearer of two
 # promise runs (06-14), 06-05 stays alone; neither is paid -> broken (2 concluded, 0
@@ -205,6 +206,7 @@ inst = plan_rows(
     [
         ("A", "ptp:1", D(2026, 7, 10)),
         ("A", "settlement:2", D(2026, 2, 1)),
+        ("A", "settlement:0", D(2025, 8, 1)),
         ("M", "ptp:5", D(2026, 6, 10)),
     ]
 )
@@ -226,6 +228,7 @@ check(
         for r in ev.where("account_id = 'A'").collect()
     ),
     [
+        ("2025-08-01", "table_only", None, "none"),
         ("2026-02-01", "table_only", None, "none"),
         ("2026-06-20", "followup_only", "PROMISE TO PAY", "paid"),
         ("2026-07-10", "matched", "CODE25 WILL PAY AT SALARY", "partial"),
@@ -255,12 +258,12 @@ check(
         (r["commitments_concluded"], r["commitments_kept"], r["commitments_partial"])
         for r in sig.where("account_id = 'A'").collect()
     ],
-    [(2, 1, 1)],
+    [(3, 1, 1)],
 )
 check(
     "A levels (next statement)",
     by_account(sig, "a3_commitments_level"),
-    {"A": "partly_kept", "B": "thin", "K": "kept", "M": "broken", "Bk": "broken"},
+    {"A": "broken", "B": "thin", "K": "kept", "M": "broken", "Bk": "broken"},
 )
 sig30 = build_commitment_signals(ep, events_for("30_days"))
 check(
@@ -667,6 +670,15 @@ check(
 )
 check("check old Moderate from 2", "state old_m2:\n  low: 1 (50.0%)" in logged[0], True)
 check("check GRR vs 30 days", "low | moderate: 1" in logged[0], True)
+check(
+    "check steps",
+    [
+        w in logged[0]
+        for w in ("(whole bundle)", "(promise events)", "(12-month window)")
+    ]
+    + ["before the episode start" in logged[1]],
+    [True] * 4,
+)
 print("\n\n".join(logged[:4]))
 
 print("\n".join(FAILS) if FAILS else "a3 engine spec: all checks pass")
