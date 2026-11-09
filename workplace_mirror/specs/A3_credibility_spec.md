@@ -152,6 +152,13 @@ Measured, not assumed (V2, V3).
   commitments) should open to regular payments plus a clean record. Both are for the GRR calibration,
   not this bundle.
 
+- **D-A3-24: Moderate from 2 points, High from 4** (user, 2026-11-09, from the threshold what-if,
+  `bundle_helpers/a3_final/threshold_whatif_summary_60_180.md`; replaces D-A3-16's Moderate cut-off).
+  A clean pre-delinquency record alone (1 point) no longer makes a customer Moderate: 85% of the CC
+  rows it moves made no promise and paid nothing while delinquent, the group that rolls most (V1f Q8).
+  60–180 states: CC 1.3 / 14.5 / 71.8 / 12.4 (High / Moderate / Low / Unknown), RL 1.6 / 24.0 / 67.6 /
+  6.9. Ships in the next A3 bundle (`MODERATE_FROM = 2`).
+
 - **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
   `bundle_helpers/b17_a3/a3_check_review.md`). An instalment is kept when the payments since the plan
   start reach the plan's cumulative due by the first statement on or after the due date (CC) / the end
@@ -265,9 +272,7 @@ whether the delinquency behaves as if paid). The user also questions how strict 
   paid as often as table plans, but the payment reading depends on the grace window's length (a fixed
   window is needed), bucket movement adds nothing independent at 60–180, and A overlaps B in the
   recent months (A's own information is in older events). 180+ not run.
-- **Moderate threshold (2026-11-09, what-if `threshold_whatif_summary_60_180.md`):** Moderate from 2
-  moves 51.5% CC / 42.4% RL to Low, 85% of the CC movers having only a clean pre-delinquency record.
-  Decision pending.
+
 
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
 - D-A3-11: V1d back (2026-11-06, `v1d_summary_60_180.md`): the ledger is complete, DCORE 'paid' is premature (PTP) or late (settlement). Both options ship in bundle 17 for the comparison; proposal: payments, grace to the next statement. Open with it: the payments judge's cumulative rule breaks a settlement instalment that sits behind an earlier miss (V1d cascade addendum, `v1d_cascade_cc_60_180.md`: 65% of CC settlement G1 is behind an earlier miss, 72% pays its own amount by the cut-off); the user applies bundle 17 as is (2026-11-06) and reads the effect from the check (`A3 COMMITMENTS`, `A3 BROKEN`) before choosing.
