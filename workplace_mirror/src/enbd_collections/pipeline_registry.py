@@ -83,6 +83,9 @@ from enbd_collections.pipelines.crx_persona import (
     cc_a1_ability as crx_cc_a1_ability,
 )
 from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
+from enbd_collections.pipelines.crx_persona import (
+    persona_master as crx_persona_master,
+)
 
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
@@ -241,6 +244,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         ),
         # TEMPORARY (A3 bundle 20): the A3 check; removed by the bundle's cleanup.
         "crx_rl_a3_check": crx_rl_a3_payment_credibility.create_check_pipeline(),
+        "crx_cc_persona_master": crx_persona_master.create_cc_pipeline(),
+        "crx_rl_persona_master": crx_persona_master.create_rl_pipeline(),
         # -- Digital login (OMB) --------------------------------------------
         "digital_login": dl.create_pipeline(),
         "location_features": location_features.create_pipeline(),

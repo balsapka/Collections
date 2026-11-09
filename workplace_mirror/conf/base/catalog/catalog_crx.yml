@@ -496,3 +496,33 @@ crx_rl_a3_check_30d:
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_check_30d"
   save_args:
     mode: overwrite
+
+# Persona master (crx_persona/persona_master): all axis states + signals per observation.
+
+crx_cc_persona_exposure:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_persona_exposure"
+  save_args:
+    mode: overwrite
+
+crx_cc_persona_master:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_persona_master"
+  save_args:
+    mode: overwrite
+
+crx_rl_persona_exposure:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_persona_exposure"
+  save_args:
+    mode: overwrite
+
+crx_rl_persona_master:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_persona_master"
+  save_args:
+    mode: overwrite
