@@ -52,3 +52,43 @@ both cc_60_180 / rl_60_180, month 2026-08. 180+ not run.
 - Dimension A: GRR's version is promising for coverage but needs a fixed window and a 180+ run before
   it can replace bundle 17's instalment rule. Shipping bundle 17's rule now and GRR's as the next
   version (a V1g with the fixes) keeps the A3 output moving.
+
+## 3. V1g: GRR's next-statement deadline (G) vs a fixed 30 days (F) (handoff 54, `v1g_summary_60_180.md`)
+
+60_180 only; 180+ was not run (the snippet takes the model_id from globals, so it is a re-run).
+
+- **F beats G on almost everything.**
+  - State AUC (non-roll vs roll): F 0.740 / 0.588 (CC / RL), G 0.714 / 0.578.
+  - Ladder AUC with Thin third: F 0.624 / 0.548, G 0.550 / 0.521.
+  - Coverage: G is slightly ahead (29.2 vs 28.3% CC, 26.3 vs 23.6% RL), but F moves as many accounts
+    out of Thin (7.8 vs 7.5%, 9.3 vs 8.8%).
+- **G's bias is confirmed.** Of CC promises made 7 days or less before a statement, 15.1% are paid by
+  it and another 22.1% in the next cycle, so G calls them broken (F: 37.2% paid). Beyond 7 days
+  the two read alike (G 34–37%, F 39–44%). G-paid is almost a subset of F-paid.
+- **Against bundle 17, F raises the state AUC** by 0.054 (CC, 0.686 → 0.740) and 0.023 (RL, 0.565
+  → 0.588). CC Kept is less pure (roll 62% vs bundle 17's 28%, but bundle 17's Kept is 1.1% of
+  accounts); RL Kept is purer under the events (61% vs 65%). With Thin last, the ladders tie on CC
+  (0.713 vs 0.701).
+- **Overlap with B:** under G, every recent paid event is a B cycle (same rule, same money); under F,
+  93.5% (CC) / 76% (RL). Kept with no B payment: 0.6–0.7% under F. 68–76% of paid events are older
+  than B's window under both, where A adds its own information.
+- **Settlement plans:** instalments paid 33% (G) vs 54% (F) on CC; plans fully paid 12% vs 21%.
+- **Points confirm D-A3-24.** Roll share by points total on the baseline: CC 95.0 / 90.6 / 73.8 / 62.9
+  / 33.5% (0 / 1 / 2 / 3 / 4+), RL 86.4 / 72.5 / 68.8 / 59.2 / 58.2%. On CC, 1 point rolls like 0
+  points; the step is at 2. Refusal on rolls more (CC 92.7 vs 86.6%, RL 84.7 vs 75.2%).
+- **Points below 0 (Broken, no B or C) roll less than 0 points** (CC 87.4 vs 95.0%), and Thin is the
+  worst-rolling level everywhere. Under Moderate from 2 this changes no state (both are Low); it
+  matters only for Broken with B + C = 2 (Low at −1, Moderate at 0). For later, not this bundle.
+- **Caveats.**
+  - 39.7% of CC accounts (6,314) have no level 3 months later (they left 60–180, cured or rolled past
+    180). They are left out of every AUC, the same rows in each variant, so the comparison between
+    variants is fair, but the absolute roll rates are not the whole population.
+  - No intervals; the RL gaps (0.01–0.03 on ~3,100 accounts) may be noise.
+  - **Day-level RL repayments exist** (`ec_account_loan_transaction.la_txn_dt` + amounts,
+    `sa_account_loan_dmd`), which would fix RL's month-level cash for A3 as a whole (Dimension B
+    too). Needs an EDA and a primary (`prm_loan_payments`), per the spec's open item.
+
+**Reading:** at 60–180, Dimension A = GRR's promise events judged on a 30-day deadline is better
+than both G and bundle 17's instalment rule. A middle way for GRR's cycle framing, untested: the next
+statement, or the one after when the promise is 7 days or less before it (its paid rates come out
+like F's for those promises and like G's for the rest). 180+ needs the re-run before shipping.
