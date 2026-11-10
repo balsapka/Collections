@@ -6,14 +6,10 @@ Needs, for the model_id (cc_60_180 / cc_180_plus): ``crx_cc_obs_base``,
 and the DCORE tables.
 
     kedro run --pipeline=crx_cc_a3_payment_credibility
-
-TEMPORARY (A3 bundle 20): ``create_check_pipeline`` (``a3_credibility/check.py``);
-removed by the bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
 
-from ..a3_credibility.check import create_a3_check_pipeline
 from ..a3_credibility.pipeline import TAGS, create_a3_pipeline
 from .nodes import build_cc_a3_dues, build_cc_a3_payments
 
@@ -42,8 +38,3 @@ def create_pipeline(  # pylint: disable=unused-argument
 ) -> Pipeline:
     """The CC A3 axis written to ``output``."""
     return create_a3_pipeline("cc", output, DUES, PAYMENTS)
-
-
-def create_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the A3 bundle 20 check for CC."""
-    return create_a3_check_pipeline("cc", DUES, PAYMENTS)

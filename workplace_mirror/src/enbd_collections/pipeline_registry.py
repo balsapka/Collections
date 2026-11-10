@@ -228,8 +228,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a3_payment_credibility": (
             crx_cc_a3_payment_credibility.create_pipeline()
         ),
-        # TEMPORARY (A3 bundle 20): the A3 check; removed by the bundle's cleanup.
-        "crx_cc_a3_check": crx_cc_a3_payment_credibility.create_check_pipeline(),
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
@@ -239,8 +237,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a3_payment_credibility": (
             crx_rl_a3_payment_credibility.create_pipeline()
         ),
-        # TEMPORARY (A3 bundle 20): the A3 check; removed by the bundle's cleanup.
-        "crx_rl_a3_check": crx_rl_a3_payment_credibility.create_check_pipeline(),
         # -- Digital login (OMB) --------------------------------------------
         "digital_login": dl.create_pipeline(),
         "location_features": location_features.create_pipeline(),
