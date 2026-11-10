@@ -1,4 +1,4 @@
-"""Persona deck numbers: every placeholder of the GRR deck, from the four axis outputs.
+"""Persona deck numbers: the aggregates for the management presentation, from the axes.
 
 Reads the axis outputs directly (no persona master needed): crx_<p>_obs_base,
 crx_<p>_a1_ability, crx_<p>_a2_locatability, crx_<p>_a3_payment_credibility,

@@ -1,10 +1,10 @@
 # Sonnet (UAT): persona deck numbers — snippet for PROD, then the fill-in sheet
 
 ## Goal
-The GRR deck ("Synthesized Features") has `[__]` placeholders on every axis page and in Part 2.
-`persona_deck_numbers.py` (below) computes all of them from the four axis outputs. The persona master
-(bundle 21) is **not** needed. Get it running in PROD for the four model_ids, then turn the results into one
-fill-in sheet that maps each deck placeholder to its number.
+A management presentation on the persona framework needs a set of numbers. The presentation itself is not in
+UAT: the fill-in list under Deliverables defines every number, slide by slide. `persona_deck_numbers.py`
+(below) computes them from the four axis outputs; the persona master (bundle 21) is **not** needed. Get it
+running in PROD for the four model_ids, then turn the results into one fill-in sheet.
 
 ## Decided
 - **Deck axis names differ from the code.** Deck A1 Deterioration = code A4 (`crx_<p>_a4_deterioration`),
@@ -54,17 +54,17 @@ fill-in sheet that maps each deck placeholder to its number.
      - the sequences and payments tables.
    - Commit and push.
 2. **PROD (user):** run it for `cc_60_180`, `rl_60_180`, `cc_180_plus` and `rl_180_plus` (switch `model_id` in `globals_dev.yml`). Commit the four `deck_<model_id>.md/.json` files and push.
-3. **UAT:** write `tmp_validation/persona_deck/fill_in.md`, one line per placeholder as `slide · placeholder · value · source table` in this order:
+3. **UAT:** write `tmp_validation/persona_deck/fill_in.md`, one line per number as `slide · item · value · source table` in this order:
    - **Summary:**
      - % of reachable 61–180 customers who are credible or able, plus AED m (cards; loans too);
      - paid % range across tree leaves at 91–120 (cards);
      - % of 180+ accounts with a positive signal (cards and loans).
    - **A1 Deterioration:**
-     - family shares for cards 61–180 (`mix_a1_family`), and loans for the deck's 43 / 51 / 6 check;
+     - family shares for cards 61–180 and loans 61–180 (`mix_a1_family`). The current reference for loans is can_cure 43% / stopped_suddenly 51% / never_paid 6%;
      - paid within 3 months, can_cure vs the rest: overall and within each DPD band (`a1_family_outcome`, `a1_family_x_band`).
    - **A2 Locatability:**
      - 180+ reachable, in country, and both, for cards and loans (`a2_positive` on the 180+ runs);
-     - a refreshed 61–180 matrix (`mix_a2_matrix`) if it differs from the deck by more than 1 pt.
+     - the 61–180 location × reachability matrix (`mix_a2_matrix`), cards and loans. Flag any cell more than 1 pt away from the current reference: cards In Country × Reachable 8.5%, Skip × Non-Reachable 31.7%; loans 10.2% and 28.5%.
    - **A3 Payment credibility:**
      - High / Moderate / Low share, cards and loans 61–180 (`mix_a3_band`), and Unknown if above 1%;
      - roll % at 91–120, High vs Low, cards (`a3_band_x_band`);
@@ -86,14 +86,14 @@ fill-in sheet that maps each deck placeholder to its number.
    - **Part 2, pilot:** monthly accounts per action segment over the last 3 months (`volume`), and the arm size for a 2-arm test with 80% power to detect a 5-pt difference in paid %, given each segment's base rate.
 
    End with:
-   - at most five lines on anything that looks wrong: an empty axis, a segment that can't exist, missing exposure, or a family share far from the deck;
+   - at most five lines on anything that looks wrong: an empty axis, a segment that can't exist, missing exposure, or a share far from the references above;
    - the list of schema fixes you made.
 
    The user pastes `fill_in.md` back.
 
 ## The script
 ```python
-"""Persona deck numbers: every placeholder of the GRR deck, from the four axis outputs.
+"""Persona deck numbers: the aggregates for the management presentation, from the axes.
 
 Reads the axis outputs directly (no persona master needed): crx_<p>_obs_base,
 crx_<p>_a1_ability, crx_<p>_a2_locatability, crx_<p>_a3_payment_credibility,
