@@ -218,7 +218,7 @@ Optional second pass: if in Phase C you propose tier cut-offs that move any tier
 
 ## 7. Phase C — UAT: analyse and write `fill_in.md`
 
-**C1. Sections (run these five subagents in parallel, each reading the four `deck_*.json` files and returning its section in the format `slide · item · value · source table`; cards and loans 61–180 unless noted; mark cells under 10 accounts):**
+**C1. Sections (run these five subagents in parallel, each reading the four `deck_*.json` files and returning its section in the format `section · item · value · source table`; cards and loans 61–180 unless noted; mark cells under 10 accounts):**
 
 - **C1a Axes and summary.**
   - Exposure source per product.
