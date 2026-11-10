@@ -1,7 +1,7 @@
-# Persona deck numbers: four deterioration families, outstanding principal, credibility Unknown rule (follow-up)
+# Persona deck numbers: four families, outstanding principal, credibility Unknown rule, allocation tiers (follow-up)
 
 ## Goal
-The deck's deterioration families change from three to four. Stabilized customers are curing now. Slow rollers and repeat delinquents have paid or cured before but are falling now. GRR will see these as different groups. Separately, the book is always measured as **outstanding principal**, not statement balance or total outstanding. Third, credibility Unknown narrows: an account with an observed delinquency episode but no evidence is Low. Rerun the deck numbers for all four segments, and refresh the lines of `tmp_validation/persona_deck/fill_in.md` that depend on the families, on exposure or on credibility.
+The deck's deterioration families change from three to four. Stabilized customers are curing now. Slow rollers and repeat delinquents have paid or cured before but are falling now. GRR will see these as different groups. Separately, the book is always measured as **outstanding principal**, not statement balance or total outstanding. Third, credibility Unknown narrows: an account with an observed delinquency episode but no evidence is Low. Fourth, Part 2 now answers GRR's allocation question at 61–180: which customers to work in-house (extra cost, higher revenue), which to send to an agency, and which are candidates for early sale or write-off instead of being worked until 180+. Rerun the deck numbers for all four segments, and refresh the lines of `tmp_validation/persona_deck/fill_in.md` that depend on the families, on exposure or on credibility.
 
 ## Decided (user, 2026-11-10)
 - Families (deterioration `det_state` → `family`):
@@ -14,6 +14,7 @@ The deck's deterioration families change from three to four. Stabilized customer
 - **D-A3-27, credibility Unknown:** no payment while delinquent is evidence (0 points). So an A3 row with `a3_unknown_reason = 'no_evidence'` counts as **Low** in the deck; Unknown is left only for `no_episode`. The A3 pipeline gets the same change in a later bundle; until then the snippet applies it.
 - The action segment `cure_reach_cred` keeps its meaning: family `curing_now` **or** `cure_history`, reachable, credibility High or Moderate.
 - Regression check: `never_paid`, `not_reachable`, `cure_reach_cred` and `stopped_reach_means` keep their shares and paid % to the decimal. Only `reach_notcred_means` and `other` may move, because some reachable Unknown-credibility accounts with means become Low. AED figures change with the exposure.
+- **Allocation tiers (hypotheses for GRR, not decisions):** combinations ranked by back-test paid % split into In-house / Agency / Early-exit candidates. You propose the cut-offs from the capture curve (for example where payer capture flattens), state them, and report each tier's numbers.
 - All four model_ids are rerun: the credibility change touches the 180+ mix too.
 
 ## Hard rules
@@ -28,7 +29,9 @@ The deck's deterioration families change from three to four. Stabilized customer
    - `a1_state_outcome` = `_rates(bt, ["det_state"])`;
    - `a1_state_x_band` = `_rates(bt, ["dpd_band", "det_state"])`.
 5. `_exposure`: outstanding principal as above, same point-in-time join to the observation month.
-6. Combinations:
+6. New table `combos_ranked` (helper `_ranked`): every combination with at least `MIN_CELL` back-test accounts, sorted by paid % descending, with accounts, share, principal, paid %, rolled %, cured %, amount collected in the next 3 months (sum of `paid_next`) and the cumulative % of accounts, principal, payers and amount collected. Copy the helper from the mirror snippet if easier.
+7. Collections effort (optional): if an input the script already loads, or the A2 output, carries call attempts per account (for example call days in the last 3 months), add the average per combination to `combos_ranked`. If none is available, say so; don't add a new source.
+8. Combinations:
    - `possible` = number of distinct families in `FAMILY` (4) × 3 × 3 × 4 × 4 = 576;
    - add `non_empty_known_family`: non-empty combinations whose family is not `unknown`.
 
@@ -44,6 +47,12 @@ The deck's deterioration families change from three to four. Stabilized customer
    - **Part 2, combinations:** possible / non-empty / non-empty with a known family / empty (= possible − non-empty with a known family) / number covering 80% / number under 0.5%, cards and loans; and the top 8 for cards 61–180 (share % · paid %).
    - **Summary:** % of reachable 61–180 who are credible or able, with AED m on outstanding principal, cards and loans.
    - **Part 2, action:** share, AED m (outstanding principal) and paid % for the six segments, cards and loans; total AED m of the 61–180 book per product.
+   - **Part 2, allocation tiers (cards and loans 61–180):**
+     - the cut-offs you chose and why (one line);
+     - per tier: share of accounts, principal AED m, paid %, rolled %, amount collected AED m, the share of all payers and of all collected money it holds, and call attempts if available;
+     - per tier, the 3 largest combinations (share · paid %) in plain words;
+     - 5 points of the capture curve: the % of payers and of collected money held by the top 10 / 20 / 30 / 50 / 80% of accounts ranked by paid %;
+     - cards amounts are reliable; flag the loan collected amounts as using `int_loan_master.total_paid` (may not be like for like).
    - **Part 2, tree:** share and paid % for each family × nuance leaf, cards 61–180 (four families × three leaves; mark leaves under 10 accounts).
    - **A3 Payment credibility, 61–180:** High / Moderate / Low / Unknown, cards and loans (`mix_a3_band`); roll % at 91–120, High vs Low, cards (`a3_band_x_band`); untested share, cards and loans (`a3_untested`).
    - **Regression check:** as in Decided: list every change in `action`, `score_action` and `volume` against the previous run for the 61–180 model_ids, and confirm that only `reach_notcred_means` and `other` moved (AED aside).

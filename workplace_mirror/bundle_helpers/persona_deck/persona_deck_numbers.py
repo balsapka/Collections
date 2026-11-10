@@ -18,7 +18,8 @@ A4 ability (code A1). Tables are named after the slide they fill:
   a1_*         outcomes by deterioration family and state (overall and within DPD band)
   uc1_contact  share with a right-party contact in the last 3 months
   positive_*   180+ positive-signal flag, overall and per signal
-  combos_*     how concentrated the four-axis combinations are; the largest ones
+  combos_*     how concentrated the four-axis combinations are; the largest ones; all
+               combinations ranked by paid % with cumulative capture (tiers)
   tree         the decision-path tree: family > reachable > nuance, share and outcome
   action       the six action segments: share, exposure, outcome
   score_*      outcome spread inside each segment across DPD bands; band-only AUC
@@ -305,6 +306,45 @@ def _rates(df: DataFrame, by: list) -> pd.DataFrame:
     return pdf
 
 
+def _ranked(bt: DataFrame) -> pd.DataFrame:
+    """Combinations ranked by back-test paid %, with cumulative capture: the basis for the
+    in-house / agency / early-exit tiers (accounts, principal, payers, amount collected).
+    """
+    pdf = _rates(bt, ["combo"]).merge(
+        _table(
+            bt,
+            ["combo"],
+            [F.sum(F.coalesce("paid_next", F.lit(0.0))).alias("collected_aed")],
+        )[["combo", "collected_aed"]],
+        on="combo",
+    )
+    pdf = pdf[pdf["accounts"] >= MIN_CELL].sort_values("paid_pct", ascending=False)
+    for col, out in (
+        ("accounts", "cum_accounts_pct"),
+        ("exposure_aed", "cum_principal_pct"),
+        ("paid_n", "cum_payers_pct"),
+        ("collected_aed", "cum_collected_pct"),
+    ):
+        pdf[out] = (100.0 * pdf[col].cumsum() / max(pdf[col].sum(), 1)).round(1)
+    pdf["collected_aed"] = pdf["collected_aed"].round(0)
+    return pdf[
+        [
+            "combo",
+            "accounts",
+            "share_pct",
+            "exposure_aed",
+            "paid_pct",
+            "rolled_pct",
+            "cured_pct",
+            "collected_aed",
+            "cum_accounts_pct",
+            "cum_principal_pct",
+            "cum_payers_pct",
+            "cum_collected_pct",
+        ]
+    ].reset_index(drop=True)
+
+
 def _flags(df: DataFrame, cols: list) -> pd.DataFrame:
     n = df.count()
     row = df.agg(*[F.sum(c).alias(c) for c in cols]).first().asDict()
@@ -471,6 +511,7 @@ def main() -> None:
         how="left",
     )
     t["combos_top"] = top
+    t["combos_ranked"] = _ranked(bt)
     # tree, action segments, score
     tree = _table(latest, ["family", "nuance"]).merge(
         _rates(bt, ["family", "nuance"])[
