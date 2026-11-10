@@ -20,7 +20,9 @@ A4 ability (code A1). Tables are named after the slide they fill:
   positive_*   180+ positive-signal flag, overall and per signal
   combos_*     how concentrated the four-axis combinations are; the largest ones; all
                combinations ranked by paid % with cumulative capture (tiers)
-  tree         the decision-path tree: family > reachable > nuance, share and outcome
+  tier_*       allocation tiers (in-house / agency / early exit) from combination paid %:
+               summary, composition, monthly volume, score, UC1 contact
+  tree         the decision-path tree: family > reachable > nuance, share, outcome, tier
   action       the six action segments: share, exposure, outcome
   score_*      outcome spread inside each segment across DPD bands; band-only AUC
   summary_*    the three summary-slide numbers
@@ -52,6 +54,10 @@ FAMILY = {  # deck A1 families (user, 2026-11-10: stabilized is its own family)
     "early_payment_default": "never_paid",
 }
 CAN_CURE = ("curing_now", "cure_history")
+# allocation tiers from a combination's back-test paid %: in-house from the first cut,
+# early-exit candidates below the second, agency in between (provisional, per product;
+# loans are higher because their paid measure is monthly, see the prompt)
+TIER_CUTS = {"cc": (30.0, 5.0), "rl": (60.0, 25.0)}
 ABLE = ("high", "moderate")
 
 
@@ -306,6 +312,26 @@ def _rates(df: DataFrame, by: list) -> pd.DataFrame:
     return pdf
 
 
+def _with_tier(df: DataFrame, rates: pd.DataFrame, p: str, spark) -> DataFrame:
+    """``df`` + ``tier`` from its combination's back-test paid % (TIER_CUTS);
+    combinations under MIN_CELL back-test accounts are ``unassigned``."""
+    hi, lo = TIER_CUTS[p]
+    ok = rates[rates["accounts"] >= MIN_CELL]
+    tiers = [
+        (c, "in_house" if r >= hi else "early_exit" if r < lo else "agency")
+        for c, r in zip(ok["combo"], ok["paid_pct"])
+    ]
+    m = spark.createDataFrame(tiers, "combo string, tier string")
+    return df.join(F.broadcast(m), "combo", "left").fillna("unassigned", ["tier"])
+
+
+def _tier_of(rate, p: str) -> str | None:
+    hi, lo = TIER_CUTS[p]
+    if rate is None or pd.isna(rate):
+        return None
+    return "in_house" if rate >= hi else "early_exit" if rate < lo else "agency"
+
+
 def _ranked(bt: DataFrame) -> pd.DataFrame:
     """Combinations ranked by back-test paid %, with cumulative capture: the basis for the
     in-house / agency / early-exit tiers (accounts, principal, payers, amount collected).
@@ -512,6 +538,59 @@ def main() -> None:
     )
     t["combos_top"] = top
     t["combos_ranked"] = _ranked(bt)
+    # allocation tiers (in-house / agency / early exit), from combination paid %
+    spark = latest.sparkSession
+    combo_rates = _rates(bt, ["combo"])
+    latest = _with_tier(latest, combo_rates, p, spark).cache()
+    bt = _with_tier(bt, combo_rates, p, spark).cache()
+    frame = _with_tier(frame, combo_rates, p, spark)
+    collected = [F.sum(F.coalesce("paid_next", F.lit(0.0))).alias("collected_aed")]
+    tier_bt = _rates(bt, ["tier"]).merge(
+        _table(bt, ["tier"], collected)[["tier", "collected_aed"]], on="tier"
+    )
+    for col, out in (
+        ("paid_n", "payers_share_pct"),
+        ("collected_aed", "collected_share_pct"),
+    ):
+        tier_bt[out] = (100.0 * tier_bt[col] / max(tier_bt[col].sum(), 1)).round(1)
+    t["tier_summary"] = _table(latest, ["tier"]).merge(
+        tier_bt[
+            [
+                "tier",
+                "paid_pct",
+                "rolled_pct",
+                "cured_pct",
+                "collected_aed",
+                "payers_share_pct",
+                "collected_share_pct",
+            ]
+        ],
+        on="tier",
+        how="left",
+    )
+    t["tier_composition"] = _table(latest, ["tier", "family", "nuance"])
+    t["tier_volume"] = _table(
+        frame.withColumn("month", month), ["month", "tier"]
+    ).sort_values(["month", "tier"])
+    t["score_tier"] = _score(bt, "tier")
+    t["uc1_by_tier"] = _table(
+        latest, ["tier"], [F.sum("contact_3m").alias("contact_3m")]
+    ).assign(contact_pct=lambda x: (100.0 * x["contact_3m"] / x["accounts"]).round(1))
+    leaf = bt.withColumn("leaf", F.concat_ws(" | ", "family", "nuance"))
+    auc = {}
+    for name, by in (
+        ("band", ["dpd_band"]),
+        ("tree_leaf", ["leaf"]),
+        ("tier", ["tier"]),
+        ("band_and_leaf", ["dpd_band", "leaf"]),
+        ("band_and_tier", ["dpd_band", "tier"]),
+    ):
+        cells = _rates(leaf, by)
+        auc[name] = {
+            "paid": _auc(cells, "paid_n", "accounts"),
+            "rolled": _auc(cells, "rolled", "with_history"),
+        }
+    res["score_compare_auc"] = auc  # in-sample, back-test month
     # tree, action segments, score
     tree = _table(latest, ["family", "nuance"]).merge(
         _rates(bt, ["family", "nuance"])[
@@ -520,6 +599,7 @@ def main() -> None:
         on=["family", "nuance"],
         how="left",
     )
+    tree["tier"] = [_tier_of(r, p) for r in tree["paid_pct"]]
     t["tree"] = tree
     t["tree_x_band"] = _rates(bt, ["dpd_band", "family", "nuance"])
     t["action"] = _table(latest, ["action"]).merge(
