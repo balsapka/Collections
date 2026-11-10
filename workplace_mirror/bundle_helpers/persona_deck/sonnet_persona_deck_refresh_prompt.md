@@ -1,14 +1,14 @@
-# Persona deck numbers: refresh run
+# Persona framework numbers for GRR: refresh run
 
-You are refreshing every number in the GRR persona deck in one pass, for all four model_ids. It is a large job with several independent pieces: plan it, **use subagents for the independent tasks** (each phase below says which can run in parallel), and review your own work before you hand anything back. There is no token limit; correctness matters more than speed.
+You are refreshing the aggregate numbers behind a management presentation on the persona framework (the presentation itself is not in this repo; you only produce the numbers), in one pass, for all four model_ids. It is a large job with several independent pieces: plan it, **use subagents for the independent tasks** (each phase below says which can run in parallel), and review your own work before you hand anything back. There is no token limit; correctness matters more than speed.
 
 ---
 
 ## 1. Context
 
-The deck presents the synthesized-features persona framework to the head of GRR. Four axes describe each delinquent account every month (deck numbering): **A1 Deterioration** (`crx_<p>_a4_deterioration`), **A2 Locatability** (`crx_<p>_a2_locatability`), **A3 Payment credibility** (`crx_<p>_a3_payment_credibility`), **A4 Ability** (`crx_<p>_a1_ability`). Code and catalog keep their old numbers; the deck numbers apply only to `fill_in.md`.
+The numbers go to the head of GRR. Four axes describe each delinquent account every month. In `fill_in.md` use these labels: **A1 Deterioration** (`crx_<p>_a4_deterioration`), **A2 Locatability** (`crx_<p>_a2_locatability`), **A3 Payment credibility** (`crx_<p>_a3_payment_credibility`), **A4 Ability** (`crx_<p>_a1_ability`). Code and catalog keep their own numbering; the labels apply only to `fill_in.md`.
 
-Part 2 of the deck now answers GRR's allocation question at 61–180 DPD: which customers to work **in-house** (extra cost, higher revenue), which to send to an **agency**, and which are **early-exit candidates** (early sale or write-off instead of being worked until 180+). These are hypotheses for a GRR workshop, not decisions. Part 2 also asks whether a risk score is still needed, where the call-transcript work (UC1) adds most, and how to pilot.
+The second half of the analysis answers GRR's allocation question at 61–180 DPD: which customers to work **in-house** (extra cost, higher revenue), which to send to an **agency**, and which are **early-exit candidates** (early sale or write-off instead of being worked until 180+). These are hypotheses for a GRR workshop, not decisions. It also asks whether a risk score is still needed, where the call-transcript work (UC1) adds most, and how to pilot.
 
 The script you wrote earlier, `tmp_validation/persona_deck/persona_deck_numbers.py` (commit 5fc0e8f3 and later), and its `fill_in.md` are the starting point.
 
@@ -233,7 +233,7 @@ Optional second pass: if in Phase C you propose tier cut-offs that move any tier
   - Capture curve: % of payers and of money collected held by the top 10 / 20 / 30 / 50 / 80% of accounts ranked by paid % (`combos_ranked`).
   - Cut-offs: the ones used, and the ones you'd propose from the curve with one line why (for example where payer capture flattens). Evaluate your proposal offline from `combos_ranked` and give each tier's share under it.
   - Tree: share, paid % and tier for each family × nuance leaf, cards (`tree`).
-  - One sentence for the summary slide from the curve (for example "the top 20% of card accounts hold X% of payers").
+  - One headline sentence from the curve (for example "the top 20% of card accounts hold X% of payers").
   - Flag that loan amounts come from `int_loan_master.total_paid`.
 - **C1c Risk score.** Per tier: size, paid / rolled spread across DPD bands and band-only AUC (`score_tier`), with a verdict: "yes" if spread ≥ 15 pts or AUC ≥ 0.65, "no" if spread < 5 and AUC < 0.58, else "maybe". The AUC comparison (`score_compare_auc`): band alone, tree leaf, tier, band + leaf, band + tier, for paid and rolled, with one line on what it says (in-sample, back-test month).
 - **C1d UC1 and pilot.** % with a right-party contact in the last 3 months, overall and per tier (`uc1_contact`, `uc1_by_tier`). Accounts per tier in Jun / Jul / Aug (`tier_volume`); accounts per arm for a 2-arm test (two-sided α 0.05, 80% power) at +5 and +10 pts on the tier's paid %; which tiers fill both arms in one month; the monthly size of a 10% hold-out of early-exit candidates.
