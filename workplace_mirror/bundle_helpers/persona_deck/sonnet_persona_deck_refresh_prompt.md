@@ -7,6 +7,7 @@ Refresh every number of the persona deck in one run, for all four model_ids, aft
 3. **Credibility Unknown narrows (D-A3-27):** an account with an observed delinquency episode but no evidence is Low; Unknown is left only for accounts with no episode.
 4. **Allocation tiers.** Part 2 now answers GRR's allocation question at 61–180: which customers to work in-house (extra cost, higher revenue), which to send to an agency, and which are candidates for early sale or write-off instead of being worked until 180+. These are hypotheses for GRR, not decisions.
 5. **Risk score and UC1 by tier**, and a check of how well the personas rank customers against the DPD band alone.
+6. **Outcome = the risk score's target: a meaningful payment**, not any payment of AED 100 or more (definitions below).
 
 Then rewrite `tmp_validation/persona_deck/fill_in.md` from the refreshed results.
 
@@ -16,6 +17,10 @@ Then rewrite `tmp_validation/persona_deck/fill_in.md` from the refreshed results
 - **Credibility (D-A3-27):** an A3 row with `a3_unknown_reason = 'no_evidence'` counts as Low; Unknown stays only for `no_episode`. The A3 pipeline gets the same change in bundle 22; until it is applied, the snippet maps it.
 - **Action segments** stay as they are (needed for the regression check): `cure_reach_cred` takes family `curing_now` or `cure_history`.
 - **Allocation tiers** come from each combination's back-test paid % (`TIER_CUTS`, per product, provisional): in-house from the first cut, early-exit candidates below the second, agency in between; combinations with fewer than `MIN_CELL` back-test accounts are `unassigned`. Loans use higher cuts because their paid measure (`int_loan_master.total_paid`, monthly) looks inflated against cards. You propose better cut-offs from the capture curve.
+- **Outcome (the risk score's target):**
+  - **61–180:** a *meaningful payment* within 3 months = in at least one month, the customer paid at least the amount that stabilises the bucket for that month: cards, the amount in the oldest overdue bucket (the one that would roll; A1's anchor); loans, one EMI (`int_loan_master.installment_due_amount`). Use the A3 payment ledger (due and paid per cycle) if it is a catalog dataset; otherwise derive it from the sources the script already reads. Say what you used.
+  - **180+:** a meaningful payment within **6 months for early-stage charge-offs** (less than 24 months in 180+, `chargeoff_age_months < 24`) and **12 months for late-stage** (24+ months). The threshold is not settled: compute three variants, **5% of outstanding principal**, **AED 1,000** and **AED 2,000** (cumulative payments in the window). The back-test base moves back 6 / 12 months; if the persona tables don't reach that far, use the longest horizon available and say so.
+  - `paid` in every table becomes the meaningful-payment flag; keep the old "any payment of AED 100 or more" as a second column `paid_any_pct` so the two can be compared.
 - **All four model_ids** are rerun (the credibility change touches 180+ too). Part 2 is about 61–180; at 180+ only the mixes and the positive signal matter.
 
 ## Hard rules
@@ -168,6 +173,8 @@ tree["tier"] = [_tier_of(r, p) for r in tree["paid_pct"]]
    If your version names things differently, adapt the code; the tables and their columns are what matter.
 7. Collections effort (optional): if an input the script already loads, or the A2 output, carries call attempts per account (for example call days in the last 3 months), add the average per tier to `tier_summary` and per combination to `combos_ranked`. If none is available, say so; don't add a new source.
 8. Make sure `res["score_compare_auc"]` is written to the .json and printed in the .md.
+9. Outcomes as in Decided: `paid` = meaningful payment (61–180: 3 months, stabilising amount; 180+: 6 / 12 months by vintage, three threshold variants as `paid_5pct`, `paid_1000`, `paid_2000`, with `paid` = the 5% variant), plus `paid_any`. Add `vintage` (`early_stage` / `late_stage`) on the 180+ runs.
+10. 180+ tables (on the 180+ model_ids): `positive_signal_outcome` = paid rate (all three variants) for accounts with and without a positive signal, per vintage and per signal; `score_vintage` = the score table with `vintage` in place of `dpd_band` (spread across vintages and vintage-only AUC, per positive-signal group).
 
 ## Deliverables
 1. **UAT:** apply the changes, check that the script compiles, commit and push.
@@ -190,6 +197,7 @@ tree["tier"] = [_tier_of(r, p) for r in tree["paid_pct"]]
    - **Part 2, risk score:** per tier, size, paid / rolled spread across DPD bands and band-only AUC (`score_tier`), with a verdict: "yes" if spread ≥ 15 pts or AUC ≥ 0.65, "no" if spread < 5 and AUC < 0.58, else "maybe". Then the AUC table (`score_compare_auc`): band alone, tree leaf, tier, band + leaf, band + tier, for paid and rolled, with one line on what it says (in-sample, back-test month).
    - **Part 2, UC1:** % with a right-party contact in the last 3 months, overall and per tier (`uc1_contact`, `uc1_by_tier`).
    - **Part 2, pilot:** accounts per tier in Jun / Jul / Aug (`tier_volume`); accounts per arm for a 2-arm test (two-sided α 0.05, 80% power) at +5 and at +10 pts on the tier's paid %; which tiers fill both arms in one month. Also the size of a 10% hold-out of early-exit candidates per month.
-   - **180+:** positive-signal share and each signal (cards, loans).
+   - **180+:** positive-signal share and each signal (cards, loans); vintage split (early / late stage); meaningful-payment rate with and without a positive signal, per vintage and per signal, for the three thresholds (`positive_signal_outcome`); the score table by vintage (`score_vintage`), with the same verdict rule; and which threshold you'd recommend from the results, in one line.
+   - **Outcome check:** for cards and loans 61–180, the meaningful-payment rate next to the old any-payment rate, overall and per tier, so the change of target is visible.
    - **Regression check:** against the previous run, `never_paid`, `not_reachable`, `cure_reach_cred` and `stopped_reach_means` in `action` keep their shares and paid % to the decimal; only `reach_notcred_means` and `other` may move. List any other difference.
    - **Notes:** up to 5 lines on anything that looks wrong.
