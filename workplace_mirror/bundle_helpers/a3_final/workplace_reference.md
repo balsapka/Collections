@@ -177,3 +177,11 @@ Same as the mirror's lines 212–275 except:
 - the closing `}` sits on line 270.
 A3 registry keys: `"crx_cc_a3_payment_credibility"` (245), `"crx_rl_a3_payment_credibility"` (255).
 `"crx_cc_raw_extract"` (234), `"crx_cc_full_history"` (233), `"crx_rl_a4_spine"` (248) are still registered.
+
+## Registry: workplace-only `casa_windows*` pipelines (handoff 57, 2026-11-10)
+
+The workplace `pipeline_registry.py` has four `casa_windows*` imports and registry entries (modules and
+catalog entries exist there; `TASKS.md` E4 refers to them) that the mirror lacks. The bundle 21 apply
+dropped them silently (the same merge effect as the bundle 16 catalog loss); the UAT Sonnet restored
+them. Until the registry is photographed, any bundle that edits the registry must have UAT check the
+`casa_windows*` entries after the apply.
