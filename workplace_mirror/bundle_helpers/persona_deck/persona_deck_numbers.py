@@ -19,7 +19,7 @@ A4 ability (code A1). Tables are named after the slide they fill:
   uc1_contact  share with a right-party contact in the last 3 months
   positive_*   180+ positive-signal flag, overall and per signal
   combos_*     how concentrated the four-axis combinations are; the largest ones; all
-               combinations ranked by paid % with cumulative capture (tiers)
+               combinations ranked by expected collections per account (tiers)
   tier_*       allocation tiers (in-house / agency / early exit) from combination paid %:
                summary, composition, monthly volume, score, UC1 contact
   tree         the decision-path tree: family > reachable > nuance, share, outcome, tier
@@ -54,10 +54,11 @@ FAMILY = {  # deck A1 families (user, 2026-11-10: stabilized is its own family)
     "early_payment_default": "never_paid",
 }
 CAN_CURE = ("curing_now", "cure_history")
-# allocation tiers from a combination's back-test paid %: in-house from the first cut,
-# early-exit candidates below the second, agency in between (provisional, per product;
-# loans are higher because their paid measure is monthly, see the prompt)
-TIER_CUTS = {"cc": (30.0, 5.0), "rl": (60.0, 25.0)}
+# allocation tiers from a combination's expected collections: the back-test amount
+# collected in the next 3 months per account (AED). In-house from the first cut,
+# early-exit candidates below the second, agency in between. Set per product from the
+# previous run's combos_ranked before running (see the prompt).
+TIER_CUTS = {"cc": (None, None), "rl": (None, None)}
 ABLE = ("high", "moderate")
 
 
@@ -312,39 +313,51 @@ def _rates(df: DataFrame, by: list) -> pd.DataFrame:
     return pdf
 
 
-def _with_tier(df: DataFrame, rates: pd.DataFrame, p: str, spark) -> DataFrame:
-    """``df`` + ``tier`` from its combination's back-test paid % (TIER_CUTS);
-    combinations under MIN_CELL back-test accounts are ``unassigned``."""
-    hi, lo = TIER_CUTS[p]
-    ok = rates[rates["accounts"] >= MIN_CELL]
+def _values(bt: DataFrame, by: list) -> pd.DataFrame:
+    """``_rates`` + amount collected in the next 3 months, per account and as a share of
+    outstanding principal (recovery)."""
+    pdf = _rates(bt, by).merge(
+        _table(
+            bt, by, [F.sum(F.coalesce("paid_next", F.lit(0.0))).alias("collected_aed")]
+        )[by + ["collected_aed"]],
+        on=by,
+    )
+    pdf["collected_per_account"] = (pdf["collected_aed"] / pdf["accounts"]).round(0)
+    pdf["recovery_pct"] = (
+        100.0
+        * pdf["collected_aed"]
+        / pdf["exposure_aed"].where(pdf["exposure_aed"] > 0)
+    ).round(2)
+    return pdf
+
+
+def _with_tier(df: DataFrame, values: pd.DataFrame, p: str, spark) -> DataFrame:
+    """``df`` + ``tier`` from its combination's expected collections per account
+    (TIER_CUTS); combinations under MIN_CELL back-test accounts are ``unassigned``."""
+    ok = values[values["accounts"] >= MIN_CELL]
     tiers = [
-        (c, "in_house" if r >= hi else "early_exit" if r < lo else "agency")
-        for c, r in zip(ok["combo"], ok["paid_pct"])
+        (c, _tier_of(v, p)) for c, v in zip(ok["combo"], ok["collected_per_account"])
     ]
     m = spark.createDataFrame(tiers, "combo string, tier string")
     return df.join(F.broadcast(m), "combo", "left").fillna("unassigned", ["tier"])
 
 
-def _tier_of(rate, p: str) -> str | None:
+def _tier_of(value, p: str) -> str | None:
     hi, lo = TIER_CUTS[p]
-    if rate is None or pd.isna(rate):
+    if hi is None or lo is None:
+        raise ValueError(f"set TIER_CUTS for {p} first (see the prompt)")
+    if value is None or pd.isna(value):
         return None
-    return "in_house" if rate >= hi else "early_exit" if rate < lo else "agency"
+    return "in_house" if value >= hi else "early_exit" if value < lo else "agency"
 
 
 def _ranked(bt: DataFrame) -> pd.DataFrame:
-    """Combinations ranked by back-test paid %, with cumulative capture: the basis for the
-    in-house / agency / early-exit tiers (accounts, principal, payers, amount collected).
-    """
-    pdf = _rates(bt, ["combo"]).merge(
-        _table(
-            bt,
-            ["combo"],
-            [F.sum(F.coalesce("paid_next", F.lit(0.0))).alias("collected_aed")],
-        )[["combo", "collected_aed"]],
-        on="combo",
+    """Combinations ranked by expected collections per account, with cumulative capture:
+    the basis for the in-house / agency / early-exit tiers."""
+    pdf = _values(bt, ["combo"])
+    pdf = pdf[pdf["accounts"] >= MIN_CELL].sort_values(
+        "collected_per_account", ascending=False
     )
-    pdf = pdf[pdf["accounts"] >= MIN_CELL].sort_values("paid_pct", ascending=False)
     for col, out in (
         ("accounts", "cum_accounts_pct"),
         ("exposure_aed", "cum_principal_pct"),
@@ -363,6 +376,8 @@ def _ranked(bt: DataFrame) -> pd.DataFrame:
             "rolled_pct",
             "cured_pct",
             "collected_aed",
+            "collected_per_account",
+            "recovery_pct",
             "cum_accounts_pct",
             "cum_principal_pct",
             "cum_payers_pct",
@@ -538,16 +553,13 @@ def main() -> None:
     )
     t["combos_top"] = top
     t["combos_ranked"] = _ranked(bt)
-    # allocation tiers (in-house / agency / early exit), from combination paid %
+    # allocation tiers (in-house / agency / early exit), from expected collections
     spark = latest.sparkSession
-    combo_rates = _rates(bt, ["combo"])
+    combo_rates = _values(bt, ["combo"])
     latest = _with_tier(latest, combo_rates, p, spark).cache()
     bt = _with_tier(bt, combo_rates, p, spark).cache()
     frame = _with_tier(frame, combo_rates, p, spark)
-    collected = [F.sum(F.coalesce("paid_next", F.lit(0.0))).alias("collected_aed")]
-    tier_bt = _rates(bt, ["tier"]).merge(
-        _table(bt, ["tier"], collected)[["tier", "collected_aed"]], on="tier"
-    )
+    tier_bt = _values(bt, ["tier"])
     for col, out in (
         ("paid_n", "payers_share_pct"),
         ("collected_aed", "collected_share_pct"),
@@ -561,6 +573,8 @@ def main() -> None:
                 "rolled_pct",
                 "cured_pct",
                 "collected_aed",
+                "collected_per_account",
+                "recovery_pct",
                 "payers_share_pct",
                 "collected_share_pct",
             ]
@@ -593,13 +607,13 @@ def main() -> None:
     res["score_compare_auc"] = auc  # in-sample, back-test month
     # tree, action segments, score
     tree = _table(latest, ["family", "nuance"]).merge(
-        _rates(bt, ["family", "nuance"])[
-            ["family", "nuance", "paid_pct", "rolled_pct"]
+        _values(bt, ["family", "nuance"])[
+            ["family", "nuance", "paid_pct", "rolled_pct", "collected_per_account"]
         ],
         on=["family", "nuance"],
         how="left",
     )
-    tree["tier"] = [_tier_of(r, p) for r in tree["paid_pct"]]
+    tree["tier"] = [_tier_of(v, p) for v in tree["collected_per_account"]]
     t["tree"] = tree
     t["tree_x_band"] = _rates(bt, ["dpd_band", "family", "nuance"])
     t["action"] = _table(latest, ["action"]).merge(
