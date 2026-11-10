@@ -33,6 +33,7 @@ from enbd_collections.pipelines.bureau import salary_bounces as bureau_salary_bo
 
 from enbd_collections.pipelines.casa import primary as casa_prm
 from enbd_collections.pipelines.casa import features as casa_feat
+from enbd_collections.pipelines.products import features as products_feat
 
 from enbd_collections.pipelines.retail_loans import staging as retail_loans_stg
 from enbd_collections.pipelines.retail_loans import primary as retail_loans_prm
@@ -154,6 +155,7 @@ def register_pipelines() -> dict[str, Pipeline]:
         # -- CASA (domain) ---------------------------------------------------
         "casa_primary": casa_prm.create_pipeline(),
         "casa_features": casa_feat.create_pipeline(),
+        "product_features": products_feat.create_pipeline(),
         # -- Retail Loans (domain) -----------------------------------------
         "retail_loans": retail_loans.create_pipeline(),
         "retail_loans_staging": retail_loans_stg.create_pipeline(),
@@ -223,6 +225,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
+        # TEMPORARY (A1 bundle 21): the A1 check; removed by the bundle's cleanup.
+        "crx_cc_a1_check": crx_cc_a1_ability.create_check_pipeline(),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_a3_payment_credibility": (
@@ -235,6 +239,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
+        # TEMPORARY (A1 bundle 21): the A1 check; removed by the bundle's cleanup.
+        "crx_rl_a1_check": crx_rl_a1_ability.create_check_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
         "crx_rl_a3_payment_credibility": (
             crx_rl_a3_payment_credibility.create_pipeline()

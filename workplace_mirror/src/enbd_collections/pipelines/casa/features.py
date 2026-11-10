@@ -5,6 +5,8 @@
     prm_casa_transactions, prm_casa_accounts ────────────► feat_cif_casa_activity_monthly
     wm_pri_labelled_transactions, prm_beneficiary_cards ─► feat_cif_ext_card_payment_monthly
     prm_casa_return_events, prm_casa_accounts ───────────► feat_cif_returns_monthly
+    prm_casa_transactions, prm_casa_accounts,
+    wm_pri_labelled_transactions ────────────────────────► feat_cif_casa_flows_monthly
 
 Needs ``casa_primary`` for the model_id first.
 
@@ -17,7 +19,7 @@ from enbd_collections.nodes.features.casa import feat_cif_casa
 
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """The five monthly CASA feature tables."""
+    """The six monthly CASA feature tables."""
     tags = ["casa", "features"]
     window = {
         "persona_start_date": "params:crx_persona.persona_start_date",
@@ -72,6 +74,18 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 },
                 outputs="feat_cif_returns_monthly",
                 name="build_feat_cif_returns_monthly",
+                tags=tags,
+            ),
+            node(
+                func=feat_cif_casa.build_casa_flows,
+                inputs={
+                    "transactions": "prm_casa_transactions",
+                    "casa_accounts": "prm_casa_accounts",
+                    "labelled": "wm_pri_labelled_transactions",
+                    **window,
+                },
+                outputs="feat_cif_casa_flows_monthly",
+                name="build_feat_cif_casa_flows_monthly",
                 tags=tags,
             ),
         ]

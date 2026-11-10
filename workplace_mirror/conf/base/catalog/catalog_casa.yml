@@ -94,6 +94,18 @@ feat_cif_casa_activity_monthly:
     kedro-viz:
       layer: feature
 
+# CASA money in / out per (cif_id, month_end, flow_class): legs, credit / debit AED,
+# largest leg; mirrored non-evidence pairs netted (A1 money in / out, FLOW_CLASSES).
+feat_cif_casa_flows_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_casa_flows_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
 # Largest CASA payment to a registered external card per (cif_id, month_end).
 feat_cif_ext_card_payment_monthly:
   type: spark.SparkDataset
@@ -111,6 +123,18 @@ feat_cif_returns_monthly:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_returns_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# The customer's other products with us per (cif_id, month_end, product_account_id):
+# product_type, balance_aed, is_current, instalment_aed (A1 cross-product, F4).
+feat_cif_cross_product_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/products/cif_cross_product_monthly"
   save_args:
     mode: overwrite
   metadata:

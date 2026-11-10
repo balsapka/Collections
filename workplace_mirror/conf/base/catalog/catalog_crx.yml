@@ -168,7 +168,8 @@ crx_rl_obs_base:
 # ── CC A1 ability (shared a1_ability engine) ────────────────────────────────
 # Signal tables at (account_id, observation_date) and the axis crx_cc_a1_ability:
 # a1_state in {high, moderate, low, unknown}; a1_state_label in {High, Moderate, Low,
-# Unknown}; a1_unknown_reason in {no_casa, dormant_casa} on unknown rows.
+# Unknown}; a1_unknown_reason in {no_casa, dormant_casa} on unknown rows; a1_reason the
+# strongest family (income, money_in, money_out, cross_product) or distress.
 crx_cc_a1_income_signals:
   type: spark.SparkDataset
   file_format: parquet
@@ -176,10 +177,17 @@ crx_cc_a1_income_signals:
   save_args:
     mode: overwrite
 
-crx_cc_a1_liquidity_signals:
+crx_cc_a1_casa_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_liquidity_signals"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_casa_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_cross_product_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_cross_product_signals"
   save_args:
     mode: overwrite
 
@@ -208,6 +216,14 @@ crx_cc_a1_ability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_ability"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (A1 bundle 21): the new rule's states for the check; removed by the cleanup.
+crx_cc_a1_check_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_check_new"
   save_args:
     mode: overwrite
 
@@ -343,7 +359,8 @@ crx_rl_dpd_sequences_linked:
 # ── RL A1 ability (shared a1_ability engine) ────────────────────────────────
 # Signal tables at (account_id, observation_date) and the axis crx_rl_a1_ability:
 # a1_state in {high, moderate, low, unknown}; a1_state_label in {High, Moderate, Low,
-# Unknown}; a1_unknown_reason in {no_casa, dormant_casa} on unknown rows.
+# Unknown}; a1_unknown_reason in {no_casa, dormant_casa} on unknown rows; a1_reason the
+# strongest family (income, money_in, money_out, cross_product) or distress.
 crx_rl_a1_income_signals:
   type: spark.SparkDataset
   file_format: parquet
@@ -351,10 +368,17 @@ crx_rl_a1_income_signals:
   save_args:
     mode: overwrite
 
-crx_rl_a1_liquidity_signals:
+crx_rl_a1_casa_signals:
   type: spark.SparkDataset
   file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_liquidity_signals"
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_casa_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_cross_product_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_cross_product_signals"
   save_args:
     mode: overwrite
 
@@ -383,6 +407,14 @@ crx_rl_a1_ability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability"
+  save_args:
+    mode: overwrite
+
+# TEMPORARY (A1 bundle 21): the new rule's states for the check; removed by the cleanup.
+crx_rl_a1_check_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_check_new"
   save_args:
     mode: overwrite
 

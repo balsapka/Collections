@@ -1,6 +1,7 @@
 """A1 ability evidence at (account_id, observation_date), shared by CC and RL.
 
-Spec: ``workplace_mirror/specs/A1_ability_spec.md`` (GRR workbook A1_ability_20261022).
+Spec: ``workplace_mirror/specs/A1_ability_family_rule.md`` (income: S2–S16 of
+``A1_ability_spec.md``).
 
 Observation dates are month ends. The window is W calendar months, the observation month
 included (``_common.window_months``: 3 for 60–180, 6 for 180+): m1 = the observation
@@ -8,14 +9,16 @@ month … mW; "the prior window" is m(W+1)–m(2W). The builders read the observ
 and monthly ``(cif_id, month_end)`` feature tables, and return what the classifier
 compares with its thresholds:
 
-* income    — salary in each month: the larger of the internal credit and the bureau
-              salary, a pull counting in its own month and the next (S14);
-* liquidity — CASA average balance in each month, largest single external card payment;
-* activity  — customer-initiated CASA movement in the window (the Unknown gate) and
-              whether the customer holds a CASA with us at all;
-* distress  — a cheque return, a direct-debit (DDS) return or a new bureau bounce in
-              the window;
-* EOSB      — a DCORE end-of-service result in the window (diagnostic only).
+* income   — salary in each month: the larger of the internal credit and the bureau
+             salary, a pull counting in its own month and the next (S14);
+* CASA     — money in and money out per month (the counted flow classes of
+             ``feat_cif_casa_flows_monthly``), the CASA average balance per month, whether
+             any counted leg falls in the window (the Unknown gate) and whether the
+             customer holds a CASA with us at all;
+* products — the customer's other products with us at the observation month (F4);
+* distress — a cheque return, a direct-debit (DDS) return or a new bureau bounce in
+             the window;
+* EOSB     — a DCORE end-of-service result in the window (diagnostic only).
 
 Features are per customer (CIF): every account of the customer counts, never the scored
 account_id alone (an RL account_id is not a CASA account).
@@ -25,6 +28,14 @@ from __future__ import annotations
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
+
+from enbd_collections.nodes.features.casa.feat_cif_casa import (
+    MONEY_IN_CLASSES,
+    MONEY_OUT_CLASSES,
+)
+from enbd_collections.nodes.features.products.feat_cif_cross_product import (
+    COLUMNS as CROSS_PRODUCT_COLUMNS,
+)
 
 from .._common import (
     GRAIN,
@@ -40,12 +51,6 @@ from .._common import (
 # (POS refunds).
 CHEQUE_RETURN, DDS_RETURN = "CHEQUE RETURNS", "DDS Rejects/Reversal"
 REASON_BUREAU_BOUNCE = "BUREAU"  # the reason given to bureau-reported bounces (S15)
-# feat_cif_casa_activity_monthly lanes that are money the customer moved (S11): third-
-# party credits, transfers to others, cash, clearing, bill payments, card spend and
-# paying their own credit card. Not: own-account wash, the bank recovering the
-# customer's loan instalment, fees, interest, reversals, returns, group-internal and
-# ambiguous rows.
-CUSTOMER_LANES = ("economic", "card_spend", "card_payment")
 # Months in which a CASA leg or a positive balance shows the customer holds a CASA
 # with us (WM may fill missing balances with 0, so a zero balance proves nothing).
 CASA_HELD_MONTHS = 12
@@ -203,92 +208,142 @@ def build_income_signals(
     )
 
 
-# ── Liquidity and activity ────────────────────────────────────────────────────
+# ── CASA: money in / out / held ──────────────────────────────────────────────
 
 
-def _casa_legs(casa_activity: DataFrame, casa_balance: DataFrame) -> DataFrame:
-    """CASA rows of both features by ``(cif_id, month_end)``: ``balance`` (NULL on an
-    activity leg), ``customer`` (1: a leg in ``CUSTOMER_LANES``, S11) and ``held`` (1: a
-    leg, or a positive balance)."""
-    return casa_activity.select(
+def _casa_rows(casa_flows: DataFrame, casa_balance: DataFrame) -> DataFrame:
+    """CASA rows of both features by ``(cif_id, month_end)``: ``money_in`` / ``money_out``
+    (AED of the counted classes; NULL on a balance row), ``balance`` (NULL on a flow row),
+    ``counted`` (1: a counted leg) and ``held`` (1: any leg, or a positive balance)."""
+    null = F.lit(None).cast("double")
+    counted_in = F.col("flow_class").isin(*MONEY_IN_CLASSES)
+    counted_out = F.col("flow_class").isin(*MONEY_OUT_CLASSES)
+    flows = casa_flows.groupBy("cif_id", "month_end").agg(
+        F.sum(F.when(counted_in, F.col("credit_aed"))).alias("money_in"),
+        F.sum(F.when(counted_out, F.col("debit_aed"))).alias("money_out"),
+        F.max((counted_in | counted_out).cast("int")).alias("counted"),
+    )
+    return flows.select(
         "cif_id",
         "month_end",
-        F.lit(None).cast(casa_balance.schema["casa_balance"].dataType).alias("balance"),
-        F.col("lane").isin(*CUSTOMER_LANES).cast("int").alias("customer"),
+        "money_in",
+        "money_out",
+        null.alias("balance"),
+        "counted",
         F.lit(1).alias("held"),
     ).unionByName(
         casa_balance.select(
             "cif_id",
             "month_end",
-            F.col("casa_balance").alias("balance"),
-            F.lit(0).alias("customer"),
+            null.alias("money_in"),
+            null.alias("money_out"),
+            F.col("casa_balance").cast("double").alias("balance"),
+            F.lit(0).alias("counted"),
             (F.col("casa_balance") > 0).cast("int").alias("held"),
         )
     )
 
 
-def build_liquidity_signals(  # pylint: disable=too-many-arguments
+def build_casa_signals(
     obs_base: DataFrame,
     casa_balance: DataFrame,
-    ext_card_payments: DataFrame,
-    casa_activity: DataFrame,
+    casa_flows: DataFrame,
     model_id: str,
     *,
     crx_persona: dict,
 ) -> DataFrame:
-    """``casa_m1 … casa_m{2W}`` (S7, ``feat_cif_casa_balance_monthly``),
-    ``ext_card_payment_max`` (S8: largest single payment to an external card in W),
-    ``casa_active`` (S11: a leg in ``CUSTOMER_LANES`` in W) and ``casa_held`` (any CASA
-    leg or a positive balance in the last ``CASA_HELD_MONTHS`` months). CASA means the
-    scheme-code accounts of S16."""
+    """``in_m1 … in_mW`` / ``out_m1 … out_mW`` (money in / out per month, the counted
+    classes of ``feat_cif_casa_flows_monthly``; salary credits are income, not money in),
+    ``casa_m1 … casa_m{2W}`` (``feat_cif_casa_balance_monthly``), ``casa_active`` (a
+    counted leg in W: the Unknown gate) and ``casa_held`` (any CASA leg or a positive
+    balance in the last ``CASA_HELD_MONTHS`` months). CASA means the scheme-code accounts
+    of S16."""
     require_columns(
         casa_balance,
         ["cif_id", "month_end", "casa_balance"],
         "feat_cif_casa_balance_monthly",
     )
     require_columns(
-        ext_card_payments,
-        ["cif_id", "month_end", "max_payment"],
-        "feat_cif_ext_card_payment_monthly",
-    )
-    require_columns(
-        casa_activity,
-        ["cif_id", "month_end", "lane", "legs"],
-        "feat_cif_casa_activity_monthly",
+        casa_flows,
+        ["cif_id", "month_end", "flow_class", "credit_aed", "debit_aed"],
+        "feat_cif_casa_flows_monthly",
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
     # The obs base starts in the persona start month: no window reaches older rows.
     first = F.lit(str(crx_persona["persona_start_date"])).cast("date")
-    legs = _casa_legs(casa_activity, casa_balance).filter(
+    rows = _casa_rows(casa_flows, casa_balance).filter(
         F.col("month_end") >= window_start(CASA_HELD_MONTHS, first)
     )
-    payments = ext_card_payments.filter(F.col("month_end") >= window_start(w, first))
     in_w = _month_index(F.col("month_end")) <= w
-    casa_active = F.max(F.when((F.col("customer") == 1) & in_w, F.lit(1)))  # S11
-    casa_held = F.max(F.when(F.col("held") == 1, F.lit(1)))
     signals = left_join_all(
         obs_base,
         [
             _in_window(
                 obs,
-                legs,
+                rows,
                 CASA_HELD_MONTHS,
+                *_by_month("money_in", "in", w),
+                *_by_month("money_out", "out", w),
                 *_by_month("balance", "casa", 2 * w),
-                casa_active.alias("casa_active"),
-                casa_held.alias("casa_held"),
-            ),
-            _in_window(
-                obs, payments, w, F.max("max_payment").alias("ext_card_payment_max")
-            ),
+                F.max(F.when((F.col("counted") == 1) & in_w, F.lit(1))).alias(
+                    "casa_active"
+                ),
+                F.max(F.when(F.col("held") == 1, F.lit(1))).alias("casa_held"),
+            )
         ],
     )
     return signals.fillna(0, subset=["casa_active", "casa_held"]).select(
         *GRAIN,
+        *[f"in_m{i}" for i in range(1, w + 1)],
+        *[f"out_m{i}" for i in range(1, w + 1)],
         *[f"casa_m{i}" for i in range(1, 2 * w + 1)],
-        "ext_card_payment_max",
         "casa_active",
         "casa_held",
+    )
+
+
+# ── Cross-product (F4) ────────────────────────────────────────────────────────
+
+
+def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> DataFrame:
+    """At the observation month end, the customer's other products with us
+    (``feat_cif_cross_product_monthly``), the scored account itself left out:
+    ``xp_assets_aed`` (deposits + investments + WM), ``xp_instalment_max`` (the largest
+    instalment / minimum due of another credit product that is current), ``xp_current``
+    (1: another credit product is current) and ``xp_holding`` (1: any asset above 0)."""
+    require_columns(
+        products, list(CROSS_PRODUCT_COLUMNS), "feat_cif_cross_product_monthly"
+    )
+    obs = _cifs(obs_base).select(*GRAIN, "cif_id")
+    asset = F.col("product_type").isin("deposit", "investment", "wm")
+    current_credit = F.col("product_type").isin("card", "loan") & (
+        F.coalesce(F.col("is_current").cast("int"), F.lit(0)) == 1
+    )
+    rows = (
+        obs.join(
+            products.select(
+                F.col("cif_id").cast("string").alias("cif_id"),
+                F.col("month_end").alias("observation_date"),
+                F.col("product_account_id").cast("string").alias("_acct"),
+                "product_type",
+                F.col("balance_aed").cast("double").alias("_bal"),
+                "is_current",
+                F.col("instalment_aed").cast("double").alias("_inst"),
+            ),
+            on=["cif_id", "observation_date"],
+        )
+        .filter(F.col("_acct") != F.col("account_id").cast("string"))
+        .groupBy(*GRAIN)
+        .agg(
+            F.sum(F.when(asset, F.col("_bal"))).alias("xp_assets_aed"),
+            F.max(F.when(current_credit, F.col("_inst"))).alias("xp_instalment_max"),
+            F.max(current_credit.cast("int")).alias("xp_current"),
+            F.max((asset & (F.col("_bal") > 0)).cast("int")).alias("xp_holding"),
+        )
+    )
+    return left_join_all(obs_base, [rows]).fillna(
+        0, subset=["xp_current", "xp_holding"]
     )
 
 

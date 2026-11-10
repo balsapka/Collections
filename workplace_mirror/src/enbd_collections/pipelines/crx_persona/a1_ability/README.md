@@ -1,12 +1,13 @@
 # A1 Ability — how the engine decides
 
-A1 asks: **can this customer pay?** It looks at what we can see of their money — income,
-liquid balances, failed payments — and gives one state per observation:
+A1 asks: **can this customer pay?** It looks for independent evidence that the customer has
+money — income, money coming in or held, money going out by choice, other products with us —
+and failed payments, and gives one state per observation:
 `a1_state` = `high`, `moderate`, `low` or `unknown`, shown as `a1_state_label` = High,
 Moderate, Low, Unknown.
 
-This page explains the logic in plain terms. The rule table is the GRR workbook
-`A1_ability_20261022` and the spec `specs/A1_ability_spec.md` (S1–S13); the code is
+This page explains the logic in plain terms. The rule is `specs/A1_ability_family_rule.md`
+(income: `specs/A1_ability_spec.md` S1–S16); the code is
 `signals.py` (evidence), `classify.py` (levels and state) and `pipeline.py` (nodes). CC wraps
 it in `cc_a1_ability`, RL in `rl_a1_ability`; each wrapper adds its anchor.
 
@@ -22,8 +23,8 @@ it in `cc_a1_ability`, RL in `rl_a1_ability`; each wrapper adds its anchor.
   |---|---|
   | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` (`casa_features`) |
   | `feat_cif_casa_balance_monthly` | WM CASA balance and flow tables (`casa_features`) |
-  | `feat_cif_casa_activity_monthly` | `prm_casa_transactions` ← FTR (`casa_primary`, `casa_features`) |
-  | `feat_cif_ext_card_payment_monthly` | `wm_pri_labelled_transactions` + `prm_beneficiary_cards` |
+  | `feat_cif_casa_flows_monthly` | `prm_casa_transactions` ← FTR + `wm_pri_labelled_transactions` (`casa_features`) |
+  | `feat_cif_cross_product_monthly` | product holding, loan portfolio, card balances, WM assets (`product_features`) |
   | `feat_cif_returns_monthly` | `prm_casa_return_events` ← FTR |
   | `feat_cif_bureau_salary_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
   | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
@@ -42,7 +43,7 @@ it in `cc_a1_ability`, RL in `rl_a1_ability`; each wrapper adds its anchor.
     snapshot.
   - No anchor → the flat floors below apply on their own.
 
-## 1. Income — Stable (2 points) / Weak (1) / None (0)
+## 1. F1 Income — Stable (2 points) / Weak (evidence) / None
 
 **Step 1: one income amount per month** (`build_income_signals`). Two sources; for each
 month **the larger one wins**.
@@ -68,7 +69,8 @@ the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) a
   **and** it is at least 75% of what m4–m6 received (`D_INC = 0.25`; nothing in m4–m6 →
   nothing to compare). The window total, not a count of months: an employer paying early
   puts two salaries in one month and none in the next.
-- **Weak** = otherwise, any month in m1–m3 ≥ AED 1,000. **None** = neither.
+- **Weak** = otherwise, any month in m1–m3 ≥ AED 1,000 (no points, but evidence: Low rather
+  than Unknown). **None** = neither.
 
 Example — observation 31 July, anchor AED 2,000 → threshold 4,000, Stable needs 8,000:
 
@@ -79,25 +81,44 @@ Example — observation 31 July, anchor AED 2,000 → threshold 4,000, Stable ne
 The window holds 13,500 ≥ 8,000, and 13,500 ≥ 75% of 15,000 → **Stable** (June's double
 salary covers July).
 
-## 2. Liquidity — Adequate (2 points) / Weak (1) / None (0)
+## 2. Which transactions count (`feat_cif_casa_flows_monthly`)
 
-**Evidence** (`build_liquidity_signals`):
+Every CASA leg gets one class (`feat_cif_casa.flow_class`, on top of `transaction_lane`).
+Only these count:
 
-- **CASA balance per month** (`casa_m1 … casa_m6`) — current + savings average balance, the
-  4-week average on the month's last weekly WM snapshot.
-- **External card payment** (`ext_card_payment_max`) — the largest single CASA payment in
-  m1–m3 to a card registered as a payment beneficiary (money paid to another bank's card).
+- **Money in:** transfers and remittances from others and clearing credits
+  (`third_party_in`), cash deposits (`cash_in`), credits from the customer's own account at
+  another bank (`own_in_external`, WM label).
+- **Money out:** card spend, ATM, bills, transfers to others (`chosen_spend`), debits to the
+  customer's own account at another bank (`own_out_external`, WM label).
 
-**Level** (`liquidity_level`):
+Nothing else counts: salary-flagged credits (they are income), reversals, returned cheques /
+DDS and the cheque presentments they undo (narrations `CHQ RTN` / `CHQ NO`), refunds,
+transfers between the customer's accounts with us, fees and interest, paying their own card
+or loan, and anything whose meaning is not established (the rest of `MISCELLANEOUS`). A
+counted leg mirrored by a leg that does not count — the same amount (±1%) within 3 days —
+is dropped (a bounce, a reversal, a sweep).
 
-- **Adequate** = either
-  - CASA ≥ max(AED 3,000, 1 × anchor) in at least 2 of m1–m3 (3 of 6 at 180+), **and** the
-    m1–m3 average not more than 50% below the m4–m6 average (months without data skipped); or
-  - one external card payment ≥ max(AED 500, 1 × anchor).
-- **Weak** = otherwise, CASA ≥ AED 1,000 in any of m1–m3, or a card payment ≥ AED 1,000.
-- **None** = neither.
+## 3. F2 Money in or held, F3 Money out — Strong (2) / Some (evidence) / None
 
-## 3. Distress — a failed payment lowers the state one level
+- **F2 strong** = money in ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3 (3 of 6 at 180+),
+  **or** the CASA balance ≥ max(AED 3,000, 1 × anchor) in 2 of m1–m3 and not more than 50%
+  below the m4–m6 average (money held: the bank's sweep is manual, so a balance can survive
+  it). **Some** = any month with ≥ AED 1,000 of money in. A balance below strong is not
+  evidence.
+- **F3 strong** = money out ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3. **Some** = any month
+  ≥ AED 500.
+- `a1_sweepable_balance_flag` = the balance is strong: money above the floor the bank could
+  still sweep (a lead for collections; it changes nothing).
+
+## 4. F4 Cross-product — Strong (2) / Some (evidence) / None
+
+At the observation month end, the customer's other products with us (the scored account
+left out): **strong** = deposits + investments + WM assets ≥ max(AED 10,000, 3 × anchor), or
+another credit product (incl. other cards) that is current with an instalment / minimum due
+≥ max(AED 1,000, 1 × anchor); **some** = any other current credit product or any asset.
+
+## 5. Distress — a failed payment lowers the state one level
 
 `distress_flag = 1` when the customer has **at least one** of these in m1–m3
 (`build_distress_signals`; the parts are `distress_cheque`, `distress_dds`,
@@ -106,53 +127,39 @@ salary covers July).
 - **Internal:** a returned cheque or a DDS (direct debit) reject on any of their CASA
   accounts (`CHEQUE RETURNS`, `DDS Rejects/Reversal`). POS refunds (`RETURNS`) do not count;
   the two legs of one return count once.
-- **Bureau:** a **new** bounced cheque in a bureau pull — per alert key (CIF, contract type,
-  alert), a pull whose bounced amount differs from the key's previous pull, or follows a
-  pull without one. A bounce repeated unchanged in later pulls counts once. Dated by the
-  pull (the bureau gives no bounce date).
+- **Bureau:** a bounced cheque reported by the bureau, one per CIF and return date
+  (`DT_OF_RETURN`, S15).
 
-## 4. Activity — is there a CASA we can read? (spec S11)
+## 6. The state
 
-The CASA legs of the transaction table (FTR) are sorted into lanes
-(`feat_cif_casa.transaction_lane`, after the FTR row-handling reference). **Customer-initiated
-movement** = a leg in the `economic` lane (remittances in and out, transfers to others, cash,
-clearing, bill payments), `card_spend` (POS) or `card_payment` (paying their own credit
-card). It does **not** count: transfers between the customer's own accounts and auto-save
-(`wash`), the bank recovering the customer's loan instalment (`own_loan`), fees and interest,
-reversals, returns, group-internal transfers and the ambiguous rest of `MISCELLANEOUS`.
-
-- `casa_active` = a customer-initiated leg in m1–m3.
-- `casa_held` = any CASA leg, or a positive balance, in the last 12 months. WM may fill a
-  missing balance with 0, so a zero balance alone does not show a CASA.
-
-## 5. The state
-
-Points = income points + liquidity points (0–4).
+Only strong levels score (2 points each); weak / some are evidence.
 
 | State | Rule |
 |---|---|
-| `unknown` | 0 points, no distress **and** no customer-initiated movement in m1–m3 — we cannot see the customer's money, which is not evidence of no ability. `a1_unknown_reason`: `no_casa` (no CASA with us in 12 months) or `dormant_casa` |
-| `high` | 4 points, no distress |
-| `moderate` | 2–3 points without distress, or 4 points with distress |
-| `low` | everything else: 0–1 points, or 2–3 points with distress |
+| `high` | two or more strong families (4+ points) |
+| `moderate` | one strong family |
+| `low` | no strong family, but some evidence (income weak, money in / out some, cross-product some), or distress alone |
+| `unknown` | no evidence in any family, no distress **and** no counted CASA leg in m1–m3 — we cannot see the customer's money, which is not evidence of no ability. `a1_unknown_reason`: `no_casa` (no CASA leg or positive balance in 12 months) or `dormant_casa` |
 
-Unknown is checked first. Distress moves a customer exactly one rung down.
-`a1_eosb_flag` (a DCORE end-of-service result in the window) is a diagnostic column and
-changes nothing.
+Distress moves a customer exactly one rung down (High → Moderate → Low). `a1_reason` names
+the strongest family (or `distress`). `a1_eosb_flag` (a DCORE end-of-service result in the
+window) is a diagnostic column and changes nothing.
 
 ## Known limits
 
 - **The salary total is not a clean basic salary.** WM's flag counts bonuses, incentives,
   overtime and commissions, so a month with a large bonus can pass on its own.
-- **Only what WM labels as salary counts.** Regular non-salary income is invisible; about a
-  third of customers ever show an internal salary, and about a third hold no CASA with us.
+- **Only what WM labels as salary counts as income.** Other regular credits count as money in;
+  about a third of customers hold no CASA with us, so F2 / F3 cannot see them.
+- **Money in / out rest on the class table.** A flow type counts only once its meaning is
+  established; new transaction types land in `unplaced` until they are classified.
 - **Bureau salary is an event feed for now.** An alert row appears only when something changes,
   so no row means nothing is known, not that the salary stopped, and few pulls fall in the
   window. GRR's feed of pulls every 2 months enters through the same rule. A stop shows only
   as a closure, a lower amount or the end of an internal salary (`a1_salary_stopped`).
 - **Missing salary months count as 0** in the window total and the weakening check, except that
   with no internal salary in either window the weakening check compares the months with a value.
-- **Inputs follow the persona start.** `prm_casa_return_events`, `prm_casa_transactions` and
-  the WM-based features keep a fixed number of months before
+- **Inputs follow the persona start.** `prm_casa_return_events`, `prm_casa_transactions`,
+  the flows and the WM-based features keep a fixed number of months before
   `crx_persona.persona_start_date`; after moving that date, rerun `casa_primary` and
   `casa_features` first, or the A1 run stops (`build_distress_signals`).

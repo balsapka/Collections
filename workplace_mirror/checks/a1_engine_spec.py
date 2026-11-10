@@ -1,4 +1,5 @@
-"""Local spec test for the A1 engine (``a1_ability``) against specs/A1_ability_spec.md.
+"""Local spec test for the A1 engine (``a1_ability``) against specs/A1_ability_family_rule.md
+(income: specs/A1_ability_spec.md).
 
     python workplace_mirror/checks/a1_engine_spec.py      (needs pyspark + Java 17)
 
@@ -38,8 +39,9 @@ from enbd_collections.pipelines.crx_persona.a1_ability import (  # noqa: E402
     build_a1_ability,
     build_distress_signals,
     build_eosb_signals,
+    build_casa_signals,
+    build_cross_product_signals,
     build_income_signals,
-    build_liquidity_signals,
 )
 from enbd_collections.pipelines.crx_persona.cc_a1_ability.nodes import (  # noqa: E402
     build_cc_liquidity_anchor,
@@ -65,8 +67,12 @@ def week(d):
     return int(f"{d:%Y%m}0{min((d.day - 1) // 7 + 1, 4)}")
 
 
-LEG = {  # active= : (tran_type, reason, code, narration)
-    "economic": ("INWARD REMITTANCE", None, "101", "SALARY FROM X"),
+LEG = {  # active= / flows kind: (tran_type, reason, code, narration)
+    "economic": ("INWARD REMITTANCE", None, "101", "TRANSFER FROM X"),
+    "cash": ("CASH DEPOSIT", None, "102", "CASH"),
+    "remit_out": ("OUTWARD REMITTANCE", None, "120", "TO OTHER BANK"),
+    "chq_rtn": ("MISCELLANEOUS", None, None, "CHQ RTN INSUFFICIENT 123"),
+    "misc": ("MISCELLANEOUS", None, None, "ADJUSTMENT"),
     "card": ("POS TRANSACTIONS", None, "447", "POS"),
     "own_loan": ("MISCELLANEOUS", None, None, "INSTL_RECOVERY-PL-AC 123"),
     "wash": ("INTERNAL TRANSFER - SELF", "INTERNAL TRANSFER - SELF", "458", "OWN"),
@@ -75,15 +81,18 @@ LEG = {  # active= : (tran_type, reason, code, narration)
 }
 rows = {
     k: []
-    for k in "spine wmsal bal casa flow txn bene alert ret ftr dcore agr".split()
+    for k in "spine wmsal bal casa flow alert ret ftr lab prod dcore agr".split()
 }
 expect = {}
 
 
-def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active="economic",
-         on_loan=False, buckets=None, internal=None, eosb=None, model="cc_60_180", **want):
+def case(name, *, salary=(), bureau=(), casa=(), flows=(), products=(), bounces=(),
+         active="economic", on_loan=False, buckets=None, internal=None, eosb=None,
+         model="cc_60_180", **want):
     """salary: [(k, amount)]; bureau: [(k, amount[, alert type[, pull day]])]; casa:
-    [(k, balance)]; payments: [(k, amount)];
+    [(k, balance)]; flows: [(k, "C"/"D", LEG kind, amount[, day[, wm label]])] where the
+    label is "salary" or "self"; products: [(type, balance, is_current, instalment[,
+    own account])];
     bounces: [(k, bureau bounced amount on that pull[, k of its return date, None: none])]; active: a CASA leg lane in m2 (None:
     no leg); on_loan: that leg is on the loan account, not a CASA; buckets: overdue_bucket_01..08 on the latest snapshot; eosb: k of a DCORE
     EOSB result."""
@@ -99,9 +108,19 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active
         rows["alert"].append((cif, "CC", "SALARY", m(k, day), 0.0, alert_type, float(amt), None))
     for k, bal in casa:
         rows["casa"].append((cif, week(m(k, 22)), float(bal)))
-    for k, amt in payments:
-        rows["bene"].append((f"CARD{i}", "CARD_NUMBER", "OTHER BANK"))
-        rows["txn"].append((cif, "outflow", "CASA", m(k), float(amt), f"CARD{i}"))
+    for j, (k, dc, kind, amt, *rest) in enumerate(flows):
+        day = rest[0] if rest else 20
+        t, reason, code, narration = LEG[kind]
+        tid = f"F{i}_{j}"
+        rows["ftr"].append((cif, f"CASA{cif}", tid, m(k, day), dc, t, reason, code, narration,
+                            float(amt)))
+        if len(rest) > 1:
+            label = rest[1]
+            rows["lab"].append((cif, tid, m(k, day), int(label == "salary"),
+                                "self" if label == "self" else "other"))
+    for ptype, bal, current, inst, *own in products:
+        pacct = acct if own and own[0] else f"P{i}_{ptype}"
+        rows["prod"].append((str(cif), OBS, pacct, ptype, bal, current, inst))
     for k, amt, *ret in bounces:
         back = ret[0] if ret else k  # the return date's month (None: no return date)
         returned = None if back is None else m(back, 3)
@@ -112,7 +131,7 @@ def case(name, *, salary=(), bureau=(), casa=(), payments=(), bounces=(), active
     if active is not None:
         t, reason, code, narration = LEG[active]
         account = f"LOAN{cif}" if on_loan else f"CASA{cif}"
-        rows["ftr"].append((cif, account, m(2), "D", t, reason, code, narration, 100.0))
+        rows["ftr"].append((cif, account, f"A{i}", m(2), "D", t, reason, code, narration, 100.0))
         rows["flow"].append((cif, week(m(2, 8)), 100.0, 0.0))
     if eosb is not None:
         rows["agr"].append((acct, f"AG{i}", str(cif)))
@@ -172,14 +191,53 @@ case("internal salary stopped, one AECB pull at the same level -> Weak",
 case("AECB in W with internal salary in W: not stopped",
      salary=[(1, 5000), (2, 5000), (4, 5000)], income="stable", source="internal", stopped=0)
 # ── Liquidity (S7, S8) ──
-case("casa adequate 2 of 3 >= 3000", casa=[(1, 3500), (2, 3500), (3, 100)], liquidity="adequate")
-case("casa drop > 50% -> not adequate", casa=[(1, 3500), (2, 3500), (3, 3500), (4, 9000), (5, 9000), (6, 9000)],
-     liquidity="weak")
-case("single payment >= 500 adequate", payments=[(2, 600)], liquidity="adequate")
-case("payments summed do not count", payments=[(1, 300), (2, 300)], liquidity="none")
-case("payment must cover the anchor", payments=[(2, 600)], buckets=[100, 2000, 0, 0, 0, 0, 0, 0],
-     liquidity="none")
-case("casa >= 1000 once -> weak", casa=[(2, 1500)], liquidity="weak")
+# ── F2 money in or held, F3 money out (family rule §2–§3) ──
+case("F2 strong: money in >= 1000 in 2 of 3", flows=[(1, "C", "economic", 1500), (2, "C", "economic", 1500)],
+     money_in="strong")
+case("F2 some: one month of money in", flows=[(1, "C", "economic", 1500)], money_in="some")
+case("F2 strong must cover the anchor", flows=[(1, "C", "economic", 1500), (2, "C", "economic", 1500)],
+     buckets=[100, 2000, 0, 0, 0, 0, 0, 0], money_in="some")
+case("F2: cash deposits count", flows=[(1, "C", "cash", 2000), (3, "C", "cash", 2000)], money_in="strong")
+case("F2: returned-cheque credits never count", flows=[(1, "C", "chq_rtn", 9000), (2, "C", "chq_rtn", 9000)],
+     money_in=None)
+case("F2: ambiguous MISCELLANEOUS credits never count", flows=[(1, "C", "misc", 9000), (2, "C", "misc", 9000)],
+     money_in=None)
+case("F2: salary-flagged credits are income, not money in",
+     flows=[(1, "C", "economic", 5000, 20, "salary"), (2, "C", "economic", 5000, 20, "salary")], money_in=None)
+case("F2: own account at another bank (WM self) counts",
+     flows=[(1, "C", "economic", 2000, 20, "self"), (2, "C", "economic", 2000, 20, "self")], money_in="strong")
+case("F2: a credit mirrored by a non-evidence debit is netted",
+     flows=[(1, "C", "economic", 2000, 10), (1, "D", "misc", 2000, 12), (2, "C", "economic", 2000)],
+     money_in="some")
+case("F2: a mirror 5 days later is not netted",
+     flows=[(1, "C", "economic", 2000, 5), (1, "D", "misc", 2000, 10), (2, "C", "economic", 2000)],
+     money_in="strong")
+case("F2 strong: CASA balance held 2 of 3 >= 3000", casa=[(1, 3500), (2, 3500), (3, 100)],
+     money_in="strong", sweepable=1)
+case("F2: balance drop > 50% is not strong", casa=[(1, 3500), (2, 3500), (3, 3500), (4, 9000), (5, 9000), (6, 9000)],
+     money_in=None, sweepable=0)
+case("F2: a balance below strong is not evidence", active=None, casa=[(2, 1500)], money_in=None,
+     state="unknown", reason="dormant_casa")
+case("F3 strong: spend >= 1000 in 2 of 3", active=None,
+     flows=[(1, "D", "card", 1200), (2, "D", "remit_out", 1200)], money_out="strong")
+case("F3 some: one month >= 500", active=None, flows=[(1, "D", "card", 600)], money_out="some")
+case("F3: transfers to own accounts elsewhere count", active=None,
+     flows=[(1, "D", "remit_out", 3000, 20, "self"), (2, "D", "remit_out", 3000, 20, "self")],
+     money_out="strong")
+case("F3: own-account transfers with us never count", active=None,
+     flows=[(1, "D", "wash", 3000), (2, "D", "wash", 3000)], money_out=None, state="unknown")
+# ── F4 cross-product ──
+case("F4 strong: deposits >= 10000", products=[("deposit", 12000.0, None, None)], cross_product="strong")
+case("F4 some: a small deposit", products=[("deposit", 500.0, None, None)], cross_product="some")
+case("F4 strong: a current loan with instalment >= anchor", buckets=[100, 2000, 0, 0, 0, 0, 0, 0],
+     products=[("loan", None, 1, 2500.0)], cross_product="strong")
+case("F4 some: a current card with a small minimum due", buckets=[100, 2000, 0, 0, 0, 0, 0, 0],
+     products=[("card", None, 1, 300.0)], cross_product="some")
+case("F4: an overdue loan is not evidence", products=[("loan", None, 0, 5000.0)], cross_product="none")
+case("F4: the scored account itself never counts", products=[("card", None, 1, 5000.0, True)],
+     cross_product="none")
+case("F4: assets must reach 3 x anchor", buckets=[100, 5000, 0, 0, 0, 0, 0, 0],
+     products=[("wm", 12000.0, None, None)], cross_product="some")
 # ── Anchor (S1) ──
 case("anchor = oldest bucket in OVD_01..06", buckets=[100, 200, 300, 400, 0, 0, 0, 0], anchor=400.0)
 case("OVD_07/08 never anchor", buckets=[100, 0, 0, 0, 0, 0, 7000, 9000], anchor=100.0)
@@ -188,10 +246,19 @@ case("no overdue -> flat floors", buckets=[0] * 8, anchor=None)
 case("High", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)], state="high")
 case("High + bureau bounce -> Moderate", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
      bounces=[(2, 500)], state="moderate")
-case("Stable + None -> Moderate", salary=[(1, 5000), (2, 5000)], state="moderate")
-case("Stable + Weak + bounce -> Low", salary=[(1, 5000), (2, 5000)], casa=[(1, 1500)], bounces=[(1, 500)],
+case("one strong family (income) -> Moderate", salary=[(1, 5000), (2, 5000)], state="moderate")
+case("one strong family + bounce -> Low", salary=[(1, 5000), (2, 5000)], casa=[(1, 1500)], bounces=[(1, 500)],
      state="low")
-case("Weak + None -> Low", salary=[(1, 1500)], state="low")
+case("income weak only -> Low", salary=[(1, 1500)], state="low")
+case("High: money out + cross-product", active=None, flows=[(1, "D", "card", 1200), (2, "D", "card", 1200)],
+     products=[("deposit", 20000.0, None, None)], state="high", why="money_out")
+case("High: money in + money out", flows=[(1, "C", "economic", 1500), (2, "C", "economic", 1500),
+     (1, "D", "card", 1200), (2, "D", "card", 1200)], state="high")
+case("some levels score nothing: Moderate stays Moderate", salary=[(1, 5000), (2, 5000)],
+     flows=[(1, "C", "economic", 1500), (1, "D", "card", 600)], products=[("deposit", 500.0, None, None)],
+     state="moderate", why="income")
+case("cross-product some alone -> Low (evidence)", active=None, products=[("card", None, 1, 100.0)],
+     state="low")
 case("High + internal cheque return -> Moderate", salary=[(1, 5000), (2, 5000)],
      casa=[(1, 4000), (2, 4000)], internal=(2, "CHEQUE RETURNS"), state="moderate")
 case("internal DDS return counts", salary=[(1, 5000), (2, 5000)], casa=[(1, 4000), (2, 4000)],
@@ -231,7 +298,9 @@ case("180+: stable, 15000 >= 3 x 3000", salary=[(1, 5000), (4, 5000), (6, 5000)]
 case("180+: 8000 < 9000 is weak", salary=[(1, 4000), (5, 4000)], income="weak", **P180)
 case("180+: weakening vs the prior 6", salary=[(k, 4000) for k in range(1, 7)] + [(k, 9000) for k in range(7, 13)],
      income="weak", **P180)
-case("180+: casa adequate 3 of 6", casa=[(2, 3500), (4, 3500), (6, 3500)], liquidity="adequate", **P180)
+case("180+: balance held 3 of 6", casa=[(2, 3500), (4, 3500), (6, 3500)], money_in="strong", **P180)
+case("180+: money in 3 of 6", flows=[(1, "C", "economic", 1000), (3, "C", "economic", 1000),
+     (6, "C", "economic", 1000)], money_in="strong", **P180)
 case("180+: bounce in month 5 counts", salary=[(1, 5000), (2, 5000), (3, 5000)], bounces=[(5, 500)],
      state="low", **P180)
 case("180+: overdue buckets give no anchor", buckets=[100, 200, 0, 0, 0, 0, 0, 0], anchor=None, **P180)
@@ -241,7 +310,7 @@ df = spark.createDataFrame
 # early enough (build_distress_signals checks it)
 COVER = [(-1, "CASA-1", "TC", m(6), "CHARGES")]
 ret_schema = "cif_id long, foracid string, tran_id string, tran_date date, reason_for_excluding string"
-ftr_schema = ("cif_id long, foracid string, tran_date date, tran_dc string, tran_type string,"
+ftr_schema = ("cif_id long, foracid string, tran_id string, tran_date date, tran_dc string, tran_type string,"
               " reason_for_excluding string,"
               " tran_particular_code string, tran_narration_1 string, actual_tran_amt_aed double")
 
@@ -257,20 +326,18 @@ casa_balance = fc.build_casa_balance(
                      " ft_outflow_casa_amt_in_last_0_0_weeks_sum double"),
     PERSONA["persona_start_date"], 12,
 )
-payments = fc.build_ext_card_payments(
-    df(rows["txn"], "cif_id long, in_out_flow string, product_category string, tran_date date, tran_amt double,"
-                    " transaction_acid string"),
-    prm_casa.build_beneficiary_cards(
-        df(rows["bene"], "instrument_number string, instrument_type string, institution_name string")),
-    PERSONA["persona_start_date"], 12,
-)
 # every customer has a current account (scheme 101) and a loan account (scheme LAA)
 gam = [(c, f"CASA{c}", "101") for c in range(-1, 1000 + len(expect))]
 gam += [(c, f"LOAN{c}", "LAA") for c in range(1000, 1000 + len(expect))] + [(1, "CASA1", "101")]
 CA, SA = ["101", "110"], ["021"]
 accounts = prm_casa.build_casa_accounts(df(gam, "cif_id long, foracid string, schm_code string"), CA, SA)
 assert {r["schm_code"] for r in accounts.collect()} == {"101"}  # the loan scheme is not CASA
-activity = fc.build_casa_activity(df(rows["ftr"], ftr_schema), accounts)
+lab_schema = "cif_id long, tran_id string, tran_date date, salary_txn_flag int, counterparty_type string"
+flows = fc.build_casa_flows(df(rows["ftr"], ftr_schema), accounts, df(rows["lab"], lab_schema),
+                            PERSONA["persona_start_date"], 12)
+prod_schema = ("cif_id string, month_end date, product_account_id string, product_type string,"
+               " balance_aed double, is_current int, instalment_aed double")
+products = df(rows["prod"], prod_schema)
 returns = fc.build_returns(df(rows["ret"] + COVER, ret_schema), accounts)
 bounces = feat_cif_bureau_bounces_monthly.build(df(rows["alert"], alert_schema))
 followup = df(rows["dcore"], "agreement_id string, action_ts date, result_name string")
@@ -290,9 +357,8 @@ def run(model_id):
         model_id,
         PERSONA["persona_end_date"],
         income=build_income_signals(o, internal_salary, bureau_salary, model_id),
-        liquidity=build_liquidity_signals(
-            o, casa_balance, payments, activity, model_id, crx_persona=PERSONA
-        ),
+        casa=build_casa_signals(o, casa_balance, flows, model_id, crx_persona=PERSONA),
+        cross_product=build_cross_product_signals(o, products),
         distress=build_distress_signals(o, returns, bounces, model_id),
         eosb=build_eosb_signals(o, followup, agreements, model_id),
     ).collect()
@@ -302,7 +368,9 @@ got = {r["account_id"]: r for r in run("cc_60_180") + run("cc_180_plus")}
 fails = 0
 for acct, (name, want, _) in expect.items():
     r = got[acct]
-    actual = {"income": r["a1_income_level"], "liquidity": r["a1_liquidity_level"],
+    actual = {"income": r["a1_income_level"], "money_in": r["a1_money_in_level"],
+              "money_out": r["a1_money_out_level"], "cross_product": r["a1_cross_product_level"],
+              "sweepable": r["a1_sweepable_balance_flag"], "why": r["a1_reason"],
               "state": r["a1_state"], "anchor": r["liquidity_anchor_amt"],
               "reason": r["a1_unknown_reason"], "eosb_flag": r["a1_eosb_flag"],
               "source": r["a1_income_source"], "stopped": r["a1_salary_stopped"]}
@@ -319,10 +387,10 @@ probe = fc.build_internal_salary(df([(1, week(snap), 5000.0, (snap - m(1, 1)).da
 assert probe["month_end"] == date(2026, 7, 31), probe
 # the lanes of the FTR reference: card payments survive the SELF reason, DDS beats SELF
 lanes = {r["lane"] for r in fc.build_casa_activity(df(
-    [(1, "CASA1", m(1), "D", "CREDIT CARD PAYMENTS", "INTERNAL TRANSFER - SELF", "405", "CC", 1.0),
-     (1, "CASA1", m(1), "D", "INTERNAL TRANSFER - SELF", "DDS Rejects/Reversal", "445", "DDR", 1.0),
-     (1, "CASA1", m(1), "C", "POS TRANSACTIONS", "RETURNS", "948", "REF", 1.0),
-     (1, "CASA1", m(1), "C", "INWARD REMITTANCE", "SUBSIDIARIES EXCLUSION", "101", "X", 1.0)],
+    [(1, "CASA1", "L1", m(1), "D", "CREDIT CARD PAYMENTS", "INTERNAL TRANSFER - SELF", "405", "CC", 1.0),
+     (1, "CASA1", "L2", m(1), "D", "INTERNAL TRANSFER - SELF", "DDS Rejects/Reversal", "445", "DDR", 1.0),
+     (1, "CASA1", "L3", m(1), "C", "POS TRANSACTIONS", "RETURNS", "948", "REF", 1.0),
+     (1, "CASA1", "L4", m(1), "C", "INWARD REMITTANCE", "SUBSIDIARIES EXCLUSION", "101", "X", 1.0)],
     ftr_schema), accounts).collect()}
 assert lanes == {"card_payment", "signal", "refund", "group_internal"}, lanes
 # 180+ has no anchor; a balance snapshot from before the observation month gives none

@@ -2,9 +2,9 @@
 
     crx_<p>_obs_base ─┬─ income signals ────┐   feat_cif_internal_salary_monthly,
                       │                     │   feat_cif_bureau_salary_monthly (+ RL loans)
-                      ├─ liquidity signals ─┤   feat_cif_casa_balance_monthly,
-                      │                     │   feat_cif_ext_card_payment_monthly,
-                      │                     │   feat_cif_casa_activity_monthly
+                      ├─ CASA signals ──────┤   feat_cif_casa_balance_monthly,
+                      │                     │   feat_cif_casa_flows_monthly
+                      ├─ cross-product ─────┤   feat_cif_cross_product_monthly
                       ├─ distress signals ──┼─► crx_<p>_a1_ability
                       │                     │   feat_cif_returns_monthly,
                       │                     │   feat_cif_bureau_bounces_monthly
@@ -13,7 +13,8 @@
                       └─ liquidity anchor ──┘   (product node: prm_balance / int_loan_master)
 
 Needs, for the model_id: the observation base, ``casa_primary``, ``casa_features``,
-``bureau_salary_bounces`` and ``location_features`` (``prm_dcore_account_agreements``).
+``product_features``, ``bureau_salary_bounces`` and ``location_features``
+(``prm_dcore_account_agreements``).
 """
 
 from kedro.pipeline import Pipeline, node
@@ -21,10 +22,11 @@ from kedro.pipeline.node import Node
 
 from .classify import build_a1_ability
 from .signals import (
+    build_casa_signals,
+    build_cross_product_signals,
     build_distress_signals,
     build_eosb_signals,
     build_income_signals,
-    build_liquidity_signals,
 )
 
 TAGS = ["crx_persona", "crx", "a1", "ability", "persona_axis"]
@@ -53,17 +55,26 @@ def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
                 tags=TAGS,
             ),
             node(
-                func=build_liquidity_signals,
+                func=build_casa_signals,
                 inputs={
                     "obs_base": obs,
                     "casa_balance": "feat_cif_casa_balance_monthly",
-                    "ext_card_payments": "feat_cif_ext_card_payment_monthly",
-                    "casa_activity": "feat_cif_casa_activity_monthly",
+                    "casa_flows": "feat_cif_casa_flows_monthly",
                     "model_id": "params:model_id",
                     "crx_persona": "params:crx_persona",
                 },
-                outputs=f"{prefix}_liquidity_signals",
-                name=f"build_{prefix}_liquidity_signals",
+                outputs=f"{prefix}_casa_signals",
+                name=f"build_{prefix}_casa_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_cross_product_signals,
+                inputs={
+                    "obs_base": obs,
+                    "products": "feat_cif_cross_product_monthly",
+                },
+                outputs=f"{prefix}_cross_product_signals",
+                name=f"build_{prefix}_cross_product_signals",
                 tags=TAGS,
             ),
             node(
@@ -96,7 +107,8 @@ def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
                 inputs={
                     "obs_base": obs,
                     "income": f"{prefix}_income_signals",
-                    "liquidity": f"{prefix}_liquidity_signals",
+                    "casa": f"{prefix}_casa_signals",
+                    "cross_product": f"{prefix}_cross_product_signals",
                     "distress": f"{prefix}_distress_signals",
                     "eosb": f"{prefix}_eosb_signals",
                     "anchor": f"{prefix}_liquidity_anchor",
