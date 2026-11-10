@@ -71,7 +71,8 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
 | `chosen_spend` (POS, ATM, bills, transfers to others) | | yes | every dominant type lifts alike |
 | `reversal_return` (reversals, returned cheques / DDS, refunds, and the presentment they undo) | no | no | `CHQ RTN` / `CHQ NO` credits are 100% mirrored the same day; round 2 counted AED 186M (CC) / 264M (RL) of them as income |
 | `own_out_external` (debits to the customer's own account at another bank: WM label `self`, or the own-account remittance types such as `OUTWARD REMITTANCE 120`) | | yes | money leaving our bank that the customer controls (user, 2026-11-10). Largest such type: CC 33,785 legs / AED 76.8M, RL 9,688 / AED 30.2M |
-| `own_transfer` (between the customer's own accounts with us, auto-save; credits from own accounts elsewhere) | no | no | moves money the customer already has; no new evidence |
+| `own_in_external` (credits from the customer's own account at another bank: WM label `self` on credits, or the own-account inward types) | yes | | money brought into our bank from elsewhere (user, 2026-11-10); round 2: own-account credits lift in CC (cure +7.8pp, pay +9.1pp) |
+| `own_transfer` (between the customer's own accounts with us, auto-save) | no | no | the money never leaves our bank; no new evidence |
 | `bank_initiated` (sweeps, fees, interest, disbursements, recoveries) | no | no | |
 | `debt_elsewhere` | no | no | AED 0.2–1.0M; no state changes |
 | `debt_to_us` (own card / own loan) | no | no | A3 |
@@ -117,10 +118,10 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
 
 ## 6. Open (decisions for the user / GRR)
 
-1. **Credits from the customer's own account at another bank** (the incoming side of WM `self`).
-   They are out of F2 for now. The user decided only the outgoing side (2026-11-10). WM `self` and
-   our wash lane disagree on CC 224,903 legs / AED 861M and RL 62,523 / AED 240M, both directions
-   together. Round 2 saw own-account credits lift in CC (cure +7.8pp, pay +9.1pp). To confirm.
+1. **Own-account transfers with another bank count both ways** (user, 2026-11-10): out in F3, in in
+   F2. WM `self` and our wash lane disagree on CC 224,903 legs / AED 861M and RL 62,523 / AED 240M.
+   The bundle check reports how many states these legs move. A transfer that returns within 3 days
+   is still netted as a round trip, so moving money out and back does not count twice.
 2. **The `MIN_MONTHS` knob** (2 of 3, 3 of 6) is the only one that moves more than 5% of rows (CC
    5.8%, RL 13.6%). GRR to confirm.
 3. **The Unknown estimate** (round 3 B2) is a separate `a1_estimate` column, never part of the
