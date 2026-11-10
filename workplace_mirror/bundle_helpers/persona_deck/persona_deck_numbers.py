@@ -15,7 +15,7 @@ A4 ability (code A1). Tables are named after the slide they fill:
   mix_*        August mix per axis (latest month)
   a2_positive  180+ positives: reachable, in country, both
   a3_*         untested share; outcomes by credibility band within DPD band
-  a1_*         outcomes by deterioration family (overall and within DPD band)
+  a1_*         outcomes by deterioration family and state (overall and within DPD band)
   uc1_contact  share with a right-party contact in the last 3 months
   positive_*   180+ positive-signal flag, overall and per signal
   combos_*     how concentrated the four-axis combinations are; the largest ones
@@ -42,14 +42,15 @@ OFFSET = {"cc": 0, "rl": 1}  # native bucket + offset = canonical (A4 constants)
 OUT_DIR = Path("tmp_validation/persona_deck")
 GRAIN = ["account_id", "observation_date"]
 
-FAMILY = {  # deck A1 families (user, 2026-11-10)
-    "stabilized": "can_cure",
-    "slow_roller": "can_cure",
-    "repeat_delinquent": "can_cure",
+FAMILY = {  # deck A1 families (user, 2026-11-10: stabilized is its own family)
+    "stabilized": "curing_now",
+    "slow_roller": "cure_history",
+    "repeat_delinquent": "cure_history",
     "straight_roller_seasoned": "stopped_suddenly",
     "straight_roller_early_life": "stopped_suddenly",
     "early_payment_default": "never_paid",
 }
+CAN_CURE = ("curing_now", "cure_history")
 ABLE = ("high", "moderate")
 
 
@@ -180,7 +181,7 @@ def _frame(catalog, p: str) -> DataFrame:
             "action",
             F.when(F.col("family") == "never_paid", "never_paid")
             .when(~reach, "not_reachable")
-            .when((F.col("family") == "can_cure") & a3b.isin(*ABLE), "cure_reach_cred")
+            .when(F.col("family").isin(*CAN_CURE) & a3b.isin(*ABLE), "cure_reach_cred")
             .when(
                 (F.col("family") == "stopped_suddenly") & a4b.isin(*ABLE),
                 "stopped_reach_means",
@@ -423,6 +424,8 @@ def main() -> None:
     # outcomes (deck A1 and A3 insights)
     t["a1_family_outcome"] = _rates(bt, ["family"])
     t["a1_family_x_band"] = _rates(bt, ["dpd_band", "family"])
+    t["a1_state_outcome"] = _rates(bt, ["det_state"])
+    t["a1_state_x_band"] = _rates(bt, ["dpd_band", "det_state"])
     t["a3_band_x_band"] = _rates(bt, ["dpd_band", "credibility"])
     t["a3_untested"] = _flags(latest, ["untested"])
     t["uc1_contact"] = _flags(latest, ["contact_3m"])
@@ -441,12 +444,17 @@ def main() -> None:
     combos = _table(latest, ["combo"])
     cum = combos["share_pct"].cumsum()
     res["combos"] = {
-        "possible": 3
+        "possible": len(set(FAMILY.values()))
         * 3
         * 3
         * 4
         * 4,  # families x location x reach x credibility x ability
         "non_empty": int((combos["accounts"] > 0).sum()),
+        "non_empty_known_family": int(
+            (
+                (combos["accounts"] > 0) & ~combos["combo"].str.startswith("unknown")
+            ).sum()
+        ),
         "cover_80pct": int((cum < 80).sum() + 1),
         "under_small_pct": int((combos["share_pct"] < SMALL_COMBO_PCT).sum()),
         "small_pct": SMALL_COMBO_PCT,
