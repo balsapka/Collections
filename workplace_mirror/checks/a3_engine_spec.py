@@ -103,9 +103,7 @@ LEVELS_B = {"regular": 2, "some": 1, "none": 0}
 LEVELS_C = {"clean": 1, "not_clean": 0, "no_record": 0}
 
 
-def reference(a, b, c, refusal):
-    if (a, b, c, refusal) == ("thin", "none", "no_record", False):
-        return "unknown"
+def reference(a, b, c, refusal):  # no Unknown inside an episode (D-A3-27)
     pts = LEVELS_A[a] + LEVELS_B[b] + LEVELS_C[c]
     rungs = ["low", "moderate", "high"]
     rung = 2 if pts >= 4 else 1 if pts >= 2 else 0  # Moderate from 2 (D-A3-24)

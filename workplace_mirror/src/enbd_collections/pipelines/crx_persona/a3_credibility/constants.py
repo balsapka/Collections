@@ -55,9 +55,9 @@ SCORECARD = Scorecard(
     prefix="a3",
     dimensions=(
         Dimension("commitments", "a3_commitments_level", COMMITMENT_POINTS, ("thin",)),
-        Dimension(
-            "dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, ("none",)
-        ),
+        # no silent level: no payment while delinquent is evidence (0 points), so an
+        # episode row is never Unknown (D-A3-27)
+        Dimension("dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, ()),
         Dimension(
             "pre_dlq_record", "a3_pre_dlq_payment_level", PRE_DLQ_POINTS, ("no_record",)
         ),
