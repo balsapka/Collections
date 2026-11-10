@@ -1,7 +1,7 @@
 # Bundle 20 check, 60_180: Claude's review (2026-11-10)
 
 Source: `b20_check_results_60_180.md` (handoff 56). CC n = 19,292, RL n = 3,985, month 2026-08,
-every row matched to bundle 17's output. 180+ not run yet.
+every row matched to bundle 17's output. 180+ not run (user, 2026-11-10).
 
 ## Verdict
 
@@ -65,6 +65,6 @@ Moderate +902 / +157.
 
 ## Open before the logic is final
 
-1. 180+ (cc_180_plus, rl_180_plus): the same check, still to run.
-2. Outcome evidence for the window (and for 30 days at 180+): a V1h prompt, if wanted.
-3. GRR: next statement vs 30 days.
+- 180+ is not checked (user, 2026-11-10: not run); the 60_180 check stands for the bundle.
+- Outcome evidence for the window: a V1h prompt, if wanted.
+- GRR: next statement vs 30 days.
