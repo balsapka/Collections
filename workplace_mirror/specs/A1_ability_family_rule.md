@@ -1,12 +1,15 @@
-# A1 ability: the evidence-family rule (target logic, pending GRR)
+# A1 ability: the evidence-family rule
 
 This is the rule that replaces today's income + liquidity ladder (`A1_ability_spec.md`, S1–S16) once
 GRR agrees. It comes from the family-redesign rounds 1–3 (`bundle_helpers/a1_final/
 family_redesign_results_60_180.md`, `family_redesign_results_r3_60_180.md`; rule R4 there), plus the
 CASA balance folded into Money in (user, 2026-11-10; not run as a separate check).
 
-Nothing here is built yet. The implementing bundle's check is the first PROD run of the full rule,
-including the balance.
+Built as **bundle 21** (`bundles/21_a1_evidence_family_rule.md`, stage branch
+`refactor/a1_family`, `8f9d69e..b159b5b`; spec test `checks/a1_engine_spec.py` 92/92). Its check
+(`crx_<p>_a1_check`) is the first PROD run of the full rule, including the balance. Filled in UAT
+from the round-3 code: the cross-product feature body, the WM "self" column, the class table
+against the flow dictionary, the check's outcome block.
 
 ## 1. What stays from today
 
@@ -50,7 +53,7 @@ Each family is **strong**, **some** or **none** (NULL = no data). Only strong sc
 | **F1 Income** | today's `income_level` = stable | weak |
 | **F2 Money in or held** | either inflow or balance (below) is strong | inflow some |
 | **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 1,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 500 |
-| **F4 Cross-product** | deposits / investments / WM balances ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ 1 × anchor | any other product current, or any holding > 0 |
+| **F4 Cross-product** | deposits / investments / WM balances ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
 
 ### F2 Money in or held
 
