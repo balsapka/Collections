@@ -147,6 +147,7 @@ def _frame(catalog, p: str) -> DataFrame:
             _key(),
             "observation_date",
             "a3_state",
+            "a3_unknown_reason",
             "commitments_concluded",
             "commitments_kept",
             "commitments_partial",
@@ -162,7 +163,12 @@ def _frame(catalog, p: str) -> DataFrame:
     fam = F.create_map(*[F.lit(x) for kv in FAMILY.items() for x in kv])
     canon = F.greatest(F.col("current_bucket") + OFFSET[p], F.lit(1))
     reach = F.col("reachability_state") == "reachable"
-    a3b, a4b = _band_of(F.col("a3_state")), _band_of(F.col("a1_state"))
+    # D-A3-27 (user, 2026-11-10): no payment while delinquent is evidence, so an
+    # observed episode with no evidence is Low; Unknown = no episode only
+    a3b = F.when(F.col("a3_unknown_reason") == "no_evidence", "low").otherwise(
+        _band_of(F.col("a3_state"))
+    )
+    a4b = _band_of(F.col("a1_state"))
     return (
         df.withColumn("family", F.coalesce(fam[F.col("det_state")], F.lit("unknown")))
         .withColumn("location", F.coalesce("location_state", F.lit("unknown")))
