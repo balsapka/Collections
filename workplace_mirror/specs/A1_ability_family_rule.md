@@ -53,7 +53,7 @@ Each family is **strong**, **some** or **none** (NULL = no data). Only strong sc
 | **F1 Income** | today's `income_level` = stable | weak |
 | **F2 Money in or held** | either inflow or balance (below) is strong | inflow some |
 | **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 1,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 500 |
-| **F4 Cross-product** | deposits / investments / WM balances ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
+| **F4 Cross-product** | deposits / investments / WM assets (AUM; kept, user 2026-11-10) ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
 
 ### F2 Money in or held
 
@@ -97,6 +97,12 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
 | `debt_to_us` (own card / own loan) | no | no | A3 |
 | `unplaced` | no | no | meaning not established |
 
+- **Lane before the self label on the wash lane** (user, 2026-11-10, handoff 57). A wash-lane leg
+  (direct-debit returns, DDS legs) stays `own_transfer` / `reversal_return` even when WM labels it
+  `self`, as the flow dictionary orders it: these are returns, not money moved to another bank
+  (CC ~AED 19M, RL ~5M, almost all mirrored). The self label decides only outside that lane.
+- **Fees and possible own-loan payments** (dictionary, step 4): a debit WM labels `fees_charges` is
+  `bank_initiated`; a debit with WM's loan-payment flag and no bank counterparty is `unplaced`.
 - **Pairs that cancel are netted.** A leg mirrored by an opposite leg of the same amount (±1%) within
   0–3 days on any account of the CIF is dropped together with its mirror when the pair is a bounce,
   reversal, sweep or round trip. Sweep-matched debits stay out of F3.
