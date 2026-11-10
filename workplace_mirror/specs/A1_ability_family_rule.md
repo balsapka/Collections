@@ -30,13 +30,11 @@ including the balance.
   - **To swap the source,** rebuild that dataset from the new layer: map its amount column to
     `bureau_salary` in the feature node. The engine, catalog name and persona pipelines stay as
     they are.
-  - **Source-specific logic belongs in the feature node, not the engine.** Two pieces sit in
-    `a1_ability/signals.py` today and move out with the bundle that builds this rule:
-    - the **one-month carry** (S14, `_with_next_month`) exists because alert pulls are sparse. It
-      moves into the alert-based node. A monthly feed has nothing to carry, so the new node simply
-      leaves it out;
-    - **RL `feature_retail_loans`** (latest pull per loan, `_loan_bureau_salary`) becomes an extra
-      input of the same feature node, kept until the bulk load replaces it.
+  - **Two alert-specific pieces stay in `a1_ability/signals.py` until then:**
+    - the **one-month carry** (S14, `_with_next_month`) is removed together with the switch to the
+      new bureau logic (user, 2026-11-10). The rule bundle leaves it alone;
+    - **RL `feature_retail_loans`** (latest pull per loan, `_loan_bureau_salary`) stays an extra
+      source until the bulk load replaces it.
   - The S12 level check for windows where only the bureau shows salary stays in the engine, because
     it is about how much a bureau amount is trusted, not where it comes from. Review it when the
     bulk load arrives.
