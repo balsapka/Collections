@@ -33,7 +33,7 @@ Each family is **strong**, **some** or **none** (NULL = no data). Only strong sc
 |---|---|---|
 | **F1 Income** | today's `income_level` = stable | weak |
 | **F2 Money in or held** | either inflow or balance (below) is strong | inflow some |
-| **F3 Spend** | chosen spend ≥ max(AED 1,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 500 |
+| **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 1,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 500 |
 | **F4 Cross-product** | deposits / investments / WM balances ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ 1 × anchor | any other product current, or any holding > 0 |
 
 ### F2 Money in or held
@@ -70,7 +70,8 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
 | `cash_in` (cash deposits) | yes | | CC cure +5.6pp, pay +19.8pp; dropping it demotes rows that perform at or above their state |
 | `chosen_spend` (POS, ATM, bills, transfers to others) | | yes | every dominant type lifts alike |
 | `reversal_return` (reversals, returned cheques / DDS, refunds, and the presentment they undo) | no | no | `CHQ RTN` / `CHQ NO` credits are 100% mirrored the same day; round 2 counted AED 186M (CC) / 264M (RL) of them as income |
-| `own_transfer` (own accounts here or elsewhere) | no | no | |
+| `own_out_external` (debits to the customer's own account at another bank: WM label `self`, or the own-account remittance types such as `OUTWARD REMITTANCE 120`) | | yes | money leaving our bank that the customer controls (user, 2026-11-10). Largest such type: CC 33,785 legs / AED 76.8M, RL 9,688 / AED 30.2M |
+| `own_transfer` (between the customer's own accounts with us, auto-save; credits from own accounts elsewhere) | no | no | moves money the customer already has; no new evidence |
 | `bank_initiated` (sweeps, fees, interest, disbursements, recoveries) | no | no | |
 | `debt_elsewhere` | no | no | AED 0.2–1.0M; no state changes |
 | `debt_to_us` (own card / own loan) | no | no | A3 |
@@ -116,9 +117,10 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
 
 ## 6. Open (decisions for the user / GRR)
 
-1. **Legs WM labels `self`** (own account at another bank) that our lanes do not call wash: CC
-   224,903 legs / AED 861M, RL 62,523 / AED 240M. **Proposed default:** an own transfer if either
-   source says so (inclusion principle). To confirm.
+1. **Credits from the customer's own account at another bank** (the incoming side of WM `self`).
+   They are out of F2 for now. The user decided only the outgoing side (2026-11-10). WM `self` and
+   our wash lane disagree on CC 224,903 legs / AED 861M and RL 62,523 / AED 240M, both directions
+   together. Round 2 saw own-account credits lift in CC (cure +7.8pp, pay +9.1pp). To confirm.
 2. **The `MIN_MONTHS` knob** (2 of 3, 3 of 6) is the only one that moves more than 5% of rows (CC
    5.8%, RL 13.6%). GRR to confirm.
 3. **The Unknown estimate** (round 3 B2) is a separate `a1_estimate` column, never part of the
@@ -129,6 +131,7 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
    - Before any use: absolute rates per group, and the F4 model's AUC of 0.93 checked for leakage
      from the holdings features.
 4. **180+ has not run in any round.** At 180+ there is no anchor and Unknown is 87–90%.
-5. **Today's A1 gate** (A6): 0.2% CC / 0.7% RL of rows leave Unknown only on non-evidence legs
-   (mostly `OUTWARD REMITTANCE 120` to own accounts). The allow-list in §3 fixes it when this rule
-   ships.
+5. **Today's A1 gate** (A6): 0.2% CC / 0.7% RL of rows leave Unknown only on legs round 3 called
+   non-evidence. The largest of those, `OUTWARD REMITTANCE 120` to own accounts elsewhere, is now
+   evidence (`own_out_external`), so the remaining gap is smaller still. The allow-list in §3 settles
+   the rest when this rule ships.
