@@ -44,3 +44,4 @@ The deck's deterioration families change from three to four. Stabilized customer
    - **Part 2, tree:** share and paid % for each family × nuance leaf, cards 61–180 (four families × three leaves; mark leaves under 10 accounts).
    - **Regression check:** confirm that the shares and paid % in `action`, plus `score_action` and `volume`, match the previous run for both model_ids, to the decimal. List any difference. AED is expected to change.
    - **Exposure source:** dataset and column used for each product.
+   - **A3 Payment credibility at 180+:** High / Moderate / Low / Unknown shares for cards 180+ and loans 180+, from `mix_a3_band` in the existing `deck_cc_180_plus.md` / `deck_rl_180_plus.md` (no rerun of the 180+ segments).
