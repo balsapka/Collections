@@ -22,6 +22,24 @@ including the balance.
   - 180+ or missing: flat floors only.
 - **CIF level.** All customer signals cover every account of the `cif_id`.
 - **Income (F1).** Computed exactly as today's `income_level` (S12, S14).
+- **The bureau salary source is swappable** (user, 2026-11-10). GRR is building a bureau salary
+  feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
+  engine therefore reads bureau salary through one contract only:
+  - **Contract:** `feat_cif_bureau_salary_monthly`, one row per `(cif_id, month_end)` with
+    `bureau_salary` (AED; 0 = salary account closed, which ends the series).
+  - **To swap the source,** rebuild that dataset from the new layer: map its amount column to
+    `bureau_salary` in the feature node. The engine, catalog name and persona pipelines stay as
+    they are.
+  - **Source-specific logic belongs in the feature node, not the engine.** Two pieces sit in
+    `a1_ability/signals.py` today and move out with the bundle that builds this rule:
+    - the **one-month carry** (S14, `_with_next_month`) exists because alert pulls are sparse. It
+      moves into the alert-based node. A monthly feed has nothing to carry, so the new node simply
+      leaves it out;
+    - **RL `feature_retail_loans`** (latest pull per loan, `_loan_bureau_salary`) becomes an extra
+      input of the same feature node, kept until the bulk load replaces it.
+  - The S12 level check for windows where only the bureau shows salary stays in the engine, because
+    it is about how much a bureau amount is trusted, not where it comes from. Review it when the
+    bulk load arrives.
 - **Distress.** Cheque returns, DDS and bureau bounces (S15).
 
 ## 2. Families
