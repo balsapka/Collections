@@ -1,0 +1,17 @@
+<section id="app-a4" data-transition="fade" style="background:#FFFFFF;color:#072447;font-family:'Plus Jakarta Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-size:24px;letter-spacing:3px;text-transform:uppercase;color:#2765FF;font-weight:600">Appendix C</p>
+<h2 style="font-family:'Plus Jakarta Sans', Arial, sans-serif;font-size:56px;font-weight:600;line-height:1.1">How a journey state is assigned</h2>
+</div>
+<table style="font-size:24px;color:#072447">
+<tr><th style="width:6%;text-align:left">#</th><th style="width:30%;text-align:left">Question</th><th style="width:40%;text-align:left">Yes when</th><th style="width:24%;text-align:left">State</th></tr>
+<tr><td>0</td><td>Start of journey seen?</td><td>Oldest month already delinquent and not stabilized</td><td>Unknown</td></tr>
+<tr><td>1</td><td>Early payment default?</td><td>≤ 3 months of history, rolled in, never paid since</td><td>EPD</td></tr>
+<tr><td>2</td><td>Stabilized?</td><td>Pays about one month’s due in 5 of the last 6 months (61–180 only)</td><td>Stabilized</td></tr>
+<tr><td>3</td><td>Repeat delinquent?</td><td>Cured an earlier spell that reached 31–60 DPD, back within 12 months</td><td>Repeat delinquent</td></tr>
+<tr><td>4</td><td>Straight roller?</td><td>Current to 61+ DPD in ≤ 3 months, no payment on the way</td><td>Seasoned (12+ months on book) or early-life</td></tr>
+<tr><td>5</td><td>Otherwise</td><td>Paid something on the way down, kept rolling</td><td>Slow roller</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#4C515A">Billing artefacts repaired first and counted · retail loans on the same tree, buckets shifted by one</p>
+<aside>Deterioration is a short ordered tree. A guard first: if the history starts already delinquent, we cannot see how they fell in, so the state is Unknown unless the account is stabilized. Then early payment default, stabilized, repeat delinquent, straight roller split by tenure, and everything else is a slow roller. One-month glitches and billing-cycle jumps are repaired before the tree runs, and every repair is counted.</aside>
+</section>

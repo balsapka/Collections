@@ -1,0 +1,16 @@
+<section id="app-signals" data-transition="fade" style="background:#FFFFFF;color:#072447;font-family:'Plus Jakarta Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-size:24px;letter-spacing:3px;text-transform:uppercase;color:#2765FF;font-weight:600">Appendix A</p>
+<h2 style="font-family:'Plus Jakarta Sans', Arial, sans-serif;font-size:56px;font-weight:600;line-height:1.1">Signals and their sources</h2>
+</div>
+<table style="font-size:24px;color:#072447">
+<tr><th style="width:16%;text-align:left">Axis</th><th style="width:44%;text-align:left">Signals</th><th style="width:40%;text-align:left">Sources</th></tr>
+<tr><td>A1 Deterioration</td><td>Monthly DPD bucket path, restructures linked to their original loans</td><td>Way4 billing history, loan master</td></tr>
+<tr><td>A2 Locatability</td><td>UAE vs foreign logins, in-person card use (POS, ATM) by country, departure notes, travel purchases, call outcomes, deceased flags</td><td>Digital login, Way4 card transactions, CASA card transactions, DCORE follow-ups, customer records</td></tr>
+<tr><td>A3 Credibility</td><td>Promises and plans with their outcome, payments vs dues per cycle, record before delinquency, refusals, disputes</td><td>DCORE plans and follow-ups, card statements and payments, loan monthly dues and cash</td></tr>
+<tr><td>A4 Ability</td><td>Salary per month (larger of ours and bureau), CASA balance and activity, external card payments, cheque / direct-debit returns, bureau bounces</td><td>Wealth-management salary and CASA features, AECB salary and bounce data, loan master (instalment)</td></tr>
+</table>
+<p style="font-size:26px;line-height:1.4;color:#4C515A">Customer-level signals are read across every account of the customer (CIF). Windows end at the observation month end: 3 months at 61–180 DPD, 6 at 180+.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#4C515A">All sources are existing production datasets; no new data feed is needed to run the framework</p>
+<aside>Where the evidence comes from. Every source is an existing production dataset read through the pipeline catalog. Customer signals such as salary, CASA, bounces and logins are read across all accounts of the customer, because the delinquent account is usually not where the salary lands. Windows are short and end at the month end, so the state reflects the customer now.</aside>
+</section>

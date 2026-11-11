@@ -1,0 +1,61 @@
+{
+  "v": 4,
+  "attachments": {},
+  "createdOnFiles": {
+    "at": "2026-11-09T12:00:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "faces": {
+    "plus-jakarta-sans": {
+      "family": "Plus Jakarta Sans",
+      "href": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    }
+  },
+  "lists": "css",
+  "order": [
+    "cover",
+    "exec",
+    "problem",
+    "mandate",
+    "questions",
+    "principles",
+    "div-axes",
+    "a4",
+    "a2",
+    "a3",
+    "a1",
+    "div-combined",
+    "p2-method",
+    "p2-combos",
+    "p2-score",
+    "p2-uc1",
+    "div-appendix",
+    "p2-tree",
+    "p2-action",
+    "p2-pilot",
+    "app-signals",
+    "app-rules",
+    "app-a4",
+    "app-governance"
+  ],
+  "sections": {
+    "s1": {
+      "description": "Where we start, the mandate, and the idea",
+      "start": "cover"
+    },
+    "s2": {
+      "description": "The decision path axis by axis: how a label is assigned, the August mix, what stands out",
+      "start": "div-axes"
+    },
+    "s3": {
+      "description": "What the personas could support: a first look at allocation, the risk score, UC1",
+      "start": "div-combined"
+    },
+    "s4": {
+      "description": "Appendix: possible treatments and pilot, signals, rules, governance",
+      "start": "div-appendix"
+    }
+  },
+  "title": "Synthesized Features — GRR"
+}
