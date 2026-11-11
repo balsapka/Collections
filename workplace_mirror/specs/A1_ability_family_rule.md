@@ -28,8 +28,11 @@ against the flow dictionary, the check's outcome block.
 - **The bureau salary source is swappable** (user, 2026-11-10). **Next source:** the DE's
   `feat_bureau_salary_unified` (handoff 66, `bundle_helpers/a1_final/bureau_salary_unified_handover.md`;
   `cif_id long`, `salary_month_end`, `monthly_salary`, `salary_source` alert > salary_credit >
-  bureau_salary). Swapped in its own bundle after bundle 21 (user, 2026-11-11), once the exploration
-  (`sonnet_a1_bureau_unified_exploration_prompt.md`) shows its coverage. GRR is building a bureau salary
+  bureau_salary). It is the long-term source: GRR's frequent bureau salary feed will land in it (user,
+  2026-11-11). Swapped in its own bundle after bundle 21. Exploration back 2026-11-11
+  (`bundle_helpers/a1_final/bureau_unified_exploration_results.md`): its `alert` source is today's
+  series, `salary_credit` is our own salary credits (thin feed), cast its `cif_id` to string, cap it at
+  the persona months. GRR is building a bureau salary
   feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
   engine therefore reads bureau salary through one contract only:
   - **Contract:** `feat_cif_bureau_salary_monthly`, one row per `(cif_id, month_end)` with
@@ -38,8 +41,9 @@ against the flow dictionary, the check's outcome block.
     `bureau_salary` in the feature node. The engine, catalog name and persona pipelines stay as
     they are.
   - **Two alert-specific pieces stay in `a1_ability/signals.py` until then:**
-    - the **one-month carry** (S14, `_with_next_month`) is removed together with the switch to the
-      new bureau logic (user, 2026-11-10). The rule bundle leaves it alone;
+    - the **one-month carry** (S14, `_with_next_month`) **stays** after the swap, until bureau salary
+      sourcing is fixed (user, 2026-11-11, replacing the 2026-11-10 plan): the unified series is
+      event-like, and dropping the carry would cut Stable by 0.8–3.6pp;
     - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
       the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
       `loan_features` input and the `product == "rl"` branch.
