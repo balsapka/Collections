@@ -1,8 +1,9 @@
-"""TEMPORARY (A3 bundle 23): the effect of GRR's month-end deadline on the latest month.
+"""TEMPORARY (A3 bundle 23): the effect of the bundle on the latest month.
 
 The A3 engine runs twice on persona_end_date's month: ``new`` as shipped
 (``PROMISE_DEADLINE``) and ``old`` with bundle 20's deadline (CC the next statement, RL
-the end of the next month). At 60-180 only loans change; at 180+ cards change too.
+the end of the next month). ``b20`` is the persisted A3 output (bundle 20). b20 -> old is
+the Unknown rule (D-A3-27), old -> new the deadline (D-A3-28; at 60-180 loans only).
 Logs ``A3 OUTPUT``, ``A3 PROMISES``, ``A3 LEVELS``. Removed by the bundle's cleanup.
 
     kedro run --pipeline=crx_<p>_a3_check
@@ -53,7 +54,9 @@ def compare_a3(
     old: DataFrame,
     events_new: DataFrame,
     events_old: DataFrame,
+    b20: DataFrame,
     model_id: str,
+    persona_end_date: str,
 ) -> None:
     """The check blocks. The event tables are checkpointed first: they are in memory,
     and every count would otherwise rebuild them."""
@@ -79,17 +82,34 @@ def compare_a3(
             ),
             "account_id",
         )
+        .join(
+            b20.where(
+                F.trunc("observation_date", "month")
+                == F.trunc(F.lit(str(persona_end_date)), "month")
+            ).select(
+                "account_id", F.regexp_replace("a3_state", short, "").alias("b20")
+            ),
+            "account_id",
+            "left",
+        )
         .localCheckpoint()
     )
     n = both.count()
     head = [f"model_id: {model_id}", f"rows: {n}"]
 
-    moved = both.where(F.col("old") != F.col("new")).count()
     lines = list(head)
-    for col in ("old", "new"):
+    for col in ("b20", "old", "new"):
         lines += [f"state {col}:"] + _counts(both, [col], n)
-    lines += [f"old x new, changed {moved} ({100 * moved / max(n, 1):.1f}%):"]
-    lines += _counts(both, ["old", "new"], n)
+    for a, b, what in (
+        ("b20", "new", "whole bundle"),
+        ("b20", "old", "Unknown rule"),
+        ("old", "new", "deadline"),
+    ):
+        moved = both.where(~F.col(a).eqNullSafe(F.col(b))).count()
+        lines += [
+            f"{a} x {b} ({what}), changed {moved} ({100 * moved / max(n, 1):.1f}%):"
+        ]
+        lines += _counts(both, [a, b], n)
     _block("A3 OUTPUT", lines)
 
     win = both.select("account_id", "observation_date", "commitments_window_start")
@@ -255,7 +275,9 @@ def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
                 "old": f"{p}_check_old",
                 "events_new": ns(f"{p}_promise_events"),
                 "events_old": ns("promise_events_old"),
+                "b20": f"{p}_payment_credibility",
                 "model_id": "params:model_id",
+                "persona_end_date": "params:crx_persona.persona_end_date",
             },
             outputs=None,
             name=f"{p}_check_compare",

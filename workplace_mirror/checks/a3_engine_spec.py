@@ -592,6 +592,7 @@ rl_in = {
         "total_paid double",
     ),
 }
+cat_out = {}
 for product, make, inputs, model in [
     ("cc", cc_pipeline, cc_in, "cc_60_180"),
     ("rl", rl_pipeline, rl_in, "rl_60_180"),
@@ -604,6 +605,7 @@ for product, make, inputs, model in [
     )
     SequentialRunner().run(pipe, cat)
     out = cat.load(f"crx_{product}_a3_payment_credibility")
+    cat_out[product] = out.localCheckpoint()  # cut the lineage for the check
     got = {
         r["account_id"]: (r["a3_state"], r["a3_refusal_flag"], r["a3_promise_deadline"])
         for r in out.collect()
@@ -645,7 +647,12 @@ for product, make, inputs, model in [
     ("rl", rl_check, rl_in, "rl_60_180"),
 ]:
     pipe = make()
-    data = {**shared, **inputs, "params:model_id": model}
+    data = {
+        **shared,
+        **inputs,
+        "params:model_id": model,
+        f"crx_{product}_a3_payment_credibility": cat_out[product],
+    }
     cat = DataCatalog(
         {
             n: MemoryDataset(v, copy_mode="assign")
@@ -662,7 +669,10 @@ check(
     blocks,
     [f"{b} START" for b in ["A3 OUTPUT", "A3 PROMISES", "A3 LEVELS"] * 2],
 )
-check("check CC unchanged at 60_180", "changed 0 (0.0%)" in logged[0], True)
+check(
+    "check CC deadline unchanged at 60_180", "(deadline), changed 0" in logged[0], True
+)
+check("check b20 matched", "b20 x new (whole bundle), changed 0" in logged[0], True)
 check("check RL model_id", "model_id: rl_60_180" in logged[3], True)
 print("\n\n".join(logged))
 
