@@ -1,6 +1,6 @@
-# Mirror bundle 23 — A3: promise deadline = GRR's month end for loans and all 180+ (D-A3-28)
+# Mirror bundle 23 — A3: Unknown = no episode only (D-A3-27) + promise deadline = GRR's month end for loans and all 180+ (D-A3-28)
 
-apply_bundle version: 7 · built 2026-11-11 from `7449f05..62d2602` · source: 1 added, 10 replaced, 0 deleted · helpers: 0
+apply_bundle version: 7 · built 2026-11-11 from `17be2bf..ba305ca` · source: 1 added, 10 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -16,7 +16,7 @@ block exactly as it is.
 git checkout feature/persona_refactor && git pull && git status --short
 ```
 
-**Step 2.** Create the folder, then save this file **raw** (GitHub → Raw → copy all) as `data/input/mirror_bundles/23_a3_promise_month_end_deadline.md`:
+**Step 2.** Create the folder, then save this file **raw** (GitHub → Raw → copy all) as `data/input/mirror_bundles/23_a3_unknown_rule_promise_month_end.md`:
 
 ```bash
 mkdir -p data/input/mirror_bundles
@@ -25,7 +25,7 @@ mkdir -p data/input/mirror_bundles
 **Step 3.** Write the apply script, apply, and list what changed — must end with `APPLY PASSED`:
 
 ```bash
-python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '23_a3_promise_month_end_deadline.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')" && python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/23_a3_promise_month_end_deadline.md --apply && git status --short
+python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '23_a3_unknown_rule_promise_month_end.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')" && python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/23_a3_unknown_rule_promise_month_end.md --apply && git status --short
 ```
 
 A file this repo changed since the bundle's copy (an edit at work, a lint fix) is
@@ -36,20 +36,20 @@ committing.
 
 1. **Catalog.** The four `crx_<p>_a3_check_{new,old}` entries exist exactly once; list every top-level key the apply removed from `catalog_crx.yml` compared with the last commit (`git diff` of the file, lines starting with `-` and no indent) and put back any that is not an A3 check entry. Do the same for `pipeline_registry.py` (the `casa_windows*` entries must survive).
 2. **Callers.** `grep -rn "build_promise_events\|build_a3_credibility\|PROMISE_DEADLINE" src` : every caller passes `model_id` and `product` (the nodes read `params:model_id`); fix any workplace-only caller and report it.
-3. **Tests.** Update the A3 tests for the new signatures and the month-end deadline; the mirror's spec test (`workplace_mirror/checks/a3_engine_spec.py`) has the cases.
+3. **Tests.** Update the A3 tests for the new signatures, the month-end deadline and the Unknown rule (a row inside an episode with thin promises, no payment while delinquent and no record before is `payment_credibility_low` with `a3_unknown_reason` NULL; a row with no episode stays Unknown with `no_episode`); the mirror's spec test (`workplace_mirror/checks/a3_engine_spec.py`) has the cases.
 
-Then check: `kedro registry list | grep a3` lists `crx_cc_a3_check` and `crx_rl_a3_check`.
+Then check: `kedro registry list | grep a3` lists `crx_cc_a3_check` and `crx_rl_a3_check`, and `grep -rn "no_evidence" src/enbd_collections/pipelines/crx_persona/a3_credibility` prints nothing.
 
 **Step 5.** Commit the source only, and push:
 
 ```bash
-git add src conf && git commit -m "A3: promise deadline = GRR's month end for loans and every 180+ promise (D-A3-28); temporary check" && git push
+git add src conf && git commit -m "A3: Unknown = no episode only (D-A3-27); promise deadline = GRR's month end for loans and every 180+ promise (D-A3-28); temporary check" && git push
 ```
 
 **Undo** (before step 5) — puts every touched file back to the last commit:
 
 ```bash
-python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/23_a3_promise_month_end_deadline.md --revert
+python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/23_a3_unknown_rule_promise_month_end.md --revert
 ```
 
 ### In PROD
@@ -60,7 +60,7 @@ python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/23_a3
 git fetch origin && git checkout feature/persona_refactor && git pull
 ```
 
-Run the check for **`rl_60_180` and `cc_60_180`** (set `model_id` in `conf/dev/globals_dev.yml`); 180+ only if wanted.
+Bundle 20's real A3 output is the baseline: do not re-run A3 before the check. Run the check for **`rl_60_180` and `cc_60_180`** (set `model_id` in `conf/dev/globals_dev.yml`); 180+ only if wanted.
 
 **Step 7.** Run the check:
 
@@ -91,9 +91,10 @@ assistant in UAT.
 
 ## What this bundle does
 
-**What this bundle does.** Judges A3 promises by GRR's thresholds (Teams answer, handoff 64): loans, and every promise at 180+, must be paid by the end of the promise month; cards at 61–180 keep the next statement. Apply on top of bundle 22 (bundle 21 is independent).
+**What this bundle does.** Two A3 payment credibility changes, folded into one bundle (bundle 22 was not applied and is replaced by this one): Unknown only for rows with no delinquency episode (D-A3-27), and GRR's promise thresholds (Teams answer, handoff 64): loans, and every promise at 180+, must be paid by the end of the promise month; cards at 61–180 keep the next statement (D-A3-28). Apply after bundle 20's cleanup; bundle 21 is independent (A1 only; the shared registry and catalog merge cleanly).
 
-**What changes in the logic** (spec `specs/A3_credibility_spec.md`, D-A3-28):
+**What changes in the logic** (spec `specs/A3_credibility_spec.md`, D-A3-27, D-A3-28):
+- **Unknown = no episode only.** No payment while delinquent (Dimension B `none`) is evidence that scores 0 points, no longer a silent level. A row with an observed episode and no points in any dimension (thin promises, no payment, no record before delinquency: mostly early payment defaults) is **Low**, not Unknown. Unknown stays only for rows with no episode anchor (`a3_unknown_reason = 'no_episode'`; `no_evidence` no longer occurs). High and Moderate don't move.
 - **Deadline, whatever date was promised:**
   - 61–180 cards: the next statement after the promise day, however close (unchanged);
   - 61–180 loans: the end of the promise month (was the end of the next month);
@@ -101,9 +102,9 @@ assistant in UAT.
 - Loan cash is dated at the month end, so the promise month's cash still counts in full. Paying on the deadline day counts.
 - Nothing else changes: events, amounts, the 12-month window, the ladder and the thresholds.
 
-**Code:** `PROMISE_DEADLINE` is keyed by segment and product, read from `params:model_id` (`promise_deadline(product, model_id)`); `build_promise_events` and `build_a3_credibility` take `model_id` and `product`. `a3_promise_deadline` in the output shows the deadline used. The 30-day and next-month-end options stay available.
+**Code:** `a3_credibility/constants.py` (Dimension B has no silent level) and `classify.py` (the `no_evidence` branch goes). `PROMISE_DEADLINE` is keyed by segment and product, read from `params:model_id` (`promise_deadline(product, model_id)`); `build_promise_events` and `build_a3_credibility` take `model_id` and `product`. `a3_promise_deadline` in the output shows the deadline used. The 30-day and next-month-end options stay available.
 
-**Check** (temporary, `a3_credibility/check.py`, pipelines `crx_<p>_a3_check`): the latest month through the engine twice: `new` (as shipped, `crx_<p>_a3_check_new`) and `old` (bundle 20's deadline, `crx_<p>_a3_check_old`). Blocks: `A3 OUTPUT` (states, old × new with the share changed), `A3 PROMISES` (concluded events and outcomes per deadline, outcome old × new, changed events by kind and by promise day of month, accounts with a concluded / kept promise), `A3 LEVELS` (Dimension A levels old × new). At 61–180 the CC block must show 0 changed.
+**Check** (temporary, `a3_credibility/check.py`, pipelines `crx_<p>_a3_check`): the latest month through the engine twice: `new` (as shipped, `crx_<p>_a3_check_new`) and `old` (bundle 20's deadline, `crx_<p>_a3_check_old`). `b20` is the persisted A3 output (bundle 20), so b20 → old is the Unknown rule and old → new the deadline. Blocks: `A3 OUTPUT` (states b20 / old / new and three crosstabs with the share changed: whole bundle, Unknown rule, deadline), `A3 PROMISES` (concluded events and outcomes per deadline, outcome old × new, changed events by kind and by promise day of month, accounts with a concluded / kept promise), `A3 LEVELS` (Dimension A levels old × new). At 61–180 the CC deadline step must show 0 changed; the Unknown-rule step moves Unknown to Low only.
 
 ## Instructions for the workplace assistant
 
@@ -1632,16 +1633,17 @@ def register_pipelines() -> dict[str, Pipeline]:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a3_credibility/check.py`
-action: add · new sha256 `ab24e43030c66de84804047a445e80fcafb40df9b959e0e6f753179b8c9fcb0d` · new trailing newline: yes
+action: add · new sha256 `ae8f034d836d017ea20e9592db95eaca695e3af9d3a79ff39da0aa1f61c0e929` · new trailing newline: yes
 
 New:
 
 `````python
-"""TEMPORARY (A3 bundle 23): the effect of GRR's month-end deadline on the latest month.
+"""TEMPORARY (A3 bundle 23): the effect of the bundle on the latest month.
 
 The A3 engine runs twice on persona_end_date's month: ``new`` as shipped
 (``PROMISE_DEADLINE``) and ``old`` with bundle 20's deadline (CC the next statement, RL
-the end of the next month). At 60-180 only loans change; at 180+ cards change too.
+the end of the next month). ``b20`` is the persisted A3 output (bundle 20). b20 -> old is
+the Unknown rule (D-A3-27), old -> new the deadline (D-A3-28; at 60-180 loans only).
 Logs ``A3 OUTPUT``, ``A3 PROMISES``, ``A3 LEVELS``. Removed by the bundle's cleanup.
 
     kedro run --pipeline=crx_<p>_a3_check
@@ -1692,7 +1694,9 @@ def compare_a3(
     old: DataFrame,
     events_new: DataFrame,
     events_old: DataFrame,
+    b20: DataFrame,
     model_id: str,
+    persona_end_date: str,
 ) -> None:
     """The check blocks. The event tables are checkpointed first: they are in memory,
     and every count would otherwise rebuild them."""
@@ -1718,17 +1722,34 @@ def compare_a3(
             ),
             "account_id",
         )
+        .join(
+            b20.where(
+                F.trunc("observation_date", "month")
+                == F.trunc(F.lit(str(persona_end_date)), "month")
+            ).select(
+                "account_id", F.regexp_replace("a3_state", short, "").alias("b20")
+            ),
+            "account_id",
+            "left",
+        )
         .localCheckpoint()
     )
     n = both.count()
     head = [f"model_id: {model_id}", f"rows: {n}"]
 
-    moved = both.where(F.col("old") != F.col("new")).count()
     lines = list(head)
-    for col in ("old", "new"):
+    for col in ("b20", "old", "new"):
         lines += [f"state {col}:"] + _counts(both, [col], n)
-    lines += [f"old x new, changed {moved} ({100 * moved / max(n, 1):.1f}%):"]
-    lines += _counts(both, ["old", "new"], n)
+    for a, b, what in (
+        ("b20", "new", "whole bundle"),
+        ("b20", "old", "Unknown rule"),
+        ("old", "new", "deadline"),
+    ):
+        moved = both.where(~F.col(a).eqNullSafe(F.col(b))).count()
+        lines += [
+            f"{a} x {b} ({what}), changed {moved} ({100 * moved / max(n, 1):.1f}%):"
+        ]
+        lines += _counts(both, [a, b], n)
     _block("A3 OUTPUT", lines)
 
     win = both.select("account_id", "observation_date", "commitments_window_start")
@@ -1894,7 +1915,9 @@ def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
                 "old": f"{p}_check_old",
                 "events_new": ns(f"{p}_promise_events"),
                 "events_old": ns("promise_events_old"),
+                "b20": f"{p}_payment_credibility",
                 "model_id": "params:model_id",
+                "persona_end_date": "params:crx_persona.persona_end_date",
             },
             outputs=None,
             name=f"{p}_check_compare",
@@ -1905,7 +1928,7 @@ def create_a3_check_pipeline(product: str, dues, payments) -> Pipeline:
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a3_credibility/classify.py`
-action: replace · base sha256 `3dc6ee8cc85538d7f506d1800ff85a720d140e77c39a08456aac4ef5147fcf96` · base trailing newline: yes · new sha256 `85a6cd96c1d6aa2bec1af0007dc690b6652bf32aa7be2f6cce08d581ac673f7d` · new trailing newline: yes
+action: replace · base sha256 `3bb4768508c4a274d4dda012b1bdae864d0ac953d54a974652794b3d8a3b91c2` · base trailing newline: yes · new sha256 `85a6cd96c1d6aa2bec1af0007dc690b6652bf32aa7be2f6cce08d581ac673f7d` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -1977,11 +2000,11 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     deadline: str,
     persona_end_date: str,
 ) -> DataFrame:
-    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24, -27).
+    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24).
 
     High from 4 points, Moderate from 2, else Low; a refusal takes one rung off. Unknown:
-    no episode anchor only (``a3_unknown_reason`` = ``no_episode``); an episode with no
-    evidence scores 0 points and is Low.
+    no evidence in any dimension and no refusal, or no episode anchor (Q-12,
+    ``a3_unknown_reason``).
     """
     df = left_join_all(
         episode, [episode, commitments, dlq_payments, pre_dlq, contacts]
@@ -1990,7 +2013,10 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     no_episode = F.col("episode_start").isNull()
     unknown = DISPLAY_NAMES["unknown"]
     out = scored.withColumn(
-        "a3_unknown_reason", F.when(no_episode, "no_episode")
+        "a3_unknown_reason",
+        F.when(no_episode, "no_episode").when(
+            F.col("a3_state") == unknown, "no_evidence"
+        ),
     ).withColumn("a3_state", F.when(no_episode, unknown).otherwise(F.col("a3_state")))
     out = out.select(*OUTPUT_COLUMNS)
     log_latest_month(out, "a3_state", "A3 credibility", persona_end_date)
@@ -2092,7 +2118,7 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
 `````
 
 ### FILE: `src/enbd_collections/pipelines/crx_persona/a3_credibility/constants.py`
-action: replace · base sha256 `c3c26a1575e672d1ad29a362aa916db860bced579ec54bc5dd8e78850355dc24` · base trailing newline: yes · new sha256 `8ce15d77727b043fe0e90a9eb5417572a64f17033b3b65aedc24bab79b1e03fb` · new trailing newline: yes
+action: replace · base sha256 `53ffe52e1e082a62f5646c29641e84910e4a5edbc20f22bca6ae9517cea9ec62` · base trailing newline: yes · new sha256 `8ce15d77727b043fe0e90a9eb5417572a64f17033b3b65aedc24bab79b1e03fb` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -2154,9 +2180,9 @@ SCORECARD = Scorecard(
     prefix="a3",
     dimensions=(
         Dimension("commitments", "a3_commitments_level", COMMITMENT_POINTS, ("thin",)),
-        # no silent level: no payment while delinquent is evidence (0 points), so an
-        # episode row is never Unknown (D-A3-27)
-        Dimension("dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, ()),
+        Dimension(
+            "dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, ("none",)
+        ),
         Dimension(
             "pre_dlq_record", "a3_pre_dlq_payment_level", PRE_DLQ_POINTS, ("no_record",)
         ),
@@ -4032,7 +4058,7 @@ if __name__ == "__main__":
 Copy this to the workplace assistant in UAT once the bundle's PROD checks are done:
 
 ````text
-Clean up after mirror bundle 23_a3_promise_month_end_deadline.md, on the bundle's branch.
+Clean up after mirror bundle 23_a3_unknown_rule_promise_month_end.md, on the bundle's branch.
 - **HDFS first.** The user runs these in PROD; UAT has no data. Resolve `${_project.hdfs_path}/<model_id>/${globals:folders.persona}/crx/<dataset>` from the workplace conf and write out each command in full, `hdfs dfs -rm -r <resolved path>`, for every model_id (CC datasets for the CC model_ids, RL for RL); skip folders that do not exist: the check outputs `crx_<p>_a3_check_new`, `crx_<p>_a3_check_old`.
 - **Remove the temporary check** (everything marked TEMPORARY for A3 bundle 23):
   - `conf/base/catalog/catalog_crx.yml`: the four `crx_<p>_a3_check_*` entries and their comment block;

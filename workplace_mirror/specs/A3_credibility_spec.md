@@ -188,9 +188,15 @@ Measured, not assumed (V2, V3).
   bundle 20 check measures it (state / level with the episode window vs 12 months, events before the
   episode start) before the logic is final.
 
+- **D-A3-27: Unknown = no episode only** (user, 2026-11-10; ships in bundle 23, which absorbed
+  bundle 22). No payment while delinquent (Dimension B `none`) is evidence that scores 0 points, not a
+  silent level, so a row with an observed episode and no points in any dimension (mostly early
+  payment defaults) is Low. Unknown stays only for rows with no episode anchor
+  (`a3_unknown_reason = no_episode`); `no_evidence` no longer occurs.
+
 - **D-A3-28: promise deadline = GRR's threshold, whatever date was promised** (GRR Teams answer,
   handoff 64, `bundle_helpers/a3_final/grr_broken_ptp_thresholds_handoff64.md`; user 2026-11-11:
-  the promised date is ignored; ships in bundle 23, pending its check). Replaces D-A3-25's deadline:
+  the promised date is ignored; ships in bundle 23 with D-A3-27, pending its check). Replaces D-A3-25's deadline:
   61–180 cards by the next statement after the promise day (unchanged); 61–180 loans by the end of
   the promise month (was the end of the next month); 180+ cards and loans by the end of the promise
   month. Paying on the deadline day counts. `PROMISE_DEADLINE` is keyed by segment (from

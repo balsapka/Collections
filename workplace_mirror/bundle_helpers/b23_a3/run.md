@@ -1,4 +1,4 @@
-Run the check for **`rl_60_180` and `cc_60_180`** (set `model_id` in `conf/dev/globals_dev.yml`); 180+ only if wanted.
+Bundle 20's real A3 output is the baseline: do not re-run A3 before the check. Run the check for **`rl_60_180` and `cc_60_180`** (set `model_id` in `conf/dev/globals_dev.yml`); 180+ only if wanted.
 
 **Step 7.** Run the check:
 
