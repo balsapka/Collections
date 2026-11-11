@@ -26,12 +26,14 @@
     "a3",
     "a1",
     "div-combined",
+    "p2-explode",
+    "p2-focus",
     "p2-method",
     "p2-combos",
-    "p2-score",
     "p2-uc1",
+    "p2-shortlist",
+    "p2-score",
     "div-appendix",
-    "p2-tree",
     "p2-action",
     "p2-pilot",
     "app-signals",
@@ -49,7 +51,7 @@
       "start": "div-axes"
     },
     "s3": {
-      "description": "What the personas could support: a first look at allocation, the risk score, UC1",
+      "description": "From states to a strategy: too many personas, only in-house needs a strategy, a first look at the tiers, UC1, the short list, the risk score",
       "start": "div-combined"
     },
     "s4": {
