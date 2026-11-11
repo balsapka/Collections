@@ -23,15 +23,22 @@ only by `to_date(tran_date) >= floor` in our code.
    anyway. Filter to rows where at least one of them is set, then aggregate. Expect this side to
    shrink to a small share of the table. If it is then small enough by your judgement of the table,
    broadcast it; otherwise leave the join to Spark.
-2. **Prune partitions and columns on the WM side.** Check how `wm_pri_labelled_transactions` is
-   stored (catalog entry, `partitionBy`, the WM repo's node that writes it). If it has a partition
-   column (month / week / load date), filter on that column too, so Spark skips old partitions;
-   keep the `tran_date` filter for exactness. Select only the key and flag columns before anything
+2. **Prune partitions and columns on the WM side.** The PROD Spark UI shows the read lists **all 280
+   weekly partitions** of `.../wealth_management/03_primary/pri_labelled_transactions_indicators_by_week/
+   week_number=…` (about five years), so nothing is pruned today. Add a filter on `week_number`
+   (`yyyyMM0W`: compare it with the floor month as `yyyyMM01`, or whatever form the column has; check
+   its type) so Spark reads only the weeks from the floor month on; keep the `tran_date` filter for
+   exactness. Select only the key and flag columns before anything
    else.
 3. **Legs without a usable key skip the join.** Legs whose `cif_id` or `tran_id` is NULL or blank
    can never match a label, but in a left join they all hash to one partition (one task that never
    finishes). Split them off, give them `wm_salary = wm_self = … = false`, and union them back
    after the join.
+5. **Few files per output partition.** In PROD all Spark jobs finished and the app sat idle, still
+   running: the driver is committing the partitioned overwrite (renaming each task's file into every
+   `event_month` folder on HDFS). Repartition by `event_month` right before the save
+   (`df.repartition("event_month")` in the node's return) so each month folder gets one file instead
+   of one per shuffle partition. Do the same for any other partitioned output this bundle added.
 4. **Prune transaction columns early.** Right after the read, select only the columns that
    `transaction_lane`, `flow_class` and the output need.
 
@@ -46,7 +53,7 @@ only by `to_date(tran_date) >= floor` in our code.
 
 ## Deliverables
 
-1. The four changes; tests updated and passing, plus one test that a leg with a blank `tran_id`
+1. The five changes; tests updated and passing, plus one test that a leg with a blank `tran_id`
    keeps its class and one that a label row with every flag 0 changes nothing; black / pylint
    clean.
 2. Report: the partition column of `wm_pri_labelled_transactions` (or "none"), the current
