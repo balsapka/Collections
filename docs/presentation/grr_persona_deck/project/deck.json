@@ -32,10 +32,10 @@
     "p2-combos",
     "p2-uc1",
     "p2-shortlist",
-    "p2-score",
     "div-appendix",
     "p2-action",
     "p2-pilot",
+    "p2-score",
     "app-signals",
     "app-rules",
     "app-a4",
@@ -51,11 +51,11 @@
       "start": "div-axes"
     },
     "s3": {
-      "description": "From states to a strategy: too many personas, only in-house needs a strategy, a first look at the tiers, UC1, the short list, the risk score",
+      "description": "From states to a strategy: too many personas, only in-house needs a strategy, a first look at the tiers, UC1, the short list",
       "start": "div-combined"
     },
     "s4": {
-      "description": "Appendix: possible treatments and pilot, signals, rules, governance",
+      "description": "Appendix: possible treatments and pilot, the risk score, signals, rules, governance",
       "start": "div-appendix"
     }
   },
