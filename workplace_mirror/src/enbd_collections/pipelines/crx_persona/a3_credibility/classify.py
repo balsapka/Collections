@@ -4,7 +4,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, left_join_all, log_latest_month
-from .constants import DISPLAY_NAMES, SCORECARD
+from .constants import DISPLAY_NAMES, SCORECARD, promise_deadline
 
 # Every input of the decision is carried (D-A3-17).
 OUTPUT_COLUMNS = [
@@ -62,8 +62,10 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     dlq_payments: DataFrame,
     pre_dlq: DataFrame,
     contacts: DataFrame,
-    deadline: str,
+    model_id: str,
     persona_end_date: str,
+    product: str,
+    deadline: str | None = None,
 ) -> DataFrame:
     """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24, -27).
 
@@ -73,7 +75,9 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     """
     df = left_join_all(
         episode, [episode, commitments, dlq_payments, pre_dlq, contacts]
-    ).withColumn("a3_promise_deadline", F.lit(deadline))
+    ).withColumn(
+        "a3_promise_deadline", F.lit(deadline or promise_deadline(product, model_id))
+    )
     scored = SCORECARD.score(df)
     no_episode = F.col("episode_start").isNull()
     unknown = DISPLAY_NAMES["unknown"]

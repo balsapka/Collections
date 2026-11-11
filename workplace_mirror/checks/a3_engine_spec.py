@@ -212,13 +212,13 @@ ep = episode([(a, D(2026, 4, 1), False) for a in A_ACCTS])
 obs_a = ep.select("account_id", "observation_date", "cif_id")
 
 
-def events_for(deadline):
+def events_for(model_id="cc_60_180", deadline=None):
     return build_promise_events(
-        obs_a, a_followup, a_agreements, inst, dues, pays, deadline
+        obs_a, a_followup, a_agreements, inst, dues, pays, model_id, "cc", deadline
     )
 
 
-ev = events_for("next_statement")
+ev = events_for()
 check(
     "events A",
     sorted(
@@ -249,6 +249,16 @@ check(
     ],
     ["2026-08-05"],
 )
+check(
+    "cutoff A 07-10 at 180+ (month end)",
+    [
+        str(r["promise_cutoff"])
+        for r in events_for("cc_180_plus")
+        .where("account_id = 'A' AND event_date = '2026-07-10'")
+        .collect()
+    ],
+    ["2026-07-31"],
+)
 sig = build_commitment_signals(ep, ev)
 check(
     "A counts",
@@ -263,12 +273,12 @@ check(
     by_account(sig, "a3_commitments_level"),
     {"A": "broken", "B": "thin", "K": "kept", "M": "broken", "Bk": "broken"},
 )
-sig30 = build_commitment_signals(ep, events_for("30_days"))
+sig30 = build_commitment_signals(ep, events_for(deadline="30_days"))
 check(
     "B level (30 days)", by_account(sig30, "a3_commitments_level")["B"], "partly_kept"
 )
-# RL, end of the next month: cash dated at the month end. R: promise 06-15, July cash ->
-# paid; S: only August cash -> none; T: June cash counts (same month); U: promise on
+# RL, end of the promise month: cash dated at the month end. R: promise 06-15, July cash
+# -> none; S: only August cash -> none; T: June cash counts (same month); U: promise on
 # 06-30, June cash dated 06-30 counts.
 rl_accts = ["R", "S", "T", "U"]
 rl_dues = df(
@@ -311,12 +321,13 @@ rl_ev = build_promise_events(
     plan_rows([]),
     rl_dues,
     rl_pays,
-    "next_month_end",
+    "rl_60_180",
+    "rl",
 )
 check(
     "RL outcomes",
     by_account(rl_ev, "promise_outcome"),
-    {"R": "paid", "S": "none", "T": "paid", "U": "paid"},
+    {"R": "none", "S": "none", "T": "paid", "U": "paid"},
 )
 
 # ── 3-4. Dimensions B and C on the ledger ─────────────────────────────────────
@@ -463,8 +474,9 @@ st = build_a3_credibility(
     build_dlq_payment_signals(ep_s, ledger, "cc_60_180"),
     build_pre_dlq_payment_signals(ep_s, ledger),
     build_contact_signals(ep_s, followup, agreements, inst, pays, dues, "cc_60_180"),
-    "next_statement",
+    "cc_60_180",
     "2026-08-31",
+    "cc",
 )
 check("state N", by_account(st, "a3_unknown_reason")["N"], "no_episode")
 check(
@@ -602,13 +614,57 @@ for product, make, inputs, model in [
     check(
         f"kedro {product} deadline",
         got["A"][2],
-        {"cc": "next_statement", "rl": "next_month_end"}[product],
+        {"cc": "next_statement", "rl": "month_end"}[product],
     )
     check(
         f"kedro {product} promises concluded",
         by_account(out, "commitments_concluded")["A"],
         1,
     )
+
+# ── 9. TEMPORARY (A3 bundle 23): the check pipelines run and log every block ──
+import logging  # noqa: E402
+
+from enbd_collections.pipelines.crx_persona.a3_credibility import (  # noqa: E402
+    check as a3_check,
+)
+from enbd_collections.pipelines.crx_persona.cc_a3_payment_credibility import (  # noqa: E402
+    create_check_pipeline as cc_check,
+)
+from enbd_collections.pipelines.crx_persona.rl_a3_payment_credibility import (  # noqa: E402
+    create_check_pipeline as rl_check,
+)
+
+logged = []
+handler = logging.Handler()
+handler.emit = lambda record: logged.append(record.getMessage())
+logging.getLogger(a3_check.__name__).addHandler(handler)
+logging.getLogger(a3_check.__name__).setLevel(logging.INFO)
+for product, make, inputs, model in [
+    ("cc", cc_check, cc_in, "cc_60_180"),
+    ("rl", rl_check, rl_in, "rl_60_180"),
+]:
+    pipe = make()
+    data = {**shared, **inputs, "params:model_id": model}
+    cat = DataCatalog(
+        {
+            n: MemoryDataset(v, copy_mode="assign")
+            for n, v in data.items()
+            if n in pipe.inputs()
+        }
+        | {n: MemoryDataset(copy_mode="assign") for n in pipe.all_outputs()}
+    )
+    SequentialRunner().run(pipe, cat)
+    spark.catalog.clearCache()  # one long session: free the CC run first
+blocks = [m.split("===")[1].strip() for m in logged]
+check(
+    "check blocks",
+    blocks,
+    [f"{b} START" for b in ["A3 OUTPUT", "A3 PROMISES", "A3 LEVELS"] * 2],
+)
+check("check CC unchanged at 60_180", "changed 0 (0.0%)" in logged[0], True)
+check("check RL model_id", "model_id: rl_60_180" in logged[3], True)
+print("\n\n".join(logged))
 
 print("\n".join(FAILS) if FAILS else "a3 engine spec: all checks pass")
 sys.exit(1 if FAILS else 0)
