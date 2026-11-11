@@ -1,6 +1,6 @@
 # GRR persona deck (UC2)
 
-Source of the artifact deck https://claude.ai/artifact/2NjxvqhabYHBPEYsxhNPe8 (v61, 2026-11-11); `grr_persona_deck.pdf` is the printed copy (speaker notes left out).
+Source of the artifact deck https://claude.ai/artifact/2NjxvqhabYHBPEYsxhNPe8 (v62, 2026-11-11); `grr_persona_deck.pdf` is the printed copy (speaker notes left out).
 
 - `project/deck.json` — slide order and metadata; `project/slides/*.html` — one file per slide (speaker notes in `<aside>`).
 - `tools/` — the one-off scripts that generated or edited slides; kept for reference, the slide HTML is the source of truth.
