@@ -225,8 +225,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
-        # TEMPORARY (A1 bundle 21): the A1 check; removed by the bundle's cleanup.
-        "crx_cc_a1_check": crx_cc_a1_ability.create_check_pipeline(),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_a3_payment_credibility": (
@@ -239,8 +237,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
-        # TEMPORARY (A1 bundle 21): the A1 check; removed by the bundle's cleanup.
-        "crx_rl_a1_check": crx_rl_a1_ability.create_check_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
         "crx_rl_a3_payment_credibility": (
             crx_rl_a3_payment_credibility.create_pipeline()

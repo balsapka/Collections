@@ -10,7 +10,6 @@ Needs, for the model_id (rl_60_180 / rl_180_plus): ``crx_rl_obs_base``,
 
 from kedro.pipeline import Pipeline, node
 
-from ..a1_ability.check import create_a1_check_pipeline
 from ..a1_ability.pipeline import TAGS, create_a1_pipeline
 from .nodes import build_rl_liquidity_anchor
 
@@ -28,9 +27,3 @@ def create_pipeline(  # pylint: disable=unused-argument
 ) -> Pipeline:
     """The RL A1 axis written to ``output``."""
     return create_a1_pipeline("rl", output, _ANCHOR)
-
-
-def create_check_pipeline() -> Pipeline:
-    """TEMPORARY (A1 bundle 21): the new rule against the persisted ``crx_rl_a1_ability``;
-    removed by the bundle's cleanup."""
-    return create_a1_check_pipeline("rl", _ANCHOR)

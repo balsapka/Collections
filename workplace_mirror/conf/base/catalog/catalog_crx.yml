@@ -219,14 +219,6 @@ crx_cc_a1_ability:
   save_args:
     mode: overwrite
 
-# TEMPORARY (A1 bundle 21): the new rule's states for the check; removed by the cleanup.
-crx_cc_a1_check_new:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_check_new"
-  save_args:
-    mode: overwrite
-
 # ── CC A3 Payment Credibility (shared a3_credibility engine) ──────────────────
 # Grain: (account_id, observation_date), month ends, persona months (crx_cc_obs_base).
 # a3_state ∈ {payment_credibility_high, payment_credibility_moderate,
@@ -407,14 +399,6 @@ crx_rl_a1_ability:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_ability"
-  save_args:
-    mode: overwrite
-
-# TEMPORARY (A1 bundle 21): the new rule's states for the check; removed by the cleanup.
-crx_rl_a1_check_new:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_check_new"
   save_args:
     mode: overwrite
 
