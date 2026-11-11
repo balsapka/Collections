@@ -25,7 +25,11 @@ against the flow dictionary, the check's outcome block.
   - 180+ or missing: flat floors only.
 - **CIF level.** All customer signals cover every account of the `cif_id`.
 - **Income (F1).** Computed exactly as today's `income_level` (S12, S14).
-- **The bureau salary source is swappable** (user, 2026-11-10). GRR is building a bureau salary
+- **The bureau salary source is swappable** (user, 2026-11-10). **Next source:** the DE's
+  `feat_bureau_salary_unified` (handoff 66, `bundle_helpers/a1_final/bureau_salary_unified_handover.md`;
+  `cif_id long`, `salary_month_end`, `monthly_salary`, `salary_source` alert > salary_credit >
+  bureau_salary). Swapped in its own bundle after bundle 21 (user, 2026-11-11), once the exploration
+  (`sonnet_a1_bureau_unified_exploration_prompt.md`) shows its coverage. GRR is building a bureau salary
   feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
   engine therefore reads bureau salary through one contract only:
   - **Contract:** `feat_cif_bureau_salary_monthly`, one row per `(cif_id, month_end)` with
@@ -36,8 +40,9 @@ against the flow dictionary, the check's outcome block.
   - **Two alert-specific pieces stay in `a1_ability/signals.py` until then:**
     - the **one-month carry** (S14, `_with_next_month`) is removed together with the switch to the
       new bureau logic (user, 2026-11-10). The rule bundle leaves it alone;
-    - **RL `feature_retail_loans`** (latest pull per loan, `_loan_bureau_salary`) stays an extra
-      source until the bulk load replaces it.
+    - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
+      the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
+      `loan_features` input and the `product == "rl"` branch.
   - The S12 level check for windows where only the bureau shows salary stays in the engine, because
     it is about how much a bureau amount is trusted, not where it comes from. Review it when the
     bulk load arrives.
