@@ -173,7 +173,7 @@ Measured, not assumed (V2, V3).
     open on the event day (the last known one, at least 100 AED). Paid: they reach it; partial:
     100 AED or more (counts as not kept); else none. Concluded once the deadline is on or before
     the observation date.
-  - Deadline (GRR): CC the next statement after the event day, however close (no statement yet:
+  - Deadline (GRR; replaced by D-A3-28): CC the next statement after the event day, however close (no statement yet:
     31 days); RL the end of the next month (cash is month-level; the event month's cash counts
     in full). The 30-day alternative (V1g: higher AUC, CC 0.740 vs 0.714) is built in
     (`PROMISE_DEADLINE`) and logged by the bundle check, pending GRR.
@@ -187,6 +187,14 @@ Measured, not assumed (V2, V3).
   overlaps: with C (a repeat delinquent's earlier episode can cost in both) and a little with B. The
   bundle 20 check measures it (state / level with the episode window vs 12 months, events before the
   episode start) before the logic is final.
+
+- **D-A3-28: promise deadline = GRR's threshold, whatever date was promised** (GRR Teams answer,
+  handoff 64, `bundle_helpers/a3_final/grr_broken_ptp_thresholds_handoff64.md`; user 2026-11-11:
+  the promised date is ignored; ships in bundle 23, pending its check). Replaces D-A3-25's deadline:
+  61–180 cards by the next statement after the promise day (unchanged); 61–180 loans by the end of
+  the promise month (was the end of the next month); 180+ cards and loans by the end of the promise
+  month. Paying on the deadline day counts. `PROMISE_DEADLINE` is keyed by segment (from
+  `params:model_id`) and product; the 30-day and next-month-end options stay.
 
 - **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
   `bundle_helpers/b17_a3/a3_check_review.md`). An instalment is kept when the payments since the plan
