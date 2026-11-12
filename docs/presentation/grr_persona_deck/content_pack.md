@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 27 slides, in order: every word, number and speaker note as it stands in v74 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 27 slides, in order: every word, number and speaker note as it stands in v81 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -443,7 +443,7 @@ Under the bars: All card accounts 41% · loans 52%
 
 Right, "What transcripts add" (blue dashed chips): Stated intent to pay · Change in income or job · Hardship reason · Dispute · Promise made on the call
 
-Quote line (blue left border): What the data cannot see, heard where it matters most: the cases we keep in-house.
+Line with a blue left border: These come from what customers say on calls, so most of them will come from the in-house cases.
 
 Footer: Cards 61–180 · August 2026 · groups at the illustrative cut-offs
 
