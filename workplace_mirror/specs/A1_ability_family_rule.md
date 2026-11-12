@@ -80,7 +80,15 @@ against the flow dictionary, the check's outcome block.
       to 6 months (0.8–3.8% of fill months with internal history) but reach 9–11% at 7–12 and 28–32% at
       13+. Not settled: the 37–67% disagreement while filled has no fresh-alert baseline (sources may
       differ by definition), 0 alerts hidden behind `salary_credit` rows inflate missed stops, and the
-      pull may be shifted a month. Decision pending a baseline rerun; cure rates are secondary;
+      pull may be shifted a month. **Baseline rerun 2026-11-12** (`bureau_fill_baseline_results.md`, raw
+      alerts, 4 model_ids): silence = no change holds to alert age 3 (internal agreement within CIF no lower
+      than at age 0; net stops 0.2–0.5% of fill months, most early stops are bank moves), is unclear at 4–6
+      (net stops 1.3–3.1%) and fails from 7 (net stops 7–8%, 21–31% at 13–24). Fresh alerts already disagree
+      with every source (internal within 10% in 18–22% at age 0), so disagreement alone never decides. The
+      pull is not booked a month late (DE label kept). 34–43% of the first run's missed stops are
+      `salaryaccountclosed` alerts the DE drops (no amount); precedence hides only 2–8%. **Proposed (awaiting
+      the user's sign-off):** carry each bureau row up to 3 months (ages 1–3), ended by a newer row or a 0;
+      4–6 only after the DE maps every closed alert to 0; never beyond 6. Cure rates were not used (user);
     - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
       the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
       `loan_features` input and the `product == "rl"` branch.
