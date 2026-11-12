@@ -45,12 +45,18 @@ against the flow dictionary, the check's outcome block.
   So every unified row is bureau salary: it goes into `bureau_salary` of the contract as is, with
   `salary_source` kept for reporting; no internal / bureau label decision.
   **Direction (user, 2026-11-12):** the bulk pull becomes the primary source; pulled every ~2 months its
-  aggregates pin each month's salary and the alerts are no longer needed. Until then the pull's monthly
-  amounts must be shaped by the alerts (a change alert marks the month the level moves) instead of a
-  flat spread of each aggregate. Today the pull is thin (~5% of customers, user's estimate; after the
-  unified precedence it shows in 0.1–1.4% of CIFs, since an alert month hides the pull month). Raw
-  pull coverage, the DE's spreading rule and the alert-shaped rebuild are for the DE's unified node;
-  the A1 contract does not change. The alert table loads daily in PROD (`edp_load_date`) and is complete
+  aggregates pin each month's salary and the alerts are no longer needed. Until then the plan was to shape the
+  pull's monthly amounts by the alerts (a change alert marks the month the level moves) instead of a
+  flat spread of each aggregate. **Bulk pull read 2026-11-12** (`bundle_helpers/a1_final/bulk_pull_results.md`,
+  4 model_ids): one load (2026-09), all `bulk`, ~1% of 61–180 CIFs (0.8% CC / 1.4% RL; 180+ ≤ 0.1%), not ~5%;
+  the precedence hides only 10–17% of pull months. The DE books `_1m` to the month before
+  `EDP_LOAD_DATE` and splits the nested differences evenly back 12 months (no one-month shift in the
+  code; the anchor is the load stamp, not the response date). The flat spread sits > 25% below internal
+  salary in 19–34% of CIF-months and misses ~4 in 5 internal changes / stops; the alert-shaped rebuild
+  sees more stops but fits levels no better (30–48% conflicts), changes < 10 A1 rows: not adopted, flat
+  spread kept until pulls repeat. Open with the DE: codes 232–235 reference date, where the ~5% went
+  (CIF resolution / scope), pull schedule, later 0 hidden by an earlier positive.
+  Either way the A1 contract does not change. The alert table loads daily in PROD (`edp_load_date`) and is complete
   from 2024-01 on (user, 2026-11-12): silence before 2024 is not "no change". GRR is building a bureau salary
   feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
   engine therefore reads bureau salary through one contract only:
