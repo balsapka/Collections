@@ -42,6 +42,11 @@ is the ground truth for customers paid into our bank: a cross-bank pull should m
 back to its raw/staging tables and catalog entries. Write down for each source: table, the columns
 used, the date that becomes `salary_month_end`, and for `bureau_salary`:
 - which aggregate columns are read (`_1m`, `_3m`, `_6m`, `_12m`, others), and the pull date column;
+- **the month the "last month" amount is booked to.** The AECB characteristics are codes 232 / 233 /
+  234 / 235 = "salaries reported for the last month / 3 / 6 / 12 months" (user, AECB documentation).
+  The user suspects the pipeline books `_1m` to the pull's own month, one month too late: "last month"
+  is the month before the report date. Quote the line that sets the month, say which date it starts
+  from (pull / report / load date), and whether month 1 is that date's month or the month before;
 - the formula that gives each month's amount (even split of a total? differences between nested
   windows, e.g. `(_3m − _1m) / 2` for months 2–3? something else?), how far back it goes, and what
   happens with NULL / 0 aggregates, negative differences, and two pulls whose windows overlap;
@@ -56,6 +61,10 @@ used, the date that becomes `salary_month_end`, and for `bureau_salary`:
   Then the share of raw pull CIF-months that the unified output replaces with alert / salary_credit.
 - **Spreading check:** the share of pull CIFs whose inferred months are flat (one value across the
   window) versus varying.
+- **Month alignment:** for pull CIFs with internal salary, compare each inferred pull month with internal
+  salary at lag 0, −1 and −2 months (pull month m against internal m, m−1, m−2): share within 5% and
+  within 10% per lag. The lag that agrees best tells the true booking month; report it with the
+  share, and use it in the truth test and the rebuild below (say so).
 - **Truth test (pull vs internal):** for pull CIFs that also have internal salary in the pull window:
   per month, inferred pull amount vs internal (within 5%, pull higher, pull lower by >25%); a month
   where internal salary changes level or stops but the inferred pull stays flat.
@@ -83,7 +92,7 @@ used, the date that becomes `salary_month_end`, and for `bureau_salary`:
 ## Deliverable: `summary.md`
 
 1. **DE code, per source** (table, columns, date, precedence) and the **exact `bureau_salary` monthly
-   formula**, quoting the lines (file:line on the DE branch). Flag anything that looks wrong.
+   formula and month anchoring** (verdict on the one-month shift: code reading + the lag test), quoting the lines (file:line on the DE branch). Flag anything that looks wrong.
 2. **Coverage** table (four model_ids): raw pull CIFs and share of obs base / cohort, pull dates, repeat
    pulls, share hidden by precedence. Verdict on the user's ~5%.
 3. **Spreading and truth test:** flat vs varying; pull vs internal agreement; missed changes / stops.
