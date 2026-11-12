@@ -10,6 +10,12 @@ block exactly as it is.
 
 ### In UAT
 
+**Step 0 (only if the first apply of this bundle failed with `ImportError: cannot import name '_cif'`).** Undo it with the script and bundle file already in `data/input/mirror_bundles/`; must end with every touched file back to the last commit (`git status --short` shows no `src` / `conf` changes). Then do step 1, and in step 2 save this new version of the file over the old one:
+
+```bash
+python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/24_a1_product_primaries_bureau_swap.md --revert && git status --short
+```
+
 **Step 1.** Continue on the branch of the earlier bundle (nothing uncommitted on it):
 
 ```bash
