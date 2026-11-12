@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 27 slides, in order: every word, number and speaker note as it stands in v81 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 27 slides, in order: every word, number and speaker note as it stands in v82 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -22,6 +22,7 @@ Recurring elements:
 - **Stat box**: a large blue number on the left and one sentence on the right. Two stat boxes sit side by side at the bottom of the axis slides.
 - **Footer**: small grey source line at the bottom-left.
 - **Step tracker** (axis slides 8–11, top-right): ① How they got here · ② Can we talk to them · ③ What we can offer. The current step is filled navy; the others are grey outlines.
+- **Page number**: in a navy wedge at the top-right of every slide except the cover and the three dividers (numbering follows the deck order, so the cover counts as 1). Side margins are 0.5 in, as in the template.
 - **Speaker notes**: go into the PowerPoint notes pane, not on the slide.
 
 ---
