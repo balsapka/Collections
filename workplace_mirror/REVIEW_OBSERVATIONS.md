@@ -1045,6 +1045,9 @@ unchanged by the move; not blocking (bundle 21 check passed).
 `feat_cif_bureau_salary_monthly`; the docstring says "from prm_bureau_alert_enriched only". After bundle
 24 it holds the DE's unified bureau salary (plus a `salary_source` column), so these tables change at
 their next run and the docstrings are stale. `windows_all_models.py` / `windows_casa_all_models.py` loop
-over a hardcoded `feat_cif_windows.MODEL_IDS` (deliberate: they union the four models). Fix with the
-docstrings when the node modules are mirrored.
+over a hardcoded `feat_cif_windows.MODEL_IDS` (deliberate: they union the four models). `feat_cif_windows._external_series` repeats A1's one-month carry with its own
+`_BUREAU_CARRY_MONTHS = 1` (`feat_cif_windows.py:42`, 88-109): it works on the new contract (reads only
+`cif_id`, `month_end`, `bureau_salary`), but a carry change in A1 (3 months, the closure rule) will not
+reach it; and `_data_end` takes the latest bureau month, which the unified table runs to 2026-11 (partial).
+Fix with the import repoint (handoff 7): docstrings, one carry rule shared with A1.
 

@@ -410,6 +410,16 @@ Typed by the workplace Sonnet from photos; copied to the stage branch `refactor/
   them back when applied (tested: 24 then 23 gives the head's registry and catalog). Lines 1–177 match handoff 74; separator
   lengths kept from the mirror.
 
+## Handoff 7 (2026-11-12, IMG_9033–9041): the casa_windows node modules
+
+- `nodes/features/casa/feat_cif_casa_flow.py` (editor lines 1–160; the photos stop there, the last
+  function returns at 159, so the file is probably complete) and `feat_cif_windows.py` (1–303) added
+  verbatim. `py_compile` and ruff F/E9 clean.
+- These are the `_cif` importers behind bundle 24's first failed apply: `feat_cif_casa_flow.py:19`
+  (`_cif, _require`) and `feat_cif_windows.py:32` (`_cif, _require, _wm_month`); bundle 24 keeps the
+  aliases, a later bundle repoints both to `nodes/utils/frames.py`.
+- Transcriber: "▯" in docstrings read as `-` (a minus / dash the font did not render).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
