@@ -2,19 +2,15 @@
 
 ## 1. Closed / added-closed alerts (needed)
 
-In `int_bureau_alert_salary_monthly`, please decide these two alert types by their amount, since the
-bureau mixes added and closed:
+Hi, one change in `int_bureau_alert_salary_monthly`, please. The bureau mixes added and closed, so for
+`salaryaccountclosed` and `salaryaccountisadded/closed` let's go by the amount instead of the type. If the
+amount is 0 or NULL, set the salary to 0, so it shows as a stop (right now the NULL ones get dropped). If
+the amount is positive, keep it as that month's salary.
 
-| Type | Amount > 0 | Amount 0 or NULL |
-|---|---|---|
-| `salaryaccountclosed` | that month's salary, with `is_closure` = true | salary 0 (a stop) |
-| `salaryaccountisadded/closed` | that month's salary (a level, like an added alert) | salary 0 (a stop) |
-
-Today the NULL-amount ones are dropped. Please add the boolean `is_closure` to
-`feat_bureau_salary_unified`: true only on rows from a `salaryaccountclosed` alert with a positive
-amount, so we count that amount in its month without carrying it forward.
-
-Added / average-changed alerts stay as they are (an added alert with no amount stays dropped).
+Could you also add a boolean `is_closure` to `feat_bureau_salary_unified`, true only on rows that come from
+a `salaryaccountclosed` alert with a positive amount? We count those in their month but don't carry them
+into the next one. A positive `isadded/closed` stays a normal level, and the other alert types stay as
+they are. Thanks!
 
 ## 2. Bulk pull (no rush; for when the pull grows)
 
