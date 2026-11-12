@@ -86,9 +86,12 @@ against the flow dictionary, the check's outcome block.
       (net stops 1.3–3.1%) and fails from 7 (net stops 7–8%, 21–31% at 13–24). Fresh alerts already disagree
       with every source (internal within 10% in 18–22% at age 0), so disagreement alone never decides. The
       pull is not booked a month late (DE label kept). 34–43% of the first run's missed stops are
-      `salaryaccountclosed` alerts the DE drops (no amount); precedence hides only 2–8%. **Proposed (awaiting
-      the user's sign-off):** carry each bureau row up to 3 months (ages 1–3), ended by a newer row or a 0;
-      4–6 only after the DE maps every closed alert to 0; never beyond 6. Cure rates were not used (user);
+      `salaryaccountclosed` alerts the DE drops (no amount); precedence hides only 2–8%. **Decided (user,
+      2026-11-12): keep the one-month carry for now.** Ready option, not forgotten: a carry of up to 3
+      months (ages 1–3, ended by a newer row or a 0) is what the data support; switching is one constant in
+      `signals.py` (`_with_next_month`) plus the spec cases. 4–6 months only after the DE maps every closed
+      alert to 0; never beyond 6. DE ask: map `salaryaccountclosed` to 0 whatever its amount (and say what
+      `salaryaccountisadded/closed` means); a stop beating lower sources in its month is optional;
     - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
       the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
       `loan_features` input and the `product == "rl"` branch.
