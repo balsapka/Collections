@@ -64,9 +64,17 @@ Q4 Who moves. Rows whose state differs between GRR and B20, and between GRR and 
    paid by the month end, paid only in the following month (B20 counts them, GRR does not), and not
    paid: the account's later outcome rates for each.
 Q5 Unknown -> Low. Size of ex_unknown per model_id; its outcome rates next to the other Low rows,
-   Moderate and High; what it is made of (account age at the episode start: < 6, 6-12, 12-24,
-   24+ months; months since the episode start; 180+: charge-off age < 24 vs >= 24 months); and whether
-   any outcome makes it look better than the other Low rows (then it would belong in its own state).
+   Moderate and High; and whether any outcome makes it look better than the other Low rows (then it
+   would belong in its own state). What it is made of: ex_unknown requires Dimension C = no_record,
+   and the user's EPD share at cc_60_180 is ~7%, not the 11.5% ex_unknown, so split ex_unknown by
+   why C is no_record, from the Dimension C signals (pre_dlq_reason, pre_dlq_months_due_n):
+   (a) censored episode (A4 cropped the history: the episode start is unknown, C is no_record by
+   rule); (b) 0 / 1 / 2 months with a billed amount > 0 in the 12 months before the episode, crossed
+   with months on book at the episode start (< 6, 6-12, 12-24, 24+, from the card / loan open date)
+   so young accounts (EPD-like) separate from old accounts with idle months (dormant card, no bill);
+   (c) months missing from the ledger in that window (no statement, or cycles over 62 days dropped).
+   Also months since the episode start, and at 180+ charge-off age < 24 vs >= 24 months. Report each
+   group's outcome rates too.
 Q6 Stability: Q3's state AUC for paid_due per observation month and deadline.
 
 Rules
