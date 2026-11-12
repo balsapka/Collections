@@ -435,56 +435,56 @@ def _net_mirrored(legs: DataFrame) -> DataFrame:
 
 
 _TRANSACTION_COLUMNS = (
-# <<NOT PHOTOGRAPHED: line 438>>
-# <<NOT PHOTOGRAPHED: line 439>>
-# <<NOT PHOTOGRAPHED: line 440>>
-# <<NOT PHOTOGRAPHED: line 441>>
-# <<NOT PHOTOGRAPHED: line 442>>
-# <<NOT PHOTOGRAPHED: line 443>>
-# <<NOT PHOTOGRAPHED: line 444>>
-# <<NOT PHOTOGRAPHED: line 445>>
-# <<NOT PHOTOGRAPHED: line 446>>
-# <<NOT PHOTOGRAPHED: line 447>>
-# <<NOT PHOTOGRAPHED: line 448>>
-# <<NOT PHOTOGRAPHED: line 449>>
-# <<NOT PHOTOGRAPHED: line 450>>
-# <<NOT PHOTOGRAPHED: line 451>>
-# <<NOT PHOTOGRAPHED: line 452>>
-# <<NOT PHOTOGRAPHED: line 453>>
-# <<NOT PHOTOGRAPHED: line 454>>
-# <<NOT PHOTOGRAPHED: line 455>>
-# <<NOT PHOTOGRAPHED: line 456>>
-# <<NOT PHOTOGRAPHED: line 457>>
-# <<NOT PHOTOGRAPHED: line 458>>
-# <<NOT PHOTOGRAPHED: line 459>>
-# <<NOT PHOTOGRAPHED: line 460>>
-# <<NOT PHOTOGRAPHED: line 461>>
-# <<NOT PHOTOGRAPHED: line 462>>
-# <<NOT PHOTOGRAPHED: line 463>>
-# <<NOT PHOTOGRAPHED: line 464>>
-# <<NOT PHOTOGRAPHED: line 465>>
-# <<NOT PHOTOGRAPHED: line 466>>
-# <<NOT PHOTOGRAPHED: line 467>>
-# <<NOT PHOTOGRAPHED: line 468>>
-# <<NOT PHOTOGRAPHED: line 469>>
-# <<NOT PHOTOGRAPHED: line 470>>
-# <<NOT PHOTOGRAPHED: line 471>>
-# <<NOT PHOTOGRAPHED: line 472>>
-# <<NOT PHOTOGRAPHED: line 473>>
-# <<NOT PHOTOGRAPHED: line 474>>
-# <<NOT PHOTOGRAPHED: line 475>>
-# <<NOT PHOTOGRAPHED: line 476>>
-# <<NOT PHOTOGRAPHED: line 477>>
-# <<NOT PHOTOGRAPHED: line 478>>
-# <<NOT PHOTOGRAPHED: line 479>>
-# <<NOT PHOTOGRAPHED: line 480>>
-# <<NOT PHOTOGRAPHED: line 481>>
-# <<NOT PHOTOGRAPHED: line 482>>
-# <<NOT PHOTOGRAPHED: line 483>>
-# <<NOT PHOTOGRAPHED: line 484>>
-# <<NOT PHOTOGRAPHED: line 485>>
-# <<NOT PHOTOGRAPHED: line 486>>
-# <<NOT PHOTOGRAPHED: line 487>>
+    "cif_id",
+    "foracid",
+    "tran_id",
+    "tran_date",
+    "tran_dc",
+    "tran_type",
+    "reason_for_excluding",
+    "tran_particular_code",
+    "tran_narration_1",
+    "actual_tran_amt_aed",
+)
+_LABEL_KEYS = ["cif_id", "tran_id", "tran_date", "tran_dc"]
+_LABEL_COLUMNS = ("_sal", "_self", "_fee", "_loan", "_bank")
+
+
+def _usable_key(*columns: str) -> Column:
+    """True when every column is neither NULL nor blank (NULL when a column is NULL)."""
+    usable = F.lit(True)
+    for column in columns:
+        usable &= F.length(F.trim(F.col(column).cast("string"))) > 0
+    return usable
+
+
+def _flow_labels(labelled: DataFrame, floor_day: date) -> DataFrame:
+    """One row per ``(cif_id, tran_id, tran_date, tran_dc)`` of ``wm_pri_labelled_transactions``
+    that carries a label the flow classes read, with ``_sal``, ``_self``, ``_fee``,
+    ``_loan`` and ``_bank``.
+
+    The table is partitioned by ``week_number`` (``yyyyMM0W``), so a bound on it lets Spark
+    skip old partitions (one month of margin: a week can start in the month before its
+    ``tran_date``; ``tran_date`` stays the exact filter). Only the key and flag columns are
+    read. A row with every flag 0 / NULL would end up unlabelled anyway, so it is dropped
+    before the aggregate; so is a group with no salary, self, fee or loan label (a bank
+    flag alone changes nothing: it is read only together with the loan label)."""
+    direction = F.when(F.lower(F.trim("in_out_flow")) == "inflow", "C").when(
+        F.lower(F.trim("in_out_flow")) == "outflow", "D"
+    )
+    flags = ("salary_txn_flag", WM_SELF_COLUMN, *WM_LABEL_FLAGS)
+    keep = ["cif_id", "tran_id", "tran_date", "in_out_flow", *flags]
+    has_week = "week_number" in labelled.columns
+    labelled = labelled.select(*keep, *(["week_number"] if has_week else []))
+    if has_week:
+        week_bound = int(months_back(floor_day, 1).strftime("%Y%m")) * 100 + 1
+        labelled = labelled.filter(F.col("week_number") >= week_bound)
+    carries_label = F.lit(False)
+    for column in flags:
+        carries_label |= _flag(column) != 0
+    carries_label_we_use = (F.col("_sal") == 1) | (F.col("_self") == 1)
+    carries_label_we_use |= (F.col("_fee") == 1) | (F.col("_loan") == 1)
+    return (
         labelled.filter((F.to_date("tran_date") >= F.lit(floor_day)) & carries_label)
         .groupBy(
             _cif(),

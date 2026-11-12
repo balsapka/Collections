@@ -109,6 +109,7 @@ from enbd_collections.pipelines.crx_persona import (
 )
 from enbd_collections.pipelines import digital_login as dl
 from enbd_collections.pipelines.location import pipeline as location_features
+from enbd_collections.pipelines import genesys
 
 
 def register_pipelines() -> dict[str, Pipeline]:

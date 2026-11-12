@@ -385,14 +385,17 @@ Typed by the workplace Sonnet from photos; copied to the stage branch `refactor/
 - `nodes/features/casa/feat_cif_casa.py` (628): **lines 438–487 not photographed** (body of
   `_TRANSACTION_COLUMNS`, `_LABEL_KEYS`, `_LABEL_COLUMNS`, `_flag`, `_usable_key`, the start of
   `_flow_labels` at 461). Marked `# <<NOT PHOTOGRAPHED: line N>>`; ruff F821 on those names until
-  the photo arrives. Line 19 / 81 `yyyyMM0W` read as zero.
+  the photo arrives. Line 19 / 81 `yyyyMM0W` read as zero. **Filled by handoff 74** (lines 434–491;
+  overlaps agree): file complete.
 - `pipelines/casa/features.py` (101; docstring lines 3–7 kept from the mirror, arrows unreadable),
   `pipelines/products/features.py` (41), `catalog_casa.yml` (288, now incl. the `casa_windows*`
   outputs; `rl_` vs `r1_` on lines 144/154/198/208 read as `rl_`), `catalog_bureau.yml` (35, adds
   `feat_bureau_salary_unified`).
 - `pipeline_registry.py`: only lines 1–53 and 131–179 photographed. Added the four `casa_windows*`
   imports and entries; comment rules kept from the mirror. The workplace has one more line in
-  54–130 than the mirror (`cc_dpl_spine_target` at 131 vs 130 here), unknown which.
+  54–130 than the mirror. **Handoff 74** filled 51–162: the extra line is `from enbd_collections.pipelines
+  import genesys` (line 112); lines 1–179 now match. Lines 180+ still unphotographed (the genesys entry is
+  presumably there: ruff F401 here until then). `rl_` read for `r1_` in the crx imports.
 
 ## Review findings
 
