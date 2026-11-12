@@ -54,7 +54,9 @@ against the flow dictionary, the check's outcome block.
   code; the anchor is the load stamp, not the response date). The flat spread sits > 25% below internal
   salary in 19–34% of CIF-months and misses ~4 in 5 internal changes / stops; the alert-shaped rebuild
   sees more stops but fits levels no better (30–48% conflicts), changes < 10 A1 rows: not adopted, flat
-  spread kept until pulls repeat. Open with the DE: codes 232–235 reference date, where the ~5% went
+  spread kept until pulls repeat. Codes 232–235 = salaries reported for the last 1 / 3 / 6 / 12 months, cumulative (AECB documentation,
+  `bureau_fill_whatif_results.md`; the DE's nested reading is right). Open with the DE: the look-back's
+  reference date (response date vs the load stamp), where the ~5% went
   (CIF resolution / scope), pull schedule, later 0 hidden by an earlier positive.
   Either way the A1 contract does not change. The alert table loads daily in PROD (`edp_load_date`) and is complete
   from 2024-01 on (user, 2026-11-12): silence before 2024 is not "no change". GRR is building a bureau salary

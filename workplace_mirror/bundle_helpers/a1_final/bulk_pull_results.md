@@ -1,3 +1,5 @@
+> **Note (2026-11-12):** codes 232–235 are documented (AECB table in `bureau_fill_whatif_results.md`, handoff 2 photo 1): salaries reported for the last 1 / 3 / 6 / 12 months, cumulative. DE question 1 is answered except the look-back's reference date (response date vs `EDP_LOAD_DATE`).
+
 # Claude Code handoff 3 — transcription of phone photos IMG_9017, 9018, 9019, 9020
 
 Follows `claude_code_handoff.md` and `claude_code_handoff_2.md`. Read together. This batch is a different file from handoff 2: `tmp_validation/a1_bulk_pull/summary.md` (the A1 *bulk pull* analysis), not `a1_bureau_fill/summary.md`.
