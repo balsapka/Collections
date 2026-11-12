@@ -161,7 +161,10 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
    5.8%, RL 13.6%). GRR to confirm.
 3. **The Unknown estimate** (round 3 B2) is a separate `a1_estimate` column, never part of the
    state.
-   - CC passes all five criteria (FamGBM, pay gap +8–10pp, coverage 75–100%).
+   - **Not a working state estimate.** Direct evidence (B1) found nothing. In CC, a model (FamGBM)
+     passes the formal criteria but only ranks Unknown customers by likelihood to pay (pay gap
+     +8–10pp between its top and bottom groups); its labels are not levels ("moderate" for 56% of
+     Unknown, who pay 19% vs 42% for real Moderate), and with abstention most rows are only "not high".
    - RL did not run (singular matrix).
    - It uses risk-model-style features, so GRR decides.
    - Before any use: absolute rates per group, and the F4 model's AUC of 0.93 checked for leakage
