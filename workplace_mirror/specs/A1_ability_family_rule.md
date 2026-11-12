@@ -43,7 +43,14 @@ against the flow dictionary, the check's outcome block.
     the month pattern is inferred, not observed; today one pull, rows 2025-09 .. 2026-08). This is
     the source GRR is pushing to cover every 61–180 customer.
   So every unified row is bureau salary: it goes into `bureau_salary` of the contract as is, with
-  `salary_source` kept for reporting; no internal / bureau label decision. The alert table loads daily in PROD (`edp_load_date`) and is complete
+  `salary_source` kept for reporting; no internal / bureau label decision.
+  **Direction (user, 2026-11-12):** the bulk pull becomes the primary source; pulled every ~2 months its
+  aggregates pin each month's salary and the alerts are no longer needed. Until then the pull's monthly
+  amounts must be shaped by the alerts (a change alert marks the month the level moves) instead of a
+  flat spread of each aggregate. Today the pull is thin (~5% of customers, user's estimate; after the
+  unified precedence it shows in 0.1–1.4% of CIFs, since an alert month hides the pull month). Raw
+  pull coverage, the DE's spreading rule and the alert-shaped rebuild are for the DE's unified node;
+  the A1 contract does not change. The alert table loads daily in PROD (`edp_load_date`) and is complete
   from 2024-01 on (user, 2026-11-12): silence before 2024 is not "no change". GRR is building a bureau salary
   feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
   engine therefore reads bureau salary through one contract only:
