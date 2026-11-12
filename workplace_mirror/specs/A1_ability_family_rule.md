@@ -32,7 +32,8 @@ against the flow dictionary, the check's outcome block.
   2026-11-11). Swapped in its own bundle after bundle 21. Exploration back 2026-11-11
   (`bundle_helpers/a1_final/bureau_unified_exploration_results.md`): its `alert` source is today's
   series, `salary_credit` is our own salary credits (thin feed), cast its `cif_id` to string, cap it at
-  the persona months. GRR is building a bureau salary
+  the persona months. The alert table loads daily in PROD (`edp_load_date`) and is complete
+  from 2024-01 on (user, 2026-11-12): silence before 2024 is not "no change". GRR is building a bureau salary
   feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
   engine therefore reads bureau salary through one contract only:
   - **Contract:** `feat_cif_bureau_salary_monthly`, one row per `(cif_id, month_end)` with

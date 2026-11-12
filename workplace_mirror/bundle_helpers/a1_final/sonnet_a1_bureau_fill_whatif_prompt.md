@@ -27,6 +27,17 @@ Exploration only: no pipeline, catalog or A1 code changes.
   levels and the occasional bulk upload. Internal salary is the one monthly comparator. Report what
   the data show; low counts are not a failure.
 
+## Feed facts (user, 2026-11-12)
+
+- The alert table is loaded **daily in PROD** (`edp_load_date`); the sandpit copy was last refreshed a
+  few weeks ago. Run the snippet in PROD and report the latest `edp_load_date` it sees; a thin
+  latest month in another environment is a load lag, not a feed gap.
+- **Alerts are complete from 2024-01 on.** Before that, a missing alert does not mean "no change".
+  So: fills (C12 / CU / CU-W) start only from alert levels dated 2024-01 or later (an older level
+  gets C1 only); feed health, the monitoring proxy and missed changes / stops are measured from
+  2024-01 on. Report how many CIFs' latest positive level predates 2024 (they lose nothing against
+  today, but cannot be filled).
+
 ## Fill variants (bureau series only; `salary_credit` is never filled, it is a monthly credit)
 
 - **C1** (today): an alert or pull level counts in its month and the next; a 0 ends it.
