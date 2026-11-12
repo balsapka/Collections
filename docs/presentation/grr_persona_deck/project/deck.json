@@ -39,6 +39,7 @@
     "app-signals",
     "app-rules",
     "app-a4",
+    "app-ability",
     "app-governance"
   ],
   "sections": {
