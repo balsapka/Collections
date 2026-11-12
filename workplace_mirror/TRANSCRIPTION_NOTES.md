@@ -406,7 +406,8 @@ Typed by the workplace Sonnet from photos; copied to the stage branch `refactor/
   mirror. One of them must import `_cif` from `feat_cif_casa` (bundle 24's first apply failed on it; the
   pipeline files do not). **Photograph both node modules.**
 - `pipeline_registry.py` 178–276: the `genesys` entry added (F401 gone); the bundle 23 A3 check entries
-  are gone in the workplace (its cleanup), removed here too. Lines 1–177 match handoff 74; separator
+  are not in the workplace (bundle 23 not applied yet, user 2026-11-12), removed here too; bundle 23 adds
+  them back when applied (tested: 24 then 23 gives the head's registry and catalog). Lines 1–177 match handoff 74; separator
   lengths kept from the mirror.
 
 ## Review findings
