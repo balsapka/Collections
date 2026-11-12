@@ -1,15 +1,18 @@
 # Messages to the DE: bureau salary (2026-11-12)
 
-## 1. Closure alerts (needed)
+## 1. Closed / added-closed alerts (needed)
 
-In `int_bureau_alert_salary_monthly`, please read the closure alerts (`salaryaccountclosed` and
-`salaryaccountisadded/closed`) by their amount, since the bureau mixes added and closed:
+In `int_bureau_alert_salary_monthly`, please decide these two alert types by their amount, since the
+bureau mixes added and closed:
 
-- amount > 0 → keep it as that month's salary;
-- amount 0 or NULL → salary 0 (a stop). Today the NULL-amount ones are dropped.
+| Type | Amount > 0 | Amount 0 or NULL |
+|---|---|---|
+| `salaryaccountclosed` | that month's salary, with `is_closure` = true | salary 0 (a stop) |
+| `salaryaccountisadded/closed` | that month's salary (a level, like an added alert) | salary 0 (a stop) |
 
-Please also add a boolean `is_closure` to `feat_bureau_salary_unified`, true on rows that come from a
-closure alert, so we can count a positive closure amount in its month without carrying it forward.
+Today the NULL-amount ones are dropped. Please add the boolean `is_closure` to
+`feat_bureau_salary_unified`: true only on rows from a `salaryaccountclosed` alert with a positive
+amount, so we count that amount in its month without carrying it forward.
 
 Added / average-changed alerts stay as they are (an added alert with no amount stays dropped).
 
