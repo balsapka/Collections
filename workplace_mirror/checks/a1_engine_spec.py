@@ -116,8 +116,8 @@ def case(name, *, salary=(), bureau=(), casa=(), flows=(), products=(), bounces=
                             float(amt)))
         if len(rest) > 1:
             label = rest[1]
-            rows["lab"].append((cif, tid, m(k, day), int(label == "salary"),
-                                "self" if label == "self" else "other"))
+            rows["lab"].append((cif, tid, m(k, day), "inflow" if dc == "C" else "outflow",
+                                int(label == "salary"), int(label == "self"), 0, 0, 0, 0, 0))
     for ptype, bal, current, inst, *own in products:
         pacct = acct if own and own[0] else f"P{i}_{ptype}"
         rows["prod"].append((str(cif), OBS, pacct, ptype, bal, current, inst))
@@ -332,9 +332,12 @@ gam += [(c, f"LOAN{c}", "LAA") for c in range(1000, 1000 + len(expect))] + [(1, 
 CA, SA = ["101", "110"], ["021"]
 accounts = prm_casa.build_casa_accounts(df(gam, "cif_id long, foracid string, schm_code string"), CA, SA)
 assert {r["schm_code"] for r in accounts.collect()} == {"101"}  # the loan scheme is not CASA
-lab_schema = "cif_id long, tran_id string, tran_date date, salary_txn_flag int, counterparty_type string"
-flows = fc.build_casa_flows(df(rows["ftr"], ftr_schema), accounts, df(rows["lab"], lab_schema),
-                            PERSONA["persona_start_date"], 12)
+lab_schema = ("cif_id long, tran_id string, tran_date date, in_out_flow string, salary_txn_flag int,"
+              " self_transfer_flag int, fees_charges int, loan_payment_flag int, bank_transfer int,"
+              " local_bank_transfer int, international_bank_transfer int")
+legs = fc.build_casa_flow_legs(df(rows["ftr"], ftr_schema), accounts, df(rows["lab"], lab_schema),
+                               PERSONA["persona_start_date"], 12)
+flows = fc.build_casa_flows(legs)
 prod_schema = ("cif_id string, month_end date, product_account_id string, product_type string,"
                " balance_aed double, is_current int, instalment_aed double")
 products = df(rows["prod"], prod_schema)

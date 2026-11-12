@@ -1,0 +1,8 @@
+##################################################
+# PRODUCTS (product_primary, product_features)
+##################################################
+products:
+  # Calendar months kept up to and including the persona start month by the product
+  # primaries and the cross-product feature: the A1 cross-product family reads the
+  # observation month only, so this matches the CASA features' 12 months.
+  history_months: 12

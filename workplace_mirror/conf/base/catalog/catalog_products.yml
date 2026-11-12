@@ -1,0 +1,58 @@
+# Product primaries (pipeline product_primary) and the cross-product feature (product_features).
+
+# Every Way4 card contract of a known client, all CIFs: cif_id, contract_id,
+# parent_contract_id (the contract a newer one replaced).
+prm_card_contracts:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/products/card_contracts"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: primary
+
+# Per (contract_id, month_end) with a billing row in the month: level (BS_PMT_CYCLE_DUE of
+# the latest billing row) and minimum_due (latest balance snapshot in the month's last days).
+prm_card_month_end:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/products/card_month_end"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: primary
+
+# Every monthly retail-loan snapshot (bo_rr_portf_actv_acct_mthly), all CIFs: cif_id,
+# account_id, month_end, bucket, overdue days, instalment due, write-off date.
+prm_loan_month_end:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/products/loan_month_end"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: primary
+
+# The customer's other products with us per (cif_id, month_end, product_account_id):
+# product_type, balance_aed, is_current, instalment_aed (A1 cross-product, F4).
+feat_cif_cross_product_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/products/cif_cross_product_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# TEMPORARY (bundle 24): the cross-product table rebuilt from the primaries, for the check;
+# removed by the cleanup.
+feat_cif_cross_product_monthly_b24_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/products/cif_cross_product_monthly_b24_new"
+  save_args:
+    mode: overwrite

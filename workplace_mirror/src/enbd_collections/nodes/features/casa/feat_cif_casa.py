@@ -26,6 +26,13 @@ from datetime import date
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
+from enbd_collections.nodes.utils.frames import (
+    cif_column,
+    months_back,
+    require_columns,
+    wm_month,
+)
+
 _CASA_BALANCE = "ft_avg_casa_eod_balance_in_last_0_3_weeks_avg"  # CA+SA, ~1 month
 _CASA_IN = "ft_inflow_casa_amt_in_last_0_0_weeks_sum"
 _CASA_OUT = "ft_outflow_casa_amt_in_last_0_0_weeks_sum"
@@ -64,33 +71,11 @@ LANES = (
 )
 
 
-def months_back(day: str | date, months: int) -> date:
-    """First day of the month ``months`` calendar months before ``day``'s month."""
-    day = date.fromisoformat(str(day))
-    year, month = divmod(day.year * 12 + day.month - 1 - months, 12)
-    return date(year, month + 1, 1)
-
-
-def _require(df: DataFrame, columns: list[str], source: str) -> None:
-    missing = sorted(set(columns) - set(df.columns))
-    if missing:
-        raise ValueError(f"{source} is missing columns: {missing}")
-
-
-def _wm_month(week_number: str = "week_number") -> Column:
-    """First day of the month of a ``yyyyMM0W`` week."""
-    return F.to_date(F.substring(F.col(week_number).cast("string"), 1, 6), "yyyyMM")
-
-
 def _wm_week_date(week_number: str = "week_number") -> Column:
     """The middle of week W of the month (day 4, 11, 18 or 25): within 4 days of any
     day of that week."""
     week = F.substring(F.col(week_number).cast("string"), 7, 2).cast("int")
-    return F.date_add(_wm_month(week_number), 7 * week - 4)
-
-
-def _cif() -> Column:
-    return F.col("cif_id").cast("string").alias("cif_id")
+    return F.date_add(wm_month(week_number), 7 * week - 4)
 
 
 def build_internal_salary(wm_salary: DataFrame) -> DataFrame:
@@ -102,7 +87,7 @@ def build_internal_salary(wm_salary: DataFrame) -> DataFrame:
     few days of the first of the salary month, so it is rounded to the nearest first.
     Snapshots that see the same month collapse to its largest total.
     """
-    _require(
+    require_columns(
         wm_salary,
         [
             "cif_id",
@@ -121,7 +106,7 @@ def build_internal_salary(wm_salary: DataFrame) -> DataFrame:
             (F.col("ft_last_salary_amount") > 0)
             & F.col("ft_days_since_salary_transaction").isNotNull()
         )
-        .groupBy(_cif(), F.last_day(month).alias("month_end"))
+        .groupBy(cif_column(), F.last_day(month).alias("month_end"))
         .agg(F.max(F.col("ft_last_salary_amount").cast("double")).alias("salary"))
     )
 
@@ -136,12 +121,12 @@ def build_casa_balance(
     weekly snapshot; ``casa_flow``: 1 when any week of the month has an inflow or outflow.
     From the first of the last ``history_months`` months up to the persona start month on.
     """
-    _require(
+    require_columns(
         wm_casa_balance,
         ["cif_id", "week_number", _CASA_BALANCE],
         "wm_fea_casa_eod_avg_balance",
     )
-    _require(
+    require_columns(
         wm_casa_flow,
         ["cif_id", "week_number", _CASA_IN, _CASA_OUT],
         "wm_fea_casa_cc_inflow_outflow",
@@ -154,15 +139,15 @@ def build_casa_balance(
         )
     )
     balance = (
-        wm_casa_balance.filter(_wm_month() >= floor)
-        .groupBy(_cif(), F.last_day(_wm_month()).alias("month_end"))
+        wm_casa_balance.filter(wm_month() >= floor)
+        .groupBy(cif_column(), F.last_day(wm_month()).alias("month_end"))
         .agg(last_week.alias("_last"))
         .select("cif_id", "month_end", F.col("_last.v").alias("casa_balance"))
     )
     moved = (F.col(_CASA_IN) > 0) | (F.col(_CASA_OUT) > 0)
     flow = (
-        wm_casa_flow.filter(_wm_month() >= floor)
-        .groupBy(_cif(), F.last_day(_wm_month()).alias("month_end"))
+        wm_casa_flow.filter(wm_month() >= floor)
+        .groupBy(cif_column(), F.last_day(wm_month()).alias("month_end"))
         .agg(F.max(moved.cast("int")).alias("casa_flow"))
     )
     return balance.join(flow, on=["cif_id", "month_end"], how="full")
@@ -208,7 +193,7 @@ def transaction_lane() -> Column:
 
 def _on_casa_accounts(legs: DataFrame, casa_accounts: DataFrame) -> DataFrame:
     """The legs whose ``foracid`` is a current or savings account."""
-    _require(casa_accounts, ["foracid"], "prm_casa_accounts")
+    require_columns(casa_accounts, ["foracid"], "prm_casa_accounts")
     accounts = casa_accounts.select("foracid").distinct()
     return legs.withColumn("foracid", F.trim(F.col("foracid").cast("string"))).join(
         accounts, on="foracid", how="leftsemi"
@@ -218,7 +203,7 @@ def _on_casa_accounts(legs: DataFrame, casa_accounts: DataFrame) -> DataFrame:
 def build_casa_activity(transactions: DataFrame, casa_accounts: DataFrame) -> DataFrame:
     """Per ``(cif_id, month_end, lane)``: ``legs`` and the credit / debit AED of the
     ``prm_casa_transactions`` legs on CASA accounts (its whole history)."""
-    _require(
+    require_columns(
         transactions,
         [
             "cif_id",
@@ -237,7 +222,9 @@ def build_casa_activity(transactions: DataFrame, casa_accounts: DataFrame) -> Da
     return (
         _on_casa_accounts(transactions, casa_accounts)
         .withColumn("lane", transaction_lane())
-        .groupBy(_cif(), F.last_day(F.to_date("tran_date")).alias("month_end"), "lane")
+        .groupBy(
+            cif_column(), F.last_day(F.to_date("tran_date")).alias("month_end"), "lane"
+        )
         .agg(
             F.count(F.lit(1)).alias("legs"),
             F.sum(F.when(F.col("tran_dc") == "C", amount)).alias("credit_aed"),
@@ -259,7 +246,7 @@ def build_ext_card_payments(
     The beneficiary list is a current snapshot: a card registered later still counts
     (a mild look-ahead, accepted).
     """
-    _require(
+    require_columns(
         labelled,
         [
             "cif_id",
@@ -271,7 +258,7 @@ def build_ext_card_payments(
         ],
         "wm_pri_labelled_transactions",
     )
-    _require(beneficiary_cards, ["card_number"], "prm_beneficiary_cards")
+    require_columns(beneficiary_cards, ["card_number"], "prm_beneficiary_cards")
     floor = F.lit(months_back(persona_start_date, history_months - 1))
     cards = beneficiary_cards.select(F.col("card_number").alias("transaction_acid"))
     return (
@@ -281,7 +268,7 @@ def build_ext_card_payments(
             & (F.col("product_category") == "CASA")
         )
         .join(F.broadcast(cards), on="transaction_acid", how="leftsemi")
-        .groupBy(_cif(), F.last_day(F.to_date("tran_date")).alias("month_end"))
+        .groupBy(cif_column(), F.last_day(F.to_date("tran_date")).alias("month_end"))
         .agg(
             F.max(F.col("tran_amt").cast("double")).alias("max_payment"),
             F.count(F.lit(1)).alias("payments"),
@@ -293,7 +280,7 @@ def build_returns(return_events: DataFrame, casa_accounts: DataFrame) -> DataFra
     """``events``: returned transactions on CASA accounts per ``(cif_id, month_end,
     reason)`` from ``prm_casa_return_events`` - one event per ``(tran_id, tran_date)``, so
     the debit and credit legs of a return count once."""
-    _require(
+    require_columns(
         return_events,
         ["cif_id", "foracid", "tran_id", "tran_date", "reason_for_excluding"],
         "prm_casa_return_events",
@@ -302,7 +289,7 @@ def build_returns(return_events: DataFrame, casa_accounts: DataFrame) -> DataFra
     return (
         _on_casa_accounts(return_events, casa_accounts)
         .select(
-            _cif(),
+            cif_column(),
             "tran_id",
             F.to_date("tran_date").alias("tran_date"),
             F.trim("reason_for_excluding").alias("reason"),
@@ -487,7 +474,7 @@ def _flow_labels(labelled: DataFrame, floor_day: date) -> DataFrame:
     return (
         labelled.filter((F.to_date("tran_date") >= F.lit(floor_day)) & carries_label)
         .groupBy(
-            _cif(),
+            cif_column(),
             F.trim(F.col("tran_id").cast("string")).alias("tran_id"),
             F.to_date("tran_date").alias("tran_date"),
             direction.alias("tran_dc"),
@@ -526,7 +513,7 @@ def build_casa_flow_legs(
     joined on ``(cif_id, tran_id, tran_date)`` and the direction (``in_out_flow``), as in
     round 3. Saved on its own so the heavy join / classification is read once and a failed
     run restarts from here (``build_casa_flows`` nets and aggregates it)."""
-    _require(
+    require_columns(
         transactions,
         [
             "cif_id",
@@ -542,7 +529,7 @@ def build_casa_flow_legs(
         ],
         "prm_casa_transactions",
     )
-    _require(
+    require_columns(
         labelled,
         [
             "cif_id",
@@ -563,7 +550,7 @@ def build_casa_flow_legs(
         .filter(F.to_date("tran_date") >= floor)
         .withColumn("lane", transaction_lane())
         .select(
-            _cif(),
+            cif_column(),
             F.trim(F.col("tran_id").cast("string")).alias("tran_id"),
             F.to_date("tran_date").alias("tran_date"),
             "tran_dc",
@@ -610,7 +597,7 @@ def build_casa_flows(legs: DataFrame) -> DataFrame:
     """Per ``(cif_id, month_end, flow_class)``: ``legs``, ``credit_aed``, ``debit_aed``
     and ``max_leg_aed`` of the classified legs (``build_casa_flow_legs``). Counted legs
     mirrored by a leg that does not count are dropped (``_net_mirrored``)."""
-    _require(
+    require_columns(
         legs,
         ["cif_id", "tran_id", "tran_date", "tran_dc", "amount", "flow_class"],
         "prm_casa_flow_legs",

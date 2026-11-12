@@ -273,15 +273,3 @@ feat_cif_returns_monthly:
   metadata:
     kedro-viz:
       layer: feature
-
-# The customer's other products with us per (cif_id, month_end, product_account_id):
-# product_type, balance_aed, is_current, instalment_aed (A1 cross-product, F4).
-feat_cif_cross_product_monthly:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/products/cif_cross_product_monthly"
-  save_args:
-    mode: overwrite
-  metadata:
-    kedro-viz:
-      layer: feature
