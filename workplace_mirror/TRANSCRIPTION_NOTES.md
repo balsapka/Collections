@@ -397,6 +397,18 @@ Typed by the workplace Sonnet from photos; copied to the stage branch `refactor/
   import genesys` (line 112); lines 1–179 now match. Lines 180+ still unphotographed (the genesys entry is
   presumably there: ruff F401 here until then). `rl_` read for `r1_` in the crx imports.
 
+## Handoff 6 (2026-11-12, IMG_9026–9032): casa_windows pipelines + registry 178–276
+
+- `pipelines/casa/windows.py`, `windows_all_models.py`, `windows_casa_all_models.py`, `windows_casa.py`
+  added verbatim. The docstring diagrams were redrawn in ASCII by the transcriber, so their line count may
+  be off by one (`windows.py` 53 vs 54 editor lines, `windows_casa.py` 58 vs 59); code lines match.
+- They import `feat_cif_windows` and `feat_cif_casa_flow` from `nodes/features/casa/`: neither is in the
+  mirror. One of them must import `_cif` from `feat_cif_casa` (bundle 24's first apply failed on it; the
+  pipeline files do not). **Photograph both node modules.**
+- `pipeline_registry.py` 178–276: the `genesys` entry added (F401 gone); the bundle 23 A3 check entries
+  are gone in the workplace (its cleanup), removed here too. Lines 1–177 match handoff 74; separator
+  lengths kept from the mirror.
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).

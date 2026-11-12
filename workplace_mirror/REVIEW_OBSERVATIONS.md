@@ -1038,3 +1038,13 @@ card level (`BS_PMT_CYCLE_DUE` from `add_info`) and the minimum due (`derive_bil
 that the cc_way4 primary layer already builds. Fix later: read `prm_` card tables (billing level,
 balance / minimum due per contract) or add a primary node `prm_cif_card_products_monthly`. Output
 unchanged by the move; not blocking (bundle 21 check passed).
+
+### O91 — `casa_windows*` read `feat_cif_bureau_salary_monthly`, whose source bundle 24 changes (L)
+
+`pipelines/casa/windows.py:3-8`, `windows_casa.py:3-8`: both salary-window nodes read
+`feat_cif_bureau_salary_monthly`; the docstring says "from prm_bureau_alert_enriched only". After bundle
+24 it holds the DE's unified bureau salary (plus a `salary_source` column), so these tables change at
+their next run and the docstrings are stale. `windows_all_models.py` / `windows_casa_all_models.py` loop
+over a hardcoded `feat_cif_windows.MODEL_IDS` (deliberate: they union the four models). Fix with the
+docstrings when the node modules are mirrored.
+
