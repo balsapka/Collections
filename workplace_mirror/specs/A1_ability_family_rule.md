@@ -67,6 +67,8 @@ against the flow dictionary, the check's outcome block.
   - **To swap the source,** rebuild that dataset from the new layer: map its amount column to
     `bureau_salary` in the feature node. The engine, catalog name and persona pipelines stay as
     they are.
+  - **Built in bundle 24** (`bundles/24_a1_product_primaries_bureau_swap.md`, 2026-11-12): the feature node
+    reads `feat_bureau_salary_unified`; the carry stays, the RL loan salary is dropped.
   - **Two alert-specific pieces stay in `a1_ability/signals.py` until then:**
     - the **one-month carry** (S14, `_with_next_month`) **stays** after the swap, until bureau salary
       sourcing is fixed (user, 2026-11-11, replacing the 2026-11-10 plan): the unified series is

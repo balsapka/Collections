@@ -1,6 +1,6 @@
-# Mirror bundle 24 — A1 products: raw reads moved to product primaries
+# Mirror bundle 24 — A1: product primaries + bureau salary from the unified table
 
-apply_bundle version: 7 · built 2026-11-12 from `ca3f382..cdc0d31` · source: 7 added, 5 replaced, 0 deleted · helpers: 0
+apply_bundle version: 7 · built 2026-11-12 from `ca3f382..79bc263` · source: 9 added, 12 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -16,7 +16,7 @@ block exactly as it is.
 git checkout feature/persona_refactor && git pull && git status --short
 ```
 
-**Step 2.** Create the folder, then save this file **raw** (GitHub → Raw → copy all) as `data/input/mirror_bundles/24_a1_product_primaries.md`:
+**Step 2.** Create the folder, then save this file **raw** (GitHub → Raw → copy all) as `data/input/mirror_bundles/24_a1_product_primaries_bureau_swap.md`:
 
 ```bash
 mkdir -p data/input/mirror_bundles
@@ -25,7 +25,7 @@ mkdir -p data/input/mirror_bundles
 **Step 3.** Write the apply script, apply, and list what changed — must end with `APPLY PASSED`:
 
 ```bash
-python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '24_a1_product_primaries.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')" && python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/24_a1_product_primaries.md --apply && git status --short
+python -c "import pathlib, re; d = pathlib.Path('data/input/mirror_bundles'); md = (d / '24_a1_product_primaries_bureau_swap.md').read_text(encoding='utf-8'); sec = md.split('\n## Apply script\n', 1)[1]; m = re.search(r'^(\x60{5,})python\n(.*?)\n\1$', sec, re.S | re.M); (d / 'apply_bundle.py').write_text(m.group(2) + '\n', encoding='utf-8'); print('apply_bundle.py written')" && python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/24_a1_product_primaries_bureau_swap.md --apply && git status --short
 ```
 
 A file this repo changed since the bundle's copy (an edit at work, a lint fix) is
@@ -34,22 +34,23 @@ committing.
 
 **Step 4.** Ask Sonnet the following, in one go:
 
-1. **Catalog and registry.** `catalog_products.yml` is new and `feat_cif_cross_product_monthly` now lives there only: confirm it is gone from `catalog_casa.yml` and defined exactly once in `conf/`. List every top-level key the apply removed from `catalog_casa.yml` and `pipeline_registry.py` compared with the last commit and put back any that is not `feat_cif_cross_product_monthly` (the `casa_windows*` entries and `genesys` must survive). `kedro registry list` shows `product_primary`, `product_features` and `product_features_b24_check`.
+1. **Catalog and registry.** `catalog_products.yml` and `tmp_b24_check.yml` are new and `feat_cif_cross_product_monthly` now lives there only: confirm it is gone from `catalog_casa.yml` and defined exactly once in `conf/`. List every top-level key the apply removed from `catalog_casa.yml`, `catalog_bureau.yml`, `catalog_products.yml` and `pipeline_registry.py` compared with the last commit and put back any that is not `feat_cif_cross_product_monthly` (the `casa_windows*` entries and `genesys` must survive). `kedro registry list` shows `product_primary`, `product_features`, `product_features_b24_check`, `crx_cc_a1_b24_check` and `crx_rl_a1_b24_check`. `feat_bureau_salary_unified` must be defined exactly once in `conf/` (the mirror has it in `catalog_bureau.yml`; if the DE's entries were merged into `catalog_outputs.yml`, keep one, same path) and point at the parquet the DE wrote for every model_id.
 2. **`derive_billing_amounts`.** `nodes/primary/products/prm_products.py` calls `prm_cc.derive_billing_amounts(tail, account_group)` exactly as bundle 21's node did; confirm the signature and that it returns `contract_idt`, `banking_date` and `minimum_due`.
 3. **Callers of the moved helpers.** `grep -rn "feat_cif_casa import\|_require\|_wm_month\|_cif()" src`: nothing outside `feat_cif_casa.py` may still import its old private helpers (they are now `nodes/utils/frames.py`); fix any workplace-only caller and report it.
 4. **Parameters.** `products.history_months` resolves (`parameters_products.yml`); `crx_persona.persona_start_date` / `persona_end_date` exist.
-5. **Tests.** Update the tests of `feat_cif_cross_product` for the new signature (primaries + WM; no `feat_product_holding`, no raw tables) and add tests for the three primaries; update any CASA test that imported `_require` / `_cif` / `_wm_month` / `months_back` from `feat_cif_casa`. Black, ruff and pylint clean on the touched files.
+5. **Bureau swap.** `feat_cif_bureau_salary_monthly.build(unified)` reads `cif_id`, `salary_month_end`, `monthly_salary`, `salary_source`: confirm these names and types on the real `feat_bureau_salary_unified` schema. `grep -rn "loan_features\|_loan_bureau_salary\|feat_cif_bureau_salary_monthly.build" src`: no A1 code may still pass `loan_features`; report any other caller of the old `build(alerts)`.
+6. **Tests.** Update the tests of `feat_cif_cross_product` for the new signature (primaries + WM; no `feat_product_holding`, no raw tables) and add tests for the three primaries; update the tests of `feat_cif_bureau_salary_monthly` (unified rows in, no alert types) and of `build_income_signals` (no `loan_features`); update any CASA test that imported `_require` / `_cif` / `_wm_month` / `months_back` from `feat_cif_casa`. Black, ruff and pylint clean on the touched files.
 
 **Step 5.** Commit the source only, and push:
 
 ```bash
-git add src conf && git commit -m "A1 products: product_primary (card contracts, card month ends, loan month ends) replaces the raw reads in product_features; temporary check product_features_b24_check (bundle 24)" && git push
+git add src conf && git commit -m "A1: product_primary replaces the raw reads in product_features; bureau salary from feat_bureau_salary_unified (carry kept, RL loan salary dropped); temporary checks product_features_b24_check, crx_<p>_a1_b24_check (bundle 24)" && git push
 ```
 
 **Undo** (before step 5) — puts every touched file back to the last commit:
 
 ```bash
-python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/24_a1_product_primaries.md --revert
+python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/24_a1_product_primaries_bureau_swap.md --revert
 ```
 
 ### In PROD
@@ -60,9 +61,11 @@ python data/input/mirror_bundles/apply_bundle.py data/input/mirror_bundles/24_a1
 git fetch origin && git checkout feature/persona_refactor && git pull
 ```
 
-Bundle 21's persisted `feat_cif_cross_product_monthly` is the baseline: do not re-run `product_features` before the check. The tables cover all customers, so the check needs one model_id: **`cc_60_180`** (set `model_id` in `conf/dev/globals_dev.yml`).
+The persisted tables are the baseline: do not re-run `product_features`, `bureau_salary_bounces` or the A1 pipelines before the checks. Set `model_id` in `conf/dev/globals_dev.yml` for each run.
 
-**Step 7.** Build the primaries, then run the check (cc_60_180):
+**Step 7.** Run the checks.
+
+**cc_60_180:** build the product primaries, then both checks:
 
 ```bash
 kedro run --env=dev --pipeline=product_primary
@@ -72,9 +75,19 @@ kedro run --env=dev --pipeline=product_primary
 kedro run --env=dev --pipeline=product_features_b24_check
 ```
 
-Paste back both blocks, `=== B24 PRODUCTS START ===` … `END ===` and `=== B24 A1 INPUTS START ===` … `END ===`. Also note the run time of each pipeline.
+```bash
+kedro run --env=dev --pipeline=crx_cc_a1_b24_check
+```
 
-**Step 8.** After the blocks are reviewed, write the real tables for **all four model_ids** (A1 does not need a re-run: its inputs do not change):
+**rl_60_180, cc_180_plus, rl_180_plus:** the A1 check only (`crx_rl_a1_b24_check` for rl, `crx_cc_a1_b24_check` for cc):
+
+```bash
+kedro run --env=dev --pipeline=crx_rl_a1_b24_check
+```
+
+Paste back, per model_id, every `=== B24 … START ===` … `END ===` block: `B24 PRODUCTS` and `B24 A1 INPUTS` (cc_60_180 only), `B24 BUREAU`, `B24 INCOME`, `B24 A1 OUTPUT`, `B24 A1 MOVES`. Also note the run time of each pipeline.
+
+**Step 8.** After the blocks are reviewed, write the real tables for **all four model_ids**, in this order:
 
 ```bash
 kedro run --env=dev --pipeline=product_primary
@@ -84,14 +97,24 @@ kedro run --env=dev --pipeline=product_primary
 kedro run --env=dev --pipeline=product_features
 ```
 
-Then the cleanup prompt.
+```bash
+kedro run --env=dev --pipeline=bureau_salary_bounces
+```
+
+```bash
+kedro run --env=dev --pipeline=crx_cc_a1_ability
+```
+
+(`crx_rl_a1_ability` for the rl model_ids.) Then the cleanup prompt.
 
 **When you are done**, give the *Cleanup prompt* at the bottom to the workplace
 assistant in UAT.
 
 ## What this bundle does
 
-**What this bundle does.** The A1 cross-product feature (`product_features`, F4) no longer reads raw tables. The raw Way4 card tables and the loan portfolio are read once, by a new primary pipeline `product_primary`; the feature node reads those primaries and the two WM asset features only (DESIGN_REVIEW §7: primary nodes read raw, feature nodes read primary or a WM feature). A1's inputs do not change. Apply after bundle 21's cleanup (and bundle 23, which this branch was built on; no shared lines).
+**What this bundle does.** Two A1 changes in one bundle (the bureau swap planned as bundle 25 is folded in, user 2026-11-12): (1) the product inputs leave the raw tables, with no change to A1; (2) A1's bureau salary comes from the DE's unified table.
+
+**Part 1: product primaries.** The A1 cross-product feature (`product_features`, F4) no longer reads raw tables. The raw Way4 card tables and the loan portfolio are read once, by a new primary pipeline `product_primary`; the feature node reads those primaries and the two WM asset features only (DESIGN_REVIEW §7: primary nodes read raw, feature nodes read primary or a WM feature). Part 1 changes no A1 input. Apply after bundle 21's cleanup (and bundle 23, which this branch was built on; no shared lines).
 
 **New primaries** (`nodes/primary/products/prm_products.py`, all customers, the last `products.history_months` months up to the persona start month):
 - `prm_card_contracts`: every Way4 card contract of a known client (`cif_id`, `contract_id`, `parent_contract_id`), from `raw_stg_client` + `raw_stg_contract`;
@@ -104,7 +127,17 @@ The workplace's `prm_contract` / `prm_balance` are spine-scoped (only the model'
 
 **Tidy-ups:** the node no longer imports private helpers from `feat_cif_casa`: `months_back`, `require_columns`, `wm_month` and `cif_column` move to `nodes/utils/frames.py`, used by both (CASA logic unchanged). The pipeline has its own parameter `products.history_months` (12, as before via `casa_features.history_months`; new file `parameters_products.yml`). The `feat_cif_cross_product_monthly` catalog entry moves to the new `catalog_products.yml` (same path, so the existing table stays).
 
-**Check** (temporary, `pipelines/products/check.py`, pipeline `product_features_b24_check`): builds the new table into `feat_cif_cross_product_monthly_b24_new` and compares it with the persisted bundle 21 table. Blocks `B24 PRODUCTS` (rows per type: old / new / only old / only new / values that differ) and `B24 A1 INPUTS` (customer-months whose A1 cross-product inputs differ). Expected: only `deposit` rows with a NULL balance are "only old"; everything else matches; A1 inputs differ in 0 customer-months. Tested locally on synthetic data against bundle 21's node: identical except that row kind.
+**Check 1** (temporary, `pipelines/products/check.py`, pipeline `product_features_b24_check`): builds the new table into `feat_cif_cross_product_monthly_b24_new` and compares it with the persisted bundle 21 table. Blocks `B24 PRODUCTS` (rows per type: old / new / only old / only new / values that differ) and `B24 A1 INPUTS` (customer-months whose A1 cross-product inputs differ). Expected: only `deposit` rows with a NULL balance are "only old"; everything else matches; A1 inputs differ in 0 customer-months. Tested locally on synthetic data against bundle 21's node: identical except that row kind.
+
+
+**Part 2: bureau salary from `feat_bureau_salary_unified`** (spec `A1_ability_family_rule.md`, bureau section). `feat_cif_bureau_salary_monthly` stays the A1 contract and its catalog name and path do not change, but its node (`nodes/features/bureau/feat_cif_bureau_salary_monthly.py`, pipeline `bureau_salary_bounces`) now reads the DE's `feat_bureau_salary_unified` (read-only, already run in PROD for all four model_ids) instead of the alert feed: `cif_id` as string, `month_end` = `last_day(salary_month_end)`, `bureau_salary` = `monthly_salary`, plus `salary_source` for reporting. The unified table already picks one salary per CIF-month across `alert` > `salary_credit` > `bureau_salary` (bulk pull).
+- **Kept:** the one-month carry (S14, `_with_next_month`; user 2026-11-11). A 0 row still ends the carry. The S12 level check for bureau-only windows is unchanged.
+- **Dropped:** the RL loan salary (`feature_retail_loans`, `aecb_last_salary_credit_amount`; application-time, not a monthly series, user 2026-11-11): `_loan_bureau_salary`, the `loan_features` argument and the RL-only input in `a1_ability/pipeline.py`. `feature_retail_loans` itself is untouched.
+- **What moves, by construction:** alert selection is now the DE's rule (latest `extract_date`, then the larger amount; closure alerts count only with an amount), `salary_credit` and pull months add rows, a usable amount beats a 0 in the same month, and RL loses the loan salary. The bounces node is unchanged (still the alert feed).
+
+**Check 2** (temporary, `pipelines/crx_persona/a1_ability/check.py`, pipelines `crx_cc_a1_b24_check` / `crx_rl_a1_b24_check`): rebuilds the bureau feature into `feat_cif_bureau_salary_monthly_b24_new`, the income signals into `crx_<p>_a1_income_b24_new` and the A1 state into `crx_<p>_a1_b24_new` (the other signals are the persisted ones; no real output is touched), against the persisted A1 output. Blocks, for the latest month: `B24 BUREAU` (old vs new bureau CIF-months of the observation CIFs over the last 2W + 1 months: rows, zero rows, only old / only new / > 1% apart, new by `salary_source`), `B24 INCOME` (old x new bureau evidence in W, income source and income level), `B24 A1 OUTPUT`, `B24 A1 MOVES`. All four model_ids.
+
+All temporary datasets are in one new file, `conf/base/catalog/tmp_b24_check.yml` (the bundle 24 product entry moved there from `catalog_products.yml`). Spec test 90/90 (the alert-type cases moved to the DE's code; new cases for pull and mid-month rows).
 
 ## Instructions for the workplace assistant
 
@@ -119,20 +152,110 @@ The workplace's `prm_contract` / `prm_balance` are spine-scoped (only the model'
 
 | Action | Path |
 |---|---|
+| replace | `conf/base/catalog/catalog_bureau.yml` |
 | replace | `conf/base/catalog/catalog_casa.yml` |
 | add | `conf/base/catalog/catalog_products.yml` |
+| add | `conf/base/catalog/tmp_b24_check.yml` |
 | add | `conf/base/parameters/parameters_products.yml` |
+| replace | `src/enbd_collections/nodes/features/bureau/feat_cif_bureau_salary_monthly.py` |
 | replace | `src/enbd_collections/nodes/features/casa/feat_cif_casa.py` |
 | replace | `src/enbd_collections/nodes/features/products/feat_cif_cross_product.py` |
 | add | `src/enbd_collections/nodes/primary/products/__init__.py` |
 | add | `src/enbd_collections/nodes/primary/products/prm_products.py` |
 | add | `src/enbd_collections/nodes/utils/frames.py` |
 | replace | `src/enbd_collections/pipeline_registry.py` |
+| replace | `src/enbd_collections/pipelines/bureau/salary_bounces.py` |
+| replace | `src/enbd_collections/pipelines/crx_persona/a1_ability/README.md` |
+| add | `src/enbd_collections/pipelines/crx_persona/a1_ability/check.py` |
+| replace | `src/enbd_collections/pipelines/crx_persona/a1_ability/pipeline.py` |
+| replace | `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py` |
+| replace | `src/enbd_collections/pipelines/crx_persona/rl_a1_ability/pipeline.py` |
 | add | `src/enbd_collections/pipelines/products/check.py` |
 | replace | `src/enbd_collections/pipelines/products/features.py` |
 | add | `src/enbd_collections/pipelines/products/primary.py` |
 
 ## Files
+
+### FILE: `conf/base/catalog/catalog_bureau.yml`
+action: replace · base sha256 `b11cccc0d0382114792455d7bcd0949980fb13f17c3edd606146f269aa5e57e0` · base trailing newline: yes · new sha256 `7192c9d518f98abc273c8cdb69acdbeb201d0515c170e531e4821d66d1d9244e` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````yaml
+# Bureau salary and bounce datasets of the persona axes (pipeline bureau_salary_bounces).
+
+# AECB-reported salary per (cif_id, month_end of the pull): the latest pull's level, all history.
+feat_cif_bureau_salary_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/cif_bureau_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# DE-owned (branch bureau-pipeline-analysis, read-only here): one monthly salary per CIF unified across
+# alert > salary_credit > bureau_salary sources. cif_id (long), salary_month_end (date),
+# monthly_salary (double), salary_source (string). Replaces feat_cif_bureau_salary_monthly in A1 income.
+feat_bureau_salary_unified:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/salary_unified"
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Bureau bounce pulls and new bounce events per (cif_id, month_end).
+feat_cif_bureau_bounces_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/cif_bureau_bounces_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+`````
+
+New:
+
+`````yaml
+# Bureau salary and bounce datasets of the persona axes (pipeline bureau_salary_bounces).
+
+# A1's bureau salary per (cif_id, month_end): feat_bureau_salary_unified as the A1 contract.
+feat_cif_bureau_salary_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/cif_bureau_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# DE-owned (branch bureau-pipeline-analysis, read-only here): one monthly salary per CIF unified across
+# alert > salary_credit > bureau_salary sources. cif_id (long), salary_month_end (date),
+# monthly_salary (double), salary_source (string). Read by feat_cif_bureau_salary_monthly.
+feat_bureau_salary_unified:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/salary_unified"
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Bureau bounce pulls and new bounce events per (cif_id, month_end).
+feat_cif_bureau_bounces_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/cif_bureau_bounces_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+`````
 
 ### FILE: `conf/base/catalog/catalog_casa.yml`
 action: replace · base sha256 `18f6f92c6b228fe53a599c8883d149a7389960d5cdb03c4bc938a7dcd9aa5833` · base trailing newline: yes · new sha256 `83b62ecdae3a0761522e6f2c6b2a665381c005ab2852f23fbd11d6a825fa2d0a` · new trailing newline: yes
@@ -710,7 +833,7 @@ feat_cif_returns_monthly:
 `````
 
 ### FILE: `conf/base/catalog/catalog_products.yml`
-action: add · new sha256 `0fa12192bcbcfbb38adeefefad9bf11b7ae8ac657958ef95ff4d24cc25794ac8` · new trailing newline: yes
+action: add · new sha256 `7608f99a27895ec7cd5b1ddb90ba61ca1f07f1400d8edd14b2587362f55d1e1c` · new trailing newline: yes
 
 New:
 
@@ -764,15 +887,76 @@ feat_cif_cross_product_monthly:
   metadata:
     kedro-viz:
       layer: feature
+`````
 
-# TEMPORARY (bundle 24): the cross-product table rebuilt from the primaries, for the check;
-# removed by the cleanup.
+### FILE: `conf/base/catalog/tmp_b24_check.yml`
+action: add · new sha256 `7daee5d44c4b5512a795baf9e0bcf7e605cd6a1e5ea71668616c24ffd68179ba` · new trailing newline: yes
+
+New:
+
+`````yaml
+# TEMPORARY (bundle 24): the datasets of the bundle's checks (product_features_b24_check,
+# crx_<p>_a1_b24_check); this file and their HDFS folders are removed by the cleanup.
+
 feat_cif_cross_product_monthly_b24_new:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/products/cif_cross_product_monthly_b24_new"
   save_args:
     mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+feat_cif_bureau_salary_monthly_b24_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/cif_bureau_salary_monthly_b24_new"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+crx_cc_a1_income_b24_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_income_b24_new"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: persona
+
+crx_cc_a1_b24_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a1_b24_new"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: persona
+
+crx_rl_a1_income_b24_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_income_b24_new"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: persona
+
+crx_rl_a1_b24_new:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a1_b24_new"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: persona
 `````
 
 ### FILE: `conf/base/parameters/parameters_products.yml`
@@ -789,6 +973,104 @@ products:
   # primaries and the cross-product feature: the A1 cross-product family reads the
   # observation month only, so this matches the CASA features' 12 months.
   history_months: 12
+`````
+
+### FILE: `src/enbd_collections/nodes/features/bureau/feat_cif_bureau_salary_monthly.py`
+action: replace · base sha256 `31863ef4c0fb89778fb9993283a8d8c6448c216fd5689c6a5aed1fefebe4448e` · base trailing newline: yes · new sha256 `0e2a8a5a0f02b3724772fe4d4c4860a33c600d3a7952235a2fcab3a28eaa471a` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""Feature node: AECB-reported salary per customer and pull month.
+
+One row per ``(cif_id, month_end)`` with a salary alert, dated by the pull
+(``extract_date``). ``bureau_salary`` is the salary reported on the month's latest pull, an
+accurate level on that date, not a month's credit: salary rows are ``alert_type_number`` 31
+(average salary changed) and 32 (salary account added) with an amount; 43 (salary account
+closed) gives 0. Months without a pull have no row. How far a pull carries is decided by the
+consumer.
+"""
+
+from __future__ import annotations
+
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+
+_SALARY_TYPES = (31, 32)
+_CLOSED_TYPE = 43
+
+
+def build(alerts: DataFrame) -> DataFrame:
+    """The month's latest pull from ``prm_bureau_alert_enriched``; on the same pull a
+    closure wins, then the largest amount."""
+    columns = {"cif_id", "extract_date", "alert_type_number", "salary_credit_amount"}
+    missing = sorted(columns - set(alerts.columns))
+    if missing:
+        raise ValueError(f"prm_bureau_alert_enriched is missing columns: {missing}")
+    alert_type = F.col("alert_type_number").cast("double")
+    amount = F.col("salary_credit_amount").cast("double")
+    closed = alert_type == _CLOSED_TYPE
+    latest = F.max(F.struct("pull_date", "closed", "amount")).alias("_latest")
+    return (
+        alerts.filter(
+            F.col("cif_id").isNotNull()
+            & (closed | (alert_type.isin(*_SALARY_TYPES) & (amount > 0)))
+        )
+        .select(
+            F.col("cif_id").cast("string").alias("cif_id"),
+            F.to_date("extract_date").alias("pull_date"),
+            closed.alias("closed"),
+            F.when(closed, 0.0).otherwise(amount).alias("amount"),
+        )
+        .groupBy("cif_id", F.last_day("pull_date").alias("month_end"))
+        .agg(latest)
+        .select("cif_id", "month_end", F.col("_latest.amount").alias("bureau_salary"))
+    )
+`````
+
+New:
+
+`````python
+"""Feature node: bureau salary per customer and month, the A1 income contract.
+
+One row per ``(cif_id, month_end)`` from the DE's ``feat_bureau_salary_unified``, which
+picks one monthly salary per customer across three AECB sources (``alert`` change events,
+``salary_credit`` application-time history, ``bureau_salary`` bulk-pull aggregates spread
+back over 12 months):
+
+* ``bureau_salary`` - the unified ``monthly_salary`` (AED; 0 = no usable amount that
+  month, e.g. a salary account closed);
+* ``salary_source`` - the source that gave it (reporting only).
+
+Months without a row have no bureau salary. How far a row carries is decided by the
+consumer (A1 carries it one month, S14). To swap the bureau source, rebuild this table
+from the new one; the A1 engine reads only this contract.
+"""
+
+from __future__ import annotations
+
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+
+from enbd_collections.nodes.utils.frames import require_columns
+
+
+def build(unified: DataFrame) -> DataFrame:
+    """``cif_id`` (string), ``month_end``, ``bureau_salary``, ``salary_source`` from
+    ``feat_bureau_salary_unified`` (already one row per customer and month)."""
+    require_columns(
+        unified,
+        ["cif_id", "salary_month_end", "monthly_salary", "salary_source"],
+        "feat_bureau_salary_unified",
+    )
+    return unified.filter(
+        F.col("cif_id").isNotNull() & F.col("monthly_salary").isNotNull()
+    ).select(
+        F.trim(F.col("cif_id").cast("string")).alias("cif_id"),
+        F.last_day("salary_month_end").alias("month_end"),
+        F.col("monthly_salary").cast("double").alias("bureau_salary"),
+        "salary_source",
+    )
 `````
 
 ### FILE: `src/enbd_collections/nodes/features/casa/feat_cif_casa.py`
@@ -2862,7 +3144,7 @@ def cif_column() -> Column:
 `````
 
 ### FILE: `src/enbd_collections/pipeline_registry.py`
-action: replace · base sha256 `55891314e2b8b0aee8d166672caafcad6b7ad923b3cb733cb73cc4ee2913fd63` · base trailing newline: yes · new sha256 `f6417bd3a03734750ca4dbb2a72c6530e6250279d76ef9db28d317f353f337a1` · new trailing newline: yes
+action: replace · base sha256 `55891314e2b8b0aee8d166672caafcad6b7ad923b3cb733cb73cc4ee2913fd63` · base trailing newline: yes · new sha256 `216399a176be0058bcd28857c620fcf3b96c58f1b05e2292fb6138027ec36771` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -3243,6 +3525,9 @@ from enbd_collections.pipelines.crx_persona import (
     rl_a4_deterioration as crx_rl_a4_deterioration,
 )
 from enbd_collections.pipelines.crx_persona import rl_a1_ability as crx_rl_a1_ability
+from enbd_collections.pipelines.crx_persona.a1_ability import (  # TEMPORARY (bundle 24)
+    check as crx_a1_b24_check,
+)
 from enbd_collections.pipelines.crx_persona import (
     rl_a2_locatability as crx_rl_a2_locatability,
 )
@@ -3378,6 +3663,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
+        # TEMPORARY (A1 bundle 24): the A1 bureau check; removed by the bundle's cleanup.
+        "crx_cc_a1_b24_check": crx_a1_b24_check.create_b24_check_pipeline("cc"),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_a3_payment_credibility": (
@@ -3390,6 +3677,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
+        # TEMPORARY (A1 bundle 24): the A1 bureau check; removed by the bundle's cleanup.
+        "crx_rl_a1_b24_check": crx_a1_b24_check.create_b24_check_pipeline("rl"),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
         "crx_rl_a3_payment_credibility": (
             crx_rl_a3_payment_credibility.create_pipeline()
@@ -3409,6 +3698,1966 @@ def register_pipelines() -> dict[str, Pipeline]:
         + model_training.create_pipeline()
         + model_reporting.create_pipeline(),
     }
+`````
+
+### FILE: `src/enbd_collections/pipelines/bureau/salary_bounces.py`
+action: replace · base sha256 `b9b0861bc022ae5d20c64dfae12f5d33db6cdc2e1df98693f7238452b672272a` · base trailing newline: yes · new sha256 `816fa665a06d0d1a8caa1fb88995cb3f1ad41ea53baf4655e743a2d0acc459b0` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""Bureau salary and bounce inputs of the persona axes (per model_id).
+
+    prm_bureau_alert_enriched ─┬─► feat_cif_bureau_salary_monthly
+                               └─► feat_cif_bureau_bounces_monthly
+
+Needs ``bureau_staging`` and ``bureau_primary`` (the alerts) first.
+
+    kedro run --pipeline=bureau_salary_bounces
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from enbd_collections.nodes.features.bureau import (
+    feat_cif_bureau_bounces_monthly,
+    feat_cif_bureau_salary_monthly,
+)
+
+
+def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """The two monthly bureau features."""
+    return Pipeline(
+        [
+            node(
+                func=feat_cif_bureau_salary_monthly.build,
+                inputs={"alerts": "prm_bureau_alert_enriched"},
+                outputs="feat_cif_bureau_salary_monthly",
+                name="build_feat_cif_bureau_salary_monthly",
+                tags=["bureau", "features"],
+            ),
+            node(
+                func=feat_cif_bureau_bounces_monthly.build,
+                inputs={"alerts": "prm_bureau_alert_enriched"},
+                outputs="feat_cif_bureau_bounces_monthly",
+                name="build_feat_cif_bureau_bounces_monthly",
+                tags=["bureau", "features"],
+            ),
+        ]
+    )
+`````
+
+New:
+
+`````python
+"""Bureau salary and bounce inputs of the persona axes (per model_id).
+
+    feat_bureau_salary_unified ──► feat_cif_bureau_salary_monthly
+    prm_bureau_alert_enriched ───► feat_cif_bureau_bounces_monthly
+
+Needs the DE's ``feat_bureau_salary_unified`` (read-only here) and ``bureau_staging`` +
+``bureau_primary`` (the alerts) first.
+
+    kedro run --pipeline=bureau_salary_bounces
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from enbd_collections.nodes.features.bureau import (
+    feat_cif_bureau_bounces_monthly,
+    feat_cif_bureau_salary_monthly,
+)
+
+
+def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+    """The two monthly bureau features."""
+    return Pipeline(
+        [
+            node(
+                func=feat_cif_bureau_salary_monthly.build,
+                inputs={"unified": "feat_bureau_salary_unified"},
+                outputs="feat_cif_bureau_salary_monthly",
+                name="build_feat_cif_bureau_salary_monthly",
+                tags=["bureau", "features"],
+            ),
+            node(
+                func=feat_cif_bureau_bounces_monthly.build,
+                inputs={"alerts": "prm_bureau_alert_enriched"},
+                outputs="feat_cif_bureau_bounces_monthly",
+                name="build_feat_cif_bureau_bounces_monthly",
+                tags=["bureau", "features"],
+            ),
+        ]
+    )
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/README.md`
+action: replace · base sha256 `3dc8b844907db4756e4ca6a31b0d4e3a8c8fd363f6beee0896f2bb2b11eba5e2` · base trailing newline: yes · new sha256 `a9e284be1769f8bbaa3eee6b08bc8e87323df1a29ea53369160bd50db46e79ec` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````markdown
+# A1 Ability — how the engine decides
+
+A1 asks: **can this customer pay?** It looks for independent evidence that the customer has
+money — income, money coming in or held, money going out by choice, other products with us —
+and failed payments, and gives one state per observation:
+`a1_state` = `high`, `moderate`, `low` or `unknown`, shown as `a1_state_label` = High,
+Moderate, Low, Unknown.
+
+This page explains the logic in plain terms. The rule is `specs/A1_ability_family_rule.md`
+(income: `specs/A1_ability_spec.md` S1–S16); the code is
+`signals.py` (evidence), `classify.py` (levels and state) and `pipeline.py` (nodes). CC wraps
+it in `cc_a1_ability`, RL in `rl_a1_ability`; each wrapper adds its anchor.
+
+## Ground rules
+
+- **Grain:** one row per `(account_id, observation_date)` from the observation base.
+  Observation dates are **month ends**. Only the persona months are scored,
+  `crx_persona.persona_start_date` to `persona_end_date`.
+- **Layers:** the signal nodes read the observation base and monthly feature tables, one
+  row per `(cif_id, month_end)` — never raw or staging tables:
+
+  | Feature | Built from (pipeline) |
+  |---|---|
+  | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` (`casa_features`) |
+  | `feat_cif_casa_balance_monthly` | WM CASA balance and flow tables (`casa_features`) |
+  | `feat_cif_casa_flows_monthly` | `prm_casa_transactions` ← FTR + `wm_pri_labelled_transactions` (`casa_features`) |
+  | `feat_cif_cross_product_monthly` | product holding, loan portfolio, card balances, WM assets (`product_features`) |
+  | `feat_cif_returns_monthly` | `prm_casa_return_events` ← FTR |
+  | `feat_cif_bureau_salary_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
+  | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
+
+- **Windows are calendar months, by segment** (`_common.window_months`), the observation
+  month included (m1 = the observation month, m2 the one before, …):
+  - **60–180: 3 months** (m1–m3); the prior window m4–m6 (used to spot a decline).
+  - **180+: 6 months** (m1–m6); the prior window m7–m12.
+  - The sections below are written for 60–180; read m1–m6 / m7–m12 for 180+.
+- **Customer level.** Salary, CASA, card payments, bounces and returns are read across
+  **all accounts of the customer's CIF**, never the scored account alone.
+- **Anchor** (the workbook's "minimum due"): what the customer must pay now.
+  - CC 60–180: the amount in the oldest overdue bucket (`overdue_bucket_01..06`) on the
+    latest balance snapshot in the observation month. CC 180+: none.
+  - RL: one EMI — `installment_due_amount` on the observation month's `int_loan_master`
+    snapshot.
+  - No anchor → the flat floors below apply on their own.
+
+## 1. F1 Income — Stable (2 points) / Weak (evidence) / None
+
+**Step 1: one income amount per month** (`build_income_signals`). Two sources; for each
+month **the larger one wins**.
+
+- **Internal salary** — WM's monthly total of salary-flagged credits (bonuses and
+  commissions included). WM's weekly snapshots carry the latest salary month's total and the
+  days from the first of that month; `week_number` is `yyyyMM0W` (week 1–4 of the month), so
+  the salary month is the snapshot week minus those days, rounded to the nearest first of a
+  month.
+- **Bureau salary** — the salary on AECB's alert feed (types 31 and 32, keyed by CIF), an
+  accurate level on the pull date. It counts in the pull's month and the next, never before
+  the pull and no further (S14), so pulls every 2 months make a continuous series; a salary
+  account closure (type 43) ends it. RL also reads `feature_retail_loans`: the salary of each
+  loan's latest bureau pull, handled the same way.
+
+The result is `income_m1 … income_m6` (`… m12` at 180+; NULL = no salary that month), and
+the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) and the prior window's internal salary (`internal_salary_prior`).
+
+**Step 2: the level** (`income_level`, spec S12).
+
+- **Threshold** = max(AED 3,000, 2 × anchor).
+- **Stable** = the salary received in m1–m3 adds up to **2 × the threshold** (3 × at 180+),
+  **and** it is at least 75% of what m4–m6 received (`D_INC = 0.25`; nothing in m4–m6 →
+  nothing to compare). The window total, not a count of months: an employer paying early
+  puts two salaries in one month and none in the next.
+- **Weak** = otherwise, any month in m1–m3 ≥ AED 1,000 (no points, but evidence: Low rather
+  than Unknown). **None** = neither.
+
+Example — observation 31 July, anchor AED 2,000 → threshold 4,000, Stable needs 8,000:
+
+| | Jul (m1) | Jun (m2) | May (m3) | Apr–Feb (m4–m6) |
+|---|---|---|---|---|
+| income | NULL | 9,000 | 4,500 | 5,000 each |
+
+The window holds 13,500 ≥ 8,000, and 13,500 ≥ 75% of 15,000 → **Stable** (June's double
+salary covers July).
+
+## 2. Which transactions count (`feat_cif_casa_flows_monthly`)
+
+Every CASA leg gets one class (`feat_cif_casa.flow_class`, on top of `transaction_lane`).
+Only these count:
+
+- **Money in:** transfers and remittances from others and clearing credits
+  (`third_party_in`), cash deposits (`cash_in`), credits from the customer's own account at
+  another bank (`own_in_external`, WM label).
+- **Money out:** card spend, ATM, bills, transfers to others (`chosen_spend`), debits to the
+  customer's own account at another bank (`own_out_external`, WM label).
+
+Nothing else counts: salary-flagged credits (they are income), reversals, returned cheques /
+DDS and the cheque presentments they undo (narrations `CHQ RTN` / `CHQ NO`), refunds,
+transfers between the customer's accounts with us, fees and interest, paying their own card
+or loan, and anything whose meaning is not established (the rest of `MISCELLANEOUS`). A
+counted leg mirrored by a leg that does not count — the same amount (±1%) within 3 days —
+is dropped (a bounce, a reversal, a sweep).
+
+## 3. F2 Money in or held, F3 Money out — Strong (2) / Some (evidence) / None
+
+- **F2 strong** = money in ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3 (3 of 6 at 180+),
+  **or** the CASA balance ≥ max(AED 3,000, 1 × anchor) in 2 of m1–m3 and not more than 50%
+  below the m4–m6 average (money held: the bank's sweep is manual, so a balance can survive
+  it). **Some** = any month with ≥ AED 1,000 of money in. A balance below strong is not
+  evidence.
+- **F3 strong** = money out ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3. **Some** = any month
+  ≥ AED 500.
+- `a1_sweepable_balance_flag` = the balance is strong: money above the floor the bank could
+  still sweep (a lead for collections; it changes nothing).
+
+## 4. F4 Cross-product — Strong (2) / Some (evidence) / None
+
+At the observation month end, the customer's other products with us (the scored account
+left out): **strong** = deposits + investments + WM assets ≥ max(AED 10,000, 3 × anchor), or
+another credit product (incl. other cards) that is current with an instalment / minimum due
+≥ max(AED 1,000, 1 × anchor); **some** = any other current credit product or any asset.
+
+## 5. Distress — a failed payment lowers the state one level
+
+`distress_flag = 1` when the customer has **at least one** of these in m1–m3
+(`build_distress_signals`; the parts are `distress_cheque`, `distress_dds`,
+`distress_bureau`):
+
+- **Internal:** a returned cheque or a DDS (direct debit) reject on any of their CASA
+  accounts (`CHEQUE RETURNS`, `DDS Rejects/Reversal`). POS refunds (`RETURNS`) do not count;
+  the two legs of one return count once.
+- **Bureau:** a bounced cheque reported by the bureau, one per CIF and return date
+  (`DT_OF_RETURN`, S15).
+
+## 6. The state
+
+Only strong levels score (2 points each); weak / some are evidence.
+
+| State | Rule |
+|---|---|
+| `high` | two or more strong families (4+ points) |
+| `moderate` | one strong family |
+| `low` | no strong family, but some evidence (income weak, money in / out some, cross-product some), or distress alone |
+| `unknown` | no evidence in any family, no distress **and** no counted CASA leg in m1–m3 — we cannot see the customer's money, which is not evidence of no ability. `a1_unknown_reason`: `no_casa` (no CASA leg or positive balance in 12 months) or `dormant_casa` |
+
+Distress moves a customer exactly one rung down (High → Moderate → Low). `a1_reason` names
+the strongest family (or `distress`). `a1_eosb_flag` (a DCORE end-of-service result in the
+window) is a diagnostic column and changes nothing.
+
+## Known limits
+
+- **The salary total is not a clean basic salary.** WM's flag counts bonuses, incentives,
+  overtime and commissions, so a month with a large bonus can pass on its own.
+- **Only what WM labels as salary counts as income.** Other regular credits count as money in;
+  about a third of customers hold no CASA with us, so F2 / F3 cannot see them.
+- **Money in / out rest on the class table.** A flow type counts only once its meaning is
+  established; new transaction types land in `unplaced` until they are classified.
+- **Bureau salary is an event feed for now.** An alert row appears only when something changes,
+  so no row means nothing is known, not that the salary stopped, and few pulls fall in the
+  window. GRR's feed of pulls every 2 months enters through the same rule. A stop shows only
+  as a closure, a lower amount or the end of an internal salary (`a1_salary_stopped`).
+- **Missing salary months count as 0** in the window total and the weakening check, except that
+  with no internal salary in either window the weakening check compares the months with a value.
+- **Inputs follow the persona start.** `prm_casa_return_events`, `prm_casa_transactions`,
+  the flows and the WM-based features keep a fixed number of months before
+  `crx_persona.persona_start_date`; after moving that date, rerun `casa_primary` and
+  `casa_features` first, or the A1 run stops (`build_distress_signals`).
+`````
+
+New:
+
+`````markdown
+# A1 Ability — how the engine decides
+
+A1 asks: **can this customer pay?** It looks for independent evidence that the customer has
+money — income, money coming in or held, money going out by choice, other products with us —
+and failed payments, and gives one state per observation:
+`a1_state` = `high`, `moderate`, `low` or `unknown`, shown as `a1_state_label` = High,
+Moderate, Low, Unknown.
+
+This page explains the logic in plain terms. The rule is `specs/A1_ability_family_rule.md`
+(income: `specs/A1_ability_spec.md` S1–S16); the code is
+`signals.py` (evidence), `classify.py` (levels and state) and `pipeline.py` (nodes). CC wraps
+it in `cc_a1_ability`, RL in `rl_a1_ability`; each wrapper adds its anchor.
+
+## Ground rules
+
+- **Grain:** one row per `(account_id, observation_date)` from the observation base.
+  Observation dates are **month ends**. Only the persona months are scored,
+  `crx_persona.persona_start_date` to `persona_end_date`.
+- **Layers:** the signal nodes read the observation base and monthly feature tables, one
+  row per `(cif_id, month_end)` — never raw or staging tables:
+
+  | Feature | Built from (pipeline) |
+  |---|---|
+  | `feat_cif_internal_salary_monthly` | `wm_fea_salary_days_since_increment` (`casa_features`) |
+  | `feat_cif_casa_balance_monthly` | WM CASA balance and flow tables (`casa_features`) |
+  | `feat_cif_casa_flows_monthly` | `prm_casa_transactions` ← FTR + `wm_pri_labelled_transactions` (`casa_features`) |
+  | `feat_cif_cross_product_monthly` | product holding, loan portfolio, card balances, WM assets (`product_features`) |
+  | `feat_cif_returns_monthly` | `prm_casa_return_events` ← FTR |
+  | `feat_cif_bureau_salary_monthly` | the DE's `feat_bureau_salary_unified` (`bureau_salary_bounces`) |
+  | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
+
+- **Windows are calendar months, by segment** (`_common.window_months`), the observation
+  month included (m1 = the observation month, m2 the one before, …):
+  - **60–180: 3 months** (m1–m3); the prior window m4–m6 (used to spot a decline).
+  - **180+: 6 months** (m1–m6); the prior window m7–m12.
+  - The sections below are written for 60–180; read m1–m6 / m7–m12 for 180+.
+- **Customer level.** Salary, CASA, card payments, bounces and returns are read across
+  **all accounts of the customer's CIF**, never the scored account alone.
+- **Anchor** (the workbook's "minimum due"): what the customer must pay now.
+  - CC 60–180: the amount in the oldest overdue bucket (`overdue_bucket_01..06`) on the
+    latest balance snapshot in the observation month. CC 180+: none.
+  - RL: one EMI — `installment_due_amount` on the observation month's `int_loan_master`
+    snapshot.
+  - No anchor → the flat floors below apply on their own.
+
+## 1. F1 Income — Stable (2 points) / Weak (evidence) / None
+
+**Step 1: one income amount per month** (`build_income_signals`). Two sources; for each
+month **the larger one wins**.
+
+- **Internal salary** — WM's monthly total of salary-flagged credits (bonuses and
+  commissions included). WM's weekly snapshots carry the latest salary month's total and the
+  days from the first of that month; `week_number` is `yyyyMM0W` (week 1–4 of the month), so
+  the salary month is the snapshot week minus those days, rounded to the nearest first of a
+  month.
+- **Bureau salary** — one monthly AECB salary per CIF from the DE's unified table (alert
+  change events first, then application-time salary history, then the bulk pull's
+  aggregates spread back over 12 months). A row counts in its month and the next, never
+  before it and no further (S14); a 0 row ends the carry.
+
+The result is `income_m1 … income_m6` (`… m12` at 180+; NULL = no salary that month), and
+the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) and the prior window's internal salary (`internal_salary_prior`).
+
+**Step 2: the level** (`income_level`, spec S12).
+
+- **Threshold** = max(AED 3,000, 2 × anchor).
+- **Stable** = the salary received in m1–m3 adds up to **2 × the threshold** (3 × at 180+),
+  **and** it is at least 75% of what m4–m6 received (`D_INC = 0.25`; nothing in m4–m6 →
+  nothing to compare). The window total, not a count of months: an employer paying early
+  puts two salaries in one month and none in the next.
+- **Weak** = otherwise, any month in m1–m3 ≥ AED 1,000 (no points, but evidence: Low rather
+  than Unknown). **None** = neither.
+
+Example — observation 31 July, anchor AED 2,000 → threshold 4,000, Stable needs 8,000:
+
+| | Jul (m1) | Jun (m2) | May (m3) | Apr–Feb (m4–m6) |
+|---|---|---|---|---|
+| income | NULL | 9,000 | 4,500 | 5,000 each |
+
+The window holds 13,500 ≥ 8,000, and 13,500 ≥ 75% of 15,000 → **Stable** (June's double
+salary covers July).
+
+## 2. Which transactions count (`feat_cif_casa_flows_monthly`)
+
+Every CASA leg gets one class (`feat_cif_casa.flow_class`, on top of `transaction_lane`).
+Only these count:
+
+- **Money in:** transfers and remittances from others and clearing credits
+  (`third_party_in`), cash deposits (`cash_in`), credits from the customer's own account at
+  another bank (`own_in_external`, WM label).
+- **Money out:** card spend, ATM, bills, transfers to others (`chosen_spend`), debits to the
+  customer's own account at another bank (`own_out_external`, WM label).
+
+Nothing else counts: salary-flagged credits (they are income), reversals, returned cheques /
+DDS and the cheque presentments they undo (narrations `CHQ RTN` / `CHQ NO`), refunds,
+transfers between the customer's accounts with us, fees and interest, paying their own card
+or loan, and anything whose meaning is not established (the rest of `MISCELLANEOUS`). A
+counted leg mirrored by a leg that does not count — the same amount (±1%) within 3 days —
+is dropped (a bounce, a reversal, a sweep).
+
+## 3. F2 Money in or held, F3 Money out — Strong (2) / Some (evidence) / None
+
+- **F2 strong** = money in ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3 (3 of 6 at 180+),
+  **or** the CASA balance ≥ max(AED 3,000, 1 × anchor) in 2 of m1–m3 and not more than 50%
+  below the m4–m6 average (money held: the bank's sweep is manual, so a balance can survive
+  it). **Some** = any month with ≥ AED 1,000 of money in. A balance below strong is not
+  evidence.
+- **F3 strong** = money out ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3. **Some** = any month
+  ≥ AED 500.
+- `a1_sweepable_balance_flag` = the balance is strong: money above the floor the bank could
+  still sweep (a lead for collections; it changes nothing).
+
+## 4. F4 Cross-product — Strong (2) / Some (evidence) / None
+
+At the observation month end, the customer's other products with us (the scored account
+left out): **strong** = deposits + investments + WM assets ≥ max(AED 10,000, 3 × anchor), or
+another credit product (incl. other cards) that is current with an instalment / minimum due
+≥ max(AED 1,000, 1 × anchor); **some** = any other current credit product or any asset.
+
+## 5. Distress — a failed payment lowers the state one level
+
+`distress_flag = 1` when the customer has **at least one** of these in m1–m3
+(`build_distress_signals`; the parts are `distress_cheque`, `distress_dds`,
+`distress_bureau`):
+
+- **Internal:** a returned cheque or a DDS (direct debit) reject on any of their CASA
+  accounts (`CHEQUE RETURNS`, `DDS Rejects/Reversal`). POS refunds (`RETURNS`) do not count;
+  the two legs of one return count once.
+- **Bureau:** a bounced cheque reported by the bureau, one per CIF and return date
+  (`DT_OF_RETURN`, S15).
+
+## 6. The state
+
+Only strong levels score (2 points each); weak / some are evidence.
+
+| State | Rule |
+|---|---|
+| `high` | two or more strong families (4+ points) |
+| `moderate` | one strong family |
+| `low` | no strong family, but some evidence (income weak, money in / out some, cross-product some), or distress alone |
+| `unknown` | no evidence in any family, no distress **and** no counted CASA leg in m1–m3 — we cannot see the customer's money, which is not evidence of no ability. `a1_unknown_reason`: `no_casa` (no CASA leg or positive balance in 12 months) or `dormant_casa` |
+
+Distress moves a customer exactly one rung down (High → Moderate → Low). `a1_reason` names
+the strongest family (or `distress`). `a1_eosb_flag` (a DCORE end-of-service result in the
+window) is a diagnostic column and changes nothing.
+
+## Known limits
+
+- **The salary total is not a clean basic salary.** WM's flag counts bonuses, incentives,
+  overtime and commissions, so a month with a large bonus can pass on its own.
+- **Only what WM labels as salary counts as income.** Other regular credits count as money in;
+  about a third of customers hold no CASA with us, so F2 / F3 cannot see them.
+- **Money in / out rest on the class table.** A flow type counts only once its meaning is
+  established; new transaction types land in `unplaced` until they are classified.
+- **Bureau salary is mostly an event feed for now.** Most rows are alerts, which appear only
+  when something changes, so no row means nothing is known, not that the salary stopped; the
+  bulk pull covers about 1% of customers. GRR's feed of pulls every 2 months enters through
+  the same table. A stop shows only
+  as a closure, a lower amount or the end of an internal salary (`a1_salary_stopped`).
+- **Missing salary months count as 0** in the window total and the weakening check, except that
+  with no internal salary in either window the weakening check compares the months with a value.
+- **Inputs follow the persona start.** `prm_casa_return_events`, `prm_casa_transactions`,
+  the flows and the WM-based features keep a fixed number of months before
+  `crx_persona.persona_start_date`; after moving that date, rerun `casa_primary` and
+  `casa_features` first, or the A1 run stops (`build_distress_signals`).
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/check.py`
+action: add · new sha256 `00c8a464ec27f4232de23edaaa8dd3ab13c5a8f43ea39920a647c3bd169c48af` · new trailing newline: yes
+
+New:
+
+`````python
+"""TEMPORARY (A1 bundle 24): A1 with bureau salary from the DE's unified table against the
+persisted A1 output (bureau salary from the alert feed, RL plus the loan's bureau pull).
+
+The check rebuilds ``feat_cif_bureau_salary_monthly`` from ``feat_bureau_salary_unified``
+into ``feat_cif_bureau_salary_monthly_b24_new`` and the income signals and A1 state into
+``crx_<p>_a1_income_b24_new`` / ``crx_<p>_a1_b24_new``; the other signals are the persisted
+ones, and no real output is touched. It logs, for the latest month's observation CIFs:
+
+- ``B24 BUREAU``: old and new bureau rows in the last 2W + 1 months (rows, zero rows, new
+  rows by ``salary_source``), CIF-months only old / only new / in both with amounts more
+  than 1% apart;
+- ``B24 INCOME``: old x new bureau evidence in the window, income source and income level;
+- ``B24 A1 OUTPUT``: old and new state mix;
+- ``B24 A1 MOVES``: old x new state.
+
+Removed by the bundle's cleanup.
+
+    kedro run --pipeline=crx_<p>_a1_b24_check
+"""
+
+import logging
+
+from kedro.pipeline import Pipeline, node
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
+
+from enbd_collections.nodes.features.bureau import feat_cif_bureau_salary_monthly
+
+from .._common import GRAIN, window_months
+from .classify import build_a1_ability
+from .pipeline import TAGS
+from .signals import build_income_signals
+
+logger = logging.getLogger(__name__)
+NEW_BUREAU = "feat_cif_bureau_salary_monthly_b24_new"
+EVIDENCE_AED = 1000  # a window month the A1 engine counts as salary evidence
+
+
+def _block(name: str, lines: list[str]) -> None:
+    body = "\n".join(lines)
+    logger.info("\n=== %s START ===\n%s\n=== %s END ===", name, body, name)
+
+
+def _latest(df: DataFrame, persona_end_date: str) -> DataFrame:
+    month = F.trunc(F.lit(str(persona_end_date)), "month")
+    return df.filter(F.trunc("observation_date", "month") == month)
+
+
+def _counts(df: DataFrame, cols: list[str], total: int) -> list[str]:
+    rows = df.groupBy(*cols).count().orderBy(*cols).collect()
+    return [
+        "  "
+        + " | ".join(str(r[c]) for c in cols)
+        + f": {r['count']} ({100 * r['count'] / max(total, 1):.1f}%)"
+        for r in rows
+    ]
+
+
+def _bureau_lines(
+    old: DataFrame, new: DataFrame, cifs: DataFrame, since: Column
+) -> list[str]:
+    """Old vs new bureau rows of ``cifs`` from ``since`` on."""
+
+    def scoped(df: DataFrame, side: str) -> DataFrame:
+        return (
+            df.join(cifs, "cif_id")
+            .filter(F.col("month_end") >= since)
+            .select("cif_id", "month_end", F.col("bureau_salary").alias(side))
+        )
+
+    a, b = scoped(old, "old"), scoped(new, "new")
+    both = a.join(b, ["cif_id", "month_end"], "full")
+    apart = F.abs(F.col("old") - F.col("new")) > 0.01 * F.greatest(
+        F.abs("old"), F.abs("new")
+    )
+    s = both.agg(
+        F.count("old").alias("old"),
+        F.count("new").alias("new"),
+        F.sum((F.col("old") == 0).cast("int")).alias("old_zero"),
+        F.sum((F.col("new") == 0).cast("int")).alias("new_zero"),
+        F.sum((F.col("new").isNull()).cast("int")).alias("only_old"),
+        F.sum((F.col("old").isNull()).cast("int")).alias("only_new"),
+        F.sum(apart.cast("int")).alias("apart"),
+    ).collect()[0]
+    n_new = max(s["new"], 1)
+    return [
+        f"  CIF-months: old {s['old']} (zero {s['old_zero']}) | new {s['new']} "
+        f"(zero {s['new_zero']})",
+        f"  only old {s['only_old']} | only new {s['only_new']} | in both, > 1% apart "
+        f"{s['apart']}",
+        "  new by salary_source:",
+    ] + _counts(
+        new.join(cifs, "cif_id").filter(F.col("month_end") >= since),
+        ["salary_source"],
+        n_new,
+    )
+
+
+def compare(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    obs_base: DataFrame,
+    old_bureau: DataFrame,
+    new_bureau: DataFrame,
+    old_income: DataFrame,
+    new_income: DataFrame,
+    old: DataFrame,
+    new: DataFrame,
+    model_id: str,
+    persona_end_date: str,
+) -> None:
+    """Logs the B24 BUREAU / INCOME / A1 OUTPUT / A1 MOVES blocks for ``model_id``."""
+    head = [f"  model_id {model_id}, latest month {persona_end_date}"]
+    w = window_months(model_id)
+    old_l = _latest(old, persona_end_date)
+    new_l = _latest(new, persona_end_date).cache()
+    n = new_l.count()
+    cifs = (
+        _latest(obs_base, persona_end_date)
+        .filter(F.col("cif_id").isNotNull())
+        .select(F.col("cif_id").cast("string").alias("cif_id"))
+        .distinct()
+    )
+    since = F.trunc(F.add_months(F.lit(str(persona_end_date)), -2 * w), "month")
+    _block("B24 BUREAU", head + _bureau_lines(old_bureau, new_bureau, cifs, since))
+
+    def evidence(df: DataFrame, side: str) -> DataFrame:
+        return _latest(df, persona_end_date).select(
+            *GRAIN,
+            (F.coalesce(F.col("bureau_salary_w"), F.lit(0.0)) >= EVIDENCE_AED)
+            .cast("int")
+            .alias(f"{side}_bureau_evidence"),
+        )
+
+    states = old_l.select(
+        *GRAIN,
+        F.col("a1_state").alias("old_state"),
+        F.col("a1_income_source").alias("old_source"),
+        F.col("a1_income_level").alias("old_income"),
+    ).join(
+        new_l.select(
+            *GRAIN,
+            F.col("a1_state").alias("new_state"),
+            F.col("a1_income_source").alias("new_source"),
+            F.col("a1_income_level").alias("new_income"),
+        ),
+        list(GRAIN),
+        "full",
+    )
+    income = evidence(old_income, "old").join(
+        evidence(new_income, "new"), list(GRAIN), "full"
+    )
+    _block(
+        "B24 INCOME",
+        head
+        + ["  bureau evidence in W (>= AED 1,000), old | new:"]
+        + _counts(income, ["old_bureau_evidence", "new_bureau_evidence"], n)
+        + ["  income source, old | new:"]
+        + _counts(states, ["old_source", "new_source"], n)
+        + ["  income level, old | new:"]
+        + _counts(states, ["old_income", "new_income"], n),
+    )
+    _block(
+        "B24 A1 OUTPUT",
+        head
+        + [f"  rows: new {n}", "  new state:"]
+        + _counts(states, ["new_state"], n)
+        + ["  old state:"]
+        + _counts(states, ["old_state"], n),
+    )
+    _block(
+        "B24 A1 MOVES",
+        head + ["  old | new"] + _counts(states, ["old_state", "new_state"], n),
+    )
+    new_l.unpersist()
+
+
+def create_b24_check_pipeline(product: str) -> Pipeline:
+    """The new bureau feature, income signals and A1 state into temporary datasets, then
+    the comparison."""
+    prefix = f"crx_{product}_a1"
+    obs = f"crx_{product}_obs_base"
+    return Pipeline(
+        [
+            node(
+                func=feat_cif_bureau_salary_monthly.build,
+                inputs={"unified": "feat_bureau_salary_unified"},
+                outputs=NEW_BUREAU,
+                name=f"build_{prefix}_b24_bureau",
+                tags=TAGS,
+            ),
+            node(
+                func=build_income_signals,
+                inputs={
+                    "obs_base": obs,
+                    "internal_salary": "feat_cif_internal_salary_monthly",
+                    "bureau_salary": NEW_BUREAU,
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_income_b24_new",
+                name=f"build_{prefix}_income_b24_new",
+                tags=TAGS,
+            ),
+            node(
+                func=build_a1_ability,
+                inputs={
+                    "obs_base": obs,
+                    "income": f"{prefix}_income_b24_new",
+                    "casa": f"{prefix}_casa_signals",
+                    "cross_product": f"{prefix}_cross_product_signals",
+                    "distress": f"{prefix}_distress_signals",
+                    "eosb": f"{prefix}_eosb_signals",
+                    "anchor": f"{prefix}_liquidity_anchor",
+                    "model_id": "params:model_id",
+                    "persona_end_date": "params:crx_persona.persona_end_date",
+                },
+                outputs=f"{prefix}_b24_new",
+                name=f"build_{prefix}_b24_new",
+                tags=TAGS,
+            ),
+            node(
+                func=compare,
+                inputs={
+                    "obs_base": obs,
+                    "old_bureau": "feat_cif_bureau_salary_monthly",
+                    "new_bureau": NEW_BUREAU,
+                    "old_income": f"{prefix}_income_signals",
+                    "new_income": f"{prefix}_income_b24_new",
+                    "old": f"{prefix}_ability",
+                    "new": f"{prefix}_b24_new",
+                    "model_id": "params:model_id",
+                    "persona_end_date": "params:crx_persona.persona_end_date",
+                },
+                outputs=None,
+                name=f"compare_{prefix}_b24",
+                tags=TAGS,
+            ),
+        ]
+    )
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/pipeline.py`
+action: replace · base sha256 `9ac0eed0ccee7dc3f9fac5a59385733ecc8ed9ed246ec9a3c7fb71a7136e8f8b` · base trailing newline: yes · new sha256 `2b068c6ce426211319022b7a88fe4273964e1d8b8e9b0e142279d69ff05bdb1e` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""The A1 ability pipeline for one product (``cc`` or ``rl``).
+
+    crx_<p>_obs_base ─┬─ income signals ────┐   feat_cif_internal_salary_monthly,
+                      │                     │   feat_cif_bureau_salary_monthly (+ RL loans)
+                      ├─ CASA signals ──────┤   feat_cif_casa_balance_monthly,
+                      │                     │   feat_cif_casa_flows_monthly
+                      ├─ cross-product ─────┤   feat_cif_cross_product_monthly
+                      ├─ distress signals ──┼─► crx_<p>_a1_ability
+                      │                     │   feat_cif_returns_monthly,
+                      │                     │   feat_cif_bureau_bounces_monthly
+                      ├─ EOSB signals ──────┤   dcore_prm_followup_outcomes,
+                      │                     │   prm_dcore_account_agreements
+                      └─ liquidity anchor ──┘   (product node: prm_balance / int_loan_master)
+
+Needs, for the model_id: the observation base, ``casa_primary``, ``casa_features``,
+``product_features``, ``bureau_salary_bounces`` and ``location_features``
+(``prm_dcore_account_agreements``).
+"""
+
+from kedro.pipeline import Pipeline, node
+from kedro.pipeline.node import Node
+
+from .classify import build_a1_ability
+from .signals import (
+    build_casa_signals,
+    build_cross_product_signals,
+    build_distress_signals,
+    build_eosb_signals,
+    build_income_signals,
+)
+
+TAGS = ["crx_persona", "crx", "a1", "ability", "persona_axis"]
+
+
+def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
+    """Signal nodes, ``anchor`` (writing ``crx_<p>_a1_liquidity_anchor``) and the state
+    node of ``product``'s A1 axis, written to ``output``."""
+    obs = f"crx_{product}_obs_base"
+    prefix = f"crx_{product}_a1"
+    income_inputs = {
+        "obs_base": obs,
+        "internal_salary": "feat_cif_internal_salary_monthly",
+        "bureau_salary": "feat_cif_bureau_salary_monthly",
+        "model_id": "params:model_id",
+    }
+    if product == "rl":
+        income_inputs["loan_features"] = "feature_retail_loans"
+    return Pipeline(
+        [
+            node(
+                func=build_income_signals,
+                inputs=income_inputs,
+                outputs=f"{prefix}_income_signals",
+                name=f"build_{prefix}_income_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_casa_signals,
+                inputs={
+                    "obs_base": obs,
+                    "casa_balance": "feat_cif_casa_balance_monthly",
+                    "casa_flows": "feat_cif_casa_flows_monthly",
+                    "model_id": "params:model_id",
+                    "crx_persona": "params:crx_persona",
+                },
+                outputs=f"{prefix}_casa_signals",
+                name=f"build_{prefix}_casa_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_cross_product_signals,
+                inputs={
+                    "obs_base": obs,
+                    "products": "feat_cif_cross_product_monthly",
+                },
+                outputs=f"{prefix}_cross_product_signals",
+                name=f"build_{prefix}_cross_product_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_distress_signals,
+                inputs={
+                    "obs_base": obs,
+                    "returns": "feat_cif_returns_monthly",
+                    "bureau_bounces": "feat_cif_bureau_bounces_monthly",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_distress_signals",
+                name=f"build_{prefix}_distress_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_eosb_signals,
+                inputs={
+                    "obs_base": obs,
+                    "followup": "dcore_prm_followup_outcomes",
+                    "agreements": "prm_dcore_account_agreements",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_eosb_signals",
+                name=f"build_{prefix}_eosb_signals",
+                tags=TAGS,
+            ),
+            anchor,
+            node(
+                func=build_a1_ability,
+                inputs={
+                    "obs_base": obs,
+                    "income": f"{prefix}_income_signals",
+                    "casa": f"{prefix}_casa_signals",
+                    "cross_product": f"{prefix}_cross_product_signals",
+                    "distress": f"{prefix}_distress_signals",
+                    "eosb": f"{prefix}_eosb_signals",
+                    "anchor": f"{prefix}_liquidity_anchor",
+                    "model_id": "params:model_id",
+                    "persona_end_date": "params:crx_persona.persona_end_date",
+                },
+                outputs=output,
+                name=f"build_{prefix}_ability",
+                tags=TAGS,
+            ),
+        ],
+    )
+`````
+
+New:
+
+`````python
+"""The A1 ability pipeline for one product (``cc`` or ``rl``).
+
+    crx_<p>_obs_base ─┬─ income signals ────┐   feat_cif_internal_salary_monthly,
+                      │                     │   feat_cif_bureau_salary_monthly
+                      ├─ CASA signals ──────┤   feat_cif_casa_balance_monthly,
+                      │                     │   feat_cif_casa_flows_monthly
+                      ├─ cross-product ─────┤   feat_cif_cross_product_monthly
+                      ├─ distress signals ──┼─► crx_<p>_a1_ability
+                      │                     │   feat_cif_returns_monthly,
+                      │                     │   feat_cif_bureau_bounces_monthly
+                      ├─ EOSB signals ──────┤   dcore_prm_followup_outcomes,
+                      │                     │   prm_dcore_account_agreements
+                      └─ liquidity anchor ──┘   (product node: prm_balance / int_loan_master)
+
+Needs, for the model_id: the observation base, ``casa_primary``, ``casa_features``,
+``product_features``, ``bureau_salary_bounces`` and ``location_features``
+(``prm_dcore_account_agreements``).
+"""
+
+from kedro.pipeline import Pipeline, node
+from kedro.pipeline.node import Node
+
+from .classify import build_a1_ability
+from .signals import (
+    build_casa_signals,
+    build_cross_product_signals,
+    build_distress_signals,
+    build_eosb_signals,
+    build_income_signals,
+)
+
+TAGS = ["crx_persona", "crx", "a1", "ability", "persona_axis"]
+
+
+def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
+    """Signal nodes, ``anchor`` (writing ``crx_<p>_a1_liquidity_anchor``) and the state
+    node of ``product``'s A1 axis, written to ``output``."""
+    obs = f"crx_{product}_obs_base"
+    prefix = f"crx_{product}_a1"
+    return Pipeline(
+        [
+            node(
+                func=build_income_signals,
+                inputs={
+                    "obs_base": obs,
+                    "internal_salary": "feat_cif_internal_salary_monthly",
+                    "bureau_salary": "feat_cif_bureau_salary_monthly",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_income_signals",
+                name=f"build_{prefix}_income_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_casa_signals,
+                inputs={
+                    "obs_base": obs,
+                    "casa_balance": "feat_cif_casa_balance_monthly",
+                    "casa_flows": "feat_cif_casa_flows_monthly",
+                    "model_id": "params:model_id",
+                    "crx_persona": "params:crx_persona",
+                },
+                outputs=f"{prefix}_casa_signals",
+                name=f"build_{prefix}_casa_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_cross_product_signals,
+                inputs={
+                    "obs_base": obs,
+                    "products": "feat_cif_cross_product_monthly",
+                },
+                outputs=f"{prefix}_cross_product_signals",
+                name=f"build_{prefix}_cross_product_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_distress_signals,
+                inputs={
+                    "obs_base": obs,
+                    "returns": "feat_cif_returns_monthly",
+                    "bureau_bounces": "feat_cif_bureau_bounces_monthly",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_distress_signals",
+                name=f"build_{prefix}_distress_signals",
+                tags=TAGS,
+            ),
+            node(
+                func=build_eosb_signals,
+                inputs={
+                    "obs_base": obs,
+                    "followup": "dcore_prm_followup_outcomes",
+                    "agreements": "prm_dcore_account_agreements",
+                    "model_id": "params:model_id",
+                },
+                outputs=f"{prefix}_eosb_signals",
+                name=f"build_{prefix}_eosb_signals",
+                tags=TAGS,
+            ),
+            anchor,
+            node(
+                func=build_a1_ability,
+                inputs={
+                    "obs_base": obs,
+                    "income": f"{prefix}_income_signals",
+                    "casa": f"{prefix}_casa_signals",
+                    "cross_product": f"{prefix}_cross_product_signals",
+                    "distress": f"{prefix}_distress_signals",
+                    "eosb": f"{prefix}_eosb_signals",
+                    "anchor": f"{prefix}_liquidity_anchor",
+                    "model_id": "params:model_id",
+                    "persona_end_date": "params:crx_persona.persona_end_date",
+                },
+                outputs=output,
+                name=f"build_{prefix}_ability",
+                tags=TAGS,
+            ),
+        ],
+    )
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/a1_ability/signals.py`
+action: replace · base sha256 `13b4a878dfb01d9ae32caf9b01b7f021329b8abf287b47ea989ca6c017e14fbd` · base trailing newline: yes · new sha256 `990812ce5f0f7c5a2671b823bba73ea54de2e444eed3eac26ae3b0eb3f68e6d6` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""A1 ability evidence at (account_id, observation_date), shared by CC and RL.
+
+Spec: ``workplace_mirror/specs/A1_ability_family_rule.md`` (income: S2–S16 of
+``A1_ability_spec.md``).
+
+Observation dates are month ends. The window is W calendar months, the observation month
+included (``_common.window_months``: 3 for 60–180, 6 for 180+): m1 = the observation
+month … mW; "the prior window" is m(W+1)–m(2W). The builders read the observation base
+and monthly ``(cif_id, month_end)`` feature tables, and return what the classifier
+compares with its thresholds:
+
+* income   — salary in each month: the larger of the internal credit and the bureau
+             salary, a pull counting in its own month and the next (S14);
+* CASA     — money in and money out per month (the counted flow classes of
+             ``feat_cif_casa_flows_monthly``), the CASA average balance per month, whether
+             any counted leg falls in the window (the Unknown gate) and whether the
+             customer holds a CASA with us at all;
+* products — the customer's other products with us at the observation month (F4);
+* distress — a cheque return, a direct-debit (DDS) return or a new bureau bounce in
+             the window;
+* EOSB     — a DCORE end-of-service result in the window (diagnostic only).
+
+Features are per customer (CIF): every account of the customer counts, never the scored
+account_id alone (an RL account_id is not a CASA account).
+"""
+
+from __future__ import annotations
+
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
+
+from enbd_collections.nodes.features.casa.feat_cif_casa import (
+    MONEY_IN_CLASSES,
+    MONEY_OUT_CLASSES,
+)
+from enbd_collections.nodes.features.products.feat_cif_cross_product import (
+    COLUMNS as CROSS_PRODUCT_COLUMNS,
+)
+
+from .._common import (
+    GRAIN,
+    left_join_all,
+    lookback_floor,
+    require_columns,
+    window_agg,
+    window_months,
+    window_start,
+)
+
+# prm_casa_return_events reasons that count as distress; it also carries "RETURNS"
+# (POS refunds).
+CHEQUE_RETURN, DDS_RETURN = "CHEQUE RETURNS", "DDS Rejects/Reversal"
+REASON_BUREAU_BOUNCE = "BUREAU"  # the reason given to bureau-reported bounces (S15)
+# Months in which a CASA leg or a positive balance shows the customer holds a CASA
+# with us (WM may fill missing balances with 0, so a zero balance proves nothing).
+CASA_HELD_MONTHS = 12
+EOSB = "EOSB"  # in a DCORE result name: end-of-service benefits expected / received
+# Which source a salary row comes from, in ``build_income_signals``.
+SOURCE_INTERNAL, SOURCE_BUREAU = "int", "bur"
+
+
+def _cifs(obs_base: DataFrame) -> DataFrame:
+    """Observation rows with a CIF, ``cif_id`` as string (the features' type)."""
+    return obs_base.filter(F.col("cif_id").isNotNull()).withColumn(
+        "cif_id", F.col("cif_id").cast("string")
+    )
+
+
+def _month_index(date: Column) -> Column:
+    """1 for the observation month, 2 for the one before, …"""
+    obs_month = F.trunc(F.col("observation_date"), "month")
+    return F.months_between(obs_month, F.trunc(date, "month")).cast("int") + 1
+
+
+def _by_month(value: str, prefix: str, months: int) -> list[Column]:
+    """Aggregates spreading ``value`` of a ``(cif_id, month_end, …)`` series over
+    ``{prefix}_m1 … _m{months}`` per observation (NULL where the month has no value)."""
+    k = _month_index(F.col("month_end"))
+    return [
+        F.max(F.when(k == i, F.col(value))).alias(f"{prefix}_m{i}")
+        for i in range(1, months + 1)
+    ]
+
+
+def _in_window(obs: DataFrame, series: DataFrame, months: int, *aggs) -> DataFrame:
+    """``aggs`` over the ``(cif_id, month_end, …)`` rows of the last ``months`` months."""
+    return window_agg(obs, series, date_col="month_end", aggs=list(aggs), months=months)
+
+
+# ── Income ────────────────────────────────────────────────────────────────────
+
+
+def _loan_bureau_salary(obs_base: DataFrame, loan_features: DataFrame) -> DataFrame:
+    """RL: the last salary credit reported by each loan's latest bureau pull
+    (``feature_retail_loans``, one row per spine row), dated by the pull month.
+
+    Pulls are rare (most accounts have one), so this rarely falls in the window.
+    """
+    require_columns(
+        loan_features,
+        ["account_id", "aecb_bureau_pull_date", "aecb_last_salary_credit_amount"],
+        "feature_retail_loans",
+    )
+    cifs = _cifs(obs_base).select("account_id", "cif_id").distinct()
+    return (
+        loan_features.select(
+            F.col("account_id").cast("string").alias("account_id"),
+            F.last_day(F.to_date("aecb_bureau_pull_date")).alias("month_end"),
+            F.col("aecb_last_salary_credit_amount")
+            .cast("double")
+            .alias("bureau_salary"),
+        )
+        .filter(F.col("month_end").isNotNull() & (F.col("bureau_salary") > 0))
+        .join(cifs, on="account_id")
+        .select("cif_id", "month_end", "bureau_salary")
+    )
+
+
+def _with_next_month(bureau: DataFrame) -> DataFrame:
+    """One bureau salary per ``(cif_id, month_end)``: each pull's month, and the month
+    after it unless that month has its own pull (never before a pull; pulls every 2
+    months make a continuous series). A pull of 0 (salary account closed) ends the carry.
+    """
+    none = F.lit(None).cast("double")
+    own = bureau.select("cif_id", "month_end", "bureau_salary", none.alias("_carried"))
+    carried = bureau.select(
+        "cif_id",
+        F.last_day(F.add_months("month_end", 1)).alias("month_end"),
+        none.alias("bureau_salary"),
+        F.col("bureau_salary").alias("_carried"),
+    )
+    return (
+        own.unionByName(carried)
+        .groupBy("cif_id", "month_end")
+        .agg(
+            F.coalesce(F.max("bureau_salary"), F.max("_carried")).alias("bureau_salary")
+        )
+    )
+
+
+def build_income_signals(
+    obs_base: DataFrame,
+    internal_salary: DataFrame,
+    bureau_salary: DataFrame,
+    model_id: str,
+    loan_features: DataFrame | None = None,
+) -> DataFrame:
+    """``income_m1 … income_m{2W}`` (S3, S12, S14): salary received per month — the
+    larger of the internal salary (``feat_cif_internal_salary_monthly``) and the bureau
+    salary (``feat_cif_bureau_salary_monthly``, carried one month forward); NULL: no
+    salary that month. Also the largest month per source: ``internal_salary_w`` /
+    ``bureau_salary_w`` in the window, ``internal_salary_prior`` in the prior window.
+
+    ``loan_features`` (RL only): ``feature_retail_loans``, whose latest-pull bureau salary
+    joins the bureau salary.
+    """
+    require_columns(
+        internal_salary,
+        ["cif_id", "month_end", "salary"],
+        "feat_cif_internal_salary_monthly",
+    )
+    require_columns(
+        bureau_salary,
+        ["cif_id", "month_end", "bureau_salary"],
+        "feat_cif_bureau_salary_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    since = lookback_floor(obs, 2 * w)
+    internal = internal_salary.select(
+        "cif_id",
+        "month_end",
+        F.col("salary").alias("amount"),
+        F.lit(SOURCE_INTERNAL).alias("src"),
+    )
+    bureau = bureau_salary.select("cif_id", "month_end", "bureau_salary")
+    if loan_features is not None:
+        bureau = bureau.unionByName(_loan_bureau_salary(obs_base, loan_features))
+    sources = internal.unionByName(
+        _with_next_month(bureau).select(
+            "cif_id",
+            "month_end",
+            F.col("bureau_salary").alias("amount"),
+            F.lit(SOURCE_BUREAU).alias("src"),
+        )
+    ).filter(F.col("month_end") >= F.lit(since))
+    in_w = _month_index(F.col("month_end")) <= w
+    internal_rows = F.col("src") == SOURCE_INTERNAL
+    return left_join_all(
+        obs_base,
+        [
+            _in_window(
+                obs,
+                sources,
+                2 * w,
+                *_by_month("amount", "income", 2 * w),
+                F.max(F.when(internal_rows & in_w, F.col("amount"))).alias(
+                    "internal_salary_w"
+                ),
+                F.max(F.when(~internal_rows & in_w, F.col("amount"))).alias(
+                    "bureau_salary_w"
+                ),
+                F.max(F.when(internal_rows & ~in_w, F.col("amount"))).alias(
+                    "internal_salary_prior"
+                ),
+            )
+        ],
+    )
+
+
+# ── CASA: money in / out / held ──────────────────────────────────────────────
+
+
+def _casa_rows(casa_flows: DataFrame, casa_balance: DataFrame) -> DataFrame:
+    """CASA rows of both features by ``(cif_id, month_end)``: ``money_in`` / ``money_out``
+    (AED of the counted classes; NULL on a balance row), ``balance`` (NULL on a flow row),
+    ``counted`` (1: a counted leg) and ``held`` (1: any leg, or a positive balance)."""
+    null = F.lit(None).cast("double")
+    counted_in = F.col("flow_class").isin(*MONEY_IN_CLASSES)
+    counted_out = F.col("flow_class").isin(*MONEY_OUT_CLASSES)
+    flows = casa_flows.groupBy("cif_id", "month_end").agg(
+        F.sum(F.when(counted_in, F.col("credit_aed"))).alias("money_in"),
+        F.sum(F.when(counted_out, F.col("debit_aed"))).alias("money_out"),
+        F.max((counted_in | counted_out).cast("int")).alias("counted"),
+    )
+    return flows.select(
+        "cif_id",
+        "month_end",
+        "money_in",
+        "money_out",
+        null.alias("balance"),
+        "counted",
+        F.lit(1).alias("held"),
+    ).unionByName(
+        casa_balance.select(
+            "cif_id",
+            "month_end",
+            null.alias("money_in"),
+            null.alias("money_out"),
+            F.col("casa_balance").cast("double").alias("balance"),
+            F.lit(0).alias("counted"),
+            (F.col("casa_balance") > 0).cast("int").alias("held"),
+        )
+    )
+
+
+def build_casa_signals(
+    obs_base: DataFrame,
+    casa_balance: DataFrame,
+    casa_flows: DataFrame,
+    model_id: str,
+    *,
+    crx_persona: dict,
+) -> DataFrame:
+    """``in_m1 … in_mW`` / ``out_m1 … out_mW`` (money in / out per month, the counted
+    classes of ``feat_cif_casa_flows_monthly``; salary credits are income, not money in),
+    ``casa_m1 … casa_m{2W}`` (``feat_cif_casa_balance_monthly``), ``casa_active`` (a
+    counted leg in W: the Unknown gate) and ``casa_held`` (any CASA leg or a positive
+    balance in the last ``CASA_HELD_MONTHS`` months). CASA means the scheme-code accounts
+    of S16."""
+    require_columns(
+        casa_balance,
+        ["cif_id", "month_end", "casa_balance"],
+        "feat_cif_casa_balance_monthly",
+    )
+    require_columns(
+        casa_flows,
+        ["cif_id", "month_end", "flow_class", "credit_aed", "debit_aed"],
+        "feat_cif_casa_flows_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    # The obs base starts in the persona start month: no window reaches older rows.
+    first = F.lit(str(crx_persona["persona_start_date"])).cast("date")
+    rows = _casa_rows(casa_flows, casa_balance).filter(
+        F.col("month_end") >= window_start(CASA_HELD_MONTHS, first)
+    )
+    in_w = _month_index(F.col("month_end")) <= w
+    signals = left_join_all(
+        obs_base,
+        [
+            _in_window(
+                obs,
+                rows,
+                CASA_HELD_MONTHS,
+                *_by_month("money_in", "in", w),
+                *_by_month("money_out", "out", w),
+                *_by_month("balance", "casa", 2 * w),
+                F.max(F.when((F.col("counted") == 1) & in_w, F.lit(1))).alias(
+                    "casa_active"
+                ),
+                F.max(F.when(F.col("held") == 1, F.lit(1))).alias("casa_held"),
+            )
+        ],
+    )
+    return signals.fillna(0, subset=["casa_active", "casa_held"]).select(
+        *GRAIN,
+        *[f"in_m{i}" for i in range(1, w + 1)],
+        *[f"out_m{i}" for i in range(1, w + 1)],
+        *[f"casa_m{i}" for i in range(1, 2 * w + 1)],
+        "casa_active",
+        "casa_held",
+    )
+
+
+# ── Cross-product (F4) ────────────────────────────────────────────────────────
+
+
+def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> DataFrame:
+    """At the observation month end, the customer's other products with us
+    (``feat_cif_cross_product_monthly``), the scored account itself left out:
+    ``xp_assets_aed`` (deposits + investments + WM), ``xp_instalment_max`` (the largest
+    instalment / minimum due of another credit product that is current), ``xp_current``
+    (1: another credit product is current) and ``xp_holding`` (1: any asset above 0)."""
+    require_columns(
+        products, list(CROSS_PRODUCT_COLUMNS), "feat_cif_cross_product_monthly"
+    )
+    obs = _cifs(obs_base).select(*GRAIN, "cif_id")
+    asset = F.col("product_type").isin("deposit", "investment", "wm")
+    current_credit = F.col("product_type").isin("card", "loan") & (
+        F.coalesce(F.col("is_current").cast("int"), F.lit(0)) == 1
+    )
+    rows = (
+        obs.join(
+            products.select(
+                F.col("cif_id").cast("string").alias("cif_id"),
+                F.col("month_end").alias("observation_date"),
+                F.col("product_account_id").cast("string").alias("_acct"),
+                "product_type",
+                F.col("balance_aed").cast("double").alias("_bal"),
+                "is_current",
+                F.col("instalment_aed").cast("double").alias("_inst"),
+            ),
+            on=["cif_id", "observation_date"],
+        )
+        .filter(F.col("_acct") != F.col("account_id").cast("string"))
+        .groupBy(*GRAIN)
+        .agg(
+            F.sum(F.when(asset, F.col("_bal"))).alias("xp_assets_aed"),
+            F.max(F.when(current_credit, F.col("_inst"))).alias("xp_instalment_max"),
+            F.max(current_credit.cast("int")).alias("xp_current"),
+            F.max((asset & (F.col("_bal") > 0)).cast("int")).alias("xp_holding"),
+        )
+    )
+    return left_join_all(obs_base, [rows]).fillna(
+        0, subset=["xp_current", "xp_holding"]
+    )
+
+
+# ── Distress ──────────────────────────────────────────────────────────────────
+
+
+def _flag(reason: str) -> Column:
+    """1 when any event in the window has this ``reason``."""
+    return F.max((F.col("reason") == reason).cast("int"))
+
+
+def _require_returns_from(returns: DataFrame, since: str) -> None:
+    """Stop the run when the returns table starts after ``since`` (an ISO date)."""
+    first = returns.agg(F.min("month_end")).first()[0]
+    if first is None or first.isoformat()[:7] > since[:7]:
+        raise ValueError(
+            f"feat_cif_returns_monthly starts at {first}, but the observations need "
+            f"returns from {since}: rerun casa_primary and casa_features after changing "
+            "crx_persona.persona_start_date"
+        )
+
+
+def _distress_events(
+    returns: DataFrame,
+    bureau_bounces: DataFrame,
+    payment_order: DataFrame | None,
+    since: str,
+) -> DataFrame:
+    """``(cif_id, month_end, reason)`` per distress event: the bank's own cheque / DDS
+    returns, bureau bounces and, when given, ``payment_order`` returns. The returns and
+    bounces are read from ``since`` (an ISO date) on."""
+    events = bureau_bounces.filter(
+        (F.col("bounce_events") > 0) & (F.col("month_end") >= F.lit(since))
+    ).select("cif_id", "month_end", F.lit(REASON_BUREAU_BOUNCE).alias("reason"))
+    if payment_order is not None:
+        require_columns(
+            payment_order,
+            ["cif_id", "return_date", "reason_code"],
+            "prm_bureau_payment_order",
+        )
+        events = events.unionByName(
+            payment_order.filter(F.col("reason_code").isNotNull()).select(
+                F.col("cif_id").cast("string").alias("cif_id"),
+                F.last_day(F.to_date("return_date")).alias("month_end"),
+                F.lit(REASON_BUREAU_BOUNCE).alias("reason"),
+            )
+        )
+    return events.unionByName(
+        returns.filter(
+            F.col("reason").isin(CHEQUE_RETURN, DDS_RETURN)
+            & (F.col("events") > 0)
+            & (F.col("month_end") >= F.lit(since))
+        ).select("cif_id", "month_end", "reason")
+    )
+
+
+def build_distress_signals(
+    obs_base: DataFrame,
+    returns: DataFrame,
+    bureau_bounces: DataFrame,
+    model_id: str,
+    payment_order: DataFrame | None = None,
+) -> DataFrame:
+    """``distress_flag`` (S9) and its parts in the window, each 0 / 1:
+
+    * ``distress_cheque`` / ``distress_dds`` — the bank's own returned cheques and DDS
+      returns, across all the customer's CASA accounts (``feat_cif_returns_monthly``);
+    * ``distress_bureau`` — a bureau-reported bounce dated by its return date
+      (``feat_cif_bureau_bounces_monthly`` ``bounce_events``, S15);
+    * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet.
+
+    Stops the run when the returns table starts after the earliest observation's window
+    (it follows ``crx_persona.persona_start_date``; rebuilt for an older one otherwise).
+    """
+    require_columns(
+        returns, ["cif_id", "month_end", "reason", "events"], "feat_cif_returns_monthly"
+    )
+    require_columns(
+        bureau_bounces,
+        ["cif_id", "month_end", "bounce_events"],
+        "feat_cif_bureau_bounces_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    since = lookback_floor(obs, w)
+    _require_returns_from(returns, since)
+    events = _distress_events(returns, bureau_bounces, payment_order, since)
+    hits = _in_window(
+        obs,
+        events,
+        w,
+        _flag(CHEQUE_RETURN).alias("distress_cheque"),
+        _flag(DDS_RETURN).alias("distress_dds"),
+        _flag(REASON_BUREAU_BOUNCE).alias("distress_bureau"),
+    )
+    parts = ["distress_cheque", "distress_dds", "distress_bureau"]
+    return (
+        left_join_all(obs_base, [hits])
+        .fillna(0, subset=parts)
+        .withColumn("distress_flag", F.greatest(*[F.col(p) for p in parts]))
+    )
+
+
+# ── EOSB (diagnostic) ─────────────────────────────────────────────────────────
+
+
+def build_eosb_signals(
+    obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
+) -> DataFrame:
+    """``eosb_flag`` (S13): 1 when a DCORE result on any of the customer's agreements
+    names an end-of-service benefit (EOSB expected / awaited / received) in the
+    window. A diagnostic only: it changes no level or state."""
+    require_columns(
+        followup,
+        ["agreement_id", "action_ts", "result_name"],
+        "dcore_prm_followup_outcomes",
+    )
+    require_columns(
+        agreements, ["agreement_id", "cif_id"], "prm_dcore_account_agreements"
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    notes = (
+        followup.filter(F.upper(F.col("result_name")).contains(EOSB))
+        .select(
+            F.col("agreement_id").cast("string").alias("agreement_id"),
+            F.to_date("action_ts").alias("day"),
+        )
+        .join(
+            agreements.select(
+                F.col("agreement_id").cast("string").alias("agreement_id"),
+                F.col("cif_id").cast("string").alias("cif_id"),
+            ).distinct(),
+            on="agreement_id",
+        )
+        .filter(F.col("day") >= F.lit(lookback_floor(obs, w)))
+    )
+    hits = window_agg(
+        obs, notes, date_col="day", aggs=[F.max(F.lit(1)).alias("eosb_flag")], months=w
+    )
+    return left_join_all(obs_base, [hits]).fillna(0, subset=["eosb_flag"])
+`````
+
+New:
+
+`````python
+"""A1 ability evidence at (account_id, observation_date), shared by CC and RL.
+
+Spec: ``workplace_mirror/specs/A1_ability_family_rule.md`` (income: S2–S16 of
+``A1_ability_spec.md``).
+
+Observation dates are month ends. The window is W calendar months, the observation month
+included (``_common.window_months``: 3 for 60–180, 6 for 180+): m1 = the observation
+month … mW; "the prior window" is m(W+1)–m(2W). The builders read the observation base
+and monthly ``(cif_id, month_end)`` feature tables, and return what the classifier
+compares with its thresholds:
+
+* income   — salary in each month: the larger of the internal credit and the bureau
+             salary, a bureau row counting in its own month and the next (S14);
+* CASA     — money in and money out per month (the counted flow classes of
+             ``feat_cif_casa_flows_monthly``), the CASA average balance per month, whether
+             any counted leg falls in the window (the Unknown gate) and whether the
+             customer holds a CASA with us at all;
+* products — the customer's other products with us at the observation month (F4);
+* distress — a cheque return, a direct-debit (DDS) return or a new bureau bounce in
+             the window;
+* EOSB     — a DCORE end-of-service result in the window (diagnostic only).
+
+Features are per customer (CIF): every account of the customer counts, never the scored
+account_id alone (an RL account_id is not a CASA account).
+"""
+
+from __future__ import annotations
+
+from pyspark.sql import Column, DataFrame
+from pyspark.sql import functions as F
+
+from enbd_collections.nodes.features.casa.feat_cif_casa import (
+    MONEY_IN_CLASSES,
+    MONEY_OUT_CLASSES,
+)
+from enbd_collections.nodes.features.products.feat_cif_cross_product import (
+    COLUMNS as CROSS_PRODUCT_COLUMNS,
+)
+
+from .._common import (
+    GRAIN,
+    left_join_all,
+    lookback_floor,
+    require_columns,
+    window_agg,
+    window_months,
+    window_start,
+)
+
+# prm_casa_return_events reasons that count as distress; it also carries "RETURNS"
+# (POS refunds).
+CHEQUE_RETURN, DDS_RETURN = "CHEQUE RETURNS", "DDS Rejects/Reversal"
+REASON_BUREAU_BOUNCE = "BUREAU"  # the reason given to bureau-reported bounces (S15)
+# Months in which a CASA leg or a positive balance shows the customer holds a CASA
+# with us (WM may fill missing balances with 0, so a zero balance proves nothing).
+CASA_HELD_MONTHS = 12
+EOSB = "EOSB"  # in a DCORE result name: end-of-service benefits expected / received
+# Which source a salary row comes from, in ``build_income_signals``.
+SOURCE_INTERNAL, SOURCE_BUREAU = "int", "bur"
+
+
+def _cifs(obs_base: DataFrame) -> DataFrame:
+    """Observation rows with a CIF, ``cif_id`` as string (the features' type)."""
+    return obs_base.filter(F.col("cif_id").isNotNull()).withColumn(
+        "cif_id", F.col("cif_id").cast("string")
+    )
+
+
+def _month_index(date: Column) -> Column:
+    """1 for the observation month, 2 for the one before, …"""
+    obs_month = F.trunc(F.col("observation_date"), "month")
+    return F.months_between(obs_month, F.trunc(date, "month")).cast("int") + 1
+
+
+def _by_month(value: str, prefix: str, months: int) -> list[Column]:
+    """Aggregates spreading ``value`` of a ``(cif_id, month_end, …)`` series over
+    ``{prefix}_m1 … _m{months}`` per observation (NULL where the month has no value)."""
+    k = _month_index(F.col("month_end"))
+    return [
+        F.max(F.when(k == i, F.col(value))).alias(f"{prefix}_m{i}")
+        for i in range(1, months + 1)
+    ]
+
+
+def _in_window(obs: DataFrame, series: DataFrame, months: int, *aggs) -> DataFrame:
+    """``aggs`` over the ``(cif_id, month_end, …)`` rows of the last ``months`` months."""
+    return window_agg(obs, series, date_col="month_end", aggs=list(aggs), months=months)
+
+
+# ── Income ────────────────────────────────────────────────────────────────────
+
+
+def _with_next_month(bureau: DataFrame) -> DataFrame:
+    """One bureau salary per ``(cif_id, month_end)``: each row's month, and the month
+    after it unless that month has its own row (never before a row; pulls every 2 months
+    make a continuous series). A row of 0 ends the carry.
+    """
+    none = F.lit(None).cast("double")
+    own = bureau.select("cif_id", "month_end", "bureau_salary", none.alias("_carried"))
+    carried = bureau.select(
+        "cif_id",
+        F.last_day(F.add_months("month_end", 1)).alias("month_end"),
+        none.alias("bureau_salary"),
+        F.col("bureau_salary").alias("_carried"),
+    )
+    return (
+        own.unionByName(carried)
+        .groupBy("cif_id", "month_end")
+        .agg(
+            F.coalesce(F.max("bureau_salary"), F.max("_carried")).alias("bureau_salary")
+        )
+    )
+
+
+def build_income_signals(
+    obs_base: DataFrame,
+    internal_salary: DataFrame,
+    bureau_salary: DataFrame,
+    model_id: str,
+) -> DataFrame:
+    """``income_m1 … income_m{2W}`` (S3, S12, S14): salary received per month — the
+    larger of the internal salary (``feat_cif_internal_salary_monthly``) and the bureau
+    salary (``feat_cif_bureau_salary_monthly``, carried one month forward); NULL: no
+    salary that month. Also the largest month per source: ``internal_salary_w`` /
+    ``bureau_salary_w`` in the window, ``internal_salary_prior`` in the prior window.
+    """
+    require_columns(
+        internal_salary,
+        ["cif_id", "month_end", "salary"],
+        "feat_cif_internal_salary_monthly",
+    )
+    require_columns(
+        bureau_salary,
+        ["cif_id", "month_end", "bureau_salary"],
+        "feat_cif_bureau_salary_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    since = lookback_floor(obs, 2 * w)
+    internal = internal_salary.select(
+        "cif_id",
+        "month_end",
+        F.col("salary").alias("amount"),
+        F.lit(SOURCE_INTERNAL).alias("src"),
+    )
+    bureau = bureau_salary.select("cif_id", "month_end", "bureau_salary")
+    sources = internal.unionByName(
+        _with_next_month(bureau).select(
+            "cif_id",
+            "month_end",
+            F.col("bureau_salary").alias("amount"),
+            F.lit(SOURCE_BUREAU).alias("src"),
+        )
+    ).filter(F.col("month_end") >= F.lit(since))
+    in_w = _month_index(F.col("month_end")) <= w
+    internal_rows = F.col("src") == SOURCE_INTERNAL
+    return left_join_all(
+        obs_base,
+        [
+            _in_window(
+                obs,
+                sources,
+                2 * w,
+                *_by_month("amount", "income", 2 * w),
+                F.max(F.when(internal_rows & in_w, F.col("amount"))).alias(
+                    "internal_salary_w"
+                ),
+                F.max(F.when(~internal_rows & in_w, F.col("amount"))).alias(
+                    "bureau_salary_w"
+                ),
+                F.max(F.when(internal_rows & ~in_w, F.col("amount"))).alias(
+                    "internal_salary_prior"
+                ),
+            )
+        ],
+    )
+
+
+# ── CASA: money in / out / held ──────────────────────────────────────────────
+
+
+def _casa_rows(casa_flows: DataFrame, casa_balance: DataFrame) -> DataFrame:
+    """CASA rows of both features by ``(cif_id, month_end)``: ``money_in`` / ``money_out``
+    (AED of the counted classes; NULL on a balance row), ``balance`` (NULL on a flow row),
+    ``counted`` (1: a counted leg) and ``held`` (1: any leg, or a positive balance)."""
+    null = F.lit(None).cast("double")
+    counted_in = F.col("flow_class").isin(*MONEY_IN_CLASSES)
+    counted_out = F.col("flow_class").isin(*MONEY_OUT_CLASSES)
+    flows = casa_flows.groupBy("cif_id", "month_end").agg(
+        F.sum(F.when(counted_in, F.col("credit_aed"))).alias("money_in"),
+        F.sum(F.when(counted_out, F.col("debit_aed"))).alias("money_out"),
+        F.max((counted_in | counted_out).cast("int")).alias("counted"),
+    )
+    return flows.select(
+        "cif_id",
+        "month_end",
+        "money_in",
+        "money_out",
+        null.alias("balance"),
+        "counted",
+        F.lit(1).alias("held"),
+    ).unionByName(
+        casa_balance.select(
+            "cif_id",
+            "month_end",
+            null.alias("money_in"),
+            null.alias("money_out"),
+            F.col("casa_balance").cast("double").alias("balance"),
+            F.lit(0).alias("counted"),
+            (F.col("casa_balance") > 0).cast("int").alias("held"),
+        )
+    )
+
+
+def build_casa_signals(
+    obs_base: DataFrame,
+    casa_balance: DataFrame,
+    casa_flows: DataFrame,
+    model_id: str,
+    *,
+    crx_persona: dict,
+) -> DataFrame:
+    """``in_m1 … in_mW`` / ``out_m1 … out_mW`` (money in / out per month, the counted
+    classes of ``feat_cif_casa_flows_monthly``; salary credits are income, not money in),
+    ``casa_m1 … casa_m{2W}`` (``feat_cif_casa_balance_monthly``), ``casa_active`` (a
+    counted leg in W: the Unknown gate) and ``casa_held`` (any CASA leg or a positive
+    balance in the last ``CASA_HELD_MONTHS`` months). CASA means the scheme-code accounts
+    of S16."""
+    require_columns(
+        casa_balance,
+        ["cif_id", "month_end", "casa_balance"],
+        "feat_cif_casa_balance_monthly",
+    )
+    require_columns(
+        casa_flows,
+        ["cif_id", "month_end", "flow_class", "credit_aed", "debit_aed"],
+        "feat_cif_casa_flows_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    # The obs base starts in the persona start month: no window reaches older rows.
+    first = F.lit(str(crx_persona["persona_start_date"])).cast("date")
+    rows = _casa_rows(casa_flows, casa_balance).filter(
+        F.col("month_end") >= window_start(CASA_HELD_MONTHS, first)
+    )
+    in_w = _month_index(F.col("month_end")) <= w
+    signals = left_join_all(
+        obs_base,
+        [
+            _in_window(
+                obs,
+                rows,
+                CASA_HELD_MONTHS,
+                *_by_month("money_in", "in", w),
+                *_by_month("money_out", "out", w),
+                *_by_month("balance", "casa", 2 * w),
+                F.max(F.when((F.col("counted") == 1) & in_w, F.lit(1))).alias(
+                    "casa_active"
+                ),
+                F.max(F.when(F.col("held") == 1, F.lit(1))).alias("casa_held"),
+            )
+        ],
+    )
+    return signals.fillna(0, subset=["casa_active", "casa_held"]).select(
+        *GRAIN,
+        *[f"in_m{i}" for i in range(1, w + 1)],
+        *[f"out_m{i}" for i in range(1, w + 1)],
+        *[f"casa_m{i}" for i in range(1, 2 * w + 1)],
+        "casa_active",
+        "casa_held",
+    )
+
+
+# ── Cross-product (F4) ────────────────────────────────────────────────────────
+
+
+def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> DataFrame:
+    """At the observation month end, the customer's other products with us
+    (``feat_cif_cross_product_monthly``), the scored account itself left out:
+    ``xp_assets_aed`` (deposits + investments + WM), ``xp_instalment_max`` (the largest
+    instalment / minimum due of another credit product that is current), ``xp_current``
+    (1: another credit product is current) and ``xp_holding`` (1: any asset above 0)."""
+    require_columns(
+        products, list(CROSS_PRODUCT_COLUMNS), "feat_cif_cross_product_monthly"
+    )
+    obs = _cifs(obs_base).select(*GRAIN, "cif_id")
+    asset = F.col("product_type").isin("deposit", "investment", "wm")
+    current_credit = F.col("product_type").isin("card", "loan") & (
+        F.coalesce(F.col("is_current").cast("int"), F.lit(0)) == 1
+    )
+    rows = (
+        obs.join(
+            products.select(
+                F.col("cif_id").cast("string").alias("cif_id"),
+                F.col("month_end").alias("observation_date"),
+                F.col("product_account_id").cast("string").alias("_acct"),
+                "product_type",
+                F.col("balance_aed").cast("double").alias("_bal"),
+                "is_current",
+                F.col("instalment_aed").cast("double").alias("_inst"),
+            ),
+            on=["cif_id", "observation_date"],
+        )
+        .filter(F.col("_acct") != F.col("account_id").cast("string"))
+        .groupBy(*GRAIN)
+        .agg(
+            F.sum(F.when(asset, F.col("_bal"))).alias("xp_assets_aed"),
+            F.max(F.when(current_credit, F.col("_inst"))).alias("xp_instalment_max"),
+            F.max(current_credit.cast("int")).alias("xp_current"),
+            F.max((asset & (F.col("_bal") > 0)).cast("int")).alias("xp_holding"),
+        )
+    )
+    return left_join_all(obs_base, [rows]).fillna(
+        0, subset=["xp_current", "xp_holding"]
+    )
+
+
+# ── Distress ──────────────────────────────────────────────────────────────────
+
+
+def _flag(reason: str) -> Column:
+    """1 when any event in the window has this ``reason``."""
+    return F.max((F.col("reason") == reason).cast("int"))
+
+
+def _require_returns_from(returns: DataFrame, since: str) -> None:
+    """Stop the run when the returns table starts after ``since`` (an ISO date)."""
+    first = returns.agg(F.min("month_end")).first()[0]
+    if first is None or first.isoformat()[:7] > since[:7]:
+        raise ValueError(
+            f"feat_cif_returns_monthly starts at {first}, but the observations need "
+            f"returns from {since}: rerun casa_primary and casa_features after changing "
+            "crx_persona.persona_start_date"
+        )
+
+
+def _distress_events(
+    returns: DataFrame,
+    bureau_bounces: DataFrame,
+    payment_order: DataFrame | None,
+    since: str,
+) -> DataFrame:
+    """``(cif_id, month_end, reason)`` per distress event: the bank's own cheque / DDS
+    returns, bureau bounces and, when given, ``payment_order`` returns. The returns and
+    bounces are read from ``since`` (an ISO date) on."""
+    events = bureau_bounces.filter(
+        (F.col("bounce_events") > 0) & (F.col("month_end") >= F.lit(since))
+    ).select("cif_id", "month_end", F.lit(REASON_BUREAU_BOUNCE).alias("reason"))
+    if payment_order is not None:
+        require_columns(
+            payment_order,
+            ["cif_id", "return_date", "reason_code"],
+            "prm_bureau_payment_order",
+        )
+        events = events.unionByName(
+            payment_order.filter(F.col("reason_code").isNotNull()).select(
+                F.col("cif_id").cast("string").alias("cif_id"),
+                F.last_day(F.to_date("return_date")).alias("month_end"),
+                F.lit(REASON_BUREAU_BOUNCE).alias("reason"),
+            )
+        )
+    return events.unionByName(
+        returns.filter(
+            F.col("reason").isin(CHEQUE_RETURN, DDS_RETURN)
+            & (F.col("events") > 0)
+            & (F.col("month_end") >= F.lit(since))
+        ).select("cif_id", "month_end", "reason")
+    )
+
+
+def build_distress_signals(
+    obs_base: DataFrame,
+    returns: DataFrame,
+    bureau_bounces: DataFrame,
+    model_id: str,
+    payment_order: DataFrame | None = None,
+) -> DataFrame:
+    """``distress_flag`` (S9) and its parts in the window, each 0 / 1:
+
+    * ``distress_cheque`` / ``distress_dds`` — the bank's own returned cheques and DDS
+      returns, across all the customer's CASA accounts (``feat_cif_returns_monthly``);
+    * ``distress_bureau`` — a bureau-reported bounce dated by its return date
+      (``feat_cif_bureau_bounces_monthly`` ``bounce_events``, S15);
+    * ``payment_order`` — prm_bureau_payment_order returns; not in PROD yet.
+
+    Stops the run when the returns table starts after the earliest observation's window
+    (it follows ``crx_persona.persona_start_date``; rebuilt for an older one otherwise).
+    """
+    require_columns(
+        returns, ["cif_id", "month_end", "reason", "events"], "feat_cif_returns_monthly"
+    )
+    require_columns(
+        bureau_bounces,
+        ["cif_id", "month_end", "bounce_events"],
+        "feat_cif_bureau_bounces_monthly",
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    since = lookback_floor(obs, w)
+    _require_returns_from(returns, since)
+    events = _distress_events(returns, bureau_bounces, payment_order, since)
+    hits = _in_window(
+        obs,
+        events,
+        w,
+        _flag(CHEQUE_RETURN).alias("distress_cheque"),
+        _flag(DDS_RETURN).alias("distress_dds"),
+        _flag(REASON_BUREAU_BOUNCE).alias("distress_bureau"),
+    )
+    parts = ["distress_cheque", "distress_dds", "distress_bureau"]
+    return (
+        left_join_all(obs_base, [hits])
+        .fillna(0, subset=parts)
+        .withColumn("distress_flag", F.greatest(*[F.col(p) for p in parts]))
+    )
+
+
+# ── EOSB (diagnostic) ─────────────────────────────────────────────────────────
+
+
+def build_eosb_signals(
+    obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
+) -> DataFrame:
+    """``eosb_flag`` (S13): 1 when a DCORE result on any of the customer's agreements
+    names an end-of-service benefit (EOSB expected / awaited / received) in the
+    window. A diagnostic only: it changes no level or state."""
+    require_columns(
+        followup,
+        ["agreement_id", "action_ts", "result_name"],
+        "dcore_prm_followup_outcomes",
+    )
+    require_columns(
+        agreements, ["agreement_id", "cif_id"], "prm_dcore_account_agreements"
+    )
+    obs = _cifs(obs_base)
+    w = window_months(model_id)
+    notes = (
+        followup.filter(F.upper(F.col("result_name")).contains(EOSB))
+        .select(
+            F.col("agreement_id").cast("string").alias("agreement_id"),
+            F.to_date("action_ts").alias("day"),
+        )
+        .join(
+            agreements.select(
+                F.col("agreement_id").cast("string").alias("agreement_id"),
+                F.col("cif_id").cast("string").alias("cif_id"),
+            ).distinct(),
+            on="agreement_id",
+        )
+        .filter(F.col("day") >= F.lit(lookback_floor(obs, w)))
+    )
+    hits = window_agg(
+        obs, notes, date_col="day", aggs=[F.max(F.lit(1)).alias("eosb_flag")], months=w
+    )
+    return left_join_all(obs_base, [hits]).fillna(0, subset=["eosb_flag"])
+`````
+
+### FILE: `src/enbd_collections/pipelines/crx_persona/rl_a1_ability/pipeline.py`
+action: replace · base sha256 `128e0ebcae44ca2e8218efe203d45e54c868957c1d74a28a0032857a3cc1b4e3` · base trailing newline: yes · new sha256 `0971a2ae70291a54efd81cc964cbb8c1eadb599b9c5c726a17f9165895090881` · new trailing newline: yes
+
+Base (as photographed — used only for the safety check and --revert):
+
+`````python
+"""Kedro pipeline: RL A1 ability axis on the shared ``a1_ability`` engine; the anchor is
+one EMI (``nodes.py``) and the loan's latest bureau pull adds a salary source.
+
+Needs, for the model_id (rl_60_180 / rl_180_plus): ``crx_rl_obs_base``,
+``casa_primary``, ``casa_features``, ``product_features``, ``bureau_salary_bounces`` and
+``location_features``.
+
+    kedro run --pipeline=crx_rl_a1_ability
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from ..a1_ability.pipeline import TAGS, create_a1_pipeline
+from .nodes import build_rl_liquidity_anchor
+
+_ANCHOR = node(
+    func=build_rl_liquidity_anchor,
+    inputs={"obs_base": "crx_rl_obs_base", "int_loan_master": "int_loan_master"},
+    outputs="crx_rl_a1_liquidity_anchor",
+    name="build_crx_rl_a1_liquidity_anchor",
+    tags=TAGS,
+)
+
+
+def create_pipeline(  # pylint: disable=unused-argument
+    output: str = "crx_rl_a1_ability", **kwargs
+) -> Pipeline:
+    """The RL A1 axis written to ``output``."""
+    return create_a1_pipeline("rl", output, _ANCHOR)
+`````
+
+New:
+
+`````python
+"""Kedro pipeline: RL A1 ability axis on the shared ``a1_ability`` engine; the anchor is
+one EMI (``nodes.py``).
+
+Needs, for the model_id (rl_60_180 / rl_180_plus): ``crx_rl_obs_base``,
+``casa_primary``, ``casa_features``, ``product_features``, ``bureau_salary_bounces`` and
+``location_features``.
+
+    kedro run --pipeline=crx_rl_a1_ability
+"""
+
+from kedro.pipeline import Pipeline, node
+
+from ..a1_ability.pipeline import TAGS, create_a1_pipeline
+from .nodes import build_rl_liquidity_anchor
+
+_ANCHOR = node(
+    func=build_rl_liquidity_anchor,
+    inputs={"obs_base": "crx_rl_obs_base", "int_loan_master": "int_loan_master"},
+    outputs="crx_rl_a1_liquidity_anchor",
+    name="build_crx_rl_a1_liquidity_anchor",
+    tags=TAGS,
+)
+
+
+def create_pipeline(  # pylint: disable=unused-argument
+    output: str = "crx_rl_a1_ability", **kwargs
+) -> Pipeline:
+    """The RL A1 axis written to ``output``."""
+    return create_a1_pipeline("rl", output, _ANCHOR)
 `````
 
 ### FILE: `src/enbd_collections/pipelines/products/check.py`
@@ -4246,13 +6495,16 @@ if __name__ == "__main__":
 Copy this to the workplace assistant in UAT once the bundle's PROD checks are done:
 
 ````text
-Clean up after mirror bundle 24_a1_product_primaries.md, on the bundle's branch.
-- **HDFS first.** The user runs these in PROD; UAT has no data. Resolve `${_project.hdfs_path}/<model_id>/${globals:folders.feat}/products/cif_cross_product_monthly_b24_new` from the workplace conf and write out `hdfs dfs -rm -r <resolved path>` in full for every model_id the check ran on (skip folders that do not exist).
-- **Remove the temporary check** (everything marked TEMPORARY for bundle 24):
-  - `conf/base/catalog/catalog_products.yml`: the `feat_cif_cross_product_monthly_b24_new` entry and its comment;
-  - `src/enbd_collections/pipeline_registry.py`: the `product_features_b24_check` entry;
+Clean up after mirror bundle 24_a1_product_primaries_bureau_swap.md, on the bundle's branch.
+- **HDFS first.** The user runs these in PROD; UAT has no data. Resolve these paths from the workplace conf and write out `hdfs dfs -rm -r <resolved path>` in full for every model_id the checks ran on (skip folders that do not exist):
+  - `${_project.hdfs_path}/<model_id>/${globals:folders.feat}/products/cif_cross_product_monthly_b24_new` (cc_60_180);
+  - `${_project.hdfs_path}/<model_id>/${globals:folders.feat}/bureau/cif_bureau_salary_monthly_b24_new` (all four);
+  - `${_project.hdfs_path}/<model_id>/${globals:folders.persona}/crx/crx_<p>_a1_income_b24_new` and `…/crx/crx_<p>_a1_b24_new` (all four, `<p>` = cc / rl).
+- **Remove the temporary checks** (everything marked TEMPORARY for bundle 24):
+  - delete `conf/base/catalog/tmp_b24_check.yml`;
+  - `src/enbd_collections/pipeline_registry.py`: the `product_features_b24_check`, `crx_cc_a1_b24_check` and `crx_rl_a1_b24_check` entries and the `crx_a1_b24_check` import;
   - `src/enbd_collections/pipelines/products/features.py`: `create_b24_check_pipeline`;
-  - delete `src/enbd_collections/pipelines/products/check.py`.
+  - delete `src/enbd_collections/pipelines/products/check.py` and `src/enbd_collections/pipelines/crx_persona/a1_ability/check.py`.
 
   Then check that `kedro registry list` still works and that `grep -rn "b24" src conf` prints nothing.
 - Delete the folder data/input/mirror_bundles/ (bundle file, apply script):
