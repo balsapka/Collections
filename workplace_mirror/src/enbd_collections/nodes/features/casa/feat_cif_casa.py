@@ -33,6 +33,10 @@ from enbd_collections.nodes.utils.frames import (
     wm_month,
 )
 
+# The old private names, still imported by workplace modules outside the mirror (the
+# casa_windows* pipelines); drop them once those import nodes.utils.frames.
+_cif, _require, _wm_month = cif_column, require_columns, wm_month
+
 _CASA_BALANCE = "ft_avg_casa_eod_balance_in_last_0_3_weeks_avg"  # CA+SA, ~1 month
 _CASA_IN = "ft_inflow_casa_amt_in_last_0_0_weeks_sum"
 _CASA_OUT = "ft_outflow_casa_amt_in_last_0_0_weeks_sum"
