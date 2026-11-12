@@ -47,12 +47,3 @@ feat_cif_cross_product_monthly:
   metadata:
     kedro-viz:
       layer: feature
-
-# TEMPORARY (bundle 24): the cross-product table rebuilt from the primaries, for the check;
-# removed by the cleanup.
-feat_cif_cross_product_monthly_b24_new:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/products/cif_cross_product_monthly_b24_new"
-  save_args:
-    mode: overwrite

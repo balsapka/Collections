@@ -81,7 +81,7 @@ LEG = {  # active= / flows kind: (tran_type, reason, code, narration)
 }
 rows = {
     k: []
-    for k in "spine wmsal bal casa flow alert ret ftr lab prod dcore agr".split()
+    for k in "spine wmsal bal casa flow alert unified ret ftr lab prod dcore agr".split()
 }
 expect = {}
 
@@ -89,7 +89,7 @@ expect = {}
 def case(name, *, salary=(), bureau=(), casa=(), flows=(), products=(), bounces=(),
          active="economic", on_loan=False, buckets=None, internal=None, eosb=None,
          model="cc_60_180", **want):
-    """salary: [(k, amount)]; bureau: [(k, amount[, alert type[, pull day]])]; casa:
+    """salary: [(k, amount)]; bureau: [(k, amount[, unified salary_source[, day]])]; casa:
     [(k, balance)]; flows: [(k, "C"/"D", LEG kind, amount[, day[, wm label]])] where the
     label is "salary" or "self"; products: [(type, balance, is_current, instalment[,
     own account])];
@@ -102,10 +102,10 @@ def case(name, *, salary=(), bureau=(), casa=(), flows=(), products=(), bounces=
     for k, amt in salary:  # a week-2 snapshot of the salary month; days from its 1st
         snap = m(k, 10)
         rows["wmsal"].append((cif, week(snap), float(amt), (snap - m(k, 1)).days))
-    for k, amt, *rest in bureau:
-        alert_type = rest[0] if rest else 31
-        day = rest[1] if len(rest) > 1 else 5
-        rows["alert"].append((cif, "CC", "SALARY", m(k, day), 0.0, alert_type, float(amt), None))
+    for k, amt, *rest in bureau:  # a feat_bureau_salary_unified row
+        source = rest[0] if rest else "alert"
+        day = rest[1] if len(rest) > 1 else 28
+        rows["unified"].append((cif, m(k, day), float(amt), source))
     for k, bal in casa:
         rows["casa"].append((cif, week(m(k, 22)), float(bal)))
     for j, (k, dc, kind, amt, *rest) in enumerate(flows):
@@ -165,10 +165,10 @@ case("AECB: one month of 6000 reaches the total", bureau=[(1, 6000)], income="st
 case("AECB: a pull before W carries into W", bureau=[(4, 3000)], income="weak")
 case("AECB: pulls every 2 months fill W", bureau=[(3, 2000), (1, 2000)], income="stable")
 case("AECB: the carry goes 1 month only", bureau=[(4, 9000)], income="stable")
-case("AECB: the month's latest pull wins, not the sum", bureau=[(2, 9000, 31, 5), (2, 2000, 31, 25)],
-     income="weak")
-case("AECB: type 32 counts", bureau=[(3, 3000, 32)], income="stable")
-case("AECB: other alert types do not count", bureau=[(3, 9000, 77)], income="none")
+case("AECB: a bulk-pull month counts like an alert", bureau=[(3, 3000, "bureau_salary")],
+     income="stable")
+case("AECB: a mid-month date counts in its month", bureau=[(3, 3000, "salary_credit", 10)],
+     income="stable")
 case("AECB level check: fewer alerts at the same level -> Stable",
      bureau=[(6, 7000), (4, 7000), (1, 7000)], income="stable")
 case("AECB level check: a real fall -> Weak", bureau=[(6, 8000), (4, 8000), (2, 3500)],
@@ -181,8 +181,7 @@ case("level check off: internal salary in the window", salary=[(1, 1000)],
      bureau=[(6, 7000), (4, 7000), (1, 7000)], income="weak")
 case("level check: internal under AED 1,000 does not count", salary=[(1, 800)],
      bureau=[(6, 7000), (4, 7000), (1, 7000)], income="stable")
-case("AECB: a closure ends the carry", bureau=[(3, 3000), (2, 0, 43)], income="weak")
-case("AECB: a closure on the same pull wins", bureau=[(2, 9000), (2, 0, 43)], income="none")
+case("AECB: a 0 row ends the carry", bureau=[(3, 3000), (2, 0)], income="weak")
 case("AECB + internal: the larger per month, not the sum", salary=[(2, 2000)], bureau=[(2, 2500)],
      income="weak", source="both")
 case("internal salary stopped, one AECB pull at the same level -> Weak",
@@ -319,7 +318,8 @@ internal_salary = fc.build_internal_salary(df(
 alert_schema = ("cif_id long, contract_type string, alert_description string, extract_date date,"
                 " bounced_cheque_amount double, alert_type_number int, salary_credit_amount double,"
                 " dt_of_return date")
-bureau_salary = feat_cif_bureau_salary_monthly.build(df(rows["alert"], alert_schema))
+bureau_salary = feat_cif_bureau_salary_monthly.build(df(
+    rows["unified"], "cif_id long, salary_month_end date, monthly_salary double, salary_source string"))
 casa_balance = fc.build_casa_balance(
     df(rows["casa"], "cif_id long, week_number int, ft_avg_casa_eod_balance_in_last_0_3_weeks_avg double"),
     df(rows["flow"], "cif_id long, week_number int, ft_inflow_casa_amt_in_last_0_0_weeks_sum double,"
@@ -420,17 +420,6 @@ emi = {r["account_id"]: r["liquidity_anchor_amt"] for r in build_rl_liquidity_an
     obs, df([("A0", OBS, 2000.0), ("A1", OBS, 0.0), ("A2", date(2026, 6, 30), 1500.0)],
             loan_schema)).collect()}
 assert emi == {"A0": 2000.0, "A1": None}, emi  # 0 EMI → no anchor; a June snapshot is stale
-# RL: the loan's latest-pull bureau salary is income in its pull month and the next, PIT
-frl_schema = "account_id string, observation_date date, aecb_bureau_pull_date date, aecb_last_salary_credit_amount double"
-frl = df([("A0", OBS, m(2, 10), 6000.0), ("A1", OBS, m(0, 5), 7000.0)], frl_schema)
-inc = {r["account_id"]: r for r in build_income_signals(
-    obs.filter(F.col("account_id").isin("A0", "A1")), internal_salary, bureau_salary, "cc_60_180",
-    loan_features=frl,
-).collect()}
-assert inc["A0"]["income_m2"] == 6000.0 == inc["A0"]["income_m1"], inc["A0"]
-assert inc["A0"]["income_m3"] is None and inc["A0"]["bureau_salary_w"] == 6000.0, inc["A0"]
-# a pull after the observation month never counts
-assert 7000.0 not in [inc["A1"][f"income_m{i}"] for i in range(1, 7)], inc["A1"]
 # Scorecard: each override mode, the High gate, a NULL flag, override order, Unknown
 from enbd_collections.pipelines.crx_persona import scoring_engine as se  # noqa: E402
 
@@ -468,5 +457,5 @@ try:  # a mistyped override mode raises instead of acting as FORCE
     raise AssertionError("mistyped override mode did not raise")
 except KeyError:
     pass
-print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ dating, lanes, anchor, returns, loan salary and Scorecard checks)")
+print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ dating, lanes, anchor, returns and Scorecard checks)")
 sys.exit(1 if fails else 0)

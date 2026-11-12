@@ -1,11 +1,17 @@
-"""Feature node: AECB-reported salary per customer and pull month.
+"""Feature node: bureau salary per customer and month, the A1 income contract.
 
-One row per ``(cif_id, month_end)`` with a salary alert, dated by the pull
-(``extract_date``). ``bureau_salary`` is the salary reported on the month's latest pull, an
-accurate level on that date, not a month's credit: salary rows are ``alert_type_number`` 31
-(average salary changed) and 32 (salary account added) with an amount; 43 (salary account
-closed) gives 0. Months without a pull have no row. How far a pull carries is decided by the
-consumer.
+One row per ``(cif_id, month_end)`` from the DE's ``feat_bureau_salary_unified``, which
+picks one monthly salary per customer across three AECB sources (``alert`` change events,
+``salary_credit`` application-time history, ``bureau_salary`` bulk-pull aggregates spread
+back over 12 months):
+
+* ``bureau_salary`` - the unified ``monthly_salary`` (AED; 0 = no usable amount that
+  month, e.g. a salary account closed);
+* ``salary_source`` - the source that gave it (reporting only).
+
+Months without a row have no bureau salary. How far a row carries is decided by the
+consumer (A1 carries it one month, S14). To swap the bureau source, rebuild this table
+from the new one; the A1 engine reads only this contract.
 """
 
 from __future__ import annotations
@@ -13,33 +19,22 @@ from __future__ import annotations
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-_SALARY_TYPES = (31, 32)
-_CLOSED_TYPE = 43
+from enbd_collections.nodes.utils.frames import require_columns
 
 
-def build(alerts: DataFrame) -> DataFrame:
-    """The month's latest pull from ``prm_bureau_alert_enriched``; on the same pull a
-    closure wins, then the largest amount."""
-    columns = {"cif_id", "extract_date", "alert_type_number", "salary_credit_amount"}
-    missing = sorted(columns - set(alerts.columns))
-    if missing:
-        raise ValueError(f"prm_bureau_alert_enriched is missing columns: {missing}")
-    alert_type = F.col("alert_type_number").cast("double")
-    amount = F.col("salary_credit_amount").cast("double")
-    closed = alert_type == _CLOSED_TYPE
-    latest = F.max(F.struct("pull_date", "closed", "amount")).alias("_latest")
-    return (
-        alerts.filter(
-            F.col("cif_id").isNotNull()
-            & (closed | (alert_type.isin(*_SALARY_TYPES) & (amount > 0)))
-        )
-        .select(
-            F.col("cif_id").cast("string").alias("cif_id"),
-            F.to_date("extract_date").alias("pull_date"),
-            closed.alias("closed"),
-            F.when(closed, 0.0).otherwise(amount).alias("amount"),
-        )
-        .groupBy("cif_id", F.last_day("pull_date").alias("month_end"))
-        .agg(latest)
-        .select("cif_id", "month_end", F.col("_latest.amount").alias("bureau_salary"))
+def build(unified: DataFrame) -> DataFrame:
+    """``cif_id`` (string), ``month_end``, ``bureau_salary``, ``salary_source`` from
+    ``feat_bureau_salary_unified`` (already one row per customer and month)."""
+    require_columns(
+        unified,
+        ["cif_id", "salary_month_end", "monthly_salary", "salary_source"],
+        "feat_bureau_salary_unified",
+    )
+    return unified.filter(
+        F.col("cif_id").isNotNull() & F.col("monthly_salary").isNotNull()
+    ).select(
+        F.trim(F.col("cif_id").cast("string")).alias("cif_id"),
+        F.last_day("salary_month_end").alias("month_end"),
+        F.col("monthly_salary").cast("double").alias("bureau_salary"),
+        "salary_source",
     )

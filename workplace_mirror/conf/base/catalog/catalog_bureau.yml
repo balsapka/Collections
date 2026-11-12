@@ -1,6 +1,6 @@
 # Bureau salary and bounce datasets of the persona axes (pipeline bureau_salary_bounces).
 
-# AECB-reported salary per (cif_id, month_end of the pull): the latest pull's level, all history.
+# A1's bureau salary per (cif_id, month_end): feat_bureau_salary_unified as the A1 contract.
 feat_cif_bureau_salary_monthly:
   type: spark.SparkDataset
   file_format: parquet
@@ -13,7 +13,7 @@ feat_cif_bureau_salary_monthly:
 
 # DE-owned (branch bureau-pipeline-analysis, read-only here): one monthly salary per CIF unified across
 # alert > salary_credit > bureau_salary sources. cif_id (long), salary_month_end (date),
-# monthly_salary (double), salary_source (string). Replaces feat_cif_bureau_salary_monthly in A1 income.
+# monthly_salary (double), salary_source (string). Read by feat_cif_bureau_salary_monthly.
 feat_bureau_salary_unified:
   type: spark.SparkDataset
   file_format: parquet

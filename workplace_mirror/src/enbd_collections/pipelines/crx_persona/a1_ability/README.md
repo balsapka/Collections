@@ -26,7 +26,7 @@ it in `cc_a1_ability`, RL in `rl_a1_ability`; each wrapper adds its anchor.
   | `feat_cif_casa_flows_monthly` | `prm_casa_transactions` ← FTR + `wm_pri_labelled_transactions` (`casa_features`) |
   | `feat_cif_cross_product_monthly` | product holding, loan portfolio, card balances, WM assets (`product_features`) |
   | `feat_cif_returns_monthly` | `prm_casa_return_events` ← FTR |
-  | `feat_cif_bureau_salary_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
+  | `feat_cif_bureau_salary_monthly` | the DE's `feat_bureau_salary_unified` (`bureau_salary_bounces`) |
   | `feat_cif_bureau_bounces_monthly` | `prm_bureau_alert_enriched` (`bureau_salary_bounces`) |
 
 - **Windows are calendar months, by segment** (`_common.window_months`), the observation
@@ -53,11 +53,10 @@ month **the larger one wins**.
   days from the first of that month; `week_number` is `yyyyMM0W` (week 1–4 of the month), so
   the salary month is the snapshot week minus those days, rounded to the nearest first of a
   month.
-- **Bureau salary** — the salary on AECB's alert feed (types 31 and 32, keyed by CIF), an
-  accurate level on the pull date. It counts in the pull's month and the next, never before
-  the pull and no further (S14), so pulls every 2 months make a continuous series; a salary
-  account closure (type 43) ends it. RL also reads `feature_retail_loans`: the salary of each
-  loan's latest bureau pull, handled the same way.
+- **Bureau salary** — one monthly AECB salary per CIF from the DE's unified table (alert
+  change events first, then application-time salary history, then the bulk pull's
+  aggregates spread back over 12 months). A row counts in its month and the next, never
+  before it and no further (S14); a 0 row ends the carry.
 
 The result is `income_m1 … income_m6` (`… m12` at 180+; NULL = no salary that month), and
 the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) and the prior window's internal salary (`internal_salary_prior`).
@@ -153,9 +152,10 @@ window) is a diagnostic column and changes nothing.
   about a third of customers hold no CASA with us, so F2 / F3 cannot see them.
 - **Money in / out rest on the class table.** A flow type counts only once its meaning is
   established; new transaction types land in `unplaced` until they are classified.
-- **Bureau salary is an event feed for now.** An alert row appears only when something changes,
-  so no row means nothing is known, not that the salary stopped, and few pulls fall in the
-  window. GRR's feed of pulls every 2 months enters through the same rule. A stop shows only
+- **Bureau salary is mostly an event feed for now.** Most rows are alerts, which appear only
+  when something changes, so no row means nothing is known, not that the salary stopped; the
+  bulk pull covers about 1% of customers. GRR's feed of pulls every 2 months enters through
+  the same table. A stop shows only
   as a closure, a lower amount or the end of an internal salary (`a1_salary_stopped`).
 - **Missing salary months count as 0** in the window total and the weakening check, except that
   with no internal salary in either window the weakening check compares the months with a value.

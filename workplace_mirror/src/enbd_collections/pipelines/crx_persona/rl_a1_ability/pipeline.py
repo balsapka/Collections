@@ -1,5 +1,5 @@
 """Kedro pipeline: RL A1 ability axis on the shared ``a1_ability`` engine; the anchor is
-one EMI (``nodes.py``) and the loan's latest bureau pull adds a salary source.
+one EMI (``nodes.py``).
 
 Needs, for the model_id (rl_60_180 / rl_180_plus): ``crx_rl_obs_base``,
 ``casa_primary``, ``casa_features``, ``product_features``, ``bureau_salary_bounces`` and

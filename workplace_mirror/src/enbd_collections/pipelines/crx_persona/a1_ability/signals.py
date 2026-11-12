@@ -10,7 +10,7 @@ and monthly ``(cif_id, month_end)`` feature tables, and return what the classifi
 compares with its thresholds:
 
 * income   — salary in each month: the larger of the internal credit and the bureau
-             salary, a pull counting in its own month and the next (S14);
+             salary, a bureau row counting in its own month and the next (S14);
 * CASA     — money in and money out per month (the counted flow classes of
              ``feat_cif_casa_flows_monthly``), the CASA average balance per month, whether
              any counted leg falls in the window (the Unknown gate) and whether the
@@ -90,36 +90,10 @@ def _in_window(obs: DataFrame, series: DataFrame, months: int, *aggs) -> DataFra
 # ── Income ────────────────────────────────────────────────────────────────────
 
 
-def _loan_bureau_salary(obs_base: DataFrame, loan_features: DataFrame) -> DataFrame:
-    """RL: the last salary credit reported by each loan's latest bureau pull
-    (``feature_retail_loans``, one row per spine row), dated by the pull month.
-
-    Pulls are rare (most accounts have one), so this rarely falls in the window.
-    """
-    require_columns(
-        loan_features,
-        ["account_id", "aecb_bureau_pull_date", "aecb_last_salary_credit_amount"],
-        "feature_retail_loans",
-    )
-    cifs = _cifs(obs_base).select("account_id", "cif_id").distinct()
-    return (
-        loan_features.select(
-            F.col("account_id").cast("string").alias("account_id"),
-            F.last_day(F.to_date("aecb_bureau_pull_date")).alias("month_end"),
-            F.col("aecb_last_salary_credit_amount")
-            .cast("double")
-            .alias("bureau_salary"),
-        )
-        .filter(F.col("month_end").isNotNull() & (F.col("bureau_salary") > 0))
-        .join(cifs, on="account_id")
-        .select("cif_id", "month_end", "bureau_salary")
-    )
-
-
 def _with_next_month(bureau: DataFrame) -> DataFrame:
-    """One bureau salary per ``(cif_id, month_end)``: each pull's month, and the month
-    after it unless that month has its own pull (never before a pull; pulls every 2
-    months make a continuous series). A pull of 0 (salary account closed) ends the carry.
+    """One bureau salary per ``(cif_id, month_end)``: each row's month, and the month
+    after it unless that month has its own row (never before a row; pulls every 2 months
+    make a continuous series). A row of 0 ends the carry.
     """
     none = F.lit(None).cast("double")
     own = bureau.select("cif_id", "month_end", "bureau_salary", none.alias("_carried"))
@@ -143,16 +117,12 @@ def build_income_signals(
     internal_salary: DataFrame,
     bureau_salary: DataFrame,
     model_id: str,
-    loan_features: DataFrame | None = None,
 ) -> DataFrame:
     """``income_m1 … income_m{2W}`` (S3, S12, S14): salary received per month — the
     larger of the internal salary (``feat_cif_internal_salary_monthly``) and the bureau
     salary (``feat_cif_bureau_salary_monthly``, carried one month forward); NULL: no
     salary that month. Also the largest month per source: ``internal_salary_w`` /
     ``bureau_salary_w`` in the window, ``internal_salary_prior`` in the prior window.
-
-    ``loan_features`` (RL only): ``feature_retail_loans``, whose latest-pull bureau salary
-    joins the bureau salary.
     """
     require_columns(
         internal_salary,
@@ -174,8 +144,6 @@ def build_income_signals(
         F.lit(SOURCE_INTERNAL).alias("src"),
     )
     bureau = bureau_salary.select("cif_id", "month_end", "bureau_salary")
-    if loan_features is not None:
-        bureau = bureau.unionByName(_loan_bureau_salary(obs_base, loan_features))
     sources = internal.unionByName(
         _with_next_month(bureau).select(
             "cif_id",

@@ -1,7 +1,7 @@
 """The A1 ability pipeline for one product (``cc`` or ``rl``).
 
     crx_<p>_obs_base ─┬─ income signals ────┐   feat_cif_internal_salary_monthly,
-                      │                     │   feat_cif_bureau_salary_monthly (+ RL loans)
+                      │                     │   feat_cif_bureau_salary_monthly
                       ├─ CASA signals ──────┤   feat_cif_casa_balance_monthly,
                       │                     │   feat_cif_casa_flows_monthly
                       ├─ cross-product ─────┤   feat_cif_cross_product_monthly
@@ -37,19 +37,16 @@ def create_a1_pipeline(product: str, output: str, anchor: Node) -> Pipeline:
     node of ``product``'s A1 axis, written to ``output``."""
     obs = f"crx_{product}_obs_base"
     prefix = f"crx_{product}_a1"
-    income_inputs = {
-        "obs_base": obs,
-        "internal_salary": "feat_cif_internal_salary_monthly",
-        "bureau_salary": "feat_cif_bureau_salary_monthly",
-        "model_id": "params:model_id",
-    }
-    if product == "rl":
-        income_inputs["loan_features"] = "feature_retail_loans"
     return Pipeline(
         [
             node(
                 func=build_income_signals,
-                inputs=income_inputs,
+                inputs={
+                    "obs_base": obs,
+                    "internal_salary": "feat_cif_internal_salary_monthly",
+                    "bureau_salary": "feat_cif_bureau_salary_monthly",
+                    "model_id": "params:model_id",
+                },
                 outputs=f"{prefix}_income_signals",
                 name=f"build_{prefix}_income_signals",
                 tags=TAGS,
