@@ -103,9 +103,7 @@ LEVELS_B = {"regular": 2, "some": 1, "none": 0}
 LEVELS_C = {"clean": 1, "not_clean": 0, "no_record": 0}
 
 
-def reference(a, b, c, refusal):
-    if (a, b, c, refusal) == ("thin", "none", "no_record", False):
-        return "unknown"
+def reference(a, b, c, refusal):  # no Unknown inside an episode (D-A3-27)
     pts = LEVELS_A[a] + LEVELS_B[b] + LEVELS_C[c]
     rungs = ["low", "moderate", "high"]
     rung = 2 if pts >= 4 else 1 if pts >= 2 else 0  # Moderate from 2 (D-A3-24)
@@ -214,13 +212,13 @@ ep = episode([(a, D(2026, 4, 1), False) for a in A_ACCTS])
 obs_a = ep.select("account_id", "observation_date", "cif_id")
 
 
-def events_for(deadline):
+def events_for(model_id="cc_60_180", deadline=None):
     return build_promise_events(
-        obs_a, a_followup, a_agreements, inst, dues, pays, deadline
+        obs_a, a_followup, a_agreements, inst, dues, pays, model_id, "cc", deadline
     )
 
 
-ev = events_for("next_statement")
+ev = events_for()
 check(
     "events A",
     sorted(
@@ -251,6 +249,16 @@ check(
     ],
     ["2026-08-05"],
 )
+check(
+    "cutoff A 07-10 at 180+ (month end)",
+    [
+        str(r["promise_cutoff"])
+        for r in events_for("cc_180_plus")
+        .where("account_id = 'A' AND event_date = '2026-07-10'")
+        .collect()
+    ],
+    ["2026-07-31"],
+)
 sig = build_commitment_signals(ep, ev)
 check(
     "A counts",
@@ -265,12 +273,12 @@ check(
     by_account(sig, "a3_commitments_level"),
     {"A": "broken", "B": "thin", "K": "kept", "M": "broken", "Bk": "broken"},
 )
-sig30 = build_commitment_signals(ep, events_for("30_days"))
+sig30 = build_commitment_signals(ep, events_for(deadline="30_days"))
 check(
     "B level (30 days)", by_account(sig30, "a3_commitments_level")["B"], "partly_kept"
 )
-# RL, end of the next month: cash dated at the month end. R: promise 06-15, July cash ->
-# paid; S: only August cash -> none; T: June cash counts (same month); U: promise on
+# RL, end of the promise month: cash dated at the month end. R: promise 06-15, July cash
+# -> none; S: only August cash -> none; T: June cash counts (same month); U: promise on
 # 06-30, June cash dated 06-30 counts.
 rl_accts = ["R", "S", "T", "U"]
 rl_dues = df(
@@ -313,12 +321,13 @@ rl_ev = build_promise_events(
     plan_rows([]),
     rl_dues,
     rl_pays,
-    "next_month_end",
+    "rl_60_180",
+    "rl",
 )
 check(
     "RL outcomes",
     by_account(rl_ev, "promise_outcome"),
-    {"R": "paid", "S": "none", "T": "paid", "U": "paid"},
+    {"R": "none", "S": "none", "T": "paid", "U": "paid"},
 )
 
 # ── 3-4. Dimensions B and C on the ledger ─────────────────────────────────────
@@ -465,8 +474,9 @@ st = build_a3_credibility(
     build_dlq_payment_signals(ep_s, ledger, "cc_60_180"),
     build_pre_dlq_payment_signals(ep_s, ledger),
     build_contact_signals(ep_s, followup, agreements, inst, pays, dues, "cc_60_180"),
-    "next_statement",
+    "cc_60_180",
     "2026-08-31",
+    "cc",
 )
 check("state N", by_account(st, "a3_unknown_reason")["N"], "no_episode")
 check(
@@ -582,6 +592,7 @@ rl_in = {
         "total_paid double",
     ),
 }
+cat_out = {}
 for product, make, inputs, model in [
     ("cc", cc_pipeline, cc_in, "cc_60_180"),
     ("rl", rl_pipeline, rl_in, "rl_60_180"),
@@ -594,6 +605,7 @@ for product, make, inputs, model in [
     )
     SequentialRunner().run(pipe, cat)
     out = cat.load(f"crx_{product}_a3_payment_credibility")
+    cat_out[product] = out.localCheckpoint()  # cut the lineage for the check
     got = {
         r["account_id"]: (r["a3_state"], r["a3_refusal_flag"], r["a3_promise_deadline"])
         for r in out.collect()
@@ -604,7 +616,7 @@ for product, make, inputs, model in [
     check(
         f"kedro {product} deadline",
         got["A"][2],
-        {"cc": "next_statement", "rl": "next_month_end"}[product],
+        {"cc": "next_statement", "rl": "month_end"}[product],
     )
     check(
         f"kedro {product} promises concluded",
@@ -612,7 +624,7 @@ for product, make, inputs, model in [
         1,
     )
 
-# ── 9. TEMPORARY (A3 bundle 20): the check pipelines run and log every block ──
+# ── 9. TEMPORARY (A3 bundle 23): the check pipelines run and log every block ──
 import logging  # noqa: E402
 
 from enbd_collections.pipelines.crx_persona.a3_credibility import (  # noqa: E402
@@ -630,15 +642,6 @@ handler = logging.Handler()
 handler.emit = lambda record: logged.append(record.getMessage())
 logging.getLogger(a3_check.__name__).addHandler(handler)
 logging.getLogger(a3_check.__name__).setLevel(logging.INFO)
-old_out = df(
-    [
-        ("A", OBS, "payment_credibility_moderate", 1, False, "broken", 2, "ptp"),
-        ("N", OBS, "payment_credibility_unknown", 0, False, "thin", 0, None),
-    ],
-    "account_id string, observation_date date, a3_state string, a3_points_total int, "
-    "a3_refusal_flag boolean, a3_commitments_level string, "
-    "commitments_concluded int, last_rpc_disposition string",
-)
 for product, make, inputs, model in [
     ("cc", cc_check, cc_in, "cc_60_180"),
     ("rl", rl_check, rl_in, "rl_60_180"),
@@ -648,7 +651,7 @@ for product, make, inputs, model in [
         **shared,
         **inputs,
         "params:model_id": model,
-        f"crx_{product}_a3_payment_credibility": old_out,
+        f"crx_{product}_a3_payment_credibility": cat_out[product],
     }
     cat = DataCatalog(
         {
@@ -663,23 +666,15 @@ for product, make, inputs, model in [
 blocks = [m.split("===")[1].strip() for m in logged]
 check(
     "check blocks",
-    sorted(set(blocks)),
-    sorted(
-        f"{b} START" for b in ["A3 OUTPUT", "A3 PROMISES", "A3 LEVELS", "A3 CONTACTS"]
-    ),
+    blocks,
+    [f"{b} START" for b in ["A3 OUTPUT", "A3 PROMISES", "A3 LEVELS"] * 2],
 )
-check("check old Moderate from 2", "state old_m2:\n  low: 1 (50.0%)" in logged[0], True)
-check("check GRR vs 30 days", "low | moderate: 1" in logged[0], True)
 check(
-    "check steps",
-    [
-        w in logged[0]
-        for w in ("(whole bundle)", "(promise events)", "(12-month window)")
-    ]
-    + ["before the episode start" in logged[1]],
-    [True] * 4,
+    "check CC deadline unchanged at 60_180", "(deadline), changed 0" in logged[0], True
 )
-print("\n\n".join(logged[:4]))
+check("check b20 matched", "b20 x new (whole bundle), changed 0" in logged[0], True)
+check("check RL model_id", "model_id: rl_60_180" in logged[3], True)
+print("\n\n".join(logged))
 
 print("\n".join(FAILS) if FAILS else "a3 engine spec: all checks pass")
 sys.exit(1 if FAILS else 0)

@@ -6,8 +6,8 @@
     dcore_prm_followup_outcomes┴────────────────────────────┴─ contacts ────────┘
 
 Needs, for the model_id: the obs base, A4, the product's payment sources and the DCORE
-tables. Promises are judged by ``PROMISE_DEADLINE`` (CC the next statement, RL the end of
-the next month).
+tables. Promises are judged by ``PROMISE_DEADLINE`` (at 60-180 CC the next statement, RL
+the month end; at 180+ the month end).
 """
 
 from functools import partial
@@ -16,7 +16,6 @@ from kedro.pipeline import Pipeline, node
 from kedro.pipeline.node import Node
 
 from .classify import build_a3_credibility
-from .constants import PROMISE_DEADLINE
 from .signals import (
     build_commitment_signals,
     build_contact_signals,
@@ -40,9 +39,8 @@ def create_a3_pipeline(
 ) -> Pipeline:
     """The A3 axis for ``product``, written to ``output``. ``dues`` / ``payments`` are
     the product nodes writing ``crx_<p>_a3_dues`` / ``crx_<p>_a3_payments``.
-    ``deadline`` overrides ``PROMISE_DEADLINE`` (the bundle check)."""
+    ``deadline`` overrides ``PROMISE_DEADLINE`` (e.g. ``30_days``)."""
     p = f"crx_{product}_a3"
-    deadline = deadline or PROMISE_DEADLINE[product]
     episode, ledger, inst = f"{p}_episode", LEDGER[product], f"{p}_instalments"
     events = f"{p}_promise_events"
 
@@ -84,7 +82,7 @@ def create_a3_pipeline(
                 inst,
             ),
             step(
-                partial(build_promise_events, deadline=deadline),
+                partial(build_promise_events, product=product, deadline=deadline),
                 {
                     "obs_base": f"crx_{product}_obs_base",
                     "followup": "dcore_prm_followup_outcomes",
@@ -92,6 +90,7 @@ def create_a3_pipeline(
                     "instalments": inst,
                     "dues": f"{p}_dues",
                     "payments": f"{p}_payments",
+                    "model_id": "params:model_id",
                 },
                 events,
                 events,
@@ -129,13 +128,14 @@ def create_a3_pipeline(
                 f"{p}_contact_signals",
             ),
             step(
-                partial(build_a3_credibility, deadline=deadline),
+                partial(build_a3_credibility, product=product, deadline=deadline),
                 {
                     "episode": episode,
                     "commitments": f"{p}_commitment_signals",
                     "dlq_payments": f"{p}_dlq_payment_signals_single_payment_cycle_count",
                     "pre_dlq": f"{p}_pre_dlq_payment_signals_single_payment_cycle_count",
                     "contacts": f"{p}_strong_negative_signals",
+                    "model_id": "params:model_id",
                     "persona_end_date": "params:crx_persona.persona_end_date",
                 },
                 output,

@@ -147,6 +147,12 @@ Measured, not assumed (V2, V3).
   every other threshold moves ≤ 4%. High from 3 is the lever if High (today reachable only with DCORE
   commitments) should open to regular payments plus a clean record. Both are for the GRR calibration,
   not this bundle.
+- **D-A3-27: Unknown = no episode only** (user, 2026-11-10). No payment while delinquent is evidence
+  (Dimension B `none` = 0 points, no longer a silent level), so a row with an observed episode and
+  no points in any dimension is Low, not Unknown. These were mostly early payment defaults (thin
+  promises, no payment, no record before). Unknown stays only for rows with no episode anchor
+  (`a3_unknown_reason` = `no_episode`); the `no_evidence` reason is gone. High and Moderate don't
+  move.
 
 ## Validations before the bundle
 

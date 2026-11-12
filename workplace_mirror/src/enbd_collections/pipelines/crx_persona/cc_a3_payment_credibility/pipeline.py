@@ -7,7 +7,7 @@ and the DCORE tables.
 
     kedro run --pipeline=crx_cc_a3_payment_credibility
 
-TEMPORARY (A3 bundle 20): ``create_check_pipeline`` (``a3_credibility/check.py``);
+TEMPORARY (A3 bundle 23): ``create_check_pipeline`` (``a3_credibility/check.py``);
 removed by the bundle's cleanup.
 """
 
@@ -45,5 +45,5 @@ def create_pipeline(  # pylint: disable=unused-argument
 
 
 def create_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the A3 bundle 20 check for CC."""
+    """TEMPORARY: the A3 bundle 23 check for CC."""
     return create_a3_check_pipeline("cc", DUES, PAYMENTS)

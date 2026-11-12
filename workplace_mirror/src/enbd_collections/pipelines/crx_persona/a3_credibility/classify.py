@@ -4,7 +4,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, left_join_all, log_latest_month
-from .constants import DISPLAY_NAMES, SCORECARD
+from .constants import DISPLAY_NAMES, SCORECARD, promise_deadline
 
 # Every input of the decision is carried (D-A3-17).
 OUTPUT_COLUMNS = [
@@ -62,26 +62,27 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     dlq_payments: DataFrame,
     pre_dlq: DataFrame,
     contacts: DataFrame,
-    deadline: str,
+    model_id: str,
     persona_end_date: str,
+    product: str,
+    deadline: str | None = None,
 ) -> DataFrame:
-    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24).
+    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24, -27).
 
     High from 4 points, Moderate from 2, else Low; a refusal takes one rung off. Unknown:
-    no evidence in any dimension and no refusal, or no episode anchor (Q-12,
-    ``a3_unknown_reason``).
+    no episode anchor only (``a3_unknown_reason`` = ``no_episode``); an episode with no
+    evidence scores 0 points and is Low.
     """
     df = left_join_all(
         episode, [episode, commitments, dlq_payments, pre_dlq, contacts]
-    ).withColumn("a3_promise_deadline", F.lit(deadline))
+    ).withColumn(
+        "a3_promise_deadline", F.lit(deadline or promise_deadline(product, model_id))
+    )
     scored = SCORECARD.score(df)
     no_episode = F.col("episode_start").isNull()
     unknown = DISPLAY_NAMES["unknown"]
     out = scored.withColumn(
-        "a3_unknown_reason",
-        F.when(no_episode, "no_episode").when(
-            F.col("a3_state") == unknown, "no_evidence"
-        ),
+        "a3_unknown_reason", F.when(no_episode, "no_episode")
     ).withColumn("a3_state", F.when(no_episode, unknown).otherwise(F.col("a3_state")))
     out = out.select(*OUTPUT_COLUMNS)
     log_latest_month(out, "a3_state", "A3 credibility", persona_end_date)

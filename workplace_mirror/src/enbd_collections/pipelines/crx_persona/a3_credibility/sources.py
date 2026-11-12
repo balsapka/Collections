@@ -20,6 +20,7 @@ from .constants import (
     MATCH_DAYS,
     MIN_PAYMENT_AED,
     STATEMENT_FALLBACK_D,
+    promise_deadline,
 )
 
 DUES = ["account_id", "cycle_start", "cycle_end", "due_amount", "billed_amount"]
@@ -247,6 +248,7 @@ def _cutoff(events: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
     """``events`` + ``promise_cutoff``: the last day a payment still counts."""
     day = F.col("event_date")
     fixed = {
+        "month_end": F.last_day(day),
         "next_month_end": F.last_day(F.add_months(day, 1)),
         "30_days": F.date_add(day, 30),
         "30_days_month_end": F.last_day(F.date_add(day, 30)),
@@ -269,24 +271,27 @@ def _cutoff(events: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
     )
 
 
-def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     obs_base: DataFrame,
     followup: DataFrame,
     agreements: DataFrame,
     instalments: DataFrame,
     dues: DataFrame,
     payments: DataFrame,
-    deadline: str,
+    model_id: str,
+    product: str,
+    deadline: str | None = None,
 ) -> DataFrame:
     """Promise events of the base's accounts, judged by payment (D-A3-25). ``EVENTS``.
 
     Events: every non-cancelled PTP and settlement plan (dated at its start) and every
     follow-up promise run (``_dcore_codes.PROMISE_EVENT``) no plan claims
     (``event_kind`` matched / table_only / followup_only). Judged once: the payments
-    after the event day up to ``promise_cutoff`` (``deadline``, ``PROMISE_DEADLINE``)
-    against ``promise_amount``, the due of the cycle open on the event day (the last
-    known one, at least 100 AED). Paid: they reach it; partial: 100 AED or more; else
-    none. RL cash is dated at the month end, so the event month's cash counts in full.
+    after the event day up to ``promise_cutoff`` (``deadline``, by default
+    ``promise_deadline(product, model_id)``) against ``promise_amount``, the due of the
+    cycle open on the event day (the last known one, at least 100 AED). Paid: they reach
+    it; partial: 100 AED or more; else none. RL cash is dated at the month end, so the
+    event month's cash counts in full.
     """
     plans = instalments.select(
         "account_id", "plan_id", "plan_type", F.col("plan_start").alias("event_date")
@@ -294,7 +299,7 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     events = _cutoff(
         _consolidate(plans, _followup_promises(obs_base, followup, agreements)),
         dues,
-        deadline,
+        deadline or promise_deadline(product, model_id),
     )
     keys = ["account_id", "event_date"]
     due = (

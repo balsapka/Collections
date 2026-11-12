@@ -1,7 +1,7 @@
 """A3 payment credibility: thresholds, windows and the Scorecard (spec
 ``specs/A3_credibility_spec.md``; "row n" = the DE sheet "A3 framework")."""
 
-from .._common import SEG_60_180, SEG_180_PLUS
+from .._common import SEG_60_180, SEG_180_PLUS, segment
 from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard
 
 # ── Dimension A: promises kept (D-A3-9, D-A3-16, D-A3-25) ─────────────────────
@@ -12,12 +12,29 @@ BROKEN_RATE = 0.40  # Broken below (row 76)
 BROKEN_STREAK = 3  # Broken when the last 3 concluded were all broken (row 77)
 FOLLOWUP_RUN_DAYS = 7  # follow-up promises less than 8 days apart are one event
 MATCH_DAYS = 7  # a follow-up promise within 7 days of a DCORE plan is that plan
-# The deadline a promise is judged by (GRR): CC the next statement after the promise
-# day, however close; RL the end of the next month (RL cash is known by month only).
-# The alternative is 30 days from the promise ("30_days"; RL "30_days_month_end").
-DEADLINES = ("next_statement", "next_month_end", "30_days", "30_days_month_end")
-PROMISE_DEADLINE = {"cc": "next_statement", "rl": "next_month_end"}
+# The deadline a promise is judged by (GRR, handoff 64), whatever date was promised: at
+# 60-180 a card promise by the next statement after the promise day, however close; a
+# loan promise, and every promise at 180+, by the end of the promise month. The
+# alternatives are 30 days from the promise ("30_days"; RL "30_days_month_end") and
+# bundle 20's RL rule, the end of the next month ("next_month_end").
+DEADLINES = (
+    "next_statement",
+    "month_end",
+    "next_month_end",
+    "30_days",
+    "30_days_month_end",
+)
+PROMISE_DEADLINE = {
+    SEG_60_180: {"cc": "next_statement", "rl": "month_end"},
+    SEG_180_PLUS: {"cc": "month_end", "rl": "month_end"},
+}
 STATEMENT_FALLBACK_D = 31  # no statement after the promise day yet: 31 days
+
+
+def promise_deadline(product: str, model_id: str) -> str:
+    """The ``PROMISE_DEADLINE`` of ``product`` in ``model_id``'s segment."""
+    return PROMISE_DEADLINE[segment(model_id)][product]
+
 
 # ── Dimension B: payments while delinquent (D-A3-3, -5, -6) ───────────────────
 QUALIFYING_SHARE = 1.0  # a cycle qualifies at 100% of one month's due (row 80)
@@ -55,9 +72,9 @@ SCORECARD = Scorecard(
     prefix="a3",
     dimensions=(
         Dimension("commitments", "a3_commitments_level", COMMITMENT_POINTS, ("thin",)),
-        Dimension(
-            "dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, ("none",)
-        ),
+        # no silent level: no payment while delinquent is evidence (0 points), so an
+        # episode row is never Unknown (D-A3-27)
+        Dimension("dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, ()),
         Dimension(
             "pre_dlq_record", "a3_pre_dlq_payment_level", PRE_DLQ_POINTS, ("no_record",)
         ),

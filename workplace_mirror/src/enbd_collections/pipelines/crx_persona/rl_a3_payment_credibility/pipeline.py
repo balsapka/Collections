@@ -6,7 +6,7 @@ Needs, for the model_id (rl_60_180 / rl_180_plus): ``crx_rl_obs_base``,
 
     kedro run --pipeline=crx_rl_a3_payment_credibility
 
-TEMPORARY (A3 bundle 20): ``create_check_pipeline`` (``a3_credibility/check.py``);
+TEMPORARY (A3 bundle 23): ``create_check_pipeline`` (``a3_credibility/check.py``);
 removed by the bundle's cleanup.
 """
 
@@ -41,5 +41,5 @@ def create_pipeline(  # pylint: disable=unused-argument
 
 
 def create_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the A3 bundle 20 check for RL."""
+    """TEMPORARY: the A3 bundle 23 check for RL."""
     return create_a3_check_pipeline("rl", DUES, PAYMENTS)
