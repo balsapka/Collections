@@ -34,26 +34,3 @@ def _cross_product_node(output: str):
         name=f"build_{output}",
         tags=["products", "features"],
     )
-
-
-def create_b24_check_pipeline() -> Pipeline:
-    """TEMPORARY (bundle 24): the table rebuilt from the product primaries against the
-    persisted one; removed by the bundle's cleanup."""
-    from . import check  # pylint: disable=import-outside-toplevel
-
-    return Pipeline(
-        [
-            _cross_product_node("feat_cif_cross_product_monthly_b24_new"),
-            node(
-                func=check.compare,
-                inputs={
-                    "old": "feat_cif_cross_product_monthly",
-                    "new": "feat_cif_cross_product_monthly_b24_new",
-                    "persona_end_date": "params:crx_persona.persona_end_date",
-                },
-                outputs=None,
-                name="b24_check_compare",
-                tags=["products", "b24_check"],
-            ),
-        ]
-    )
