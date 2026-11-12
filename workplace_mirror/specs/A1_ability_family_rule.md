@@ -64,11 +64,13 @@ against the flow dictionary, the check's outcome block.
       sourcing is fixed (user, 2026-11-11, replacing the 2026-11-10 plan): the unified series is
       event-like, and dropping the carry would cut Stable by 0.8–3.6pp;
     - **fill until change — tested 2026-11-12** (`bundle_helpers/a1_final/bureau_fill_whatif_results.md`,
-      4 model_ids): filling an alert level as Stable (no cap or 12 months) adds 8–10 points of Moderate
-      on evidence that cures like Low (filled Stable 10–12% from age 2 on, flat; fresh 14.8%, Low
-      10.9%, none 9.2%); filled Weak cures below none; a fill that outlived a stopped internal salary
-      cures 1–7%; at 180+ half the fill-only evidence predates the charge-off. C1 stays for Stable;
-      a Weak-only fill is the open option (decision pending);
+      4 model_ids). The deciding question is the data's (user): does silence mean no change? Partly
+      supported: the feed stays live for 77–95% of silent CIFs, and when another source disagrees an
+      alert follows in 65–91% of credit / pull cases (half within 1–3 months); missed stops are rare up
+      to 6 months (0.8–3.8% of fill months with internal history) but reach 9–11% at 7–12 and 28–32% at
+      13+. Not settled: the 37–67% disagreement while filled has no fresh-alert baseline (sources may
+      differ by definition), 0 alerts hidden behind `salary_credit` rows inflate missed stops, and the
+      pull may be shifted a month. Decision pending a baseline rerun; cure rates are secondary;
     - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
       the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
       `loan_features` input and the `product == "rl"` branch.
