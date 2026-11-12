@@ -1,6 +1,6 @@
 # Mirror bundle 24 — A1: product primaries + bureau salary from the unified table
 
-apply_bundle version: 7 · built 2026-11-12 from `ca3f382..79bc263` · source: 9 added, 12 replaced, 0 deleted · helpers: 0
+apply_bundle version: 7 · built 2026-11-12 from `ca3f382..d72db26` · source: 9 added, 12 replaced, 0 deleted · helpers: 0
 
 ## Steps — do these in order, from the workplace repo root
 
@@ -36,7 +36,7 @@ committing.
 
 1. **Catalog and registry.** `catalog_products.yml` and `tmp_b24_check.yml` are new and `feat_cif_cross_product_monthly` now lives there only: confirm it is gone from `catalog_casa.yml` and defined exactly once in `conf/`. List every top-level key the apply removed from `catalog_casa.yml`, `catalog_bureau.yml`, `catalog_products.yml` and `pipeline_registry.py` compared with the last commit and put back any that is not `feat_cif_cross_product_monthly` (the `casa_windows*` entries and `genesys` must survive). `kedro registry list` shows `product_primary`, `product_features`, `product_features_b24_check`, `crx_cc_a1_b24_check` and `crx_rl_a1_b24_check`. `feat_bureau_salary_unified` must be defined exactly once in `conf/` (the mirror has it in `catalog_bureau.yml`; if the DE's entries were merged into `catalog_outputs.yml`, keep one, same path) and point at the parquet the DE wrote for every model_id.
 2. **`derive_billing_amounts`.** `nodes/primary/products/prm_products.py` calls `prm_cc.derive_billing_amounts(tail, account_group)` exactly as bundle 21's node did; confirm the signature and that it returns `contract_idt`, `banking_date` and `minimum_due`.
-3. **Callers of the moved helpers.** `grep -rn "feat_cif_casa import\|_require\|_wm_month\|_cif()" src`: nothing outside `feat_cif_casa.py` may still import its old private helpers (they are now `nodes/utils/frames.py`); fix any workplace-only caller and report it.
+3. **Callers of the moved helpers.** `grep -rn "feat_cif_casa import" -A6 src`: list every module outside `feat_cif_casa.py` that imports `_cif`, `_require`, `_wm_month` or `months_back` from it (the casa_windows* pipelines did, so the first apply failed on `_cif`). Do not change them: `feat_cif_casa.py` keeps the old names as aliases of `nodes/utils/frames.py` until those modules are mirrored; just report the files and lines.
 4. **Parameters.** `products.history_months` resolves (`parameters_products.yml`); `crx_persona.persona_start_date` / `persona_end_date` exist.
 5. **Bureau swap.** `feat_cif_bureau_salary_monthly.build(unified)` reads `cif_id`, `salary_month_end`, `monthly_salary`, `salary_source`: confirm these names and types on the real `feat_bureau_salary_unified` schema. `grep -rn "loan_features\|_loan_bureau_salary\|feat_cif_bureau_salary_monthly.build" src`: no A1 code may still pass `loan_features`; report any other caller of the old `build(alerts)`.
 6. **Tests.** Update the tests of `feat_cif_cross_product` for the new signature (primaries + WM; no `feat_product_holding`, no raw tables) and add tests for the three primaries; update the tests of `feat_cif_bureau_salary_monthly` (unified rows in, no alert types) and of `build_income_signals` (no `loan_features`); update any CASA test that imported `_require` / `_cif` / `_wm_month` / `months_back` from `feat_cif_casa`. Black, ruff and pylint clean on the touched files.
@@ -1074,7 +1074,7 @@ def build(unified: DataFrame) -> DataFrame:
 `````
 
 ### FILE: `src/enbd_collections/nodes/features/casa/feat_cif_casa.py`
-action: replace · base sha256 `17dea7e8b3837fb9eb0915ba0dab2979504e145c3c37ee9dd946fb6b93fdc23b` · base trailing newline: yes · new sha256 `84858f724b751c138863dc1402add14c8f8fd05b8bc62bf16a285bf434bea94e` · new trailing newline: yes
+action: replace · base sha256 `17dea7e8b3837fb9eb0915ba0dab2979504e145c3c37ee9dd946fb6b93fdc23b` · base trailing newline: yes · new sha256 `fc6b8267e71557de14c92a75be247139cdfc6a003bd1da690c343f72af93eb77` · new trailing newline: yes
 
 Base (as photographed — used only for the safety check and --revert):
 
@@ -1745,6 +1745,10 @@ from enbd_collections.nodes.utils.frames import (
     require_columns,
     wm_month,
 )
+
+# The old private names, still imported by workplace modules outside the mirror (the
+# casa_windows* pipelines); drop them once those import nodes.utils.frames.
+_cif, _require, _wm_month = cif_column, require_columns, wm_month
 
 _CASA_BALANCE = "ft_avg_casa_eod_balance_in_last_0_3_weeks_avg"  # CA+SA, ~1 month
 _CASA_IN = "ft_inflow_casa_amt_in_last_0_0_weeks_sum"
