@@ -90,8 +90,14 @@ against the flow dictionary, the check's outcome block.
       2026-11-12): keep the one-month carry for now.** Ready option, not forgotten: a carry of up to 3
       months (ages 1–3, ended by a newer row or a 0) is what the data support; switching is one constant in
       `signals.py` (`_with_next_month`) plus the spec cases. 4–6 months only after the DE maps every closed
-      alert to 0; never beyond 6. DE ask: map `salaryaccountclosed` to 0 whatever its amount (and say what
-      `salaryaccountisadded/closed` means); a stop beating lower sources in its month is optional;
+      alert to 0; never beyond 6. **Closure rule (user,
+      2026-11-12):** the bureau mixes added / closed (and has `salaryaccountisadded/closed`), so a closure
+      alert (`salaryaccountclosed`, `salaryaccountisadded/closed`) is read by its amount, not its type:
+      amount > 0 = that month's salary, **not carried** to the next month; amount 0 or NULL = a stop (0).
+      Added / changed alerts are unchanged (a positive amount is a level and carries). DE ask: apply this in
+      `int_bureau_alert_salary_monthly` and expose a closure flag (e.g. `is_closure`) on the unified rows;
+      then our feature passes it through and `_with_next_month` skips the carry for closure rows (a later
+      A1 bundle, once the column is in PROD);
     - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
       the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
       `loan_features` input and the `product == "rl"` branch.
