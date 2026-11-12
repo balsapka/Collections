@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 27 slides, in order: every word, number and speaker note as it stands in v82 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 27 slides, in order: every word, number and speaker note as it stands in v83 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -121,7 +121,7 @@ Column 1, **How did they get here?** (A1 · Deterioration). Four families, each 
 - Paid, then stopped suddenly: seasoned · early-life straight roller
 - Never paid: early payment default
 
-Bottom box: *Informs:* Context and triage
+Bottom box: *Informs:* Context and priority
 
 Column 2, **Can we talk to them?** (A2 · Locatability)
 - "The gate": where they were last seen · whether calls connect
@@ -141,7 +141,7 @@ Bottom box: *Decides:* Offer and agent
 No footer.
 
 Notes:
-> The framework in one picture, in the order a case meets it. First, how did they get here: the DPD path tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That is context and a triage flag. Second, can we talk to them: the gate. Only reachable customers go on; for those who do not answer or look abroad, the decision is the route, such as tracing or an agency. Third, for the reachable, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas come out of a workshop with GRR.
+> The framework in one picture, in the order a case meets it. First, how did they get here: the DPD path tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That gives context, and a flag for which cases to prioritise. Second, can we talk to them: the gate. Only reachable customers go on; for those who do not answer or look abroad, the decision is the route, such as tracing or an agency. Third, for the reachable, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas come out of a workshop with GRR.
 
 ## 6 · How it is built
 
@@ -158,7 +158,7 @@ Layout: a 2 × 2 grid of short cards.
 | Customer-level evidence | Salary, CASA, bounces and logins are read across all of a customer's accounts, not only the delinquent one. |
 
 Notes:
-> Four design choices, each made for adoption. Rules rather than a model, so every state can be traced to the rule that assigned it. Unknown as an explicit state with a reason, which doubles as our map of data gaps. Point-in-time month ends, so any back-test is fair. And customer-level evidence across all accounts.
+> Four design choices, each made for adoption. Rules rather than a model, so every state can be traced to the rule that assigned it. Unknown is a state of its own, always with the reason; counted up, those reasons show us where data is missing, and for ability they point to the bureau salary feed. Point-in-time month ends, so any back-test is fair. And customer-level evidence across all accounts.
 
 ## 7 · Part 1 divider
 
@@ -190,7 +190,7 @@ Left, "How a customer gets a label": Read from the DPD history alone, so it cove
 | 5 | Fell to 61+ fast, in the first year? | Early-life straight roller | fell fast, early |
 | 6 | Otherwise | Slow roller | fell slowly, paying on the way |
 
-Right, "August mix" (two stacked 100% bars, or a small table):
+Right, "August mix · share of accounts" (two stacked 100% bars, or a small table):
 
 | Family | Loans 61–180 | Cards 61–180 |
 |---|---|---|
@@ -200,13 +200,13 @@ Right, "August mix" (two stacked 100% bars, or a small table):
 | Never paid | 6% | 8% |
 
 Stat boxes:
-- **60%**: of card accounts curing now paid within 3 months, against 22% of those who cured before.
+- **60%**: of card accounts curing now paid within 3 months; of those who cured before, 22% did.
 - **Half**: of loans (six in ten cards) paid for a while, then stopped all at once: an event, not a habit.
 
 Footer: Production, 31 August 2026, 61–180 DPD · paid: meaningful payment within 3 months
 
 Notes:
-> Deterioration reads only the DPD history, so it covers every account. Six questions asked in order; the first yes decides. The states fall into four families. Stabilized customers are curing now: they have stopped falling. Slow rollers and repeat delinquents have cured or paid before, but are falling now. Straight rollers, seasoned or early in life, paid for a while and then stopped all at once, which points to an event rather than a habit: half of loans and six in ten card accounts. Early payment defaults never paid at all. The split matters: 60 percent of card accounts curing now made a meaningful payment within three months, against 22 percent of those who cured before, and the gap is 26 to 49 points in every bucket; for loans 74 against 38 percent. Whatever the path, the next question is whether we can talk to them.
+> Deterioration reads only the DPD history, so it covers every account. Six questions asked in order; the first yes decides. The states fall into four families. Stabilized customers are curing now: they have stopped falling. Slow rollers and repeat delinquents have cured or paid before, but are falling now. Straight rollers, seasoned or early in life, paid for a while and then stopped all at once, which points to an event rather than a habit: half of loans and six in ten card accounts. Early payment defaults never paid at all. The split matters: 60 percent of card accounts curing now made a meaningful payment within three months, against 22 percent of those who cured before, and within every DPD bucket from 61 to 180 the gap is 26 to 49 percentage points, so it is not just that curing customers sit in earlier buckets; for loans 74 against 38 percent. Whatever the path, the next question is whether we can talk to them.
 
 ## 9 · A2 · Locatability
 
@@ -310,12 +310,12 @@ Amber box, **Needs: GRR's bureau salary feed**: About a third of customers have 
 
 Stat boxes:
 - **58%**: of card customers at 61–180 show no evidence of their money yet.
-- **4×**: High-ability card customers cure within 3 months four times as often as those with no evidence.
+- **4×**: High-ability card customers are back below 61 DPD three months later four times as often as those with no evidence.
 
 Footer: * Strong = regular and above the floor in at least 2 of the last 3 months (floor: AED 3,000 or twice the amount due); at 180+: 3 of the last 6 months
 
 Notes:
-> Ability is work in progress. The approach: four families of evidence, income, other money arriving or held (a balance that survives the sweep counts), the customer's own spending, and activity on their other products. We count how many are strong: two or more is High, one is Moderate, some evidence but nothing strong is Low, and no evidence at all is Unknown. A bounced cheque or returned direct debit moves the customer one band down. The axis depends on one thing we do not control: about a third of customers have no current or savings account with us and half never had a salary credit here, so without GRR's bureau salary feed many stay Unknown. 58 percent of card customers at 61 to 180 show no evidence of their money yet. Where we do see it, ability separates customers clearly: 31 percent of High-ability card customers cured within three months, against 8 percent of those with no evidence, and 59 against 20 percent made a payment. At 180+, Moderate or High ability counts as a positive signal: 6.5 percent of card accounts.
+> Ability is work in progress. The approach: four families of evidence, income, other money arriving or held (a balance that survives the sweep counts), the customer's own spending, and activity on their other products. We count how many are strong: two or more is High, one is Moderate, some evidence but nothing strong is Low, and no evidence at all is Unknown. A bounced cheque or returned direct debit moves the customer one band down. The axis depends on one thing we do not control: about a third of customers have no current or savings account with us and half never had a salary credit here, so without GRR's bureau salary feed many stay Unknown. 58 percent of card customers at 61 to 180 show no evidence of their money yet. Where we do see it, ability separates customers clearly: 31 percent of High-ability card customers were back below 61 DPD three months later, against 8 percent of those with no evidence, and 59 against 20 percent made a payment. At 180+, Moderate or High ability counts as a positive signal: 6.5 percent of card accounts.
 
 ## 12 · Part 2 divider
 
@@ -652,10 +652,10 @@ Bottom cards:
 - **Other products with us** give evidence for customers with no CASA activity.
 - **Only proven transactions count;** bounces and reversals cancel out.
 
-Footer: * Cure: back to current · Pay: any payment, even partial · Roll: moves to a worse bucket
+Footer: * Cure: below 61 DPD at month 3 · Pay: any payment, even partial · Roll: moves to a worse bucket
 
 Notes:
-> How the new ability rule compares with the old one, which rested on income plus the CASA balance. The old High needed a CASA balance above the floor, and the bank sweeps balances against the overdue amount, so High almost never fired. The new rule counts four evidence families: income, money arriving or held, the customer's own spending, and other products with us. Two strong families make High, one makes Moderate, some evidence makes Low, none is Unknown; a bounced cheque or returned direct debit moves the customer one band down. Share of accounts: High grows four to eight times in every book. Low rises for loans and at 180+, mostly customers with another product kept current with us. Cards at 61 to 180 move slightly into Unknown on purpose: those customers' only account activity was fees or payments on their own loan, which says nothing about ability. Outcomes are rates within each state over the next three months: cure means back to current, pay means any payment, roll means a worse bucket. Every state orders all three in the right direction. For cards every step is significant, also within the same DPD bucket; for loans High and Moderate are not yet separable, because High is still small. The old rule's High was too small to read at all. Unknown means we cannot see the customer's money, not that they have none.
+> How the new ability rule compares with the old one, which rested on income plus the CASA balance. The old High needed a CASA balance above the floor, and the bank sweeps balances against the overdue amount, so High almost never fired. The new rule counts four evidence families: income, money arriving or held, the customer's own spending, and other products with us. Two strong families make High, one makes Moderate, some evidence makes Low, none is Unknown; a bounced cheque or returned direct debit moves the customer one band down. Share of accounts: High grows four to eight times in every book. Low rises for loans and at 180+, mostly customers with another product kept current with us. Cards at 61 to 180 move slightly into Unknown on purpose: those customers' only account activity was fees or payments on their own loan, which says nothing about ability. Outcomes are rates within each state over the next three months: cure means below 61 DPD at month 3, pay means any payment, roll means a worse bucket. Every state orders all three in the right direction. For cards every step is significant, also within the same DPD bucket; for loans High and Moderate are not yet separable, because High is still small. The old rule's High was too small to read at all. Unknown means we cannot see the customer's money, not that they have none.
 
 ## 27 · Appendix D: Status and sign-off
 
