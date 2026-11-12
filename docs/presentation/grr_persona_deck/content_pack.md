@@ -301,21 +301,21 @@ Right, "August mix":
 
 | | High | Moderate | Low | Unknown |
 |---|---|---|---|---|
-| Cards 61–180 | 1.6% | 14.8% | 25.6% | 58.0% |
-| Loans 61–180 | 1.2% | 8.7% | 49.2% | 41.0% |
-| Cards 180+ | 0.3% | 6.2% | 8.4% | 85.2% |
+| Cards 61–180 | 1.6% | 13.9% | 27.3% | 57.2% |
+| Loans 61–180 | 1.2% | 8.8% | 49.3% | 40.7% |
+| Cards 180+ | 0.3% | 6.0% | 8.6% | 85.1% |
 | Loans 180+ | 0.1% | 3.5% | 11.0% | 85.4% |
 
-Amber box, **Needs: GRR's bureau salary feed**: About a third of customers have no CASA with us, and half never had a salary credit here. Without a regular bureau salary feed they stay Unknown; with it, income becomes visible across the book.
+Amber box, **Needs: GRR's bureau salary feed**: About a third of customers have no CASA with us, and half never had a salary credit here. Without a regular bureau salary feed they stay Unknown; with it, income becomes visible across the book. Today the bureau’s bulk salary pull reaches about 1% of customers.
 
 Stat boxes:
-- **58%**: of card customers at 61–180 show no evidence of their money yet.
+- **57%**: of card customers at 61–180 show no evidence of their money yet.
 - **4×**: High-ability card customers are back below 61 DPD three months later four times as often as those with no evidence.
 
 Footer: * Strong = regular and above the floor in at least 2 of the last 3 months (floor: AED 3,000 or twice the amount due); at 180+: 3 of the last 6 months
 
 Notes:
-> Ability is work in progress. The approach: four families of evidence, income, other money arriving or held (a balance that survives the sweep counts), the customer's own spending, and activity on their other products. We count how many are strong: two or more is High, one is Moderate, some evidence but nothing strong is Low, and no evidence at all is Unknown. A bounced cheque or returned direct debit moves the customer one band down. The axis depends on one thing we do not control: about a third of customers have no current or savings account with us and half never had a salary credit here, so without GRR's bureau salary feed many stay Unknown. 58 percent of card customers at 61 to 180 show no evidence of their money yet. Where we do see it, ability separates customers clearly: 31 percent of High-ability card customers were back below 61 DPD three months later, against 8 percent of those with no evidence, and 59 against 20 percent made a payment. At 180+, Moderate or High ability counts as a positive signal: 6.5 percent of card accounts.
+> Ability is work in progress. The approach: four families of evidence, income, other money arriving or held (a balance that survives the sweep counts), the customer's own spending, and activity on their other products. We count how many are strong: two or more is High, one is Moderate, some evidence but nothing strong is Low, and no evidence at all is Unknown. A bounced cheque or returned direct debit moves the customer one band down. The axis depends on one thing we do not control: about a third of customers have no current or savings account with us and half never had a salary credit here, so without GRR's bureau salary feed many stay Unknown; today the bureau's bulk salary pull reaches only about 1 percent of customers. 57 percent of card customers at 61 to 180 show no evidence of their money yet. Where we do see it, ability separates customers clearly: 31 percent of High-ability card customers were back below 61 DPD three months later, against 8 percent of those with no evidence, and 59 against 20 percent made a payment. At 180+, Moderate or High ability counts as a positive signal: 6.3 percent of card accounts.
 
 ## 12 · Part 2 divider
 
@@ -633,9 +633,9 @@ Left, "Share of accounts in each state, August". Each cell shows the new value i
 
 | | High | Moderate | Low | Unknown |
 |---|---|---|---|---|
-| Cards 61–180 | 1.61% (was 0.23%) | 14.8% (was 14.4%) | 25.6% (was 28.9%) | 58.0% (was 56.6%) |
-| Loans 61–180 | 1.18% (was 0.28%) | 8.7% (was 8.9%) | 49.2% (was 44.7%) | 41.0% (was 46.1%) |
-| Cards 180+ | 0.26% (was 0.03%) | 6.2% (was 6.2%) | 8.4% (was 6.4%) | 85.2% (was 87.4%) |
+| Cards 61–180 | 1.62% (was 0.23%) | 13.9% (was 14.4%) | 27.3% (was 28.9%) | 57.2% (was 56.6%) |
+| Loans 61–180 | 1.18% (was 0.28%) | 8.8% (was 8.9%) | 49.3% (was 44.7%) | 40.7% (was 46.1%) |
+| Cards 180+ | 0.27% (was 0.03%) | 6.0% (was 6.2%) | 8.6% (was 6.4%) | 85.1% (was 87.4%) |
 | Loans 180+ | 0.12% (was 0.03%) | 3.5% (was 3.5%) | 11.0% (was 6.9%) | 85.4% (was 89.5%) |
 
 Right, "Next 3 months, 61–180*":
@@ -655,7 +655,7 @@ Bottom cards:
 Footer: * Cure: below 61 DPD at month 3 · Pay: any payment, even partial · Roll: moves to a worse bucket
 
 Notes:
-> How the new ability rule compares with the old one, which rested on income plus the CASA balance. The old High needed a CASA balance above the floor, and the bank sweeps balances against the overdue amount, so High almost never fired. The new rule counts four evidence families: income, money arriving or held, the customer's own spending, and other products with us. Two strong families make High, one makes Moderate, some evidence makes Low, none is Unknown; a bounced cheque or returned direct debit moves the customer one band down. Share of accounts: High grows four to eight times in every book. Low rises for loans and at 180+, mostly customers with another product kept current with us. Cards at 61 to 180 move slightly into Unknown on purpose: those customers' only account activity was fees or payments on their own loan, which says nothing about ability. Outcomes are rates within each state over the next three months: cure means below 61 DPD at month 3, pay means any payment, roll means a worse bucket. Every state orders all three in the right direction. For cards every step is significant, also within the same DPD bucket; for loans High and Moderate are not yet separable, because High is still small. The old rule's High was too small to read at all. Unknown means we cannot see the customer's money, not that they have none.
+> How the new ability rule compares with the old one, which rested on income plus the CASA balance. The old High needed a CASA balance above the floor, and the bank sweeps balances against the overdue amount, so High almost never fired. The new rule counts four evidence families: income, money arriving or held, the customer's own spending, and other products with us. Two strong families make High, one makes Moderate, some evidence makes Low, none is Unknown; a bounced cheque or returned direct debit moves the customer one band down. Share of accounts: High grows four to nine times in every book. Low rises for loans and at 180+, mostly customers with another product kept current with us. Cards at 61 to 180 move slightly into Unknown on purpose: those customers' only account activity was fees or payments on their own loan, which says nothing about ability. Outcomes are rates within each state over the next three months: cure means below 61 DPD at month 3, pay means any payment, roll means a worse bucket. Every state orders all three in the right direction. For cards every step is significant, also within the same DPD bucket; for loans High and Moderate are not yet separable, because High is still small. The old rule's High was too small to read at all. Unknown means we cannot see the customer's money, not that they have none.
 
 ## 27 · Appendix D: Status and sign-off
 
