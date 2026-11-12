@@ -1027,3 +1027,14 @@ earliest non-censored spell's t0, or before the first spine date. Under D-A3-1 /
 cover 12 months (plus one cycle) before the latest spell start, through the last observation date,
 floored at `cc_a3_history_floor_date`. That anchor comes from A4 and can be years back at 180+.
 `build_cc_limits` keeps its own T0 window, but no A3 node reads it (only the T0-only packages do).
+
+### O90 — `product_features` reads raw Way4 tables in a feature node (M)
+
+`feat_cif_cross_product.build` (`nodes/features/products/feat_cif_cross_product.py:291-358`,
+`pipelines/products/features.py`) takes `raw_stg_client / contract / billing / balance /
+account_group` next to `wm_fea_*` and `feat_product_holding`: raw and feature inputs in one node,
+against "no raw sources in persona" and one layer per node (DESIGN_REVIEW §7). It re-derives the
+card level (`BS_PMT_CYCLE_DUE` from `add_info`) and the minimum due (`derive_billing_amounts`)
+that the cc_way4 primary layer already builds. Fix later: read `prm_` card tables (billing level,
+balance / minimum due per contract) or add a primary node `prm_cif_card_products_monthly`. Output
+unchanged by the move; not blocking (bundle 21 check passed).

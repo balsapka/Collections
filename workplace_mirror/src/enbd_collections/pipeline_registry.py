@@ -33,6 +33,10 @@ from enbd_collections.pipelines.bureau import salary_bounces as bureau_salary_bo
 
 from enbd_collections.pipelines.casa import primary as casa_prm
 from enbd_collections.pipelines.casa import features as casa_feat
+from enbd_collections.pipelines.casa import windows as casa_win
+from enbd_collections.pipelines.casa import windows_all_models as casa_win_all
+from enbd_collections.pipelines.casa import windows_casa as casa_win_casa
+from enbd_collections.pipelines.casa import windows_casa_all_models as casa_win_casa_all
 from enbd_collections.pipelines.products import features as products_feat
 
 from enbd_collections.pipelines.retail_loans import staging as retail_loans_stg
@@ -155,6 +159,10 @@ def register_pipelines() -> dict[str, Pipeline]:
         # -- CASA (domain) ---------------------------------------------------
         "casa_primary": casa_prm.create_pipeline(),
         "casa_features": casa_feat.create_pipeline(),
+        "casa_windows": casa_win.create_pipeline(),
+        "casa_windows_all_models": casa_win_all.create_pipeline(),
+        "casa_windows_casa": casa_win_casa.create_pipeline(),
+        "casa_windows_casa_all_models": casa_win_casa_all.create_pipeline(),
         "product_features": products_feat.create_pipeline(),
         # -- Retail Loans (domain) -----------------------------------------
         "retail_loans": retail_loans.create_pipeline(),

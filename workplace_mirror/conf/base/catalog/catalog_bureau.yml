@@ -11,6 +11,17 @@ feat_cif_bureau_salary_monthly:
     kedro-viz:
       layer: feature
 
+# DE-owned (branch bureau-pipeline-analysis, read-only here): one monthly salary per CIF unified across
+# alert > salary_credit > bureau_salary sources. cif_id (long), salary_month_end (date),
+# monthly_salary (double), salary_source (string). Replaces feat_cif_bureau_salary_monthly in A1 income.
+feat_bureau_salary_unified:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/salary_unified"
+  metadata:
+    kedro-viz:
+      layer: feature
+
 # Bureau bounce pulls and new bounce events per (cif_id, month_end).
 feat_cif_bureau_bounces_monthly:
   type: spark.SparkDataset

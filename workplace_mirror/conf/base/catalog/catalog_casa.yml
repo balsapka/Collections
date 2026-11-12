@@ -37,6 +37,19 @@ prm_casa_transactions:
     kedro-viz:
       layer: primary
 
+# The classified CASA legs of the A1 flow evidence (flow_class per leg, persona window only),
+# one row per leg; the flows node starts from it (pipeline casa_features).
+prm_casa_flow_legs:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.prm}/casa/flow_legs"
+  save_args:
+    mode: overwrite
+    partitionBy: ["event_month"]
+  metadata:
+    kedro-viz:
+      layer: primary
+
 # Current and savings accounts (scheme code in casa_primary's CA / SA lists), one row per
 # (foracid, cif_id, schm_code), from raw_casa_acid_to_cif.
 prm_casa_accounts:
@@ -76,6 +89,138 @@ feat_cif_casa_balance_monthly:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_casa_balance_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Salary (internal, external, consolidated), CASA inflow and net flow per (cif_id, month_end): the
+# month and its trailing 3 / 6 / 12 month average, all history (casa_windows).
+feat_cif_inflow_outflow_salary_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Same columns as feat_cif_inflow_outflow_salary_monthly, but inflow / outflow / netflow are built
+# from CASA-scheme account legs only (loans and other schemes excluded), all history (casa_windows_casa).
+feat_cif_casa_inflow_outflow_salary_monthly:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/casa/cif_casa_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Copies of feat_cif_casa_inflow_outflow_salary_monthly with the model id hardcoded, so one pipeline
+# (casa_windows_casa_all_models) can read all four. Each is written by casa_windows_casa run for that model_id.
+feat_cif_casa_inflow_outflow_salary_monthly_cc_60_180:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/cc_60_180/${globals:folders.feat}/casa/cif_casa_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+feat_cif_casa_inflow_outflow_salary_monthly_cc_180_plus:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/cc_180_plus/${globals:folders.feat}/casa/cif_casa_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+feat_cif_casa_inflow_outflow_salary_monthly_rl_60_180:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/rl_60_180/${globals:folders.feat}/casa/cif_casa_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+feat_cif_casa_inflow_outflow_salary_monthly_rl_180_plus:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/rl_180_plus/${globals:folders.feat}/casa/cif_casa_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# All customers of the four models, one row per (cif_id, month_end), model-agnostic (shared
+# namespace): union and de-duplication of the four tables above (casa_windows_casa_all_models).
+feat_cif_casa_inflow_outflow_salary_monthly_all_models:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/casa/cif_casa_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# Copies of feat_cif_inflow_outflow_salary_monthly with the model id hardcoded, so one pipeline
+# (casa_windows_all_models) can read all four. Each is written by casa_windows run for that model_id.
+feat_cif_inflow_outflow_salary_monthly_cc_60_180:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/cc_60_180/${globals:folders.feat}/casa/cif_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+feat_cif_inflow_outflow_salary_monthly_cc_180_plus:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/cc_180_plus/${globals:folders.feat}/casa/cif_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+feat_cif_inflow_outflow_salary_monthly_rl_60_180:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/rl_60_180/${globals:folders.feat}/casa/cif_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+feat_cif_inflow_outflow_salary_monthly_rl_180_plus:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/rl_180_plus/${globals:folders.feat}/casa/cif_inflow_outflow_salary_monthly"
+  save_args:
+    mode: overwrite
+  metadata:
+    kedro-viz:
+      layer: feature
+
+# All customers of the four models, one row per (cif_id, month_end), model-agnostic (shared
+# namespace): union and de-duplication of the four tables above (casa_windows_all_models).
+feat_cif_inflow_outflow_salary_monthly_all_models:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/casa/cif_inflow_outflow_salary_monthly"
   save_args:
     mode: overwrite
   metadata:
