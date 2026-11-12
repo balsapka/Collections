@@ -30,9 +30,20 @@ against the flow dictionary, the check's outcome block.
   `cif_id long`, `salary_month_end`, `monthly_salary`, `salary_source` alert > salary_credit >
   bureau_salary). It is the long-term source: GRR's frequent bureau salary feed will land in it (user,
   2026-11-11). Swapped in its own bundle after bundle 21. Exploration back 2026-11-11
-  (`bundle_helpers/a1_final/bureau_unified_exploration_results.md`): its `alert` source is today's
-  series, `salary_credit` is our own salary credits (thin feed), cast its `cif_id` to string, cap it at
-  the persona months. The alert table loads daily in PROD (`edp_load_date`) and is complete
+  (`bundle_helpers/a1_final/bureau_unified_exploration_results.md`); cast its `cif_id` to string, cap it
+  at the persona months. **The three sources are all bureau data** (user, 2026-11-12; handoff 66 and
+  the exploration's reading of `salary_credit` were wrong):
+  - `alert`: today's series; an alert fires when the salary changes (forward fill under study).
+  - `salary_credit`: a bureau table of salary history across all providers, captured as a look-back
+    at the time the customer applies for a new product with us. Most delinquent customers never
+    apply again, so they have none; recent months thin out because the look-back ends at the
+    application. It equals our internal salary where the salary is paid to us (95% of shared months).
+  - `bureau_salary`: the bank's ad-hoc bulk bureau pull for a set of customers, aggregates across all
+    banks (`_1m`, `_3m`, ...); the DE infers the monthly amounts back from those aggregates (caveat:
+    the month pattern is inferred, not observed; today one pull, rows 2025-09 .. 2026-08). This is
+    the source GRR is pushing to cover every 61–180 customer.
+  So every unified row is bureau salary: it goes into `bureau_salary` of the contract as is, with
+  `salary_source` kept for reporting; no internal / bureau label decision. The alert table loads daily in PROD (`edp_load_date`) and is complete
   from 2024-01 on (user, 2026-11-12): silence before 2024 is not "no change". GRR is building a bureau salary
   feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
   engine therefore reads bureau salary through one contract only:

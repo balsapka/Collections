@@ -1,5 +1,12 @@
 # Handoff 69: `a1_bureau_unified/summary.md` (A1 unified bureau salary, DE table check), lines 1-265
 
+> **Correction (user, 2026-11-12):** `salary_credit` is not our own bank's salary credits. It is a
+> bureau table of salary history across providers, captured as a look-back when the customer applies
+> for a new product with us (hence thin and thinning; it matches internal salary where the salary is
+> paid to us). `bureau_salary` is the ad-hoc bulk bureau pull (cross-bank aggregates `_1m`, `_3m`, ...,
+> months inferred back by the DE). All three sources are bureau. Section 4's verdict and decision 5
+> below are superseded; see spec `specs/A1_ability_family_rule.md`.
+
 ## Context for Claude Code
 
 - Source: 5 phone photos of VS Code (LG monitor), file `tmp_validation/a1_bureau_unified/summary.md`, marked `U` (untracked). Other open tab: `pipeline_registry.py`. Dev container `retail.collections.risk_profiling` (cdp-devcontainer:latest).
