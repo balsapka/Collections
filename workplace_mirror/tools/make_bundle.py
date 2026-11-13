@@ -30,7 +30,7 @@ SOURCE_ROOTS = ("src/", "conf/")
 OUT_DIR = REPO / "workplace_mirror" / "bundles"
 APPLY = pathlib.Path(__file__).with_name("apply_bundle.py")
 LANG = {".py": "python", ".yml": "yaml", ".yaml": "yaml", ".md": "markdown"}
-LAST_REMOVED = 21  # highest bundle number deleted from bundles/ (numbers stay used)
+LAST_REMOVED = 24  # highest bundle number deleted from bundles/ (numbers stay used)
 WORK_DIR = "data/input/mirror_bundles"  # gitignored in the workplace repo
 
 
