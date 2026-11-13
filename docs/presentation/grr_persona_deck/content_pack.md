@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 32 slides, in order: every word, number and speaker note as it stands in v94 (2026-11-13). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 32 slides, in order: every word, number and speaker note as it stands in v95 (2026-11-13). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -351,30 +351,32 @@ Notes:
 
 ## 14 · Where the value sits
 
-Layout: a table of five personas across the top, three stat boxes underneath.
+Layout: a dark stat box with a short text on the left; on the right a horizontal bar chart of six example personas, with a dashed red line for the book average.
 
 - Section label: Where the value sits
-- Headline: **The customers most likely to pay sit in a few dozen personas**
+- Headline: **A few dozen personas bring in over half the money**
 
-Table label: The five largest high-collecting personas · cards
+Left:
+- Dark box: **54%** of the money collected came from **one fifth of card accounts**, picked in advance by their persona
+- Text: That fifth sits in a few dozen personas, mostly customers **curing now or cured before** who show **some credibility or ability**. The examples collect about three to four times the book average.
 
-| Path | Where · reach | Credibility | Ability | Accounts | Paid | AED per account |
-|---|---|---|---|---|---|---|
-| Stopped suddenly | In country · reachable | Low | Unknown | 167 | 30% | 1,274 |
-| Cured before | In country · reachable | Low | Low | 132 | 35% | 1,350 |
-| Curing now | Unknown · reachable | Moderate | Unknown | 103 | 69% | 1,713 |
-| Stopped suddenly | In country · reachable | Moderate | Low | 102 | 42% | 1,962 |
-| Cured before | In country · reachable | Moderate | Low | 97 | 43% | 1,663 |
+Chart label: Examples · AED collected per account in 3 months (bar length = AED; paid % beside it)
 
-Stat boxes:
-- **51** personas (dark): collected AED 1,250 or more per account: 11% of card accounts
-- **12** of 51: cover half of those accounts; 26 cover 80%
-- **16** personas: on loans collected AED 6,000 or more: 8% of accounts; 6 cover half
+| Path | Detail | AED | Paid |
+|---|---|---|---|
+| Curing now | In country · reachable · credibility Moderate · ability Low | 2,603 | 72% |
+| Stopped suddenly | In country · reachable · credibility Moderate · ability Unknown | 2,373 | 37% |
+| Stopped suddenly | In country · reachable · credibility Moderate · ability Low | 1,962 | 42% |
+| Curing now | Location unknown · reachable · credibility Moderate · ability Moderate | 1,892 | 60% |
+| Curing now | In country · reachable · credibility Moderate · ability Moderate | 1,794 | 65% |
+| Curing now | Location unknown · reachable · credibility Moderate · ability Unknown | 1,713 | 69% |
 
-Footer: Cards 61–180 · personas from August 2026 accounts · paid and AED per account: May 2026 accounts, collections June–August · card book average AED 639 per account
+Dashed line: card book average: AED 639
+
+Footer: Cards 61–180 · AED per account: what the persona's May 2026 accounts paid in June–August, per account · 54%: tested on months and accounts not used to rank them
 
 Notes:
-> The good news is that most of these personas don't matter much for money. The customers most likely to pay sit in a few dozen of them. On cards, 51 personas collected 1,250 dirhams or more per account over three months in the back-test. They hold 11 percent of card accounts, and just 12 of them cover half of those accounts, 26 cover 80 percent. Here are the five largest. Each holds around a hundred to a hundred and seventy accounts, and collected between 1,270 and nearly 2,000 dirhams per account, against a card book average of about 640. How often they paid ranges from 30 percent for customers who stopped suddenly with low credibility, to 69 percent for customers curing now. On loans the list is shorter: 16 personas collected 6,000 dirhams or more per account, 8 percent of loan accounts, and 6 of them cover half. The numbers are from one back-test month, so the exact list will move; the point is that the value is concentrated in a short list of recognisable customer types.
+> The good news is that the value is concentrated. If we rank card accounts by their persona, one fifth of them brought in 54 percent of all the money collected over the next three months, and that was tested on months and accounts the ranking had not seen. That fifth sits in a few dozen personas, mostly customers curing now or cured before who show some credibility or ability. On the right are examples among the larger personas, by how much each collected per account in three months: from about 1,700 to 2,600 dirhams, against a card book average of about 640, about three to four times the average. Customers curing now with moderate credibility paid most often, 60 to 72 percent of them. Personas with High credibility or High ability tend to pay well too, but High is rare, 2.5 percent and 1.6 percent of card accounts, so each of those personas holds only a handful of accounts and the figures for them are less reliable. Loans show the same pattern on a smaller book.
 
 ## 15 · The deliverable
 
