@@ -124,14 +124,14 @@ Column 1, **How did they get here?** (A1 · Deterioration). Four families, each 
 Bottom box: *Informs:* Context and priority
 
 Column 2, **Can we talk to them?** (A2 · Locatability)
-- "The gate": where they were last seen · whether calls connect
-- Reachable: on to step 3 → (highlighted)
+- "Two checks": where they were last seen · whether calls connect
+- Reachable: calls connect (highlighted)
 - Non-Reachable · calls fail
 - Skip · last seen abroad
 
 Bottom box: *Decides:* Route: in-house, agency or tracing
 
-Column 3, **What can we offer?** The nuance, for the reachable
+Column 3, **What can we offer?** The nuance, for every customer
 - A3 · Credibility · Will they pay?: High · Moderate · Low · Unknown
 - A4 · Ability · Can they pay? *(In progress tag)*: High · Moderate · Low · Unknown
 - UC1 · Conversations · joining (dashed): intent and ability to pay, from call transcripts
@@ -141,7 +141,7 @@ Bottom box: *Decides:* Offer and agent
 No footer.
 
 Notes:
-> The framework in one picture, in the order a case meets it. First, how did they get here: the DPD path tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That gives context, and a flag for which cases to prioritise. Second, can we talk to them: the gate. Only reachable customers go on; for those who do not answer or look abroad, the decision is the route, such as tracing or an agency. Third, for the reachable, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas come out of a workshop with GRR.
+> The framework in one picture, in the order a case meets it. First, how did they get here: the DPD path tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That gives context, and a flag for which cases to prioritise. Second, can we talk to them: this decides the route, it does not filter anyone out. Reachable customers can be worked by phone; for those who do not answer or look abroad, the decision is the route, such as tracing or an agency. Third, for every customer, reachable or not, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas come out of a workshop with GRR.
 
 ## 6 · How it is built
 
@@ -210,7 +210,7 @@ Notes:
 
 ## 9 · A2 · Locatability
 
-Layout: an axis slide with step 2 active. The left side holds two rule cards and the gate line; the right side a 3 × 3 matrix. Two stat boxes run across the bottom.
+Layout: an axis slide with step 2 active. The left side holds two rule cards and the route line; the right side a 3 × 3 matrix. Two stat boxes run across the bottom.
 
 - Section label: A2 · Locatability
 - Tag: States · decided by rules
@@ -219,7 +219,7 @@ Layout: an axis slide with step 2 active. The left side holds two rule cards and
 Left, "How a customer gets a label":
 - **Location: Where were they last seen?** Logins and in-person card use show where they are; a travel purchase or collector note signals they have left. The latest evidence wins. Chips: In Country · Skip · Unknown (dashed)
 - **Reachability: Do our calls connect?** Recent call days all failed, no contact since → Non-Reachable. A recent contact → Reachable. Chips: Reachable · Non-Reachable · Unknown (dashed)
-- **The gate:** only Reachable customers go on to step 3.
+- **Decides the route:** in-house calls, tracing or an agency. Credibility and ability apply to every customer.
 
 Right, "August mix": Location × reachability, 61–180. % of card accounts, with loans shown under each card figure.
 
@@ -236,7 +236,7 @@ Stat boxes:
 No footer.
 
 Notes:
-> Locatability is the gate. Two rules: where did we last see the customer, from logins and in-person card use, with travel purchases and collector notes as signs of departure, latest evidence wins; and do our calls connect. The matrix shows how they combine. Only about one in five card customers and one in four loan customers at 61 to 180 are reachable, and only they go on to the nuance step. The largest group, about a third, look abroad and do not answer: these are candidates for tracing or an agency rather than in-house calls. At 180+ we look only for positives, and being reachable counts as one: 3.7 percent of card accounts and 4.8 percent of loans.
+> Locatability tells us how a case can be worked. Two rules: where did we last see the customer, from logins and in-person card use, with travel purchases and collector notes as signs of departure, latest evidence wins; and do our calls connect. The matrix shows how they combine. Only about one in five card customers and one in four loan customers at 61 to 180 are reachable. The largest group, about a third, look abroad and do not answer: these are candidates for tracing or an agency rather than in-house calls. At 180+ we look only for positives, and being reachable counts as one: 3.7 percent of card accounts and 4.8 percent of loans.
 
 ## 10 · A3 · Payment credibility
 
