@@ -465,34 +465,3 @@ crx_rl_a3_payment_credibility:
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_payment_credibility"
   save_args:
     mode: overwrite
-
-# TEMPORARY (A3 bundle 23): the latest month's A3 with GRR's month end (new) and bundle
-# 20's deadline (old), for the A3 check. Remove these entries, check.py, the check
-# pipelines and the HDFS folders after the check.
-crx_cc_a3_check_new:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_check_new"
-  save_args:
-    mode: overwrite
-
-crx_cc_a3_check_old:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_check_old"
-  save_args:
-    mode: overwrite
-
-crx_rl_a3_check_new:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_check_new"
-  save_args:
-    mode: overwrite
-
-crx_rl_a3_check_old:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_check_old"
-  save_args:
-    mode: overwrite

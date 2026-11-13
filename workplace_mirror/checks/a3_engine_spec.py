@@ -592,7 +592,6 @@ rl_in = {
         "total_paid double",
     ),
 }
-cat_out = {}
 for product, make, inputs, model in [
     ("cc", cc_pipeline, cc_in, "cc_60_180"),
     ("rl", rl_pipeline, rl_in, "rl_60_180"),
@@ -605,7 +604,6 @@ for product, make, inputs, model in [
     )
     SequentialRunner().run(pipe, cat)
     out = cat.load(f"crx_{product}_a3_payment_credibility")
-    cat_out[product] = out.localCheckpoint()  # cut the lineage for the check
     got = {
         r["account_id"]: (r["a3_state"], r["a3_refusal_flag"], r["a3_promise_deadline"])
         for r in out.collect()
@@ -623,58 +621,6 @@ for product, make, inputs, model in [
         by_account(out, "commitments_concluded")["A"],
         1,
     )
-
-# ── 9. TEMPORARY (A3 bundle 23): the check pipelines run and log every block ──
-import logging  # noqa: E402
-
-from enbd_collections.pipelines.crx_persona.a3_credibility import (  # noqa: E402
-    check as a3_check,
-)
-from enbd_collections.pipelines.crx_persona.cc_a3_payment_credibility import (  # noqa: E402
-    create_check_pipeline as cc_check,
-)
-from enbd_collections.pipelines.crx_persona.rl_a3_payment_credibility import (  # noqa: E402
-    create_check_pipeline as rl_check,
-)
-
-logged = []
-handler = logging.Handler()
-handler.emit = lambda record: logged.append(record.getMessage())
-logging.getLogger(a3_check.__name__).addHandler(handler)
-logging.getLogger(a3_check.__name__).setLevel(logging.INFO)
-for product, make, inputs, model in [
-    ("cc", cc_check, cc_in, "cc_60_180"),
-    ("rl", rl_check, rl_in, "rl_60_180"),
-]:
-    pipe = make()
-    data = {
-        **shared,
-        **inputs,
-        "params:model_id": model,
-        f"crx_{product}_a3_payment_credibility": cat_out[product],
-    }
-    cat = DataCatalog(
-        {
-            n: MemoryDataset(v, copy_mode="assign")
-            for n, v in data.items()
-            if n in pipe.inputs()
-        }
-        | {n: MemoryDataset(copy_mode="assign") for n in pipe.all_outputs()}
-    )
-    SequentialRunner().run(pipe, cat)
-    spark.catalog.clearCache()  # one long session: free the CC run first
-blocks = [m.split("===")[1].strip() for m in logged]
-check(
-    "check blocks",
-    blocks,
-    [f"{b} START" for b in ["A3 OUTPUT", "A3 PROMISES", "A3 LEVELS"] * 2],
-)
-check(
-    "check CC deadline unchanged at 60_180", "(deadline), changed 0" in logged[0], True
-)
-check("check b20 matched", "b20 x new (whole bundle), changed 0" in logged[0], True)
-check("check RL model_id", "model_id: rl_60_180" in logged[3], True)
-print("\n\n".join(logged))
 
 print("\n".join(FAILS) if FAILS else "a3 engine spec: all checks pass")
 sys.exit(1 if FAILS else 0)

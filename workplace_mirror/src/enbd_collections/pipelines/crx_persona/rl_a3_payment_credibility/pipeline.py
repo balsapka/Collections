@@ -5,14 +5,10 @@ Needs, for the model_id (rl_60_180 / rl_180_plus): ``crx_rl_obs_base``,
 ``crx_rl_a4_deterioration``, ``int_loan_master`` and the DCORE tables.
 
     kedro run --pipeline=crx_rl_a3_payment_credibility
-
-TEMPORARY (A3 bundle 23): ``create_check_pipeline`` (``a3_credibility/check.py``);
-removed by the bundle's cleanup.
 """
 
 from kedro.pipeline import Pipeline, node
 
-from ..a3_credibility.check import create_a3_check_pipeline
 from ..a3_credibility.pipeline import TAGS, create_a3_pipeline
 from .nodes import build_rl_a3_dues, build_rl_a3_payments
 
@@ -38,8 +34,3 @@ def create_pipeline(  # pylint: disable=unused-argument
 ) -> Pipeline:
     """The RL A3 axis written to ``output``."""
     return create_a3_pipeline("rl", output, DUES, PAYMENTS)
-
-
-def create_check_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """TEMPORARY: the A3 bundle 23 check for RL."""
-    return create_a3_check_pipeline("rl", DUES, PAYMENTS)
