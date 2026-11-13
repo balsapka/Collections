@@ -77,9 +77,7 @@ def record(months: str, reaches: bool = True) -> str:
     return "clean" if sum(due) / len(due) >= CLEAN_SHARE else "not_clean"
 
 
-def state(a: str, b: str, c: str, refusal: bool = False, episode: bool = True) -> str:
-    if not episode:
-        return "unknown"
+def state(a: str, b: str, c: str, refusal: bool = False) -> str:
     pts = POINTS[a] + POINTS[b] + POINTS[c]
     if pts >= HIGH_FROM:
         return "moderate" if refusal else "high"
@@ -129,14 +127,14 @@ TONE = {  # (fill, text)
     "unknown": ("EDEDED", "595959"),
 }
 KEY_TONE = {
-    "high": "good", "moderate": "mid", "low": "bad", "unknown": "unknown",
+    "high": "good", "moderate": "mid", "low": "bad",
     "kept": "good", "partly": "mid", "thin": "unknown", "broken": "bad",
     "regular": "good", "some": "mid", "none": "bad",
     "clean": "good", "not_clean": "bad", "no_record": "unknown",
     "paid": "good", "partial": "bad", "unpaid": "bad", "refusal": "bad",
 }  # fmt: skip
 LABEL = {
-    "high": "High", "moderate": "Moderate", "low": "Low", "unknown": "Unknown",
+    "high": "High", "moderate": "Moderate", "low": "Low",
     "kept": "Kept", "partly": "Partly kept", "thin": "Thin", "broken": "Broken",
     "regular": "Regular", "some": "Some", "none": "None",
     "clean": "Clean", "not_clean": "Not clean", "no_record": "No record",
@@ -144,7 +142,7 @@ LABEL = {
 }  # fmt: skip
 CODE_TONE = {KEPT: "good", NOT_KEPT: "bad", PENDING: "unknown", QUALIFYING: "good",
              SMALL: "mid", NOTHING: "bad", AS_BILLED: "good", MISSED: "bad"}  # fmt: skip
-STATES = ["high", "moderate", "low", "unknown"]
+STATES = ["high", "moderate", "low"]
 WINDOW_HEAD, WINDOW_FILL, INPUT_FILL = "2E75B6", "DDEBF7", "FFF2CC"
 HAIR = Side(style="thin", color=RULE)
 BOX = Border(left=HAIR, right=HAIR, top=HAIR, bottom=HAIR)
@@ -303,7 +301,6 @@ def overview(wb: Workbook) -> None:
         ("low", "Fewer than 2 points. Or fewer than 4 with a refusal.",
          "Little or nothing positive on record, or it is outweighed by broken promises or a "
          "refusal."),
-        ("unknown", "No delinquency can be observed for the account.", "Nothing to judge on."),
     ]:  # fmt: skip
         s.chip(1, st)
         s.text(2, rule, span=2, align=MID)
@@ -328,22 +325,11 @@ def overview(wb: Workbook) -> None:
 
 
 # --- logic ----------------------------------------------------------------------------------
-EVIDENCE = [  # (event, counts as, tone, dimension)
-    ("Promise-to-pay or settlement plan recorded in the collections system, not cancelled",
-     "Promise", "good", "A"),
-    ("Collector note of a promise: promise to pay (full, partial or scheduled), digital collect "
-     "subscribed, will pay at salary",
-     "Promise", "good", "A"),
-    ("Card: a payment posted to the card account, by its posting date. Loan: the payments "
-     "received on the loan in a month (known by month, not by day)",
-     "Payment", "good", "A, B, C"),
-    ("Card: a statement with an amount due. Loan: a month with an instalment due",
-     "Month with an amount due", "unknown", "B, C"),
-    ("The latest conversation with the customer ended in a refusal: refuse to pay, rewrite not "
-     "agreed",
-     "Refusal", "bad", "Override"),
-]  # fmt: skip
 TERMS = [
+    ("Account", "Promises, payments, amounts due and conversations are those of the scored "
+                "account only."),
+    ("Payment", "Card: a payment posted to the card account, by its posting date. Loan: the "
+                "payments received on the loan in a month (known by month, not by day)."),
     ("Delinquency", "The current continuous run of months at 1+ DPD; a return to 0 DPD ends "
                     "it. It starts on the first day of its first month."),
     ("Month", "Card: a statement cycle, from one statement to the next. Loan: a calendar month."),
@@ -358,6 +344,10 @@ TERMS = [
     ("Conversation", "A contact in which the account holder was reached in person."),
 ]  # fmt: skip
 PROMISE_RULES = [
+    ("Promise", "A promise-to-pay or settlement plan recorded in the collections system and not "
+                "cancelled, or a collector note of a promise: promise to pay (full, partial or "
+                "scheduled), digital collect subscribed, will pay at salary. Not a promise: a "
+                "soft or re-affirmed promise, a payment the customer reports."),
     ("One promise", "Every plan is one promise, dated at its start. A collector note is the "
                     "same promise as the note before it when it comes at most 7 days later and "
                     "not after that promise's deadline; otherwise it is a new promise, dated at "
@@ -437,19 +427,7 @@ def logic(wb: Workbook) -> None:
     s.title("Logic", "What the model computes for each account at the scoring date, and the "
                      "rules that turn it into a state. Within a dimension, the first rule that "
                      "holds decides.")  # fmt: skip
-    s.section("Evidence", gap=0)
-    s.header(["Event", "", "Counts as", "Dimension"])
-    s.ws.merge_cells(start_row=s.r - 1, start_column=1, end_row=s.r - 1, end_column=2)
-    for event, counts_as, tone, dim in EVIDENCE:
-        s.text(1, event, span=2, align=MID)
-        s.chip(3, tone, counts_as)
-        s.text(4, dim, color=MUTED, align=MID)
-        s.fit([(event, s.width(1, 2)), (counts_as, s.widths[2])])
-        s.r += 1
-    s.note("All evidence is that of the scored account. Not a promise: soft or re-affirmed "
-           "promises, a payment the customer reports, a cancelled plan. Not a refusal: a "
-           "dispute, a hang-up.")  # fmt: skip
-    s.section("Terms")
+    s.section("Terms", gap=0)
     table(TERMS)
 
     s.section("A. Promises kept: counting and judging a promise")
@@ -476,11 +454,10 @@ def logic(wb: Workbook) -> None:
     ])  # fmt: skip
     flow("Refusal", [
         ("The latest conversation in the current delinquency (at most 24 months back) ended in "
-         "a refusal, and since then no plan has started and no month has 100 AED or more paid. "
+         "a refusal (refuse to pay, rewrite not agreed), and since then no plan has started and no month has 100 AED or more paid. "
          "On the same day, any other conversation counts as later than the refusal.", "refusal"),
     ], label=lambda _: "One level down")  # fmt: skip
     flow("State: total points = A + B + C", [
-        ("No delinquency can be observed for the account.", "unknown"),
         ("4 points or more, and no refusal.", "high"),
         ("2 or 3 points and no refusal; or 4 points or more with a refusal.", "moderate"),
         ("Otherwise: fewer than 2 points, or fewer than 4 with a refusal.", "low"),
@@ -501,8 +478,7 @@ def logic(wb: Workbook) -> None:
 # --- state map ------------------------------------------------------------------------------
 def state_map(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("State map"), [16, 16, 10] + [14] * 6)
-    s.title("State map", "Every combination of levels and the state it gets, for an account "
-                         "with an observed delinquency.")  # fmt: skip
+    s.title("State map", "Every combination of levels and the state it gets.")  # fmt: skip
     s.text(1, None, span=3, border=False)
     s.text(4, "No refusal", span=3, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
     s.text(7, "Refusal", span=3, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
@@ -598,16 +574,15 @@ C_EXAMPLES = [
     ("no_record", "··········✓✓", True, "Only 2 months with an amount due."),
     ("no_record", "✓✓✓✓✓✓✓✓✓✓✓✓", False, "Delinquent since before the history we hold."),
 ]  # fmt: skip
-STATE_EXAMPLES = [  # (state, A, B, C, refusal, delinquency observed, why)
-    ("high", "kept", "regular", "clean", False, True, "Keeps promises, pays, clean before."),
-    ("high", "partly", "regular", "clean", False, True, "4 points with a mixed promise record."),
-    ("moderate", "kept", "regular", "no_record", True, True, "4 points, one level down for a refusal."),
-    ("moderate", "thin", "regular", "clean", False, True, "Pays without promising: 3 points."),
-    ("moderate", "broken", "regular", "clean", False, True, "Broken promises cost a point; the payments still count."),
-    ("low", "thin", "none", "clean", False, True, "A clean past alone is 1 point."),
-    ("low", "thin", "some", "clean", True, True, "2 points, one level down for a refusal."),
-    ("low", "thin", "none", "no_record", False, True, "Delinquent with nothing positive on record."),
-    ("unknown", "thin", "none", "no_record", False, False, "No delinquency observed."),
+STATE_EXAMPLES = [  # (state, A, B, C, refusal, why)
+    ("high", "kept", "regular", "clean", False, "Keeps promises, pays, clean before."),
+    ("high", "partly", "regular", "clean", False, "4 points with a mixed promise record."),
+    ("moderate", "kept", "regular", "no_record", True, "4 points, one level down for a refusal."),
+    ("moderate", "thin", "regular", "clean", False, "Pays without promising: 3 points."),
+    ("moderate", "broken", "regular", "clean", False, "Broken promises cost a point; the payments still count."),
+    ("low", "thin", "none", "clean", False, "A clean past alone is 1 point."),
+    ("low", "thin", "some", "clean", True, "2 points, one level down for a refusal."),
+    ("low", "thin", "none", "no_record", False, "Delinquent with nothing positive on record."),
 ]  # fmt: skip
 
 
@@ -713,16 +688,13 @@ def examples(wb: Workbook) -> None:
 
     s.section("State")
     cases(["State", "A. Promises", "B. Payments", "C. Record", "Refusal", "Pts"], [3, 3, 3, 2, 1])
-    for want, a, b, c, refusal, episode, text in STATE_EXAMPLES:
-        _check(state(a, b, c, refusal, episode), want, text)
+    for want, a, b, c, refusal, text in STATE_EXAMPLES:
+        _check(state(a, b, c, refusal), want, text)
         s.chip(1, want)
-        if episode:
-            for col, lev in zip((2, 5, 8), (a, b, c)):
-                s.chip(col, lev, _points(lev), span=3)
-            s.chip(11, "refusal", "Yes", span=2) if refusal else s.text(11, "–", span=2, align=MID)
-            s.text(13, POINTS[a] + POINTS[b] + POINTS[c], align=CENTER)
-        else:
-            s.text(2, "–", span=12, align=MID)
+        for col, lev in zip((2, 5, 8), (a, b, c)):
+            s.chip(col, lev, _points(lev), span=3)
+        s.chip(11, "refusal", "Yes", span=2) if refusal else s.text(11, "–", span=2, align=MID)
+        s.text(13, POINTS[a] + POINTS[b] + POINTS[c], align=CENTER)
         s.text(why, text, align=MID)
         s.ws.row_dimensions[s.r].height = 20
         s.r += 1
@@ -740,13 +712,13 @@ VINTAGES = [f"{prod}\n{v}" for prod in ("CC 180+", "RL 180+")
             for v in ("early-stage\ncharge-off", "late-stage\ncharge-off")]  # fmt: skip
 # Production run, month end 31 Aug 2026. Counts where the run kept them, else shares (%).
 ACCOUNTS = [19292, 318663, 1397, 1224, 1364, 3985, 33862, 10306, 11203, 55371]
-STATE_COUNTS = {0: [490, 3750, 15052, 0], 1: [159, 8288, 310216, 0],
-                5: [126, 980, 2879, 0], 9: [120, 2289, 52962, 0]}  # fmt: skip
-STATE_SHARES = {2: [1.1, 18.8, 80.0, 0], 3: [2.5, 24.5, 73.0, 0], 4: [5.8, 30.6, 63.6, 0],
-                6: [0.1, 2.2, 97.7, 0], 7: [0.5, 8.7, 90.8, 0], 8: [0.4, 5.8, 93.8, 0]}  # fmt: skip
+STATE_COUNTS = {0: [490, 3750, 15052], 1: [159, 8288, 310216],
+                5: [126, 980, 2879], 9: [120, 2289, 52962]}  # fmt: skip
+STATE_SHARES = {2: [1.1, 18.8, 80.0], 3: [2.5, 24.5, 73.0], 4: [5.8, 30.6, 63.6],
+                6: [0.1, 2.2, 97.7], 7: [0.5, 8.7, 90.8], 8: [0.4, 5.8, 93.8]}  # fmt: skip
 VINTAGE_ACCOUNTS = [61112, 257551, 10050, 45321]
-VINTAGE_SHARES = {0: [0.2, 10.9, 88.9, 0], 1: [0.0, 0.6, 99.4, 0],
-                  2: [0.6, 16.4, 83.0, 0], 3: [0.1, 1.4, 98.5, 0]}  # fmt: skip
+VINTAGE_SHARES = {0: [0.2, 10.9, 88.9], 1: [0.0, 0.6, 99.4],
+                  2: [0.6, 16.4, 83.0], 3: [0.1, 1.4, 98.5]}  # fmt: skip
 SEGMENT_ACCOUNTS = [19292, 318663, 3985, 55371]
 DETAIL = [  # (section, [(label, tone key)], {segment: values}, values are counts?)
     ("A. Promises kept", [(_points(k), k) for k in A_LEVELS],
@@ -857,8 +829,7 @@ def results(wb: Workbook) -> None:
     s.section("Credibility state", gap=0)
     _state_table(s, VARIANTS, ACCOUNTS, STATE_COUNTS, STATE_SHARES)
     s.r += 1
-    s.note("Loans by product: the run kept shares, not counts. Every scored account has an "
-           "observed delinquency, so Unknown is empty. Aggregates only.")  # fmt: skip
+    s.note("Loans by product: the run kept shares, not counts. Aggregates only.")  # fmt: skip
     s.ws.freeze_panes = "B6"
 
 
@@ -901,7 +872,7 @@ def detail(wb: Workbook) -> None:
 
 
 def trend(wb: Workbook) -> None:
-    states = STATES[:3]
+    states = STATES
     s = Sheet(wb.create_sheet("Results trend"), [10, 10] + [10, 7] * len(states))
     s.title("Results trend", "Accounts per state by month, Jan–Aug 2026 (month ends). Shares are "
                              "of the month's accounts.")  # fmt: skip
