@@ -240,8 +240,8 @@ HEAD = [
     (
         "Basis",
         "Production month ends, credit cards and retail loans, 61–180 and 180+ DPD. State mix: "
-        "August 2026 ('Results'). Outcomes: back-tests on March–May 2026 with the next 3 months "
-        "('Validation', 'Back-tests').",
+        "January–August 2026 ('Results'). Outcomes: back-tests on the month ends of January–May "
+        "2026 with the next 3 months ('Validation', 'Back-tests').",
     ),
     (
         "Status",
@@ -306,8 +306,9 @@ DIMENSIONS = [
                 "Broken",
                 "−1",
                 "The last 3 concluded were all broken, or at least 2 concluded and fewer than "
-                "40% kept. Checked first. Counts against the customer. Under review: Broken "
-                "customers pay more often than Thin ones ('Validation').",
+                "40% kept. Checked first. Counts against the customer today. Under review: "
+                "Broken customers pay more often than Thin ones, and +1 ranks better than −1 "
+                "in every book ('Back-tests').",
                 True,
             ),
         ],
@@ -404,7 +405,7 @@ CUTOFFS = [  # (parameter, value, source, amber)
         "GRR; 30 days under review",
         True,
     ),
-    ("Promises: points for Broken", "−1", "Decided; Broken vs Thin under review", True),
+    ("Promises: points for Broken", "−1", "Decided; +1 tested better, with GRR", True),
     ("Payments in delinquency: window in months (61–180 / 180+)", "3 / 6", "DE proposal", False),
     (
         "Payments in delinquency: qualifying payment",
@@ -560,9 +561,9 @@ def map_sheet(wb: Workbook) -> None:
 BOOKS = ["Cards 61–180", "Loans 61–180", "Cards 180+", "Loans 180+"]
 # August 2026 month end, the rules in 'A3 framework' (GRR's deadline); counts.
 RESULTS = {  # book: (n, High, Moderate, Low)
-    "Cards 61–180": (19292, 490, 3748, 15054),
+    "Cards 61–180": (19292, 490, 3750, 15052),
     "Loans 61–180": (3985, 126, 980, 2879),
-    "Cards 180+": (318663, 159, 8290, 310214),
+    "Cards 180+": (318663, 159, 8288, 310216),
     "Loans 180+": (55371, 120, 2289, 52962),
 }
 # The same month with the earlier deadline (cards: next statement; loans: end of next month).
@@ -572,12 +573,112 @@ RESULTS_PREV = {
     "Cards 180+": (318663, 222, 8616, 309825),
     "Loans 180+": (55371, 171, 2386, 52814),
 }
-LEVELS_A = {  # book: (Kept, Partly kept, Thin, Broken) counts, August 2026
-    "Cards 61–180": (441, 2686, 13544, 2621),
-    "Loans 61–180": (192, 480, 2970, 343),
-    "Cards 180+": (146, 2483, 312052, 3982),
-    "Loans 180+": (100, 734, 54100, 437),
+# The same month with 30 days after the promise.
+RESULTS_LEN = {
+    "Cards 61–180": (19292, 765, 4382, 14145),
+    "Loans 61–180": (3985, 197, 1112, 2676),
+    "Cards 180+": (318663, 473, 9211, 308979),
+    "Loans 180+": (55371, 171, 2386, 52814),
 }
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"]
+TREND = {  # book: (High %, Moderate %, Low %) per month end 2026
+    "Cards 61–180": [
+        (4.1, 23.1, 72.7),
+        (4.2, 22.6, 73.1),
+        (4.2, 22.4, 73.4),
+        (4.0, 21.9, 74.2),
+        (3.8, 21.0, 75.2),
+        (3.2, 20.9, 75.9),
+        (2.8, 20.3, 76.9),
+        (2.5, 19.4, 78.0),
+    ],
+    "Loans 61–180": [
+        (4.6, 28.2, 67.2),
+        (4.5, 26.6, 68.9),
+        (4.6, 27.2, 68.2),
+        (3.9, 27.7, 68.4),
+        (3.1, 24.8, 72.1),
+        (2.7, 24.5, 72.9),
+        (2.7, 23.5, 73.7),
+        (3.2, 24.6, 72.2),
+    ],
+    "Cards 180+": [
+        (0.0, 2.5, 97.5),
+        (0.0, 2.5, 97.5),
+        (0.0, 2.6, 97.4),
+        (0.0, 2.6, 97.4),
+        (0.0, 2.6, 97.4),
+        (0.1, 2.6, 97.4),
+        (0.1, 2.6, 97.3),
+        (0.0, 2.6, 97.3),
+    ],
+    "Loans 180+": [
+        (0.2, 3.7, 96.1),
+        (0.2, 3.7, 96.1),
+        (0.2, 3.6, 96.2),
+        (0.2, 3.5, 96.3),
+        (0.2, 3.7, 96.1),
+        (0.2, 4.0, 95.8),
+        (0.2, 4.0, 95.8),
+        (0.2, 4.1, 95.6),
+    ],
+}
+LEVELS = [  # book, A: Kept / Partly / Thin / Broken, B: Regular / Some / None,
+    # C: Clean / Not clean / No record (history too short) / No record (too few months due)
+    (
+        "Cards 61–180",
+        ("2.3%", "13.9%", "70.2%", "13.6%"),
+        ("7.5%", "17.6%", "74.9%"),
+        ("64.5%", "20.0%", "<0.1%", "15.4%"),
+    ),
+    (
+        "Loans 61–180",
+        ("4.8%", "12.0%", "74.5%", "8.6%"),
+        ("10.9%", "32.4%", "56.7%"),
+        ("44.3%", "44.6%", "0.0%", "11.1%"),
+    ),
+    (
+        "Cards 180+",
+        ("0.0%", "0.8%", "97.9%", "1.2%"),
+        ("0.7%", "5.2%", "94.1%"),
+        ("10.5%", "4.0%", "54.5%", "31.1%"),
+    ),
+    (
+        "Loans 180+",
+        ("0.2%", "1.3%", "97.7%", "0.8%"),
+        ("1.0%", "7.2%", "91.8%"),
+        ("19.1%", "15.4%", "58.1%", "7.4%"),
+    ),
+]
+NEGATIVE_RATES = [  # book, refusal, refusal that lowers the state, dispute, no pickup, hung up
+    ("Cards 61–180", "4.4%", "0.8%", "0.4%", "7.0%", "2.3%"),
+    ("Loans 61–180", "4.6%", "0.7%", "0.0%", "8.3%", "1.0%"),
+    ("Cards 180+", "2.0%", "0.1%", "0.2%", "0.9%", "1.4%"),
+    ("Loans 180+", "1.8%", "0.1%", "0.1%", "0.7%", "1.1%"),
+]
+SPLITS = [  # book, split, value, accounts, High, Moderate, Low (August 2026, row %)
+    ("Loans 61–180", "Loan type", "Personal", "1,397", "1.1%", "18.8%", "80.0%"),
+    ("Loans 61–180", "Loan type", "Personal Cash", "1,224", "2.5%", "24.5%", "73.0%"),
+    ("Loans 61–180", "Loan type", "Auto", "1,364", "5.8%", "30.6%", "63.6%"),
+    ("Loans 180+", "Loan type", "Personal", "33,862", "0.1%", "2.2%", "97.7%"),
+    ("Loans 180+", "Loan type", "Personal Cash", "10,306", "0.5%", "8.7%", "90.8%"),
+    ("Loans 180+", "Loan type", "Auto", "11,203", "0.4%", "5.8%", "93.8%"),
+    ("Cards 180+", "Charge-off age", "under 24 months", "61,112", "0.2%", "10.9%", "88.9%"),
+    ("Cards 180+", "Charge-off age", "24 months or more", "257,551", "<0.1%", "0.6%", "99.4%"),
+    ("Loans 180+", "Charge-off age", "under 24 months", "10,050", "0.6%", "16.4%", "83.0%"),
+    ("Loans 180+", "Charge-off age", "24 months or more", "45,321", "0.1%", "1.4%", "98.5%"),
+    ("Cards 61–180", "DPD", "61–90", "5,859", "4.8%", "25.4%", "69.8%"),
+    ("Cards 61–180", "DPD", "91–120", "5,260", "2.3%", "19.2%", "78.5%"),
+    ("Cards 61–180", "DPD", "121–150", "4,401", "1.4%", "16.8%", "81.8%"),
+    ("Cards 61–180", "DPD", "151–180", "3,772", "0.7%", "13.7%", "85.7%"),
+    ("Loans 61–180", "DPD", "61–90", "1,401", "5.7%", "30.7%", "63.6%"),
+    ("Loans 61–180", "DPD", "91–120", "1,106", "2.4%", "26.9%", "70.7%"),
+    ("Loans 61–180", "DPD", "121–150", "971", "1.8%", "18.0%", "80.2%"),
+    ("Loans 61–180", "DPD", "151–180", "507", "0.6%", "15.2%", "84.2%"),
+    ("Loans 180+", "DPD", "181–360", "3,926", "1.8%", "33.0%", "65.2%"),
+    ("Loans 180+", "DPD", "361–720", "4,848", "0.4%", "10.2%", "89.4%"),
+    ("Loans 180+", "DPD", "720+", "46,597", "0.1%", "1.1%", "98.9%"),
+]
 
 
 def _pct(x: int, n: int) -> str:
@@ -585,14 +686,17 @@ def _pct(x: int, n: int) -> str:
 
 
 def results(wb: Workbook) -> None:
-    s = Sheet(wb.create_sheet("Results"), [22, 12, 14, 14, 14, 14])
+    s = Sheet(wb.create_sheet("Results"), [22, 16, 16, 16, 16, 16, 16, 16, 16])
     s.title(
-        "Results: the state mix, August 2026",
-        "Share of accounts in each state at the August 2026 month end, under the rules in 'A3 "
-        "framework'. Unknown is empty: every account scored has an observed delinquency episode.",
+        "Results: the state mix",
+        "Share of accounts in each state under the rules in 'A3 framework'. Unknown is empty in "
+        "every book and month: every account scored has an observed delinquency episode.",
     )
-    s.section("1. State mix")
-    s.header(["Book", "Accounts", "High", "Moderate", "Low", "Unknown"])
+    s.section("1. State mix, August 2026")
+    s.header(
+        ["Book", "Accounts", "High", "Moderate", "Low", "Unknown", "", "", ""],
+        [1, 1, 1, 1, 1, 1, 3],
+    )
     for book in BOOKS:
         n, hi, mo, lo = RESULTS[book]
         assert hi + mo + lo == n, book
@@ -601,67 +705,175 @@ def results(wb: Workbook) -> None:
         for col, (st, x) in enumerate(zip(("High", "Moderate", "Low"), (hi, mo, lo)), 3):
             s.text(col, f"{_pct(x, n)} ({x:,})", align=CENTER, fill=TONE[st][0])
         s.text(6, "0%", align=CENTER, fill=TONE["Unknown"][0])
+        s.text(7, "", span=3, border=False)
         s.r += 1
     s.note(
         "180+ is almost all Low by construction: little is paid, few promises are made, and the "
         "history before a long charge-off is often too short to judge. The few High and Moderate "
         "accounts at 180+ are the positive signal the strategy looks for."
     )
-    s.section("2. Effect of the promise deadline on the same month")
-    s.header(["Book", "Deadline", "High", "Moderate", "Low", "States changed"])
+
+    s.section("2. Month by month, 2026 (High / Moderate / Low)")
+    s.header(["Book"] + MONTHS)
     for book in BOOKS:
-        n, *now = RESULTS[book]
-        _, *prev = RESULTS_PREV[book]
-        for label, vals in (("Earlier rule", prev), ("Today's rule", now)):
+        s.text(1, book, bold=True)
+        for col, (hi, mo, lo) in enumerate(TREND[book], 2):
+            s.text(col, f"{hi} / {mo} / {lo}", align=CENTER)
+        s.r += 1
+    s.note(
+        "At 61–180 the books grew through the year (cards 14.7k to 19.3k accounts) and the new "
+        "accounts are mostly Low, so High and Moderate fall a little. 180+ is flat. Each account "
+        "keeps its state from one month to the next 88–90% of the time at 61–180 and 99% at 180+ "
+        "('Validation', block 6)."
+    )
+
+    s.section("3. Effect of the promise deadline on August 2026")
+    s.header(
+        ["Book", "Deadline", "High", "Moderate", "Low", "States changed", "", "", ""],
+        [1, 1, 1, 1, 1, 1, 3],
+    )
+    moved = {
+        "Cards 61–180": "0.0%",
+        "Loans 61–180": "7.2%",
+        "Cards 180+": "0.4%",
+        "Loans 180+": "0.5%",
+    }
+    for book in BOOKS:
+        n = RESULTS[book][0]
+        for label, vals, mv in (
+            ("Earlier rule", RESULTS_PREV[book][1:], ""),
+            ("Today (GRR)", RESULTS[book][1:], moved[book]),
+            ("30 days", RESULTS_LEN[book][1:], ""),
+        ):
             s.text(1, book, bold=label == "Earlier rule")
             s.text(2, label)
             for col, x in enumerate(vals, 3):
                 s.text(col, _pct(x, n), align=CENTER)
-            moved = {
-                "Cards 61–180": "0.0%",
-                "Loans 61–180": "7.2%",
-                "Cards 180+": "0.4%",
-                "Loans 180+": "0.5%",
-            }[book]
-            s.text(6, moved if label == "Today's rule" else "", align=CENTER)
+            s.text(6, mv, align=CENTER)
+            s.text(7, "", span=3, border=False)
             s.r += 1
     s.note(
-        "Earlier rule: cards the next statement, loans the end of the following month. Today's "
-        "rule (GRR): loans and all 180+ by the end of the month of the promise. Loans at 61–180 "
-        "move down: about a quarter of loan promises are paid in the following month, and paid "
-        "promises fall from 70.5% to 46.8%. Cards at 61–180 keep the statement, so nothing moves."
+        "Earlier rule: cards the next statement, loans the end of the following month. Today "
+        "(GRR): loans and all 180+ by the end of the month of the promise. 30 days: 30 days after "
+        "the promise (loans: to that month's end). Loans at 61–180 move down under GRR's rule: "
+        "about a quarter of loan promises are paid in the following month. 30 days lifts High "
+        "and Moderate in every book."
     )
-    s.section("3. Promises (Dimension A)")
-    s.header(["Book", "Accounts", "Kept", "Partly kept", "Thin", "Broken"])
-    for book in BOOKS:
-        n = RESULTS[book][0]
-        vals = LEVELS_A[book]
-        assert sum(vals) == n, book
-        s.text(1, book, bold=True)
-        s.text(2, f"{n:,}", align=CENTER)
-        for col, x in enumerate(vals, 3):
-            s.text(col, _pct(x, n), align=CENTER)
-        s.r += 1
+
+    s.section("4. Dimension levels, August 2026 (share of accounts)")
+    s.header(
+        ["Book", "A Kept", "A Partly", "A Thin", "A Broken", "B Regular", "B Some", "B None", ""]
+    )
+    for book, a, b, _ in LEVELS:
+        s.row([book, *a, *b, ""], [1] * 9)
+    s.header(
+        [
+            "Book",
+            "C Clean",
+            "C Not clean",
+            "C No record:\nhistory short",
+            "C No record:\nfew months due",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+    for book, _, _, c in LEVELS:
+        s.row([book, *c, "", "", "", ""], [1] * 9)
     s.note(
-        "Most accounts have no concluded promise in 12 months (Thin): their credibility rests on "
-        "payments and the record before delinquency. Collector follow-up notes are what lift "
-        "coverage (see 'Back-tests')."
+        "Most accounts have no concluded promise in 12 months (Thin) and paid nothing in the "
+        "payments window, so the record before delinquency carries most of the evidence at "
+        "61–180. At 180+ the record is often out of reach: the history does not go back to the "
+        "episode start for more than half of the accounts."
+    )
+
+    s.section("5. Refusal and diagnostic columns, August 2026 (share of accounts)")
+    s.header(
+        [
+            "Book",
+            "Refusal",
+            "Refusal that\nlowers the state",
+            "Dispute",
+            "No pickup\nafter contact",
+            "Hung up",
+            "",
+            "",
+            "",
+        ],
+        [1, 1, 1, 1, 1, 1, 3],
+    )
+    for row in NEGATIVE_RATES:
+        s.row([*row, ""], [1, 1, 1, 1, 1, 1, 3])
+    s.note(
+        "Most refusals change nothing: the account is already Low. Dispute is 0 for loans at "
+        "61–180 (58 accounts at 180+); the dispute codes for that book are being checked."
+    )
+
+    s.section("6. State mix by group, August 2026")
+    s.header(
+        ["Book", "Split", "Group", "Accounts", "High", "Moderate", "Low", "", ""],
+        [1, 1, 1, 1, 1, 1, 1, 2],
+    )
+    for row in SPLITS:
+        s.row([*row, ""], [1, 1, 1, 1, 1, 1, 1, 2])
+    s.note(
+        "Credibility falls with every DPD bucket and with charge-off age, and Auto loans are the "
+        "most credible loan product. Cards 180+ DPD bands follow charge-off age (85% of accounts "
+        "are past 720 days), so only the age split is shown."
     )
 
 
 # --- validation -----------------------------------------------------------------------------
-# Back-test: month ends March, April, May 2026 pooled; outcomes over the next 3 months.
-OUTCOMES = [  # book, (High, Moderate, Low) paid a due %, (High, Moderate, Low) rolled %, mix
-    ("Cards 61–180", (64.9, 35.2, 11.0), (47, 73, 93), (4.0, 21.7, 74.3)),
-    ("Loans 61–180", (71.5, 54.2, 26.2), (54, 67, 83), (3.8, 26.4, 69.8)),
-    ("Cards 180+", (50.2, 30.6, 1.6), None, (0.0, 2.6, 97.4)),
-    ("Loans 180+", (67.2, 32.5, 1.4), None, (0.2, 3.6, 96.2)),
+# Back-test: month ends January–May 2026 pooled; outcomes over the next 3 months.
+OUTCOMES = [  # book, accounts H/M/L, paid a due H/M/L, any payment H/M/L
+    ("Cards 61–180", "3,009 / 16,473 / 54,774", (65.4, 37.6, 10.9), (67.0, 40.1, 12.0)),
+    ("Loans 61–180", "508 / 3,353 / 8,651", (69.3, 54.0, 24.3), (74.2, 63.2, 32.7)),
+    ("Cards 180+", "656 / 39,190 / 1,504,342", (51.8, 30.7, 1.5), (53.5, 35.4, 2.0)),
+    ("Loans 180+", "554 / 9,675 / 256,201", (67.1, 31.6, 1.3), (70.2, 37.5, 1.9)),
 ]
-AUC = [  # book, state AUC on paid a due, points-total AUC on paid a due
-    ("Cards 61–180", "0.692", "0.70"),
-    ("Loans 61–180", "0.643", "0.70"),
-    ("Cards 180+", "0.665", "0.82"),
-    ("Loans 180+", "0.736", "0.86"),
+BY_GROUP = [  # book, split, group, paid a due H / M / L
+    ("Cards 61–180", "DPD", "61–90", "64.6 / 42.1 / 18.9"),
+    ("Cards 61–180", "DPD", "91–120", "71.3 / 41.8 / 12.0"),
+    ("Cards 61–180", "DPD", "121–150", "63.2 / 35.2 / 8.0"),
+    ("Cards 61–180", "DPD", "151–180", "50.6 / 18.4 / 2.9"),
+    ("Loans 61–180", "Loan type", "Personal", "75.2 / 42.5 / 15.2"),
+    ("Loans 61–180", "Loan type", "Personal Cash", "71.0 / 53.5 / 22.3"),
+    ("Loans 61–180", "Loan type", "Auto", "65.1 / 62.0 / 42.2"),
+    ("Loans 61–180", "DPD", "61–90", "72.2 / 60.0 / 35.2"),
+    ("Loans 61–180", "DPD", "91–120", "68.2 / 54.5 / 23.1"),
+    ("Loans 61–180", "DPD", "121–150", "62.5 / 44.0 / 15.5"),
+    ("Loans 61–180", "DPD", "151–180", "68.2 / 36.1 / 15.0"),
+    ("Cards 180+", "Charge-off age", "under 24 months", "50.6 / 21.6 / 4.0"),
+    ("Cards 180+", "Charge-off age", "24 months or more", "69.8 / 64.6 / 1.0"),
+    ("Loans 180+", "Loan type", "Personal", "75.2 / 38.7 / 0.9"),
+    ("Loans 180+", "Loan type", "Personal Cash", "60.6 / 31.7 / 2.8"),
+    ("Loans 180+", "Loan type", "Auto", "68.8 / 23.1 / 1.4"),
+    ("Loans 180+", "Charge-off age", "under 24 months", "61.4 / 22.7 / 4.4"),
+    ("Loans 180+", "Charge-off age", "24 months or more", "76.3 / 53.8 / 0.7"),
+]
+AUC = [  # book, all, per DPD bucket, points total
+    ("Cards 61–180", "0.702", "61–90 0.666 · 91–120 0.712 · 121–150 0.708 · 151–180 0.722", "0.70"),
+    ("Loans 61–180", "0.654", "61–90 0.630 · 91–120 0.668 · 121–150 0.664 · 151–180 0.608", "0.70"),
+    ("Cards 180+", "0.665", "181–360 0.576 · 361–720 0.684 · 720+ 0.653", "0.82"),
+    ("Loans 180+", "0.742", "181–360 0.683 · 361–720 0.709 · 720+ 0.713", "0.86"),
+]
+POINTS = [  # points total, then paid a due % per book (cards 61–180, loans 61–180, cards 180+,
+    # loans 180+), and the state the value lands in
+    ("−1", "15.6%", "28.4%", "8.6%", "8.0%", "Low"),
+    ("0", "9.8%", "18.4%", "0.7%", "0.5%", "Low"),
+    ("1", "11.1%", "28.2%", "9.5%", "4.5%", "Low"),
+    ("2", "30.3%", "47.6%", "27.7%", "24.5%", "Moderate"),
+    ("3", "50.3%", "66.0%", "42.8%", "54.9%", "Moderate"),
+    ("4", "64.5%", "65.2%", "49.5%", "66.6%", "High"),
+    ("5", "66.7%", "87.9%", "55.2%", "73.0%", "High"),
+]
+PROMISE_LEVELS = [  # book, paid a due %: Kept, Partly, Broken, Thin never promised,
+    # Thin promised not yet due, Thin one failed
+    ("Cards 61–180", "38.4%", "32.9%", "28.5%", "8.2%", "33.3%", "24.0%"),
+    ("Loans 61–180", "58.0%", "53.9%", "47.9%", "25.3%", "–", "42.9%"),
+    ("Cards 180+", "21.1%", "30.5%", "17.6%", "1.3%", "–", "21.0%"),
+    ("Loans 180+", "36.6%", "43.5%", "19.8%", "1.6%", "–", "20.4%"),
 ]
 NO_RECORD = [  # book, share of rows, paid a due %: no evidence / rest of Low / Moderate
     ("Cards 61–180", "12.2%", "3.9%", "12.4%", "35.2%"),
@@ -669,66 +881,158 @@ NO_RECORD = [  # book, share of rows, paid a due %: no evidence / rest of Low / 
     ("Cards 180+", "83.0%", "0.5%", "7.6%", "30.6%"),
     ("Loans 180+", "65.1%", "0.2%", "3.9%", "32.5%"),
 ]
+OVERLAP = [  # book, Cramér's V with ability, reachability, location, deterioration
+    ("Cards 61–180", "0.11", "0.19", "0.14", "0.41"),
+    ("Loans 61–180", "0.06", "0.16", "0.15", "0.36"),
+    ("Cards 180+", "0.14", "0.19", "0.17", "0.22"),
+    ("Loans 180+", "0.22", "0.24", "0.18", "0.20"),
+]
+STABILITY = [  # book, unchanged, up, down, High stays, Moderate stays
+    ("Cards 61–180", "90.2%", "4.3%", "5.6%", "77.8%", "75.3%"),
+    ("Loans 61–180", "88.2%", "5.3%", "6.6%", "72.0%", "75.9%"),
+    ("Cards 180+", "99.5%", "0.2%", "0.3%", "78.8%", "89.3%"),
+    ("Loans 180+", "99.3%", "0.3%", "0.3%", "81.7%", "91.0%"),
+]
 
 
 def validation(wb: Workbook) -> None:
-    s = Sheet(wb.create_sheet("Validation"), [22, 13, 13, 13, 13, 13, 13])
+    s = Sheet(wb.create_sheet("Validation"), [22, 18, 18, 15, 15, 16, 15, 15])
     s.title(
         "Validation: what each state goes on to do",
-        "Back-test on the month ends of March, April and May 2026 (pooled), today's rules, "
-        "outcomes over the following 3 months. Paid a due: payments reach at least one month's "
-        "due. Rolled: a worse DPD bucket at month 3 (61–180 only).",
+        "Back-test on the month ends of January to May 2026 (pooled), today's rules, outcomes "
+        "over the following 3 months. Paid a due: payments reach at least one month's due. Any "
+        "payment: 100 AED or more.",
     )
     s.section("1. Outcome rates by state")
     s.text(1, "", border=False)
-    s.text(2, "Paid a due in 3 months", span=3, bold=True, align=CENTER, fill="EEF3FA")
-    s.text(5, "Rolled to a worse bucket", span=3, bold=True, align=CENTER, fill="EEF3FA")
+    s.text(2, "", border=False)
+    s.text(3, "Paid a due in 3 months", span=3, bold=True, align=CENTER, fill="EEF3FA")
+    s.text(6, "Any payment in 3 months", span=3, bold=True, align=CENTER, fill="EEF3FA")
     s.r += 1
-    s.header(["Book", "High", "Moderate", "Low", "High", "Moderate", "Low"])
-    for book, paid, rolled, _ in OUTCOMES:
+    s.header(["Book", "Accounts\nH / M / L", "High", "Moderate", "Low", "High", "Moderate", "Low"])
+    for book, n, paid, anyp in OUTCOMES:
         s.text(1, book, bold=True)
-        for col, (st, x) in enumerate(zip(("High", "Moderate", "Low"), paid), 2):
+        s.text(2, n, align=CENTER)
+        for col, (st, x) in enumerate(zip(("High", "Moderate", "Low") * 2, paid + anyp), 3):
             s.text(col, f"{x:.1f}%", align=CENTER, fill=TONE[st][0])
-        for col in range(5, 8):
-            x = rolled[col - 5] if rolled else None
-            s.text(col, f"{x}%" if x is not None else "n/a", align=CENTER)
+        s.fit([(n, s.widths[1])])
         s.r += 1
     s.note(
-        "Every book orders the states in the right direction: High pays most and rolls least. "
-        "Cure (back to current) is too rare at 61–180 cards (0.2%) to separate states; read "
-        "payment and roll. At 180+ cure and roll are near zero by construction."
+        "High pays most in every book, every month and every group below; nowhere does the "
+        "order break on payment. Cure and roll are not used at cards 61–180: cards leave billing "
+        "at charge-off, so 43% of Low (97% at 151–180 DPD) have no level at month 3. Loans cure "
+        "similarly in every state (11–18%), so cure does not separate them either."
     )
-    s.section("2. Ranking power (AUC on paid a due; 0.5 = chance)")
-    s.header(["Book", "State (3 levels)", "Points total", "", "", "", ""], [1, 1, 1, 4])
-    for book, st_auc, pts_auc in AUC:
-        s.row([book, st_auc, pts_auc, ""], [1, 1, 1, 4])
+
+    s.section("2. Paid a due by group (High / Moderate / Low)")
+    s.header(["Book", "Split", "Group", "Paid a due", "", "", "", ""], [1, 1, 1, 2, 3])
+    for row in BY_GROUP:
+        s.row([*row, ""], [1, 1, 1, 2, 3])
     s.note(
-        "The points total ranks better than the three states, most of all at 180+, where 96–97% "
-        "of accounts sit in Low. The cut-offs at 180+ lose most of the ordering: a 180+ cut-off "
-        "review is open."
+        "The order holds inside every DPD bucket, loan type and charge-off age. Auto loans in Low "
+        "still pay 42%: Low there is not a group that does not pay. At 180+ Moderate pays more the "
+        "longer ago the charge-off: these are the customers who keep paying for years."
     )
-    s.section("3. Promises: outcome by level (paid a due in 3 months, 61–180)")
-    s.header(["Book", "Kept", "Partly kept", "Broken", "Thin", "", ""], [1, 1, 1, 1, 1, 2])
-    s.row(["Cards 61–180", "38.4%", "32.9%", "28.5%", "11.6%", ""], [1, 1, 1, 1, 1, 2])
-    s.row(["Loans 61–180", "", "", "40.5%", "27.7%", ""], [1, 1, 1, 1, 1, 2])
-    s.note(
-        "Broken customers pay more often than Thin ones, the opposite of the points (Broken −1, "
-        "Thin 0). A broken promise still means the customer engaged; most Thin accounts never "
-        "promised. A test of whether this is credibility or engagement, and of the right "
-        "weights, is running (all four books)."
-    )
-    s.section("4. Accounts with no evidence at all (now Low)")
+
+    s.section("3. Ranking power (AUC on paid a due; 0.5 = chance)")
     s.header(
-        ["Book", "Share of rows", "Paid a due:\nno evidence", "Rest of Low", "Moderate", "", ""],
-        [1, 1, 1, 1, 1, 2],
+        ["Book", "State, all", "State by DPD bucket", "", "", "Points total", "", ""],
+        [1, 1, 4, 1, 1],
+    )
+    for book, allv, bucket, pts in AUC:
+        s.row([book, allv, bucket, pts, ""], [1, 1, 4, 1, 1])
+    s.note(
+        "The state ranks customers inside every DPD bucket, not only across buckets. The points "
+        "total ranks better than the three states, most of all at 180+, where 96–97% of accounts "
+        "sit in Low (points-total AUC from the March–May back-test)."
+    )
+
+    s.section("4. Points total: paid a due in 3 months")
+    s.header(
+        [
+            "Points",
+            "Cards 61–180",
+            "Loans 61–180",
+            "Cards 180+",
+            "Loans 180+",
+            "State (no refusal)",
+            "",
+            "",
+        ],
+        [1, 1, 1, 1, 1, 1, 2],
+    )
+    for row in POINTS:
+        s.row([*row, ""], [1, 1, 1, 1, 1, 1, 2])
+    s.note(
+        "The step comes between 1 and 2 points in every book, which is where Moderate starts. "
+        "At 180+ High (4 or more) adds little over 3 points and holds very few accounts. −1 point "
+        "(Broken promises) pays more than 0 or 1 in every book: see block 5."
+    )
+
+    s.section("5. Promises: paid a due by level (March–May 2026)")
+    s.header(
+        [
+            "Book",
+            "Kept",
+            "Partly kept",
+            "Broken",
+            "Thin: never\npromised",
+            "Thin: promised,\nnot yet due",
+            "Thin: one\nfailed",
+            "",
+        ]
+    )
+    for row in PROMISE_LEVELS:
+        s.row([*row, ""], [1] * 8)
+    s.note(
+        "Customers who never promised pay least (1–25%); any promise, even a broken one, goes "
+        "with paying more. The gap stays inside reachable and contacted accounts, so it is not "
+        "only reachability. A broken record pays like a single failed promise. Scoring Broken +1 "
+        "instead of −1 ranks better in every book, under both deadlines and in every month "
+        "(cards 61–180 AUC +0.045, loans +0.030, 180+ +0.02 to +0.03): see 'Back-tests'. With "
+        "today's month-end deadline no loan or 180+ promise is still pending."
+    )
+
+    s.section("6. Accounts with no evidence at all (now Low)")
+    s.header(
+        [
+            "Book",
+            "Share of rows",
+            "Paid a due:\nno evidence",
+            "Rest of Low",
+            "Moderate",
+            "",
+            "",
+            "",
+        ],
+        [1, 1, 1, 1, 1, 3],
     )
     for row in NO_RECORD:
-        s.row(list(row) + [""], [1, 1, 1, 1, 1, 2])
+        s.row([*row, ""], [1, 1, 1, 1, 1, 3])
     s.note(
-        "They pay less than the rest of Low in every book, so Low is the right place for them, "
-        "not a separate state. At 61–180 most are young accounts (cards: 71% under 6 months on "
-        "book: early payment default) plus old cards with no bill; at 180+ mostly accounts "
-        "charged off long ago, or whose history does not reach back far enough."
+        "They pay less than the rest of Low in every book, so Low is the right place for them. "
+        "At 61–180 most are young accounts (cards: 71% under 6 months on book: early payment "
+        "default) plus old cards with no bill; at 180+ mostly accounts charged off long ago."
+    )
+
+    s.section("7. Stability and overlap with the other axes")
+    s.header(
+        ["Book", "Same state\nnext month", "Up", "Down", "High stays", "Moderate\nstays", "", ""],
+        [1, 1, 1, 1, 1, 1, 2],
+    )
+    for row in STABILITY:
+        s.row([*row, ""], [1, 1, 1, 1, 1, 1, 2])
+    s.header(
+        ["Book", "Ability", "Reachability", "Location", "Deterioration", "", "", ""],
+        [1, 1, 1, 1, 1, 3],
+    )
+    for row in OVERLAP:
+        s.row([*row, ""], [1, 1, 1, 1, 1, 3])
+    s.note(
+        "States are stable: two-step moves are 0.2% or fewer; High mostly drops to Moderate, not "
+        "Low. The overlap with each other axis is partial (Cramér's V 0.06–0.41; 1 would be the "
+        "same axis): most with deterioration at 61–180, since payments drive the DPD path, least "
+        "with ability. Credibility adds what the other axes do not carry."
     )
 
 
@@ -791,6 +1095,18 @@ BACKTESTS = [  # (question, what we tested, result, what we did)
         "Low.",
     ),
     (
+        "Broken vs Thin promises",
+        "Broken against the three kinds of Thin (never promised; promised, not yet due; one "
+        "failed), inside the same reachability, contact, payments and DPD bucket; Broken at −1, "
+        "0, +1, and Thin at −1, under both deadlines.",
+        "Never promising is what separates: those customers pay least (1–25%), also among "
+        "reachable and contacted ones. A broken record pays like a single failed promise. Broken "
+        "+1 ranks best in every book, deadline and month (cards 61–180 +0.045 AUC, loans +0.030, "
+        "180+ +0.02 to +0.03) and moves 12% (cards) / 8% (loans) of 61–180 accounts from Low to "
+        "Moderate; they pay like Moderate. Thin −1 hurts the state.",
+        "Open, for GRR: Broken +1 (or 0); keep Thin at 0.",
+    ),
+    (
         "Strong negatives",
         "Refusal, dispute, avoidance (no response, no pickup, hang-ups).",
         "No response fired on 36% (cards) and was 84% locatability's Non-Reachable: a repeat. "
@@ -809,32 +1125,31 @@ BACKTESTS = [  # (question, what we tested, result, what we did)
 
 UPCOMING = [  # (question, what it tests, why it matters, status)
     (
-        "Broken vs Thin promises",
-        "Outcomes of Broken vs Thin within the same reachability, recent contact, payments and "
-        "DPD bucket; Thin split into never promised / promised, nothing concluded / one broken; "
-        "point weights re-scored (Broken −1, 0, +1; Thin −1), under both deadlines.",
-        "Broken customers pay more often than Thin ones: either the weights are in the wrong "
-        "order, or the gap is engagement that locatability already counts.",
-        "Running, all four books.",
-    ),
-    (
-        "Detailed results",
-        "State mix by month (trend), by loan product, by 180+ charge-off age and by DPD bucket; "
-        "outcome rates by state within each; refusal and diagnostics.",
-        "Shows the states hold within products and buckets, not only on the book total.",
-        "Prompt ready; results fill the 'Results' and 'Validation' sheets.",
+        "Promise points, final shape",
+        "Broken and a single failed promise raised together; Broken +1 with Partly +2, so that "
+        "Kept > Partly > Broken holds.",
+        "Broken +1 ties Broken with Partly, yet Partly customers pay more; a single failed "
+        "promise pays like Broken but stays at 0.",
+        "Next, once GRR has seen the Broken vs Thin result.",
     ),
     (
         "180+ cut-offs",
         "Cut-offs on the points total at 180+ instead of the 61–180 ladder.",
-        "96–97% of 180+ accounts are Low; the points rank them far better than the states.",
-        "After the two above, for GRR.",
+        "96–97% of 180+ accounts are Low; the points rank them far better than the states "
+        "(AUC 0.82–0.86 vs 0.67–0.74).",
+        "With GRR.",
     ),
     (
         "Promise deadline",
         "GRR's decision between the month end and 30 days.",
         "30 days ranks best in every book and is the most lenient for the customer.",
-        "Evidence ready ('Back-tests'); with GRR.",
+        "Evidence ready; with GRR.",
+    ),
+    (
+        "Dispute codes for loans",
+        "Why no loan account at 61–180 shows a dispute (58 at 180+).",
+        "A diagnostic column, not in the state; a mapping gap would hide disputes.",
+        "To check.",
     ),
 ]
 
@@ -1012,16 +1327,16 @@ OPEN = [
     ),
     (
         "Weight of Broken promises",
-        "−1 (today), 0, +1; or Thin −1; or Thin split (never promised / promised but nothing "
-        "concluded / one broken).",
-        "Broken customers pay more often than Thin ones at 61–180 (cards 28.5% vs 11.6%). A test "
-        "across all four books, within the same reachability and payments, is running.",
+        "−1 (today), 0 or +1.",
+        "Never promising separates, not breaking: Broken pays like a single failed promise and far "
+        "above never promised. Broken +1 ranks best in every book, deadline and month; 0 gets "
+        "about half the gain. Thin −1 hurts the state ('Back-tests').",
     ),
     (
         "180+ cut-offs",
         "Keep the three states, or set 180+ cut-offs on the points.",
         "96–97% of 180+ accounts are Low; the points total ranks them far better (AUC "
-        "0.82–0.86 vs 0.67–0.75).",
+        "0.82–0.86 vs 0.67–0.74). The step in payment comes at 2 points in every book.",
     ),
 ]
 
