@@ -141,7 +141,7 @@ Bottom box: *Decides:* Offer and agent
 No footer.
 
 Notes:
-> The framework in one picture, in the order a case meets it. First, how did they get here: the DPD path tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That gives context, and a flag for which cases to prioritise. Second, can we talk to them: where we last saw them, and whether our calls connect. This does not filter anyone out, and it does not decide the route on its own. It tells us how a case can be worked: by phone, or with tracing for those who look abroad. Third, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas will come out of workshops with GRR in the coming few weeks.
+> The framework in one picture, in the order a case meets it. First, how did they get here: the deterioration journey tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That gives context, and a flag for which cases to prioritise. Second, can we talk to them: where we last saw them, and whether our calls connect. This does not filter anyone out, and it does not decide the route on its own. It tells us how a case can be worked: by phone, or with tracing for those who look abroad. Third, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas will come out of workshops with GRR in the coming few weeks.
 
 ## 6 · How it is built
 
@@ -591,7 +591,7 @@ Layout: a full-width table.
 
 | Axis | Evidence and points | State |
 |---|---|---|
-| A1 Deterioration | DPD path only, from January 2024 (reliable window) | First "yes" of six ordered questions (Appendix C) |
+| A1 Deterioration | DPD history only, from January 2024 (reliable window) | First "yes" of six ordered questions (Appendix C) |
 | A2 Locatability | Latest location evidence: foreign → Skip; UAE within 3 months (6 at 180+) → In Country; travel rule. Last 3 call days failed (6 at 180+) → Non-Reachable | Location × reachability (9 cells) + Deceased override |
 | A3 Credibility | Promises: Kept ≥ 80% +2, Partly +1, Broken < 40% or last 3 broken −1. Payments: monthly due paid in 2 of the last 3 months +2, any payment +1. Record before: 80% paid as billed +1 | High ≥ 4 · Moderate ≥ 2 · else Low; refusal −1 rung; no delinquency history → Unknown |
 | A4 Ability | Four evidence families: income (salary, ours or bureau), money arriving or held, own spending, other products. In progress | High: 2+ strong · Moderate: 1 strong · Low: evidence, none strong; distress −1 band; no evidence → Unknown |
