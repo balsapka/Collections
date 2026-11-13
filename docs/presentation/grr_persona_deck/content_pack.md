@@ -129,7 +129,7 @@ Column 2, **Can we talk to them?** (A2 · Locatability)
 - Non-Reachable · calls fail
 - Skip · last seen abroad
 
-Bottom box: *Decides:* Route: in-house, agency or tracing
+Bottom box: *Informs:* How we can reach them
 
 Column 3, **What can we offer?** The nuance, for every customer
 - A3 · Credibility · Will they pay?: High · Moderate · Low · Unknown
@@ -141,7 +141,7 @@ Bottom box: *Decides:* Offer and agent
 No footer.
 
 Notes:
-> The framework in one picture, in the order a case meets it. First, how did they get here: the DPD path tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That gives context, and a flag for which cases to prioritise. Second, can we talk to them: this decides the route, it does not filter anyone out. Reachable customers can be worked by phone; for those who do not answer or look abroad, the decision is the route, such as tracing or an agency. Third, for every customer, reachable or not, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas come out of a workshop with GRR.
+> The framework in one picture, in the order a case meets it. First, how did they get here: the DPD path tells us whether the customer is curing now, has cured or paid before, paid for a while and then stopped suddenly, or never paid at all. That gives context, and a flag for which cases to prioritise. Second, can we talk to them: where we last saw them, and whether our calls connect. This does not filter anyone out, and it does not decide the route on its own. It tells us how a case can be worked: by phone, or with tracing for those who look abroad. Third, for every customer, reachable or not, the nuance: will they pay, can they pay, which is still in progress, and soon what they told us in conversations, from the transcript work. Together these decide the offer and who should work the case. The final personas come out of a workshop with GRR.
 
 ## 6 · How it is built
 
@@ -219,7 +219,7 @@ Layout: an axis slide with step 2 active. The left side holds two rule cards and
 Left, "How a customer gets a label":
 - **Location: Where were they last seen?** Logins and in-person card use show where they are; a travel purchase or collector note signals they have left. The latest evidence wins. Chips: In Country · Skip · Unknown (dashed)
 - **Reachability: Do our calls connect?** Recent call days all failed, no contact since → Non-Reachable. A recent contact → Reachable. Chips: Reachable · Non-Reachable · Unknown (dashed)
-- **Decides the route:** in-house calls, tracing or an agency. Credibility and ability apply to every customer.
+- **Informs how we work a case:** by phone, or with tracing. The tier comes from what the whole persona paid.
 
 Right, "August mix": Location × reachability, 61–180. % of card accounts, with loans shown under each card figure.
 
