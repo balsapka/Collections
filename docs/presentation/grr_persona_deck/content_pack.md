@@ -36,7 +36,7 @@ Layout: title slide.
 - Byline: Group Retail Risk · Group AI, Data & Analytics · November 2026
 
 Notes:
-> Opening: where we are on the synthesized features use case. The framework is agreed; today is about what the combined results show, whether a risk score is still needed, how the transcript work (UC1) joins, and how we pilot and measure it. Data: production, August 2026 month end, unless marked otherwise.
+> Opening: where we are on the synthesized features use case. The framework is agreed; today is about what the combined results show, whether a risk score is still needed, how the transcript work (UC1) joins, and how we pilot and measure it. Data: August 2026 month end, unless marked otherwise.
 
 ## 2 · Summary
 
@@ -203,7 +203,7 @@ Stat boxes:
 - **60%**: of card accounts curing now paid within 3 months; of those who only cured before, 22% did.
 - **Half**: of loans (six in ten cards) paid for a while, then stopped all at once: an event, not a habit.
 
-Footer: Production, 31 August 2026, 61–180 DPD · paid: meaningful payment within 3 months
+Footer: 31 August 2026, 61–180 DPD · paid: meaningful payment within 3 months
 
 Notes:
 > Deterioration reads only the DPD history, so it covers every account. Six questions asked in order; the first yes decides. The states fall into four families. Stabilized customers are curing now: they have stopped falling. Slow rollers and repeat delinquents have cured or paid before, but are falling now. Straight rollers, seasoned or early in life, paid for a while and then stopped all at once, which points to an event rather than a habit: half of loans and six in ten card accounts. Early payment defaults never paid at all. Which family a customer falls into matters: 60 percent of card accounts curing now made a meaningful payment within three months, against 22 percent of those who only cured before. This holds within every DPD bucket: inside the same bucket, how likely a customer is to pay varies widely depending on which deterioration family they are in. Loans show the same pattern. Whatever the path, the next question is whether we can talk to them.
@@ -577,10 +577,10 @@ Layout: a full-width table.
 
 Under the table: Customer-level signals are read across every account of the customer (CIF). Windows end at the observation month end: 3 months at 61–180 DPD, 6 at 180+.
 
-Footer: All sources are existing production datasets; no new data feed is needed to run the framework
+Footer: All sources are existing bank datasets; no new data feed is needed to run the framework
 
 Notes:
-> Where the evidence comes from. Every source is an existing production dataset read through the pipeline catalog. Customer signals such as salary, CASA, bounces and logins are read across all accounts of the customer, because the delinquent account is usually not where the salary lands. Windows are short and end at the month end, so the state reflects the customer now.
+> Where the evidence comes from. Every source is an existing bank dataset read through the pipeline catalog. Customer signals such as salary, CASA, bounces and logins are read across all accounts of the customer, because the delinquent account is usually not where the salary lands. Windows are short and end at the month end, so the state reflects the customer now.
 
 ## 24 · Appendix B: The scoring rules at a glance
 
