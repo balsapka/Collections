@@ -61,7 +61,7 @@
       "start": "div-combined"
     },
     "s4": {
-      "description": "Optional: how we would approach allocation: only in-house needs a strategy, tiers from what personas paid, stability, UC1, the short list",
+      "description": "For discussion: a data-driven view of allocation: which cases need a strategy, tiers from observed collections, stability, UC1, the short list",
       "start": "div-optional"
     },
     "s5": {

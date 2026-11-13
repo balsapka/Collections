@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 32 slides, in order: every word, number and speaker note as it stands in v95 (2026-11-13). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 32 slides, in order: every word, number and speaker note as it stands in v96 (2026-11-13). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -380,33 +380,36 @@ Notes:
 
 ## 15 · The deliverable
 
-Layout: four cards in a row (the fourth blue dashed), a dark band and a dashed box underneath.
+Layout: a row of tiles forming an equation, three cards underneath (the third dashed), and a three-step timeline at the bottom.
 
 - Section label: The deliverable
 - Headline: **What we hand over: every account's persona, every month**
 
-Cards:
-1. **Persona table**: Every account, every month: its four states, each with the reason, and its persona
-2. **Persona profiles**: For every persona: how many accounts, how often they paid and what they collected, back-tested on past months
-3. **Model specifications**: One document per feature, with the full logic and back-test results
-4. **UC1 signals** (dashed): Joining from December: what customers tell us on calls, on the same accounts
+Equation tiles: A1 **Deterioration** + A2 **Locatability** + A3 **Credibility** + A4 **Ability** + UC1 **Signals from calls** (blue dashed) = **Persona**, per account, every month (dark tile)
 
-Dark band: GRR DECIDES · which personas get which offer, agent and channel
-Dashed box: **Optional:** how we would use the data to narrow the strategy question →
+Cards:
+- CORE · **The persona of every account**: Refreshed every month: the four states and what UC1 distils from calls, combined into one persona
+- CORE · **Model specifications**: One document per feature, with the final logic and results
+- TO AGREE (dashed) · **Supporting signals**: The signals behind each state, if GRR wants to see them in DCORE
+
+Timeline:
+- **20 Nov – 11 Dec** (blue): UC1 signals join the personas
+- **11 – 20 Dec**: Pilot selection
+- **From 4 Jan**: Pilot
 
 Notes:
-> This is the deliverable. Every month, every account gets its persona: its four states, each with the reason behind it. With it come the persona profiles: how many accounts each persona holds, how often they paid and what they collected, back-tested on past months, like the examples on the previous slide. Each feature has its own model specification document with the full logic and back-test results. And from December the UC1 transcript signals join on the same accounts. What to do with each persona, the offer, the agent and the channel, is GRR's decision. If it's useful, the next section shows how we would use the same data to narrow the strategy question, but that is optional.
+> This is the deliverable. A persona is the combination of all four states, plus whatever we distil from the UC1 call transcripts. Every month, every account gets its persona. With it come the model specification documents, one per feature, with the final logic and results. Whether we also hand over the supporting signals behind each state depends on whether GRR wants to see them in DCORE; that is still to agree. The UC1 signals start joining the personas between 20 November and 11 December, so they are in before pilot selection from 11 to 20 December and the pilot from 4 January. What to do with each persona stays GRR's decision.
 
 ## 16 · Part 3 divider
 
 Layout: section divider.
 
-- Label: Part 3 · Optional
-- Title: **How we would approach allocation**
-- Subtitle: Only in-house needs a strategy · tiers from what personas paid · keeping them stable
+- Label: Part 3 · For discussion
+- Title: **A data-driven view of allocation**
+- Subtitle: Which cases need a strategy · tiers from observed collections · stability of the tiers
 
 Notes:
-> This part is optional and has not been agreed with GRR. It shows how we would use the same data to narrow the strategy question: which cases need a strategy at all, how we would sort personas into tiers from what they actually paid, how stable those tiers are, and where UC1 adds most. The decisions stay with GRR.
+> This part is for discussion and has not been agreed with GRR. It looks at allocation through the data: which cases need a strategy of their own, how personas could be sorted into tiers from what they have actually paid, how stable those tiers are from month to month, and where the UC1 signals add most. The decisions stay with GRR.
 
 ## 17 · The simplification
 
