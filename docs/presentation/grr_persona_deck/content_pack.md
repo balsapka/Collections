@@ -200,13 +200,13 @@ Right, "August mix · share of accounts" (two stacked 100% bars, or a small tabl
 | Never paid | 6% | 8% |
 
 Stat boxes:
-- **60%**: of card accounts curing now paid within 3 months; of those who cured before, 22% did.
+- **60%**: of card accounts curing now paid within 3 months; of those who only cured before, 22% did.
 - **Half**: of loans (six in ten cards) paid for a while, then stopped all at once: an event, not a habit.
 
 Footer: Production, 31 August 2026, 61–180 DPD · paid: meaningful payment within 3 months
 
 Notes:
-> Deterioration reads only the DPD history, so it covers every account. Six questions asked in order; the first yes decides. The states fall into four families. Stabilized customers are curing now: they have stopped falling. Slow rollers and repeat delinquents have cured or paid before, but are falling now. Straight rollers, seasoned or early in life, paid for a while and then stopped all at once, which points to an event rather than a habit: half of loans and six in ten card accounts. Early payment defaults never paid at all. Which family a customer falls into matters: 60 percent of card accounts curing now made a meaningful payment within three months, against 22 percent of those who cured before, and within every DPD bucket from 61 to 180 the gap is 26 to 49 percentage points, so it is not just that curing customers sit in earlier buckets; for loans 74 against 38 percent. Whatever the path, the next question is whether we can talk to them.
+> Deterioration reads only the DPD history, so it covers every account. Six questions asked in order; the first yes decides. The states fall into four families. Stabilized customers are curing now: they have stopped falling. Slow rollers and repeat delinquents have cured or paid before, but are falling now. Straight rollers, seasoned or early in life, paid for a while and then stopped all at once, which points to an event rather than a habit: half of loans and six in ten card accounts. Early payment defaults never paid at all. Which family a customer falls into matters: 60 percent of card accounts curing now made a meaningful payment within three months, against 22 percent of those who only cured before. This holds within every DPD bucket: inside the same bucket, how likely a customer is to pay varies widely depending on which deterioration family they are in. Loans show the same pattern. Whatever the path, the next question is whether we can talk to them.
 
 ## 9 · A2 · Locatability
 
