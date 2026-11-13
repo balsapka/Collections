@@ -3,7 +3,7 @@
 Status: **§10 answered 2026-11-13; Phase 0 running.** U0 (scope, rubrics, dead list) is the next checkpoint.
 
 Run 1 (all axes, signed off 2026-11-06, shipped as bundles 15 and 16) is on branch
-`refactor/persona_review`; its plan is kept here as `PLAN_run1.md`. Since then A3 was built as an
+`refactor/persona_review`; its plan is kept here as `run1/PLAN.md` (with its decisions, questions and final report). Since then A3 was built as an
 engine (bundles 17–20, 23) and A1 moved to the evidence-family rule and product primaries (bundles
 21, 24). Neither has been through the council in its current shape.
 
@@ -115,7 +115,7 @@ building.
 
 ```
 workplace_mirror/refactor_review/
-  PLAN.md  PLAN_run1.md
+  PLAN.md  run1/ (run 1 plan, decisions, questions, final report)
   00_baseline/  rubrics/  round_1..3/
   decisions.md  questions.md  casa_handoff.md  FINAL_REPORT.md
 workplace_mirror/checks/refactor_golden.py  refactor_smoke.py  refactor_metrics.py
