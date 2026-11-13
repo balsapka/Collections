@@ -207,12 +207,15 @@ def register_pipelines() -> dict[str, Pipeline]:
         "cc_60_180.target": cc_way4_target.create_pipeline(),
         "cc_60_180.features": cc_way4_feat.create_pipeline(),
         "cc_60_180.rl_scope": retail_loans.create_cc_scoped_pipeline(),
+        # Bureau scoped to this model's spine CIFs (model_id set by ModelConfigHook)
+        "cc_60_180.bureau": bureau.create_pipeline(),
         # Sub-pipelines for incremental cc_180_plus runs
         "cc_180_plus.spine": cc_way4_spine.create_180_plus_pipeline(),
         "cc_180_plus.staging": cc_way4_stg.create_pipeline(),
         "cc_180_plus.target": cc_way4_target.create_recovery_pipeline(),
         "cc_180_plus.features": cc_way4_feat.create_pipeline(),
         "cc_180_plus.rl_scope": retail_loans.create_cc_scoped_pipeline(),
+        "cc_180_plus.bureau": bureau.create_pipeline(),
         # Sub-pipelines for incremental rl_60_180 / rl_180_plus runs
         "rl_60_180.spine": retail_loans_spine.create_pipeline(),
         "rl_60_180.staging": retail_loans_stg.create_pipeline(),
@@ -221,6 +224,7 @@ def register_pipelines() -> dict[str, Pipeline]:
         "rl_60_180.primary": retail_loans_prm.create_pipeline(),
         "rl_60_180.intermediate": retail_loans_int.create_pipeline(),
         "rl_60_180.cc_scope": cc_way4.create_rl_scoped_pipeline(),
+        "rl_60_180.bureau": bureau.create_pipeline(),
         "rl_180_plus.spine": retail_loans_spine.create_180_plus_pipeline(),
         "rl_180_plus.staging": retail_loans_stg.create_pipeline(),
         "rl_180_plus.target": retail_loans_target.create_recovery_pipeline(),
@@ -228,6 +232,7 @@ def register_pipelines() -> dict[str, Pipeline]:
         "rl_180_plus.primary": retail_loans_prm.create_pipeline(),
         "rl_180_plus.intermediate": retail_loans_int.create_pipeline(),
         "rl_180_plus.cc_scope": cc_way4.create_rl_scoped_pipeline(),
+        "rl_180_plus.bureau": bureau.create_pipeline(),
         # -- CRX Persona (experimental, additive) ---------------------------
         # Revert: remove this entry + the import above + rm -r crx_persona/
         "crx_cc_spell_table": crx_cc_spell.create_pipeline(),

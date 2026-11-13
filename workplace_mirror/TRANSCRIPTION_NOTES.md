@@ -433,3 +433,20 @@ keeps the workplace file's own separators on apply, so this never blocks a bundl
 The same goes for spacing and wrapping inside comments and docstrings (second PROD check,
 2026-10-23): v4 accepts a file whose Python code (AST without docstrings) or YAML content
 equals the photographed base. Only real code differences conflict.
+
+## Handoff 8 (2026-11-13): the DE bureau salary chain after the workplace merge
+
+The workplace merged the DE bureau branch (56 bureau files; note `bundle_helpers/a1_final/de_bureau_merge_summary_20261113.md`).
+Mirrored only what the persona code reads or bundles edit:
+- `conf/base/catalog/catalog_bureau.yml` verbatim (26 lines): the `feat_bureau_salary_unified` entry bundle 24 added
+  is gone; it lives once in the DE's `catalog_outputs.yml` (same path, `<<: *spark_de`), which the mirror does not
+  hold. Excerpt (lines 798–852) in `bundle_helpers/a1_final/workplace_reference.md`.
+- `nodes/features/bureau/feat_bureau_salary_unified.py` (117 lines) and `pipelines/bureau/features.py` (92 lines)
+  added verbatim; they import DE modules the mirror lacks (`scope_extractor`, `feat_bureau_alert`, …).
+  `py_compile` + ruff F/E9 clean. Output: `cif_id`, `salary_month_end`, `monthly_salary`, `salary_source`,
+  `is_closure`: bundle 24's contract (the first four) holds.
+- `pipeline_registry.py` (workplace 285 lines, photographed whole): the only lasting change is the DE's comment +
+  four `<model_id>.bureau` entries, added here. The workplace still has the bundle 24 and bundle 23 check
+  entries (their cleanups are pending); the mirror keeps them out (bundle 24 cleanup mirrored ahead). Separator
+  lengths and the em dash on the "Full pipelines" comment kept from the mirror (transcriber: `-`). Apart from
+  those, the photo and the mirror are identical.

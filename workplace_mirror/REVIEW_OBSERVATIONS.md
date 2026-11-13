@@ -1051,3 +1051,13 @@ over a hardcoded `feat_cif_windows.MODEL_IDS` (deliberate: they union the four m
 reach it; and `_data_end` takes the latest bureau month, which the unified table runs to 2026-11 (partial).
 Fix with the import repoint (handoff 7): docstrings, one carry rule shared with A1.
 
+
+### O92 — the DE's unified salary now flags closure months; A1's carry ignores the flag (M)
+
+`nodes/features/bureau/feat_bureau_salary_unified.py:51-57, 63`: the DE output carries `is_closure` (true when the
+winning row is a `salaryaccountclosed` alert with a positive amount) and says such a month "counts in its own month;
+forward filling downstream must not carry it into the next month" (the closure rule the user asked the DE for,
+2026-11-12). `feat_cif_bureau_salary_monthly.build` does not select `is_closure`, and A1's `_with_next_month`
+(`a1_ability/signals.py:93`) carries every positive month one month on, closure months included; the same holds for
+`feat_cif_windows._external_series` (O91). Fix in the next A1 bundle: pass `is_closure` through the contract and
+stop the carry on it (with the 3-month carry option, if taken).

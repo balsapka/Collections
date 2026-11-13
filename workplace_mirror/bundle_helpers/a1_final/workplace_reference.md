@@ -523,3 +523,10 @@ src/enbd_collections/pipeline_registry.py:253:        "crx_rl_departure_signatur
   names the departure / payment-trajectory / utilisation pipelines (imports and
   registration), and `crx_cc_departure_pass` appears nowhere. Nothing else reads them: they
   can go when their persona consumers do.
+
+## catalog_outputs.yml, bureau excerpt (workplace, lines 798–852, photographed 2026-11-13)
+
+`feat_bureau_salary_unified` is defined here only (DE-owned), `<<: *spark_de`, filepath
+`${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/bureau/salary_unified`. Neighbours: `feat_bureau_alert`,
+`feat_bureau_pull`, `feat_bureau`, `feat_bureau_snapshot`, `target_cifs_bureau` (bureau) and the `dcore_feat_*` entries
+(contact, ptp, resolution, legal_action, settlement), all `<<: *spark_de` under `${globals:folders.feat}/<domain>/<name>`.
