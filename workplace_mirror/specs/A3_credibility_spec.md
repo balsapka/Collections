@@ -202,6 +202,7 @@ Measured, not assumed (V2, V3).
   month. Paying on the deadline day counts. `PROMISE_DEADLINE` is keyed by segment (from
   `params:model_id`) and product; the 30-day and next-month-end options stay.
 
+- **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
   `bundle_helpers/b17_a3/a3_check_review.md`). An instalment is kept when the payments since the plan
   start reach the plan's cumulative due by the first statement on or after the due date (CC) / the end
