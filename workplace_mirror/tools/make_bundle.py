@@ -30,6 +30,7 @@ SOURCE_ROOTS = ("src/", "conf/")
 OUT_DIR = REPO / "workplace_mirror" / "bundles"
 APPLY = pathlib.Path(__file__).with_name("apply_bundle.py")
 LANG = {".py": "python", ".yml": "yaml", ".yaml": "yaml", ".md": "markdown"}
+LAST_REMOVED = 21  # highest bundle number deleted from bundles/ (numbers stay used)
 WORK_DIR = "data/input/mirror_bundles"  # gitignored in the workplace repo
 
 
@@ -220,7 +221,10 @@ def build(args: argparse.Namespace) -> pathlib.Path:  # pylint: disable=too-many
     if not files:
         raise SystemExit(f"No src/ or conf/ changes between {base} and {head}.")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    number = len(list(OUT_DIR.glob("[0-9][0-9]_*.md"))) + 1
+    # Finished bundles are deleted (git history keeps them): number after the highest
+    # one left, never below LAST_REMOVED.
+    taken = [int(p.name[:2]) for p in OUT_DIR.glob("[0-9][0-9]_*.md")]
+    number = max(taken + [LAST_REMOVED]) + 1
     name = f"{number:02d}_{args.slug}.md"
     read = _read_optional
     apply_src = APPLY.read_text(encoding="utf-8")
