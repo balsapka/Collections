@@ -27,9 +27,13 @@
     "a1",
     "div-combined",
     "p2-explode",
+    "p2-top",
+    "p2-handover",
+    "div-optional",
     "p2-focus",
     "p2-method",
     "p2-combos",
+    "p2-stability",
     "p2-uc1",
     "p2-shortlist",
     "div-appendix",
@@ -53,11 +57,15 @@
       "start": "div-axes"
     },
     "s3": {
-      "description": "From states to a strategy: too many personas, only in-house needs a strategy, a first look at the tiers, UC1, the short list",
+      "description": "From states to personas: too many personas, where the value sits, what we hand over",
       "start": "div-combined"
     },
     "s4": {
-      "description": "Appendix: possible treatments and pilot, the risk score, signals, rules, governance",
+      "description": "Optional: how we would approach allocation: only in-house needs a strategy, tiers from what personas paid, stability, UC1, the short list",
+      "start": "div-optional"
+    },
+    "s5": {
+      "description": "Appendix: possible treatments and pilot, the risk score, signals, rules, credibility, governance",
       "start": "div-appendix"
     }
   },

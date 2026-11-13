@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 28 slides, in order: every word, number and speaker note as it stands in v83 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 32 slides, in order: every word, number and speaker note as it stands in v94 (2026-11-13). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -322,11 +322,11 @@ Notes:
 Layout: section divider.
 
 - Label: Part 2
-- Title: **From states to a strategy**
-- Subtitle: Too many personas · only in-house needs a strategy · a first look
+- Title: **From states to personas**
+- Subtitle: Too many personas · where the value sits · what we hand over
 
 Notes:
-> Part 2 is a first look, not a plan. Combined, the states give far more personas than anyone could act on, so we narrow the question to the cases kept in-house, where a strategy is actually needed. It ends with a short list for the strategy workshop, where UC1 adds its signals, and a note on the risk score. None of it has been agreed with GRR.
+> Part 2 puts the four states together into personas. Combined, they give far more personas than anyone could act on, but the customers most likely to pay sit in a few dozen of them. It ends with what we hand over: every account's persona, every month, with what each persona has paid.
 
 ## 13 · Combining the states
 
@@ -347,9 +347,66 @@ Underneath:
 Footer: Cards 61–180 · August 2026 · credibility High / Moderate / Low; ability includes Unknown
 
 Notes:
-> Part 2 starts by putting the axes together. A persona is one combination of states: one of six deterioration states, one of nine locatability cells, one of three credibility bands and one of four ability bands. That is 648 possible personas before anything from UC1. The transcript signals, such as stated intent, a hardship reason or a dispute, come on top, and each one multiplies the count again. Many of these combinations do occur: 393 among card accounts in August, of which 222 have ten or more accounts; on loans 323 occur and only 111 have ten or more. Many hold just a handful of accounts. Nobody can write and run a separate strategy for hundreds of personas, so we need a way to decide where a strategy is actually needed.
+> Part 2 starts by putting the axes together. A persona is one combination of states: one of six deterioration states, one of nine locatability cells, one of three credibility bands and one of four ability bands. That is 648 possible personas before anything from UC1. The transcript signals, such as stated intent, a hardship reason or a dispute, come on top, and each one multiplies the count again. Many of these combinations do occur: 393 among card accounts in August, of which 222 have ten or more accounts; on loans 323 occur and only 111 have ten or more. Many hold just a handful of accounts. Nobody can write and run a separate strategy for hundreds of personas. The good news is on the next slide: the customers most likely to pay sit in a few dozen of them.
 
-## 14 · The simplification
+## 14 · Where the value sits
+
+Layout: a table of five personas across the top, three stat boxes underneath.
+
+- Section label: Where the value sits
+- Headline: **The customers most likely to pay sit in a few dozen personas**
+
+Table label: The five largest high-collecting personas · cards
+
+| Path | Where · reach | Credibility | Ability | Accounts | Paid | AED per account |
+|---|---|---|---|---|---|---|
+| Stopped suddenly | In country · reachable | Low | Unknown | 167 | 30% | 1,274 |
+| Cured before | In country · reachable | Low | Low | 132 | 35% | 1,350 |
+| Curing now | Unknown · reachable | Moderate | Unknown | 103 | 69% | 1,713 |
+| Stopped suddenly | In country · reachable | Moderate | Low | 102 | 42% | 1,962 |
+| Cured before | In country · reachable | Moderate | Low | 97 | 43% | 1,663 |
+
+Stat boxes:
+- **51** personas (dark): collected AED 1,250 or more per account: 11% of card accounts
+- **12** of 51: cover half of those accounts; 26 cover 80%
+- **16** personas: on loans collected AED 6,000 or more: 8% of accounts; 6 cover half
+
+Footer: Cards 61–180 · personas from August 2026 accounts · paid and AED per account: May 2026 accounts, collections June–August · card book average AED 639 per account
+
+Notes:
+> The good news is that most of these personas don't matter much for money. The customers most likely to pay sit in a few dozen of them. On cards, 51 personas collected 1,250 dirhams or more per account over three months in the back-test. They hold 11 percent of card accounts, and just 12 of them cover half of those accounts, 26 cover 80 percent. Here are the five largest. Each holds around a hundred to a hundred and seventy accounts, and collected between 1,270 and nearly 2,000 dirhams per account, against a card book average of about 640. How often they paid ranges from 30 percent for customers who stopped suddenly with low credibility, to 69 percent for customers curing now. On loans the list is shorter: 16 personas collected 6,000 dirhams or more per account, 8 percent of loan accounts, and 6 of them cover half. The numbers are from one back-test month, so the exact list will move; the point is that the value is concentrated in a short list of recognisable customer types.
+
+## 15 · The deliverable
+
+Layout: four cards in a row (the fourth blue dashed), a dark band and a dashed box underneath.
+
+- Section label: The deliverable
+- Headline: **What we hand over: every account's persona, every month**
+
+Cards:
+1. **Persona table**: Every account, every month: its four states, each with the reason, and its persona
+2. **Persona profiles**: For every persona: how many accounts, how often they paid and what they collected, back-tested on past months
+3. **Model specifications**: One document per feature, with the full logic and back-test results
+4. **UC1 signals** (dashed): Joining from December: what customers tell us on calls, on the same accounts
+
+Dark band: GRR DECIDES · which personas get which offer, agent and channel
+Dashed box: **Optional:** how we would use the data to narrow the strategy question →
+
+Notes:
+> This is the deliverable. Every month, every account gets its persona: its four states, each with the reason behind it. With it come the persona profiles: how many accounts each persona holds, how often they paid and what they collected, back-tested on past months, like the examples on the previous slide. Each feature has its own model specification document with the full logic and back-test results. And from December the UC1 transcript signals join on the same accounts. What to do with each persona, the offer, the agent and the channel, is GRR's decision. If it's useful, the next section shows how we would use the same data to narrow the strategy question, but that is optional.
+
+## 16 · Part 3 divider
+
+Layout: section divider.
+
+- Label: Part 3 · Optional
+- Title: **How we would approach allocation**
+- Subtitle: Only in-house needs a strategy · tiers from what personas paid · keeping them stable
+
+Notes:
+> This part is optional and has not been agreed with GRR. It shows how we would use the same data to narrow the strategy question: which cases need a strategy at all, how we would sort personas into tiers from what they actually paid, how stable those tiers are, and where UC1 adds most. The decisions stay with GRR.
+
+## 17 · The simplification
 
 Layout: a box on the left ("Every case") with an arrow that splits into three lanes on the right. A "From → To" band runs underneath.
 
@@ -371,9 +428,9 @@ Band, "The question changes":
 Footer: Agency and non-workable handling as in the collections policy (FR Policy on Operations, July 2025)
 
 Notes:
-> The way out of the explosion is the first decision every case meets: allocation. Once a case goes to an agency, the agency works it on the policy's terms and is paid commission on the cash it collects. The non-workable pool, the customers least probable to pay, is referred out under the policy as well. In neither case do we need a persona-level strategy. Only the cases we keep in-house need one: which offer, which agent, which channel. So the question changes from finding a strategy for every persona to deciding which personas earn in-house effort, and what we do with those.
+> If we take it further, the way through the many personas is the first decision every case meets: allocation. Once a case goes to an agency, the agency works it on the policy's terms and is paid commission on the cash it collects. The non-workable pool, the customers least probable to pay, is referred out under the policy as well. In neither case do we need a persona-level strategy. Only the cases we keep in-house need one: which offer, which agent, which channel. So the question changes from finding a strategy for every persona to deciding which personas earn in-house effort, and what we do with those.
 
-## 15 · How an account gets a tier
+## 18 · How an account gets a tier
 
 Layout: three numbered steps side by side.
 
@@ -401,7 +458,7 @@ Footer: Cards 61–180 · back-test May → Jun–Aug 2026; tiers hold on unseen
 Notes:
 > How the tiers on the next slide are built, in three steps. First, every account has one state on each of the four axes: its deterioration family, its locatability cell, its credibility band and its ability band. Together these form its persona; for the tiers, deterioration is read at family level. Second, for each persona we take every account in May and add up everything it paid in June to August, then divide by the number of accounts. That gives the amount collected per account, an observed average that combines how often accounts paid and how much they paid; for example, 400 accounts paying 70,000 dirhams is 175 dirhams per account. Third, we rank the personas large enough to judge, 97 percent of card accounts, and cut the list: 1,250 dirhams and above in-house, under 175 the non-workable pool, agency in between. The cut-offs are illustrations from the data; GRR would set them from the agency commission rate card and the in-house cost. Every account then takes the tier of its persona. Testing added two refinements. A list built from a single month moves too much, so the table is pooled over several months, and a persona enters in-house only clearly above the cut and leaves only clearly below it, a band of about ten percent either side. And the cut matters far more than anything else: moving it twenty percent either way takes the card in-house list from 70 personas to 44, while changing how we define reachability swaps only a handful.
 
-## 16 · Tiers, a first look
+## 19 · Tiers, a first look
 
 Layout: a table on the left (or a bar of the money share above the table); two descriptive lines and one stat box on the right.
 
@@ -425,7 +482,38 @@ Footer: Cards 61–180 · table out-of-sample (5 folds, Jan–May 2026); call da
 Notes:
 > A first look; nothing here has been discussed with GRR. With the illustrative cut-offs, in-house would take about a sixth of card accounts and half the money collected. In-house is mostly customers curing now or cured before who are credible or able; the non-workable pool is mostly those who stopped suddenly or never paid and cannot be reached, which also gives the policy's non-workable pool a definition. Tested on unseen months and accounts, the top fifth of card accounts by persona hold 54 percent of the money collected. The illustrative cut-offs give three groups: in-house, 17 percent of accounts and 48 percent of the money, recovering about 10 percent of principal in three months; agency, 54 percent and 46 percent; and the non-workable pool, 29 percent of accounts, about 6 percent of the money, recovering just over half a percent, yet still taking nearly 11 call days per account. The groups keep their order on every unseen month. We also checked how stable the tiers are. Rebuilt from one month alone, the card list keeps about half its personas from one month to the next; pooled over months with the band, about 80 percent, and only about one card account in twenty changes tier while its persona stays the same, down from one in eight, with no loss in money collected. On loans the order holds too, but the book is smaller and the list thinner: even pooled, about one loan account in seven changes tier with the same persona, so the loan tiers are provisional. The cut-offs are illustrations; the commission rate card and the in-house cost would set them properly.
 
-## 17 · UC1
+## 20 · Keeping the tiers stable
+
+Layout: three columns: a dark stat box with text, a table of options, and a list of next steps.
+
+- Section label: Work in progress
+- Headline: **Keeping the tier list stable from month to month**
+
+Column 1, WHY TIERS MOVE:
+- Dark box: **35%** of loan accounts change tier from one month to the next while their persona stays the same (cards 13%)
+- Most of it is chance: many personas hold only a handful of accounts, so one large payment moves their average across the cut. Two random resamples of the same month already disagree on 27% of loan tiers.
+
+Column 2, WHAT WE TRIED · TIER CHANGES, PERSONA UNCHANGED (cards / loans):
+- Today: one month per persona: 13% / 35%
+- Several months pooled: 6% / 15%
+- Pooled, with a band around the cut: 5% / 14%
+- Pooled, large payments capped: 7% / 11%
+- Pooled, on broader groups (highlighted): 1% / 5%
+- A moving or rank-based cut alone (grey): 12–13% / 25–34%
+- None of them lost money collected at the same in-house share.
+
+Column 3, NEXT:
+- **Longer pooling**: 12 months, with history from before 2026
+- **Broader groups that keep location**: fewer, larger groups for the tier; the full persona for the strategy
+- **Re-run every 3 months**: with triggers for an early re-run: in-house paid rate or the book's collection level leaving its usual range
+- **Confirm on later months**: once payment data runs past August
+
+Footer: Cards and loans 61–180 · cohorts January–May 2026 · tier built on earlier months, read on the next · broader groups: family × reachability × credible or able
+
+Notes:
+> This is work in progress. A tier list is only useful if it stays put from one run to the next, so we checked how often an account changes tier while its persona stays the same. With today's method, one month per persona, that's 13 percent of card accounts and 35 percent of loan accounts every month. Most of it is chance rather than real change: many personas hold only a handful of accounts, and one large payment moves their average across the cut. Two random resamples of the same month already disagree on 27 percent of loan tiers. So the fix is more accounts behind each estimate. Pooling several months halves the churn. A band around the cut, or capping very large payments, helps a little more. Deciding the tier on broader groups, the deterioration family, reachability and whether the customer is credible or able, brings it down to 1 percent on cards and 5 percent on loans. A cut that moves with the book, or that keeps a fixed share of accounts, does not help on its own. None of these options cost money collected. Next, we want to pool over a longer window, using history from before 2026; try broader groups that keep location; and re-run the list every three months, with triggers for an earlier re-run if the in-house paid rate or the book's collection level leaves its usual range. All of this rests on five months of data, so we will confirm it on later months once the payment data runs past August.
+
+## 21 · UC1
 
 Layout: a horizontal bar chart in a grey panel on the left; chips and a quote line on the right.
 
@@ -451,7 +539,7 @@ Footer: Cards 61–180 · August 2026 · groups at the illustrative cut-offs
 Notes:
 > The transcript work, UC1, only has something to say where a conversation took place, and that differs sharply across the groups: 89 percent of in-house card accounts had a right-party contact in the last three months, 45 percent of the agency group and 16 percent of the non-workable pool. So the UC1 signals, what customers say about their intent, income, hardship, disputes and promises, land mostly on the in-house cases. That is exactly where a strategy is needed, and where the extra detail is worth having.
 
-## 18 · Towards the strategy workshop
+## 22 · Towards the strategy workshop
 
 Layout: a table on the left with a dark summary bar under it; three vertical numbered steps on the right.
 
@@ -480,7 +568,7 @@ Footer: Cards 61–180 · August 2026 · share of in-house accounts · in-house 
 Notes:
 > Where this leads. Most personas fall to the agency or the non-workable pool and need nothing more from us. The in-house tier is a much shorter list: 51 personas on cards, and 26 of them cover 80 percent of in-house accounts; on loans 11 of 16. Look at the five largest: every one is reachable, while credibility and ability vary, from low credibility with unknown ability to moderate credibility with low ability. Reachability helps, but it does not decide who lands in-house: about one in five in-house card accounts, and two in five on loans, are not reachable. A core of the list is steady: on cards, the personas that are in-house in every month cover over a third of in-house accounts, and about half with those in-house four months out of five. For the workshop we would build the list from several pooled months, not one; on loans it is still thin and moves, so we would treat it as provisional. That short list is what we would take to GRR: the data proposes it, UC1 refines it with what customers tell us, and GRR decides the offer, agent and channel for each persona in the strategy workshop. The simplification comes from GRR, not from us merging states.
 
-## 19 · Appendix divider
+## 23 · Appendix divider
 
 Layout: section divider.
 
@@ -491,7 +579,7 @@ Layout: section divider.
 Notes:
 > Backup slides for questions on logic and data.
 
-## 20 · What each group could mean
+## 24 · What each group could mean
 
 Layout: three columns (one per tier) with a full-width 180+ band underneath.
 
@@ -513,7 +601,7 @@ Footer: For discussion in the strategy workshop; not agreed with GRR · cards 61
 Notes:
 > For discussion only, not agreed with GRR. Each illustrative group is paired with a treatment the policy already provides; nothing here is a new process. In-house customers are curing now or have cured before, can be reached and are credible or able: half of them pay within three months, so skilled collectors should convert them with the existing tools, the CARES settlements, a restructure or a deferral. The agency tier is mostly customers who stopped suddenly or cured before and cannot be reached: place them with agencies at 61 to 180, with skip tracing where they appear to be abroad. The non-workable pool is customers who stopped suddenly or never paid, and cannot be reached: the policy allows either referral to agencies with HOD approval, or no calling with dunning only, as it does for Dead Beat accounts. At 180+, the 12 percent with a positive signal are lifted out of the pool for an in-house attempt.
 
-## 21 · How a pilot could test it
+## 25 · How a pilot could test it
 
 Layout: three columns of short lists.
 
@@ -533,7 +621,7 @@ Footer: Sample per arm (cards, 5-pt lift): agency 970, non-workable 375; in-hous
 Notes:
 > For discussion only. If the strategy workshop takes the allocation view forward, a pilot could test each group against business as usual, with a random split inside each tier for three months. In the in-house tier, skilled collectors with the settlement tools against the current process. In the agency tier, placement with agencies at 61 to 180 against in-house calling. In the non-workable pool, the two treatments the policy allows, agency referral or dunning only, against business as usual: a hold-out that shows exactly what is lost, if anything, by taking collector time away. We measure meaningful payments and roll rates, the amount collected per account, recovery of outstanding principal, and the call days and cost per dirham collected; at 180+, the flagged group against the rest. On cards, the agency and non-workable tiers fill both arms in a single month for a five point lift; the in-house tier needs a ten point target, and loans need a ten point target and pooling over months. The same policy and compliance rules apply to every arm, with a monthly readout and a stop rule.
 
-## 22 · Risk score
+## 26 · Risk score
 
 Layout: a table on the left; three short findings on the right.
 
@@ -561,7 +649,7 @@ Footer: Paid = meaningful payment within 3 months (the risk score's target) · s
 Notes:
 > Is a risk score still worth building? We tested out-of-sample: the payment rates of each view were learned on some accounts and months and scored on others, January to May 2026, in five folds, and confirmed with time splits. Ranking power is the area under the curve, where 0.5 is chance and 1 is perfect. The DPD bucket alone reaches 0.65 on cards and 0.62 on loans. The personas reach 0.83 and 0.77: far better, in every test, and the top fifth of card accounts by persona hold 54 percent of the money collected, against 30 percent by bucket. Adding the bucket to the personas adds almost nothing. A simple model on the axis states and the bucket adds about two points of AUC over the personas. So a model on the same inputs adds a little, consistently. The risk score modelling is planned for Phase 2, where a full Retail 360 model, using bureau and other domains the axes do not use yet, can be tested against the personas.
 
-## 23 · Appendix A: Signals and their sources
+## 27 · Appendix A: Signals and their sources
 
 Layout: a full-width table.
 
@@ -582,7 +670,7 @@ Footer: All sources are existing bank datasets; no new data feed is needed to ru
 Notes:
 > Where the evidence comes from. Every source is an existing bank dataset read through the pipeline catalog. Customer signals such as salary, CASA, bounces and logins are read across all accounts of the customer, because the delinquent account is usually not where the salary lands. Windows are short and end at the month end, so the state reflects the customer now.
 
-## 24 · Appendix B: The scoring rules at a glance
+## 28 · Appendix B: The scoring rules at a glance
 
 Layout: a full-width table.
 
@@ -601,7 +689,7 @@ Footer: Full specification and reference workbook per axis
 Notes:
 > The exact rules, for the detailed questions. Deterioration is a decision tree on the DPD history. Locatability combines location and reachability. Credibility adds up points, High from four and Moderate from two, with a refusal lowering one band. Ability, still in progress, counts strong evidence families. Every threshold is in the axis specification and its reference workbook.
 
-## 25 · Appendix C: How a journey state is assigned
+## 29 · Appendix C: How a journey state is assigned
 
 Layout: a full-width table.
 
@@ -622,7 +710,7 @@ Footer: Billing artefacts repaired first and counted · retail loans on the same
 Notes:
 > Deterioration is a short ordered tree. A guard first: if the history starts already delinquent, we cannot see how they fell in, so the state is Unknown unless the account is stabilized. Then early payment default, stabilized, repeat delinquent, straight roller split by tenure, and everything else is a slow roller. One-month glitches and billing-cycle jumps are repaired before the tree runs, and every repair is counted.
 
-## 26 · Appendix: New ability rule vs the old
+## 30 · Appendix: New ability rule vs the old
 
 Layout: two tables side by side, with three short cards across the bottom.
 
@@ -657,7 +745,7 @@ Footer: * Cure: below 61 DPD at month 3 · Pay: any payment, even partial · Rol
 Notes:
 > How the new ability rule compares with the old one, which rested on income plus the CASA balance. The old High needed a CASA balance above the floor, and the bank sweeps balances against the overdue amount, so High almost never fired. The new rule counts four evidence families: income, money arriving or held, the customer's own spending, and other products with us. Two strong families make High, one makes Moderate, some evidence makes Low, none is Unknown; a bounced cheque or returned direct debit moves the customer one band down. Share of accounts: High grows four to nine times in every book. Low rises for loans and at 180+, mostly customers with another product kept current with us. Cards at 61 to 180 move slightly into Unknown on purpose: those customers' only account activity was fees or payments on their own loan, which says nothing about ability. Outcomes are rates within each state over the next three months: cure means below 61 DPD at month 3, pay means any payment, roll means a worse bucket. Every state orders all three in the right direction. For cards every step is significant, also within the same DPD bucket; for loans High and Moderate are not yet separable, because High is still small. The old rule's High was too small to read at all. Unknown means we cannot see the customer's money, not that they have none.
 
-## 27 · Appendix: When a promise counts as kept
+## 31 · Appendix: When a promise counts as kept
 
 Layout: a table on the left (three rules × four books), three short cards stacked on the right.
 
@@ -682,7 +770,7 @@ Footer: * How well the credibility state ranks customers on paying a due in the 
 Notes:
 > The credibility axis judges each promise to pay as kept or broken by whether the customer paid by a deadline. We back-tested three deadlines: today's rule, the next statement for cards and the end of the following month for loans; the end of the month of the promise, proposed for loans and for all 180+ accounts; and a lenient 30 days after the promise. The test scored March to May 2026 under each rule and asked how well the credibility state ranks customers on paying a monthly due over the following three months, for all four books. The number is the AUC: 0.5 is a coin toss, higher is better. 30 days ranks best or equal in every book: about 0.02 better than the statement for cards, and level with today's rule for loans. The end of the promise month ranks worst for loans and at 180+, by 0.01 to 0.02; every gap of that size is outside the 95 percent interval and holds in each of the three months. The reason is on the right. A loan customer who pays a promise in the following month goes on to pay just like one who paid on time, so a stricter deadline marks payers as broken, and the customers it moves down keep paying like the state they came from. We also checked the accounts with no promise or payment record, which now sit in Low instead of Unknown. They pay less than the rest of Low in every book, so Low is the right place for them; most are young accounts, early payment default rather than unknown customers. So the data favour 30 days: the most lenient rule for the customer is also the most predictive. The choice of rule is GRR's.
 
-## 28 · Appendix D: Status and sign-off
+## 32 · Appendix D: Status and sign-off
 
 Layout: a simple two-column table.
 
