@@ -76,4 +76,12 @@ Accounts whose tier changes while the persona stays the same, month to month (ad
    - Pooling was the biggest gain with only 1–4 months available. A 12-month pool may bring loans under 10% churn without the coarser key.
    - Re-test pooled, pooled + capped, pooled + band and shrinkage at W = 6 and 12.
 2. **Refresh payment data past 2026-08-31,** then confirm on June onwards as a true hold-out and test cadences of 6 months and more.
-3. **Take Auto loans to GRR separately.**
+3. **Refine G3 so it is acceptable** (user, 2026-11-13: G3 looks promising, but keep location in).
+   - Today G3 tiers on family × reachability × credible-or-able. Credible-or-able means credibility or ability at Moderate or above, which already combines the two.
+   - Candidate coarser keys to test, all with pooling and the p99 cap:
+     - **K1** family × locatability cell (9 cells: location × reachability) × credible-or-able: about 72 groups;
+     - **K2** family × a 5-way location-reach segment (in-country reachable, other reachable, non-reachable, unknown reach, abroad; the segments A3 V1j uses) × credible-or-able: about 40 groups;
+     - **K3** family × locatability cell × a 3-level "means and will" (neither, one at Moderate or above, both or either High): about 108 groups;
+     - **K4** the full persona shrunk toward K1 or K2, which keeps persona detail where the data supports it.
+   - Judge each on the same churn and money measures as above, and on how many groups have 30 or more accounts a month. More groups means thinner groups again, so these go with the longer pooling window of step 1.
+4. **Take Auto loans to GRR separately.**
