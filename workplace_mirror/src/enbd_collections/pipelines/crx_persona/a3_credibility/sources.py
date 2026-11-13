@@ -8,7 +8,7 @@ from enbd_collections.nodes.utils.config_dcore import (
     PTP_INSTALMENT_STATUS_CANCELLED,
     SETTLEMENT_INSTALMENT_STATUS_CANCELLED,
 )
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .. import _dcore_codes as codes
@@ -180,27 +180,58 @@ EVENTS = [
 
 
 def _followup_promises(
-    obs_base: DataFrame, followup: DataFrame, agreements: DataFrame
+    obs_base: DataFrame,
+    followup: DataFrame,
+    agreements: DataFrame,
+    dues: DataFrame,
+    deadline: str,
 ) -> DataFrame:
-    """Follow-up promise runs per account: rows less than 8 days after the previous one
-    belong to the same run, dated (and named) at its first row."""
-    rows = (
+    """Follow-up promise runs per account, dated (and named) at their first row. A row
+    starts a new run when it is more than 7 days after the previous row or after the
+    run's deadline, the ``promise_cutoff`` of its first row (D-A3-29)."""
+    rows = _cutoff(
         dcore_account_events(obs_base, followup, agreements)
         .where(F.col("name").isin(*sorted(codes.PROMISE_EVENT)))
-        .select("account_id", "day", "name")
-        .distinct()
+        .select("account_id", F.col("day").alias("event_date"), "name")
+        .distinct(),
+        dues,
+        deadline,
     )
-    order = Window.partitionBy("account_id").orderBy("day", "name")
-    gap = F.datediff("day", F.lag("day").over(order))
-    new_run = F.when(gap.isNull() | (gap > FOLLOWUP_RUN_DAYS), 1).otherwise(0)
-    first = F.min(F.struct("day", "name"))
-    return (
-        rows.withColumn(
-            "_run", F.sum(new_run).over(order.rowsBetween(Window.unboundedPreceding, 0))
+
+    def step(run: Column, row: Column) -> Column:
+        starts = (
+            run["prev"].isNull()
+            | (F.datediff(row["event_date"], run["prev"]) > FOLLOWUP_RUN_DAYS)
+            | (row["event_date"] > run["cutoff"])
         )
-        .groupBy("account_id", "_run")
-        .agg(first["day"].alias("fu_date"), first["name"].alias("event_name"))
-        .drop("_run")
+        first = F.struct(row["event_date"], row["name"])
+        return F.struct(
+            F.when(starts, F.concat(run["firsts"], F.array(first)))
+            .otherwise(run["firsts"])
+            .alias("firsts"),
+            row["event_date"].alias("prev"),
+            F.when(starts, row["promise_cutoff"])
+            .otherwise(run["cutoff"])
+            .alias("cutoff"),
+        )
+
+    start = F.struct(
+        F.array().cast("array<struct<event_date:date,name:string>>").alias("firsts"),
+        F.lit(None).cast("date").alias("prev"),
+        F.lit(None).cast("date").alias("cutoff"),
+    )
+    ordered = F.array_sort(
+        F.collect_list(F.struct("event_date", "name", "promise_cutoff"))
+    )
+    return (
+        rows.groupBy("account_id")
+        .agg(F.aggregate(ordered, start, step)["firsts"].alias("_firsts"))
+        .select("account_id", F.explode("_firsts").alias("_first"))
+        .select(
+            "account_id",
+            F.col("_first.event_date").alias("fu_date"),
+            F.col("_first.name").alias("event_name"),
+        )
     )
 
 
@@ -285,7 +316,8 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     """Promise events of the base's accounts, judged by payment (D-A3-25). ``EVENTS``.
 
     Events: every non-cancelled PTP and settlement plan (dated at its start) and every
-    follow-up promise run (``_dcore_codes.PROMISE_EVENT``) no plan claims
+    follow-up promise run (``_dcore_codes.PROMISE_EVENT``; a follow-up after the run's
+    deadline starts a new run) no plan claims
     (``event_kind`` matched / table_only / followup_only). Judged once: the payments
     after the event day up to ``promise_cutoff`` (``deadline``, by default
     ``promise_deadline(product, model_id)``) against ``promise_amount``, the due of the
@@ -296,11 +328,9 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     plans = instalments.select(
         "account_id", "plan_id", "plan_type", F.col("plan_start").alias("event_date")
     ).distinct()
-    events = _cutoff(
-        _consolidate(plans, _followup_promises(obs_base, followup, agreements)),
-        dues,
-        deadline or promise_deadline(product, model_id),
-    )
+    deadline = deadline or promise_deadline(product, model_id)
+    promises = _followup_promises(obs_base, followup, agreements, dues, deadline)
+    events = _cutoff(_consolidate(plans, promises), dues, deadline)
     keys = ["account_id", "event_date"]
     due = (
         events.select(*keys)

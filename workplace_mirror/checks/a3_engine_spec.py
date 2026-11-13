@@ -143,6 +143,9 @@ for r in SCORECARD.score(cells).collect():
 # promise runs (06-14), 06-05 stays alone; neither is paid -> broken (2 concluded, 0
 # kept).
 # Bk: three promises never paid -> broken (streak).
+# N (D-A3-29): promises 07-02, 07-07, 07-09: 07-07 is after the 07-05 statement, the
+# deadline of the 07-02 event, so it starts a new event that 07-09 joins; with a month-end
+# deadline all three are one event.
 stmts = [D(2026, m, 5) for m in range(1, 10)]
 
 
@@ -162,7 +165,7 @@ def plan_rows(rows):
     )
 
 
-A_ACCTS = ["A", "B", "K", "M", "Bk"]
+A_ACCTS = ["A", "B", "K", "M", "Bk", "N"]
 dues = df(
     [
         (a, s, n, 300.0 if (a, s) == ("A", D(2026, 7, 5)) else 100.0, 100.0)
@@ -197,6 +200,9 @@ a_followup = fu(
         ("Bk", "2026-05-10", "PROMISE TO PAY"),
         ("Bk", "2026-06-10", "PROMISE TO PAY"),
         ("Bk", "2026-07-10", "PROMISE TO PAY"),
+        ("N", "2026-07-02", "PROMISE TO PAY"),
+        ("N", "2026-07-07", "WILL PAY AT SALARY"),
+        ("N", "2026-07-09", "PROMISE TO PAY"),
     ]
 )
 a_agreements = df([(a, a) for a in A_ACCTS], "account_id string, agreement_id string")
@@ -241,6 +247,18 @@ check(
     ),
     [("2026-06-05", "followup_only"), ("2026-06-10", "matched")],
 )
+for name, deadline, want in (
+    ("next statement", None, ["2026-07-02", "2026-07-07"]),
+    ("month end", "month_end", ["2026-07-02"]),
+):
+    check(
+        f"events N, follow-up after the deadline ({name})",
+        sorted(
+            str(r["event_date"])
+            for r in events_for(deadline=deadline).where("account_id = 'N'").collect()
+        ),
+        want,
+    )
 check(
     "cutoff A 07-10",
     [
@@ -271,7 +289,14 @@ check(
 check(
     "A levels (next statement)",
     by_account(sig, "a3_commitments_level"),
-    {"A": "broken", "B": "thin", "K": "kept", "M": "broken", "Bk": "broken"},
+    {
+        "A": "broken",
+        "B": "thin",
+        "K": "kept",
+        "M": "broken",
+        "Bk": "broken",
+        "N": "broken",
+    },
 )
 sig30 = build_commitment_signals(ep, events_for(deadline="30_days"))
 check(

@@ -10,7 +10,8 @@ MIN_CONCLUDED = 2  # concluded promises before a rate counts (row 74)
 KEPT_RATE = 0.80  # Kept from (row 75)
 BROKEN_RATE = 0.40  # Broken below (row 76)
 BROKEN_STREAK = 3  # Broken when the last 3 concluded were all broken (row 77)
-FOLLOWUP_RUN_DAYS = 7  # follow-up promises less than 8 days apart are one event
+# follow-up promises less than 8 days apart are one event, up to its deadline (D-A3-29)
+FOLLOWUP_RUN_DAYS = 7
 MATCH_DAYS = 7  # a follow-up promise within 7 days of a DCORE plan is that plan
 # The deadline a promise is judged by (GRR, handoff 64), whatever date was promised: at
 # 60-180 a card promise by the next statement after the promise day, however close; a
