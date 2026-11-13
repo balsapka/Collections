@@ -219,7 +219,7 @@ Layout: an axis slide with step 2 active. The left side holds two rule cards and
 Left, "How a customer gets a label":
 - **Location: Where were they last seen?** Logins and in-person card use show where they are; a travel purchase or collector note signals they have left. The latest evidence wins. Chips: In Country · Skip · Unknown (dashed)
 - **Reachability: Do our calls connect?** Recent call days all failed, no contact since → Non-Reachable. A recent contact → Reachable. Chips: Reachable · Non-Reachable · Unknown (dashed)
-- **Informs how we work a case:** by phone, or with tracing. The tier comes from what the whole persona paid.
+- **Informs how we work a case:** by phone, or with tracing.
 
 Right, "August mix": Location × reachability, 61–180. % of card accounts, with loans shown under each card figure.
 
