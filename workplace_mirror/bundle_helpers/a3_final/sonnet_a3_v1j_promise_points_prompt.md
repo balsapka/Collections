@@ -18,6 +18,13 @@ This round tests the case from three sides:
 3. **Which point scheme ranks best while keeping Kept > Partly > Broken?** And does it hold on money
    collected, not only on paid-or-not?
 
+4. **Does it hold in the segments where the axis is used?** The axis is payment credibility, and
+   a broken promise goes against credibility. Credibility matters most for reachable customers
+   (who get worked in-house). Among them most have talked to us, so "promised at all" may only
+   proxy reachability, and reliability (kept vs broken) may be what ranks. A moderate share of
+   in-house accounts is Non-Reachable or Unknown reach (cards 19%, loans 40%) or abroad (Skip, about
+   20%). For them an earlier promise may be the only sign of engagement.
+
 Bundle 23 is applied; the deadline is still open (GRR's month end vs 30 days), so run under both.
 
 ````text
@@ -84,8 +91,27 @@ Q4 Robustness of the best scheme vs P0 and P2:
 Q5 Who moves under the best scheme vs P0: from -> to, sizes, their paid_due / AED next to the rows
    that stayed in each state, their A2 reachability mix, and how many of them are BN (paid nothing
    on any promise).
-Q6 Kept vs Partly at 180+: V1i found Kept < Partly (227-417 rows). Same comparison with 95%
+Q6b (see Q7 for the segments) Kept vs Partly at 180+: V1i found Kept < Partly (227-417 rows). Same comparison with 95%
    intervals, under GRR and LEN, pooled and per month: real, or noise?
+
+Q7 Segments. The A2 locatability state on the same observation date (crx_<p>_a2_locatability),
+   grouped:
+   S1 In Country + Reachable;
+   S2 Reachable, location Skip or Unknown;
+   S3 Non-Reachable (any location);
+   S4 Unknown reachability (any location);
+   S5 Skip (abroad), any reachability, as an extra cut that overlaps S2-S4.
+   For each segment:
+   - its share of rows;
+   - the promise-level mix (Kept / Partly / BA / BN / T2 / T1 / C1 / C0);
+   - paid_due and AED per account for Kept, Partly, BA, BN, T2, C1, C0;
+   - the state AUC on paid_due, with 95% intervals, for P0, P2, P5, P6 (and P7 if it differs from
+     P5), and the paired difference vs P0.
+   The key question: inside S1, where nearly everyone has talked to us, does a penalty for breaking
+   (P0) rank as well as or better than engagement credit (P5 / P6)? If so, the engagement gain is
+   reachability showing through, and credibility should score reliability. Answer it explicitly.
+   Also say whether S3-S5 behave differently, i.e. whether an earlier promise is the useful signal
+   there.
 
 Rules
 catalog.load only; model_id = catalog.load("params:model_id"), in every output file name; aggregates
@@ -99,12 +125,16 @@ row-level collect; at 180+ check the driver memory before the bootstrap and samp
 Deliverables
 1. Snippet + README_v1j.md, pushed from UAT.
 2. The user runs it in PROD per model_id and commits results_v1j_<model_id>.md.
-3. Back in UAT: summary_v1j.md, under 100 lines.
+3. Back in UAT: summary_v1j.md, under 120 lines.
    - One line per question per model_id, with the key numbers.
-   - A verdict, one paragraph per segment (61-180, 180+), that answers in plain words:
+   - A verdict, one paragraph per model segment (61-180, 180+), that answers in plain words:
      (a) is a promise evidence beyond contact;
      (b) do Broken customers who paid nothing deserve credit, or only those who attempted;
      (c) which scheme to ship and why, with the gain over P0 and P2 and whether it holds under both
          deadlines, in every month and inside every DPD bucket;
-     (d) the two-sentence explanation a business reader would accept.
+     (d) whether the answer differs by A2 segment (Q7): one scheme for all, or reliability scoring
+         for the reachable and engagement credit only where the customer cannot be reached now;
+     (e) the two-sentence explanation a business reader would accept, true to "payment
+         credibility" (how far we can believe the customer will pay): if Broken earns points, say
+         what it is evidence of, and why that is credibility rather than reachability.
 ````
