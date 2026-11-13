@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 27 slides, in order: every word, number and speaker note as it stands in v83 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 28 slides, in order: every word, number and speaker note as it stands in v83 (2026-11-12). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -657,7 +657,32 @@ Footer: * Cure: below 61 DPD at month 3 · Pay: any payment, even partial · Rol
 Notes:
 > How the new ability rule compares with the old one, which rested on income plus the CASA balance. The old High needed a CASA balance above the floor, and the bank sweeps balances against the overdue amount, so High almost never fired. The new rule counts four evidence families: income, money arriving or held, the customer's own spending, and other products with us. Two strong families make High, one makes Moderate, some evidence makes Low, none is Unknown; a bounced cheque or returned direct debit moves the customer one band down. Share of accounts: High grows four to nine times in every book. Low rises for loans and at 180+, mostly customers with another product kept current with us. Cards at 61 to 180 move slightly into Unknown on purpose: those customers' only account activity was fees or payments on their own loan, which says nothing about ability. Outcomes are rates within each state over the next three months: cure means below 61 DPD at month 3, pay means any payment, roll means a worse bucket. Every state orders all three in the right direction. For cards every step is significant, also within the same DPD bucket; for loans High and Moderate are not yet separable, because High is still small. The old rule's High was too small to read at all. Unknown means we cannot see the customer's money, not that they have none.
 
-## 27 · Appendix D: Status and sign-off
+## 27 · Appendix: When a promise counts as kept
+
+Layout: a table on the left (three rules × four books), three short cards stacked on the right.
+
+- Section label: Appendix · Credibility
+- Headline: **A 30-day window to keep a promise ranks customers best**
+
+Left, "Deadline for a kept promise · ranking power (AUC)*". Best value per book in a green pill, worst in red text.
+
+| Rule | Cards 61–180 | Loans 61–180 | Cards 180+ | Loans 180+ |
+|---|---|---|---|---|
+| Next statement · loans: end of next month (Today's rule) | 0.692 | **0.666** (best) | 0.670 | **0.746** (best) |
+| End of the month of the promise (Proposed for loans and all 180+) | same rule as today (grey) | 0.643 (worst) | 0.665 (worst) | 0.736 (worst) |
+| 30 days after the promise (Lenient) | **0.714** (best) | **0.666** (best) | **0.690** (best) | **0.746** (best) |
+
+Right cards:
+- **Late payers are payers.** Loan promises paid in the month after: 58% of these accounts then pay a monthly due in the next 3 months, the same as promises paid on time (58%); unpaid: 46%.
+- **Customers moved down pay like the state they left.** Loans moved from Moderate to Low by the month end: 49% pay a due, against 53% that stayed Moderate and 24% that stayed Low.
+- **No record is the weakest part of Low.** Accounts with no promise or payment record, mostly under 6 months on book, pay a due 4% of the time, against 12% for the rest of Low (cards 61–180).
+
+Footer: * How well the credibility state ranks customers on paying a due in the next 3 months (0.5 = chance) · March–May 2026 · gaps ≥ 0.01 hold every month
+
+Notes:
+> The credibility axis judges each promise to pay as kept or broken by whether the customer paid by a deadline. We back-tested three deadlines: today's rule, the next statement for cards and the end of the following month for loans; the end of the month of the promise, proposed for loans and for all 180+ accounts; and a lenient 30 days after the promise. The test scored March to May 2026 under each rule and asked how well the credibility state ranks customers on paying a monthly due over the following three months, for all four books. The number is the AUC: 0.5 is a coin toss, higher is better. 30 days ranks best or equal in every book: about 0.02 better than the statement for cards, and level with today's rule for loans. The end of the promise month ranks worst for loans and at 180+, by 0.01 to 0.02; every gap of that size is outside the 95 percent interval and holds in each of the three months. The reason is on the right. A loan customer who pays a promise in the following month goes on to pay just like one who paid on time, so a stricter deadline marks payers as broken, and the customers it moves down keep paying like the state they came from. We also checked the accounts with no promise or payment record, which now sit in Low instead of Unknown. They pay less than the rest of Low in every book, so Low is the right place for them; most are young accounts, early payment default rather than unknown customers. So the data favour 30 days: the most lenient rule for the customer is also the most predictive. The choice of rule is GRR's.
+
+## 28 · Appendix D: Status and sign-off
 
 Layout: a simple two-column table.
 
