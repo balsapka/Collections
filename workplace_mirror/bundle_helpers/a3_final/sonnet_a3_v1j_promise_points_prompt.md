@@ -27,6 +27,11 @@ This round tests the case from three sides:
 
 Bundle 23 is applied; the deadline is still open (GRR's month end vs 30 days), so run under both.
 
+5. **How often does the follow-up merge hide a promise?** (D-A3-29, user 2026-11-13: ships in bundle
+   25.) The engine merges follow-ups less than 8 days after the previous one into one event judged
+   by the first row's deadline, so a new promise made after that deadline is never judged. Q0 sizes
+   the change before it ships.
+
 ````text
 Goal
 The final evidence on how Dimension A should score promises, for all four model_ids: is making a
@@ -54,6 +59,21 @@ Decided, to follow
 
 Questions (each a short answer with the key numbers, per model_id; GRR unless said; LEN in brackets
 where it differs)
+Q0 Follow-up runs that cross their deadline (sizing only; Q1-Q7 keep the current rule). Today
+   _followup_promises chains follow-up rows less than 8 days after the previous row into one run,
+   dated at its first row and judged by that row's promise_cutoff. Proposed rule: a row also starts
+   a new event when its day is after the current event's promise_cutoff (each new event's cutoff from
+   its own first day). Under GRR and LEN, over the 12-month windows of the scored rows:
+   - runs today, runs crossing their cutoff (share), the extra events the proposed rule creates, and
+     the run length in days today (median, p90, max);
+   - the outcome mix (Kept / Partly / Broken) of the extra events, and their AED paid;
+   - rows whose promise level (Kept / Partly / Broken / T1 / T2) changes, from -> to, and rows whose
+     P0 state changes, with paid_due for the movers next to the rows that stayed;
+   - state AUC on paid_due under P0 with the proposed rule vs today, with 95% intervals (one extra
+     engine run per deadline; build the variant as a local copy of _followup_promises, the pipeline
+     stays untouched);
+   - promise events dated on their own cutoff day (an empty payment window: payments must come after
+     the event day), count and share by product and segment.
 Q1 Promise or contact? paid_due, paid_any and AED per account for C0, C1, T1, T2, Broken, Partly,
    Kept. Does C1 (talked, never promised) pay like C0 or like Broken? Then a matched comparison:
    Broken vs C1, exact cells of Dimension B level x Dimension C level x DPD bucket x A2 reachability
@@ -125,7 +145,7 @@ row-level collect; at 180+ check the driver memory before the bootstrap and samp
 Deliverables
 1. Snippet + README_v1j.md, pushed from UAT.
 2. The user runs it in PROD per model_id and commits results_v1j_<model_id>.md.
-3. Back in UAT: summary_v1j.md, under 120 lines.
+3. Back in UAT: summary_v1j.md, under 130 lines.
    - One line per question per model_id, with the key numbers.
    - A verdict, one paragraph per model segment (61-180, 180+), that answers in plain words:
      (a) is a promise evidence beyond contact;
@@ -137,4 +157,6 @@ Deliverables
      (e) the two-sentence explanation a business reader would accept, true to "payment
          credibility" (how far we can believe the customer will pay): if Broken earns points, say
          what it is evidence of, and why that is credibility rather than reachability.
+     (f) Q0: how many promises the follow-up merge hides today, and whether splitting at the
+         deadline moves the state or its AUC.
 ````
