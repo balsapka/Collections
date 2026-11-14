@@ -21,8 +21,8 @@ against the flow dictionary, the check's outcome block.
   snapshot.
 - **Anchor**, which is what the customer must find now:
   - CC 60–180: the oldest non-zero overdue bucket on the observation-month snapshot;
-  - RL: one EMI;
-  - 180+ or missing: flat floors only.
+  - RL: one EMI, at 61–180 and at 180+ (a restructuring changes the EMI; user, 2026-11-14);
+  - CC 180+, or a missing anchor: flat floors only.
 - **CIF level.** All customer signals cover every account of the `cif_id`.
 - **Income (F1).** Computed exactly as today's `income_level` (S12, S14).
 - **The bureau salary source is swappable** (user, 2026-11-10). **Next source:** the DE's
@@ -109,6 +109,13 @@ against the flow dictionary, the check's outcome block.
 
 ## 2. Families
 
+**One strong amount for every family** (user, 2026-11-14, for simplicity): income, money in, money out,
+the balance and assets are strong from max(AED 3,000, 2 × anchor) (`STRONG_FLOOR`,
+`STRONG_ANCHOR_MULT`). Before, flows used max(1,000, 1 ×), the balance max(3,000, 1 ×) and assets
+max(10,000, 3 ×). "Some" for money in and money out is AED 1,000 in any month (`FLOW_SOME`; money out
+was 500). Only the other credit product's instalment keeps max(AED 1,000, 1 × anchor). Ships in bundle
+25 as its own check step (rows moved, payment and cure per level).
+
 Each family is **strong**, **some** or **none** (NULL = no data). Only strong scores, with 2 points.
 "Some" scores 0 but still counts as evidence: it makes a row Low rather than Unknown.
 
@@ -116,16 +123,16 @@ Each family is **strong**, **some** or **none** (NULL = no data). Only strong sc
 |---|---|---|
 | **F1 Income** | today's `income_level` = stable | weak |
 | **F2 Money in or held** | either inflow or balance (below) is strong | inflow some |
-| **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 1,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 500 |
-| **F4 Cross-product** | deposits / investments / WM assets (AUM; kept, user 2026-11-10) ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
+| **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 3,000, 2 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 1,000 |
+| **F4 Cross-product** | deposits / investments / WM assets (AUM; kept, user 2026-11-10) ≥ max(AED 3,000, 2 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
 
 ### F2 Money in or held
 
-- **Inflow strong:** credits in the counted classes (§3) ≥ max(AED 1,000, 1 × anchor) in
+- **Inflow strong:** credits in the counted classes (§3) ≥ max(AED 3,000, 2 × anchor) in
   ≥ `MIN_MONTHS` months of W. Salary-flagged credits are left out, since salary is F1.
 - **Inflow some:** any month of W with ≥ AED 1,000 of counted credits.
 - **Balance strong:** the CASA average balance (`feat_cif_casa_balance_monthly`, WM's 49 CASA scheme
-  codes, CIF level) ≥ max(AED 3,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W, and the window
+  codes, CIF level) ≥ max(AED 3,000, 2 × anchor) in ≥ `MIN_MONTHS` months of W, and the window
   average is no more than 50% below the prior window's. This is today's liquidity "adequate"
   condition on balances (`F_CASA`, `K_CASA`, `D_CASA`).
 - **Balance below strong does nothing.** It scores no points and is not evidence. A small balance

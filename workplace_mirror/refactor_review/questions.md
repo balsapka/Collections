@@ -216,3 +216,19 @@ Options: (a) keep today's order and write it into the spec (Q-28); (b) give the 
 Recommendation: (a) for bundle 25; say so if GRR has an order.
 Answer:
 ```
+
+```
+Q-R-11 [A3 promise deadline · promises.py `_cutoff`, applied with the new event rule] The next-statement deadline is capped at 31 days after the promise.
+Now: the deadline is the first statement after the promise day; when the next statement on record is more than 31 days later (statements missing from the history), the deadline is day + 31. Before, such an event waited for whatever statement came next, which under the new rule kept an old promise alive for months.
+Options: (a) keep the cap; (b) no cap.
+Recommendation: (a).
+Answer:
+```
+
+```
+Q-R-12 [A3 refusal · signals.py `_paid_after_refusal`, applied with D-A3-30] On cards a payment dated on the refusal day itself also lifts the refusal.
+Now: "penalise only when certain" is applied to both products: loans by month, cards by day. A card payment on the same day as the refusal may have come before or after the call.
+Options: (a) keep (same-day payment lifts); (b) cards need a payment on a later day.
+Recommendation: (a), the same principle as on loans.
+Answer:
+```

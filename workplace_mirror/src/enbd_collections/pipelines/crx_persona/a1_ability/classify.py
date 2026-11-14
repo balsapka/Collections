@@ -27,19 +27,14 @@ from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard, state_label
 # Keyed by window length W (3 months at 60–180, 6 at 180+, S10).
 MIN_MONTHS = {3: 2, 6: 3}  # months of the window a flow / balance must reach its floor
 STABLE_INCOME_FLOORS = {3: 2, 6: 3}  # S12: the window's salary covers this many floors
-INCOME_FLOOR = 3000.0  # S2: salary floor (internal and bureau), AED
-INCOME_ANCHOR_MULT = 2.0  # S2: income must also cover this multiple of the anchor
+# Income, money in, money out, the balance and assets are strong from one amount:
+# max(floor, mult x anchor) (S2; one threshold for every family, user 2026-11-14).
+STRONG_FLOOR = 3000.0  # AED
+STRONG_ANCHOR_MULT = 2.0
 INCOME_MAX_FALL = 0.25  # S12: ... and is at most this share below the prior window
-FLOW_FLOOR = 1000.0  # F2 / F3 strong: a month's flow reaches max(floor, mult x anchor)
-FLOW_ANCHOR_MULT = 1.0
-MONEY_IN_SOME = 1000.0  # F2 some: any month with this much money in
-MONEY_OUT_SOME = 500.0  # F3 some: any month with this much money out
-BALANCE_FLOOR = 3000.0  # F2 balance strong (today's liquidity "adequate" on balances)
-BALANCE_ANCHOR_MULT = 1.0
-BALANCE_MAX_FALL = 0.50
-ASSET_FLOOR = 10000.0  # F4 strong: assets reach max(floor, mult x anchor) …
-ASSET_ANCHOR_MULT = 3.0
-INSTALMENT_FLOOR = 1000.0  # … or a current credit product's instalment reaches
+FLOW_SOME = 1000.0  # F2 / F3 some: any month with this much money in / out
+BALANCE_MAX_FALL = 0.50  # F2 balance strong: at most this share below the prior window
+INSTALMENT_FLOOR = 1000.0  # F4 strong: a current credit product's instalment reaches
 INSTALMENT_ANCHOR_MULT = 1.0  # max(floor, mult x anchor)
 MIN_EVIDENCE_AMT = 1000.0  # smallest salary that counts as evidence (income weak)
 INCOME_POINTS = {"stable": 2}  # weak is evidence (Low), not points
@@ -95,6 +90,12 @@ def _not_weakening(
     return F.coalesce(F.when(prior > 0, recent >= prior * (1 - max_drop)), F.lit(True))
 
 
+def _strong_amount(anchor: Column) -> Column:
+    """The amount a family is strong from: max(``STRONG_FLOOR``, ``STRONG_ANCHOR_MULT``
+    x anchor); the floor alone without an anchor."""
+    return F.greatest(F.lit(STRONG_FLOOR), STRONG_ANCHOR_MULT * anchor)
+
+
 def income_level(anchor: Column, w: int) -> Column:
     """stable / weak / none over a ``w``-month window (spec S12).
 
@@ -103,7 +104,7 @@ def income_level(anchor: Column, w: int) -> Column:
     the fall compares the level of the months with a value, because AECB alerts arrive
     only on a change and a month without one says nothing."""
     last = _months("income", _window(w)[0])
-    floor = F.greatest(F.lit(INCOME_FLOOR), INCOME_ANCHOR_MULT * anchor)
+    floor = _strong_amount(anchor)
     total = sum(F.coalesce(c, F.lit(0.0)) for c in last)
     has_internal_salary = _shows_evidence("internal_salary_w") | _shows_evidence(
         "internal_salary_prior"
@@ -123,22 +124,20 @@ def _strong_months(prefix: str, floor: Column, w: int) -> Column:
 
 
 def balance_strong(anchor: Column, w: int) -> Column:
-    """The CASA balance holds max(floor, anchor) in ``MIN_MONTHS`` months of the window
+    """The CASA balance holds the strong amount in ``MIN_MONTHS`` months of the window
     and is not more than ``BALANCE_MAX_FALL`` below the prior window (money held)."""
-    floor = F.greatest(F.lit(BALANCE_FLOOR), BALANCE_ANCHOR_MULT * anchor)
-    return _strong_months("casa", floor, w) & _not_weakening(
+    return _strong_months("casa", _strong_amount(anchor), w) & _not_weakening(
         "casa", BALANCE_MAX_FALL, missing_is_zero=False, w=w
     )
 
 
-def _flow_level(prefix: str, some_floor: float, anchor: Column, w: int) -> Column:
+def _flow_level(prefix: str, anchor: Column, w: int) -> Column:
     """strong / some / none / NULL (no flow in the window) of a monthly flow."""
     last = _months(prefix, _window(w)[0])
-    floor = F.greatest(F.lit(FLOW_FLOOR), FLOW_ANCHOR_MULT * anchor)
     has_data = F.greatest(*[c.isNotNull() for c in last])
     return (
-        F.when(_strong_months(prefix, floor, w), "strong")
-        .when(_count_at_least(last, F.lit(some_floor)) > 0, "some")
+        F.when(_strong_months(prefix, _strong_amount(anchor), w), "strong")
+        .when(_count_at_least(last, F.lit(FLOW_SOME)) > 0, "some")
         .when(has_data, "none")
     )
 
@@ -146,22 +145,22 @@ def _flow_level(prefix: str, some_floor: float, anchor: Column, w: int) -> Colum
 def money_in_level(anchor: Column, w: int) -> Column:
     """F2: strong when money in or the balance held is strong; some on money in only (a
     balance below strong is not evidence)."""
-    inflow = _flow_level("in", MONEY_IN_SOME, anchor, w)
+    inflow = _flow_level("in", anchor, w)
     return F.when(balance_strong(anchor, w), "strong").otherwise(inflow)
 
 
 def money_out_level(anchor: Column, w: int) -> Column:
     """F3: chosen spend and transfers to the customer's own accounts elsewhere."""
-    return _flow_level("out", MONEY_OUT_SOME, anchor, w)
+    return _flow_level("out", anchor, w)
 
 
 def cross_product_level(anchor: Column, _w: int) -> Column:
-    """F4 at the observation month end: strong on assets of max(floor, 3 x anchor) or a
+    """F4 at the observation month end: strong on assets of the strong amount or a
     current credit product whose instalment reaches max(floor, anchor); some on any
     other current credit product or any asset."""
     assets = F.coalesce(F.col("xp_assets_aed"), F.lit(0.0))
     instalment = F.coalesce(F.col("xp_instalment_max"), F.lit(0.0))
-    strong = (assets >= F.greatest(F.lit(ASSET_FLOOR), ASSET_ANCHOR_MULT * anchor)) | (
+    strong = (assets >= _strong_amount(anchor)) | (
         (F.col("xp_current") == 1)
         & (
             instalment

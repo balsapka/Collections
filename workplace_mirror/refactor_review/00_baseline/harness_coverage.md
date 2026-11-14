@@ -9,29 +9,29 @@ column cannot show) and what the oracle does not cover.
 
 | Run | Datasets | Seconds |
 |---|---|---|
-| `crx_cc_a1_ability.cc_60_180` | 8 | 31.7 |
-| `crx_cc_a3_payment_credibility.cc_60_180` | 17 | 10.0 |
-| `crx_cc_a2_locatability.cc_60_180` | 6 | 9.3 |
-| `crx_cc_a4_deterioration.cc_60_180` | 3 | 2.3 |
-| `crx_cc_a1_ability.cc_180_plus` | 8 | 6.7 |
-| `crx_cc_a3_payment_credibility.cc_180_plus` | 17 | 7.9 |
-| `crx_cc_a2_locatability.cc_180_plus` | 6 | 4.1 |
-| `crx_cc_a4_deterioration.cc_180_plus` | 3 | 1.7 |
-| `crx_cc_a4_deterioration.cc_60_180_alt` | 3 | 1.7 |
-| `crx_rl_a1_ability.rl_60_180` | 8 | 5.6 |
-| `crx_rl_a3_payment_credibility.rl_60_180` | 12 | 5.7 |
-| `crx_rl_a2_locatability.rl_60_180` | 6 | 4.4 |
-| `crx_rl_a4_deterioration.rl_60_180` | 6 | 2.9 |
-| `crx_rl_a1_ability.rl_180_plus` | 8 | 6.5 |
-| `crx_rl_a3_payment_credibility.rl_180_plus` | 12 | 6.3 |
-| `crx_rl_a2_locatability.rl_180_plus` | 6 | 3.8 |
-| `crx_rl_a4_deterioration.rl_180_plus` | 6 | 3.0 |
-| `crx_rl_a4_deterioration.rl_60_180_alt` | 6 | 3.2 |
-| `crx_cc_a3_payment_credibility.cc_60_180_30_days` | 17 | 7.8 |
-| `crx_rl_a3_payment_credibility.rl_60_180_next_month_end` | 12 | 5.8 |
-| `crx_rl_a3_payment_credibility.rl_60_180_30_days_month_end` | 12 | 6.0 |
-| `product_primary+product_features` | 4 | 1.2 |
-| `bureau_salary_bounces` | 2 | 0.4 |
+| `crx_cc_a1_ability.cc_60_180` | 8 | 46.3 |
+| `crx_cc_a3_payment_credibility.cc_60_180` | 17 | 10.4 |
+| `crx_cc_a2_locatability.cc_60_180` | 6 | 12.7 |
+| `crx_cc_a4_deterioration.cc_60_180` | 3 | 3.1 |
+| `crx_cc_a1_ability.cc_180_plus` | 8 | 8.0 |
+| `crx_cc_a3_payment_credibility.cc_180_plus` | 17 | 9.8 |
+| `crx_cc_a2_locatability.cc_180_plus` | 6 | 4.8 |
+| `crx_cc_a4_deterioration.cc_180_plus` | 3 | 2.1 |
+| `crx_cc_a4_deterioration.cc_60_180_alt` | 3 | 2.3 |
+| `crx_rl_a1_ability.rl_60_180` | 8 | 7.5 |
+| `crx_rl_a3_payment_credibility.rl_60_180` | 12 | 7.3 |
+| `crx_rl_a2_locatability.rl_60_180` | 6 | 4.7 |
+| `crx_rl_a4_deterioration.rl_60_180` | 6 | 3.9 |
+| `crx_rl_a1_ability.rl_180_plus` | 8 | 8.4 |
+| `crx_rl_a3_payment_credibility.rl_180_plus` | 12 | 7.7 |
+| `crx_rl_a2_locatability.rl_180_plus` | 6 | 5.1 |
+| `crx_rl_a4_deterioration.rl_180_plus` | 6 | 3.7 |
+| `crx_rl_a4_deterioration.rl_60_180_alt` | 6 | 4.7 |
+| `crx_cc_a3_payment_credibility.cc_60_180_30_days` | 17 | 9.7 |
+| `crx_rl_a3_payment_credibility.rl_60_180_next_month_end` | 12 | 7.8 |
+| `crx_rl_a3_payment_credibility.rl_60_180_30_days_month_end` | 12 | 7.8 |
+| `product_primary+product_features` | 4 | 1.9 |
+| `bureau_salary_bounces` | 2 | 0.7 |
 
 ## a1_ability
 

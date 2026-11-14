@@ -203,15 +203,32 @@ Measured, not assumed (V2, V3).
   month. Paying on the deadline day counts. `PROMISE_DEADLINE` is keyed by segment (from
   `params:model_id`) and product; the 30-day and next-month-end options stay.
 
-- **D-A3-29: a follow-up promise after the event's deadline is a new event** (user, 2026-11-13;
-  ships in bundle 25, sized by V1j Q0). Today `_followup_promises` chains rows less than 8 days
-  after the previous row into one run judged by the first row's deadline, so a follow-up after
-  that deadline (a new promise after a broken one) is never judged, and a chain can span weeks.
-  New rule: a follow-up starts a new event when it is more than 7 days after the previous one
-  **or** after the current event's `promise_cutoff`. Not a running sum any more: each row's own
-  cutoff first, then a per-account fold over the date-ordered rows (`F.aggregate`, no Python UDF).
-  Related, for V1j Q0 to size: at 180+ on cards (month-end deadline) a promise made on the last
-  day of the month has an empty payment window (loans unaffected: cash is dated at month end).
+- **D-A3-29: a promise event is alive until its deadline passes or the promised amount is paid**
+  (user, 2026-11-14; replaces the 2026-11-13 wording, the 7-day follow-up chaining and D-A3-25's
+  7-day plan matching; ships in bundle 25). Promises are one stream: non-cancelled DCORE plans
+  (dated at their start) and follow-up promises (dated at the call day).
+  - An event starts with the first promise. Its deadline (D-A3-28) and its promised amount are
+    those of that day.
+  - Every promise made while the event is alive belongs to it, however many days apart. A promise
+    on the deadline day still belongs to it.
+  - The event ends when the deadline passes, or when the payments made since the event day and
+    before a later promise reach the promised amount. A partial payment does not end it. The first
+    promise after the end starts a new event, which counts only the payments after its own day.
+  - Loans: cash is known only to the month (dated at the month end), so an event never ends
+    mid-month; all promises of a month are one event.
+  - `event_kind`: matched (the event holds plans and follow-up promises), table_only,
+    followup_only. `event_name` is the first follow-up promise's, `plan_id` the first plan's.
+  - The promised amount is the latest known due on or before the event day: a cycle without a due
+    amount is a data error and is skipped; 100 AED only when no due exists (user, 2026-11-14).
+  - Next-statement deadline: the first statement after the event day, at most 31 days after it (a
+    later one means statements are missing from the history).
+  - Code: `a3_credibility/promises.py` (`_event_step`, a per-account fold over the promise days in
+    date order, `F.aggregate`, no Python UDF).
+
+- **D-A3-30: a refusal is counted only when it is certain that nothing was paid after it** (user,
+  2026-11-14; refines D-A3-14 and D-A3-22). A payment of 100 AED or more that may have come after the
+  refusal lifts it: on cards one dated on or after the refusal day; on loans the refusal month's
+  cash as well, because the day within the month is not known.
 
 - **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.

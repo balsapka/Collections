@@ -191,12 +191,12 @@ case("AECB in W with internal salary in W: not stopped",
      salary=[(1, 5000), (2, 5000), (4, 5000)], income="stable", source="internal", stopped=0)
 # ── Liquidity (S7, S8) ──
 # ── F2 money in or held, F3 money out (family rule §2–§3) ──
-case("F2 strong: money in >= 1000 in 2 of 3", flows=[(1, "C", "economic", 1500), (2, "C", "economic", 1500)],
+case("F2 strong: money in >= 3000 in 2 of 3", flows=[(1, "C", "economic", 3500), (2, "C", "economic", 3500)],
      money_in="strong")
 case("F2 some: one month of money in", flows=[(1, "C", "economic", 1500)], money_in="some")
 case("F2 strong must cover the anchor", flows=[(1, "C", "economic", 1500), (2, "C", "economic", 1500)],
      buckets=[100, 2000, 0, 0, 0, 0, 0, 0], money_in="some")
-case("F2: cash deposits count", flows=[(1, "C", "cash", 2000), (3, "C", "cash", 2000)], money_in="strong")
+case("F2: cash deposits count", flows=[(1, "C", "cash", 3500), (3, "C", "cash", 3500)], money_in="strong")
 case("F2: returned-cheque credits never count", flows=[(1, "C", "chq_rtn", 9000), (2, "C", "chq_rtn", 9000)],
      money_in=None)
 case("F2: ambiguous MISCELLANEOUS credits never count", flows=[(1, "C", "misc", 9000), (2, "C", "misc", 9000)],
@@ -204,12 +204,12 @@ case("F2: ambiguous MISCELLANEOUS credits never count", flows=[(1, "C", "misc", 
 case("F2: salary-flagged credits are income, not money in",
      flows=[(1, "C", "economic", 5000, 20, "salary"), (2, "C", "economic", 5000, 20, "salary")], money_in=None)
 case("F2: own account at another bank (WM self) counts",
-     flows=[(1, "C", "economic", 2000, 20, "self"), (2, "C", "economic", 2000, 20, "self")], money_in="strong")
+     flows=[(1, "C", "economic", 3500, 20, "self"), (2, "C", "economic", 3500, 20, "self")], money_in="strong")
 case("F2: a credit mirrored by a non-evidence debit is netted",
-     flows=[(1, "C", "economic", 2000, 10), (1, "D", "misc", 2000, 12), (2, "C", "economic", 2000)],
+     flows=[(1, "C", "economic", 3500, 10), (1, "D", "misc", 3500, 12), (2, "C", "economic", 3500)],
      money_in="some")
 case("F2: a mirror 5 days later is not netted",
-     flows=[(1, "C", "economic", 2000, 5), (1, "D", "misc", 2000, 10), (2, "C", "economic", 2000)],
+     flows=[(1, "C", "economic", 3500, 5), (1, "D", "misc", 3500, 10), (2, "C", "economic", 3500)],
      money_in="strong")
 case("F2 strong: CASA balance held 2 of 3 >= 3000", casa=[(1, 3500), (2, 3500), (3, 100)],
      money_in="strong", sweepable=1)
@@ -217,16 +217,17 @@ case("F2: balance drop > 50% is not strong", casa=[(1, 3500), (2, 3500), (3, 350
      money_in=None, sweepable=0)
 case("F2: a balance below strong is not evidence", active=None, casa=[(2, 1500)], money_in=None,
      state="unknown", reason="dormant_casa")
-case("F3 strong: spend >= 1000 in 2 of 3", active=None,
-     flows=[(1, "D", "card", 1200), (2, "D", "remit_out", 1200)], money_out="strong")
-case("F3 some: one month >= 500", active=None, flows=[(1, "D", "card", 600)], money_out="some")
+case("F3 strong: spend >= 3000 in 2 of 3", active=None,
+     flows=[(1, "D", "card", 3500), (2, "D", "remit_out", 3500)], money_out="strong")
+case("F3 some: one month >= 1000", active=None, flows=[(1, "D", "card", 1200)], money_out="some")
+case("F3: one month under 1000 is not evidence", active=None, flows=[(1, "D", "card", 600)], money_out="none")
 case("F3: transfers to own accounts elsewhere count", active=None,
      flows=[(1, "D", "remit_out", 3000, 20, "self"), (2, "D", "remit_out", 3000, 20, "self")],
      money_out="strong")
 case("F3: own-account transfers with us never count", active=None,
      flows=[(1, "D", "wash", 3000), (2, "D", "wash", 3000)], money_out=None, state="unknown")
 # ── F4 cross-product ──
-case("F4 strong: deposits >= 10000", products=[("deposit", 12000.0, None, None)], cross_product="strong")
+case("F4 strong: deposits >= 3000", products=[("deposit", 4000.0, None, None)], cross_product="strong")
 case("F4 some: a small deposit", products=[("deposit", 500.0, None, None)], cross_product="some")
 case("F4 strong: a current loan with instalment >= anchor", buckets=[100, 2000, 0, 0, 0, 0, 0, 0],
      products=[("loan", None, 1, 2500.0)], cross_product="strong")
@@ -235,8 +236,8 @@ case("F4 some: a current card with a small minimum due", buckets=[100, 2000, 0, 
 case("F4: an overdue loan is not evidence", products=[("loan", None, 0, 5000.0)], cross_product="none")
 case("F4: the scored account itself never counts", products=[("card", None, 1, 5000.0, True)],
      cross_product="none")
-case("F4: assets must reach 3 x anchor", buckets=[100, 5000, 0, 0, 0, 0, 0, 0],
-     products=[("wm", 12000.0, None, None)], cross_product="some")
+case("F4: assets must reach 2 x anchor", buckets=[100, 5000, 0, 0, 0, 0, 0, 0],
+     products=[("wm", 8000.0, None, None)], cross_product="some")
 # ── Anchor (S1) ──
 case("anchor = oldest bucket in OVD_01..06", buckets=[100, 200, 300, 400, 0, 0, 0, 0], anchor=400.0)
 case("OVD_07/08 never anchor", buckets=[100, 0, 0, 0, 0, 0, 7000, 9000], anchor=100.0)
@@ -249,12 +250,12 @@ case("one strong family (income) -> Moderate", salary=[(1, 5000), (2, 5000)], st
 case("one strong family + bounce -> Low", salary=[(1, 5000), (2, 5000)], casa=[(1, 1500)], bounces=[(1, 500)],
      state="low")
 case("income weak only -> Low", salary=[(1, 1500)], state="low")
-case("High: money out + cross-product", active=None, flows=[(1, "D", "card", 1200), (2, "D", "card", 1200)],
+case("High: money out + cross-product", active=None, flows=[(1, "D", "card", 3500), (2, "D", "card", 3500)],
      products=[("deposit", 20000.0, None, None)], state="high", why="money_out")
-case("High: money in + money out", flows=[(1, "C", "economic", 1500), (2, "C", "economic", 1500),
-     (1, "D", "card", 1200), (2, "D", "card", 1200)], state="high")
+case("High: money in + money out", flows=[(1, "C", "economic", 3500), (2, "C", "economic", 3500),
+     (1, "D", "card", 3500), (2, "D", "card", 3500)], state="high")
 case("some levels score nothing: Moderate stays Moderate", salary=[(1, 5000), (2, 5000)],
-     flows=[(1, "C", "economic", 1500), (1, "D", "card", 600)], products=[("deposit", 500.0, None, None)],
+     flows=[(1, "C", "economic", 1500), (1, "D", "card", 1200)], products=[("deposit", 500.0, None, None)],
      state="moderate", why="income")
 case("cross-product some alone -> Low (evidence)", active=None, products=[("card", None, 1, 100.0)],
      state="low")
@@ -298,8 +299,8 @@ case("180+: 8000 < 9000 is weak", salary=[(1, 4000), (5, 4000)], income="weak", 
 case("180+: weakening vs the prior 6", salary=[(k, 4000) for k in range(1, 7)] + [(k, 9000) for k in range(7, 13)],
      income="weak", **P180)
 case("180+: balance held 3 of 6", casa=[(2, 3500), (4, 3500), (6, 3500)], money_in="strong", **P180)
-case("180+: money in 3 of 6", flows=[(1, "C", "economic", 1000), (3, "C", "economic", 1000),
-     (6, "C", "economic", 1000)], money_in="strong", **P180)
+case("180+: money in 3 of 6", flows=[(1, "C", "economic", 3000), (3, "C", "economic", 3000),
+     (6, "C", "economic", 3000)], money_in="strong", **P180)
 case("180+: bounce in month 5 counts", salary=[(1, 5000), (2, 5000), (3, 5000)], bounces=[(5, 500)],
      state="low", **P180)
 case("180+: overdue buckets give no anchor", buckets=[100, 200, 0, 0, 0, 0, 0, 0], anchor=None, **P180)
