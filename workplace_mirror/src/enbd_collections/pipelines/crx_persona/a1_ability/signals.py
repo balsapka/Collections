@@ -311,20 +311,21 @@ def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> Dat
     current_credit = F.col("product_type").isin(*CREDIT_TYPES) & (
         F.coalesce(F.col("is_current").cast("int"), F.lit(0)) == 1
     )
+    mine = scoped(
+        products.select(
+            cif_column(),
+            F.col("month_end").alias("observation_date"),
+            F.col("product_account_id").cast("string").alias("_acct"),
+            "product_type",
+            F.col("balance_aed").cast("double").alias("_bal"),
+            "is_current",
+            F.col("instalment_aed").cast("double").alias("_inst"),
+        ),
+        obs,
+        "cif_id",
+    )
     rows = (
-        F.broadcast(obs)
-        .join(
-            products.select(
-                cif_column(),
-                F.col("month_end").alias("observation_date"),
-                F.col("product_account_id").cast("string").alias("_acct"),
-                "product_type",
-                F.col("balance_aed").cast("double").alias("_bal"),
-                "is_current",
-                F.col("instalment_aed").cast("double").alias("_inst"),
-            ),
-            on=["cif_id", "observation_date"],
-        )
+        obs.join(mine, on=["cif_id", "observation_date"])
         .filter(F.col("_acct") != F.col("account_id").cast("string"))
         .groupBy(*GRAIN)
         .agg(

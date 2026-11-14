@@ -95,14 +95,15 @@ def _no_event() -> Column:
 
 
 def _event_starts(days: DataFrame) -> DataFrame:
-    """``account_id``, ``event_date``, ``event_start``: the event each promise day
-    belongs to (``_event_step`` over the account's days in date order)."""
+    """``days`` + ``event_start``: the event each promise day belongs to
+    (``_event_step`` over the account's days in date order)."""
     ordered = F.array_sort(
         F.collect_list(
             F.struct(
                 "event_date",
                 "promise_cutoff",
                 "promise_amount",
+                "promise_paid_amount",
                 "_paid_before",
                 "_paid_by",
             )
@@ -115,23 +116,38 @@ def _event_starts(days: DataFrame) -> DataFrame:
         .select("account_id", F.explode(F.arrays_zip("_days", "_starts")).alias("_d"))
         .select(
             "account_id",
-            F.col("_d._days.event_date").alias("event_date"),
+            *[
+                F.col(f"_d._days.{c}").alias(c)
+                for c in (
+                    "event_date",
+                    "promise_cutoff",
+                    "promise_amount",
+                    "promise_paid_amount",
+                )
+            ],
             F.col("_d._starts").alias("event_start"),
         )
     )
 
 
-def _events(rows: DataFrame, starts: DataFrame) -> DataFrame:
+def _events(rows: DataFrame, days: DataFrame) -> DataFrame:
     """One event per ``event_start``: its first plan (``plan_id``, ``event_source``) and
     first follow-up promise (``event_name``); ``event_kind`` matched (both), table_only
-    or followup_only."""
+    or followup_only; the start day's ``promise_cutoff``, ``promise_amount`` and
+    ``promise_paid_amount``."""
     is_plan = F.col("plan_id").isNotNull()
     plan = F.min(F.when(is_plan, F.struct("event_date", "plan_id", "event_source")))
     call = F.min(F.when(~is_plan, F.struct("event_date", "event_name")))
+    start_day = F.max(
+        F.when(
+            F.col("event_date") == F.col("event_start"),
+            F.struct("promise_cutoff", "promise_amount", "promise_paid_amount"),
+        )
+    )
     return (
-        rows.join(starts, on=["account_id", "event_date"])
+        rows.join(days, on=["account_id", "event_date"])
         .groupBy("account_id", "event_start")
-        .agg(plan.alias("_plan"), call.alias("_call"))
+        .agg(plan.alias("_plan"), call.alias("_call"), start_day.alias("_start"))
         .select(
             "account_id",
             F.col("event_start").alias("event_date"),
@@ -142,55 +158,56 @@ def _events(rows: DataFrame, starts: DataFrame) -> DataFrame:
             F.coalesce("_plan.event_source", F.lit("followup")).alias("event_source"),
             F.col("_call.event_name").alias("event_name"),
             F.col("_plan.plan_id").alias("plan_id"),
+            "_start.*",
         )
     )
 
 
-def _cutoff(events: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
-    """``events`` + ``promise_cutoff``, the last day a payment still counts, by
-    ``deadline`` (``DEADLINES``). ``next_statement``: the first cycle end after the
-    event day, at most ``STATEMENT_FALLBACK_D`` days after it (no statement on record
-    by then: that day)."""
-    day = F.col("event_date")
-    fixed = {
+def _cutoff(day: Column, next_cycle_end: Column, deadline: str) -> Column:
+    """``promise_cutoff``, the last day a payment still counts, by ``deadline``
+    (``DEADLINES``). ``next_statement``: the first cycle end after the promise day, at
+    most ``STATEMENT_FALLBACK_D`` days after it (no statement on record by then: that
+    day)."""
+    fallback = F.date_add(day, STATEMENT_FALLBACK_D)
+    options = {
+        "next_statement": F.least(F.coalesce(next_cycle_end, fallback), fallback),
         "month_end": F.last_day(day),
         "next_month_end": F.last_day(F.add_months(day, 1)),
         "30_days": F.date_add(day, 30),
         "30_days_month_end": F.last_day(F.date_add(day, 30)),
     }
-    if deadline in fixed:
-        return events.withColumn("promise_cutoff", fixed[deadline])
-    if deadline != "next_statement":
+    if deadline not in options:
         raise ValueError(f"promise deadline must be one of {DEADLINES}, got {deadline}")
-    nxt = (
-        events.select("account_id", "event_date")
-        .distinct()
-        .join(dues.select("account_id", "cycle_end"), on="account_id")
-        .where(F.col("cycle_end") > day)
-        .groupBy("account_id", "event_date")
-        .agg(F.min("cycle_end").alias("promise_cutoff"))
-    )
-    fallback = F.date_add(day, STATEMENT_FALLBACK_D)
-    return events.join(nxt, on=["account_id", "event_date"], how="left").withColumn(
-        "promise_cutoff", F.least(F.coalesce("promise_cutoff", fallback), fallback)
-    )
+    return options[deadline]
 
 
-def _with_due(events: DataFrame, dues: DataFrame) -> DataFrame:
-    """``events`` + ``_due``: the latest known due on the event day (the latest cycle
-    starting on or before it that has a due amount)."""
-    cycles = dues.where(F.col("due_amount").isNotNull()).select(
-        F.col("account_id").alias("_c_account"), "cycle_start", "due_amount"
-    )
-    return (
-        events.join(
-            cycles,
-            (F.col("account_id") == F.col("_c_account"))
-            & (F.col("cycle_start") <= F.col("event_date")),
-            "left",
+def _with_due(days: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
+    """``days`` + ``promise_cutoff`` (``_cutoff``) and ``promise_amount``: the latest
+    known due on the day (the latest cycle starting on or before it that has a due
+    amount), at least ``MIN_PAYMENT_AED``; one pass over the account's cycles."""
+    day = F.col("event_date")
+    known = F.col("due_amount").isNotNull() & (F.col("cycle_start") <= day)
+    facts = (
+        days.join(
+            dues.select("account_id", "cycle_start", "cycle_end", "due_amount"),
+            on="account_id",
+            how="left",
         )
-        .groupBy(*events.columns)
-        .agg(F.max(F.struct("cycle_start", "due_amount"))["due_amount"].alias("_due"))
+        .groupBy("account_id", "event_date")
+        .agg(
+            F.min(F.when(F.col("cycle_end") > day, F.col("cycle_end"))).alias("_next"),
+            F.max(F.when(known, F.struct("cycle_start", "due_amount")))[
+                "due_amount"
+            ].alias("_due"),
+        )
+    )
+    return facts.select(
+        "account_id",
+        "event_date",
+        _cutoff(day, F.col("_next"), deadline).alias("promise_cutoff"),
+        F.greatest(F.coalesce("_due", F.lit(0.0)), F.lit(float(MIN_PAYMENT_AED))).alias(
+            "promise_amount"
+        ),
     )
 
 
@@ -202,10 +219,11 @@ def _after(day: Column) -> Column:
     )
 
 
-def _with_paid_by(days: DataFrame, payments: DataFrame) -> DataFrame:
-    """``days`` + ``_paid_before``, the payments dated before the day, and ``_paid_by``,
-    the payments not after it (``_after``): what an event starting that day never
-    counts."""
+def _with_paid(days: DataFrame, payments: DataFrame) -> DataFrame:
+    """``days`` + the payments of one pass up to the day's ``promise_cutoff``:
+    ``_paid_before``, dated before the day, and ``_paid_by``, not after it (``_after``),
+    which an event starting that day never counts; ``promise_paid_amount``, after the
+    day up to its cutoff (NULL: none), which it does."""
     day = F.col("event_date")
     pays = payments.select(
         F.col("account_id").alias("_p_account"),
@@ -220,37 +238,16 @@ def _with_paid_by(days: DataFrame, payments: DataFrame) -> DataFrame:
     return (
         days.join(
             pays,
-            (F.col("account_id") == F.col("_p_account")) & (F.col("pay_date") <= day),
+            (F.col("account_id") == F.col("_p_account"))
+            & (F.col("pay_date") <= F.col("promise_cutoff")),
             "left",
         )
         .groupBy(*days.columns)
         .agg(
             total(F.col("pay_date") < day).alias("_paid_before"),
             total(~_after(day)).alias("_paid_by"),
+            F.sum(F.when(_after(day), F.col("_amount"))).alias("promise_paid_amount"),
         )
-    )
-
-
-def _with_paid(events: DataFrame, payments: DataFrame) -> DataFrame:
-    """``events`` + ``promise_paid_amount``: the payments after the event day up to its
-    ``promise_cutoff`` (a payment on the event day counts when it started earlier)."""
-    day = F.col("event_date")
-    pays = payments.select(
-        F.col("account_id").alias("_p_account"),
-        "pay_from",
-        "pay_date",
-        F.col("amount").alias("_amount"),
-    )
-    return (
-        events.join(
-            pays,
-            (F.col("account_id") == F.col("_p_account"))
-            & _after(day)
-            & (F.col("pay_date") <= F.col("promise_cutoff")),
-            "left",
-        )
-        .groupBy(*events.columns)
-        .agg(F.sum("_amount").alias("promise_paid_amount"))
     )
 
 
@@ -284,21 +281,8 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     require_columns(payments, PAYMENTS, "A3 payments")
     deadline = promise_deadline(product, model_id, deadline)
     rows = _promise_rows(obs_base, followup, agreements, instalments)
-    days = _with_due(
-        _cutoff(rows.select("account_id", "event_date").distinct(), dues, deadline),
-        dues,
-    ).select(
-        "account_id",
-        "event_date",
-        "promise_cutoff",
-        F.greatest(F.coalesce("_due", F.lit(0.0)), F.lit(float(MIN_PAYMENT_AED))).alias(
-            "promise_amount"
-        ),
-    )
-    starts = _event_starts(_with_paid_by(days, payments))
-    judged = _with_paid(
-        _events(rows, starts).join(days, on=["account_id", "event_date"]), payments
-    )
+    days = _with_due(rows.select("account_id", "event_date").distinct(), dues, deadline)
+    judged = _events(rows, _event_starts(_with_paid(days, payments)))
     got = F.coalesce("promise_paid_amount", F.lit(0.0))
     return (
         judged.withColumn("promise_paid_amount", got)
