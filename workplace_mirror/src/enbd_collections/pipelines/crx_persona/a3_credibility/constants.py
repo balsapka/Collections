@@ -13,11 +13,10 @@ BROKEN_STREAK = 3  # Broken when the last 3 concluded were all broken (row 77)
 # follow-up promises less than 8 days apart are one event, up to its deadline (D-A3-29)
 FOLLOWUP_RUN_DAYS = 7
 MATCH_DAYS = 7  # a follow-up promise within 7 days of a DCORE plan is that plan
-# The deadline a promise is judged by (GRR, handoff 64), whatever date was promised: at
-# 60-180 a card promise by the next statement after the promise day, however close; a
-# loan promise, and every promise at 180+, by the end of the promise month. The
-# alternatives are 30 days from the promise ("30_days"; RL "30_days_month_end") and
-# bundle 20's RL rule, the end of the next month ("next_month_end").
+# The deadline a promise is judged by, whatever date was promised (D-A3-28): at 60-180 a
+# card promise by the next statement after the promise day, however close; a loan
+# promise, and every promise at 180+, by the end of the promise month. Other options:
+# "30_days" from the promise, "30_days_month_end", "next_month_end".
 DEADLINES = (
     "next_statement",
     "month_end",
@@ -60,7 +59,7 @@ HISTORY_MONTHS = (
     max(PRE_DLQ_MONTHS, COMMITMENT_MONTHS, *ANY_PAYMENT_MONTHS.values()) + 1
 )
 
-# ── State (D-A3-16, -19, -20, -22, -24) ───────────────────────────────────────────────
+# ── State (D-A3-16, -19, -20, -22, -24) ───────────────────────────────────────
 DISPLAY_NAMES = {
     "high": "payment_credibility_high",
     "moderate": "payment_credibility_moderate",

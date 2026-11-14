@@ -1,16 +1,17 @@
 """The A1 ability pipeline for one product (``cc`` or ``rl``).
 
-    crx_<p>_obs_base ─┬─ income signals ────┐   feat_cif_internal_salary_monthly,
-                      │                     │   feat_cif_bureau_salary_monthly
-                      ├─ CASA signals ──────┤   feat_cif_casa_balance_monthly,
-                      │                     │   feat_cif_casa_flows_monthly
-                      ├─ cross-product ─────┤   feat_cif_cross_product_monthly
-                      ├─ distress signals ──┼─► crx_<p>_a1_ability
-                      │                     │   feat_cif_returns_monthly,
-                      │                     │   feat_cif_bureau_bounces_monthly
-                      ├─ EOSB signals ──────┤   dcore_prm_followup_outcomes,
-                      │                     │   prm_dcore_account_agreements
-                      └─ liquidity anchor ──┘   (product node: prm_balance / int_loan_master)
+    crx_<p>_obs_base ─┬─ income signals ──┐  feat_cif_internal_salary_monthly,
+                      │                   │  feat_cif_bureau_salary_monthly
+                      ├─ CASA signals ────┤  feat_cif_casa_balance_monthly,
+                      │                   │  feat_cif_casa_flows_monthly
+                      ├─ cross-product ───┤  feat_cif_cross_product_monthly
+                      ├─ distress signals ┼─► crx_<p>_a1_ability
+                      │                   │  feat_cif_returns_monthly,
+                      │                   │  feat_cif_bureau_bounces_monthly
+                      ├─ EOSB signals ────┤  dcore_prm_followup_outcomes,
+                      │                   │  prm_dcore_account_agreements
+                      └─ liquidity anchor ┘  (wrapper node: prm_balance or
+                                              int_loan_master)
 
 Needs, for the model_id: the observation base, ``casa_primary``, ``casa_features``,
 ``product_features``, ``bureau_salary_bounces`` and ``location_features``

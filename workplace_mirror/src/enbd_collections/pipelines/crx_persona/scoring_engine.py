@@ -1,7 +1,7 @@
-"""Points -> state scoring shared by the axes (A1; A3 next). An axis declares a
-``Scorecard`` (dimensions with points per level, thresholds, overrides, state labels)
-and builds its own level columns; ``Scorecard.score`` adds points, state, the override
-that fired and the reason. Imported by the axes; not run on its own."""
+"""Points -> state scoring shared by the axes (A1, A3; A2 uses ``state_label``). An axis
+declares a ``Scorecard`` (dimensions with points per level, thresholds, overrides, state
+labels) and builds its own level columns; ``Scorecard.score`` adds points, state, the
+override that fired and the reason. Imported by the axes; not run on its own."""
 
 from __future__ import annotations
 

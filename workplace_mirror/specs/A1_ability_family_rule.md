@@ -70,7 +70,7 @@ against the flow dictionary, the check's outcome block.
   - **Built in bundle 24** (`bundles/24_a1_product_primaries_bureau_swap.md`, 2026-11-12): the feature node
     reads `feat_bureau_salary_unified`; the carry stays, the RL loan salary is dropped.
   - **Two alert-specific pieces stay in `a1_ability/signals.py` until then:**
-    - the **one-month carry** (S14, `_with_next_month`) **stays** after the swap, until bureau salary
+    - the **one-month carry** (S14, `_with_carry`) **stays** after the swap, until bureau salary
       sourcing is fixed (user, 2026-11-11, replacing the 2026-11-10 plan): the unified series is
       event-like, and dropping the carry would cut Stable by 0.8–3.6pp;
     - **fill until change — tested 2026-11-12** (`bundle_helpers/a1_final/bureau_fill_whatif_results.md`,
@@ -89,7 +89,7 @@ against the flow dictionary, the check's outcome block.
       `salaryaccountclosed` alerts the DE drops (no amount); precedence hides only 2–8%. **Decided (user,
       2026-11-12): keep the one-month carry for now.** Ready option, not forgotten: a carry of up to 3
       months (ages 1–3, ended by a newer row or a 0) is what the data support; switching is one constant in
-      `signals.py` (`_with_next_month`) plus the spec cases. 4–6 months only after the DE maps every closed
+      `signals.py` (`BUREAU_CARRY_MONTHS`, read by `_with_carry`) plus the spec cases. 4–6 months only after the DE maps every closed
       alert to 0; never beyond 6. **Closure rule (user,
       2026-11-12):** the bureau mixes added / closed, so `salaryaccountclosed` and
       `salaryaccountisadded/closed` are decided by their amount: 0 or NULL = a stop (0) for both; > 0 =
@@ -97,7 +97,7 @@ against the flow dictionary, the check's outcome block.
       for `salaryaccountclosed`. Added / changed alerts are unchanged. DE ask
       (`bundle_helpers/a1_final/de_bureau_asks.md`): apply this in `int_bureau_alert_salary_monthly` and
       add `is_closure` (true only on positive `salaryaccountclosed` rows) to the unified table; then our
-      feature passes it through and `_with_next_month` skips the carry for those rows (a later A1 bundle,
+      feature passes it through and `_with_carry` skips the carry for those rows (a later A1 bundle,
       once the column is in PROD);
     - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
       the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL

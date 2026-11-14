@@ -3,17 +3,17 @@
 One row per ``(cif_id, month_end, product_account_id)`` for every product the customer
 holds with us at that month end:
 
-* ``product_type`` - ``deposit`` (term deposits), ``investment``, ``wm`` (WM assets under
-  management), ``card`` or ``loan``;
+* ``product_type`` - ``deposit`` (term deposits), ``investment``, ``wm`` (WM assets
+  under management), ``card`` or ``loan``;
 * ``balance_aed`` - the month-end balance (assets; NULL for credit products);
 * ``is_current`` - credit products: 0 DPD at the month end (NULL for assets);
 * ``instalment_aed`` - credit products: the monthly instalment (loans) or minimum due
   (cards) at the month end (NULL for assets).
 
 ``product_account_id`` is the account / contract id the persona spines use
-(``account_id``: the Way4 contract id for cards, ``acct_num`` for loans), so the A1 engine
-can leave out the scored account itself. The WM asset sources are per customer, not per
-account: their rows carry the fixed ids ``ASSET_IDS`` (they never equal a spine account).
+(``account_id``: the Way4 contract id for cards, ``acct_num`` for loans), so the A1
+engine can leave out the scored account itself. The WM asset sources are per customer,
+not per account: their rows carry the fixed ids ``ASSET_IDS`` (never a spine account).
 Supplementary cards post to their contract and never appear as a product of their own; a
 card that a newer card replaced is left out, so the scored card's predecessor is not
 "another card". CASA balances are never a product here (they are A1's money held,
@@ -63,8 +63,8 @@ def _null(spark_type: str) -> Column:
 
 
 def _wm_last_week(df: DataFrame, columns: list[str], floor: datetime.date) -> DataFrame:
-    """Weekly WM rows (``yyyyMM0W``) to one value per ``(cif_id, month_end)``: the month's
-    last week, from the month of ``floor`` on."""
+    """Weekly WM rows (``yyyyMM0W``) to one value per ``(cif_id, month_end)``: the
+    month's last week, from the month of ``floor`` on."""
     last_week = [
         F.max(
             F.struct(
@@ -82,8 +82,8 @@ def _wm_last_week(df: DataFrame, columns: list[str], floor: datetime.date) -> Da
 
 
 def _asset_rows(series: DataFrame, column: str, product_type: str) -> DataFrame:
-    """``COLUMNS`` rows of one asset type from a ``(cif_id, month_end, column)`` series; a
-    balance of 0 or less is not a holding (WM may fill missing balances with 0)."""
+    """``COLUMNS`` rows of one asset type from a ``(cif_id, month_end, column)`` series;
+    a balance of 0 or less is not a holding (WM may fill missing balances with 0)."""
     return series.filter(F.col(column) > 0).select(
         "cif_id",
         "month_end",
@@ -121,9 +121,9 @@ def _assets(
 
 
 def _cards(card_contracts: DataFrame, card_month_end: DataFrame) -> DataFrame:
-    """``card`` rows: a live contract (not replaced by a newer one) with a billing row in
-    the month; current = billing level at most ``CARD_CURRENT_MAX_LEVEL``; the instalment
-    is the month's minimum due."""
+    """``card`` rows: a live contract (not replaced by a newer one) with a billing row
+    in the month; current = billing level at most ``CARD_CURRENT_MAX_LEVEL``; the
+    instalment is the month's minimum due."""
     require_columns(
         card_contracts,
         ["cif_id", "contract_id", "parent_contract_id"],
@@ -152,8 +152,8 @@ def _cards(card_contracts: DataFrame, card_month_end: DataFrame) -> DataFrame:
 
 
 def _loans(loan_month_end: DataFrame) -> DataFrame:
-    """``loan`` rows: every retail loan snapshot; current = bucket 0, no overdue days and
-    not written off; the instalment is the one due."""
+    """``loan`` rows: every retail loan snapshot; current = bucket 0, no overdue days
+    and not written off; the instalment is the one due."""
     require_columns(
         loan_month_end,
         [
@@ -192,10 +192,10 @@ def build(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     persona_start_date: str,
     history_months: int,
 ) -> DataFrame:
-    """``COLUMNS`` from the first of the last ``history_months`` months up to the persona
-    start month on, for all customers (the persona scope is applied by the A1 engine's
-    join on the observation base). The primaries are already bounded to that window by
-    ``product_primary`` (same parameter).
+    """``COLUMNS`` from ``history_floor(persona_start_date, history_months)`` on, for
+    all customers (the A1 engine's join on the observation base applies the persona
+    scope). The primaries are already bounded to that floor by ``product_primary`` (same
+    parameters).
 
     Raises ``ValueError`` naming the source when a column is missing."""
     floor = history_floor(persona_start_date, history_months)

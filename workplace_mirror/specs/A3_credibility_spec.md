@@ -124,7 +124,8 @@ Measured, not assumed (V2, V3).
 - **D-A3-18: A3 builds the source outputs it needs itself, for now** (user, 2026-11-03). No refactor of
   the core CC pipelines in this bundle; merging them into the CC primaries / features is a later
   option. The builders still lose their T0 windows (D-A3-1): rescoping them needs the current
-  `cc_raw_extract/nodes.py` (`build_cc_acct_windows`, `build_cc_billing`) at bundle time.
+  `cc_raw_extract/nodes.py` (`build_cc_billing`) and `build_cc_acct_windows` (now in
+  `cc_a3_payment_credibility/nodes.py`) at bundle time.
 
 - **D-A3-19: no contact-based negative in the state** (user, 2026-11-04, from V2). Today's no-response
   rule goes: it fires on 36% CC / 26% RL and is 84% / 78% A2 Non-Reachable (dead-line outcomes), so

@@ -59,7 +59,8 @@ month **the larger one wins**.
   before it and no further (S14); a 0 row ends the carry.
 
 The result is `income_m1 … income_m6` (`… m12` at 180+; NULL = no salary that month), and
-the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) and the prior window's internal salary (`internal_salary_prior`).
+the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) and the
+prior window's internal salary (`internal_salary_prior`).
 
 **Step 2: the level** (`income_level`, spec S12).
 
@@ -154,9 +155,9 @@ window) is a diagnostic column and changes nothing.
   established; new transaction types land in `unplaced` until they are classified.
 - **Bureau salary is mostly an event feed for now.** Most rows are alerts, which appear only
   when something changes, so no row means nothing is known, not that the salary stopped; the
-  bulk pull covers about 1% of customers. GRR's feed of pulls every 2 months enters through
-  the same table. A stop shows only
-  as a closure, a lower amount or the end of an internal salary (`a1_salary_stopped`).
+  bulk pull covers about 1% of customers. GRR's feed of pulls every 2 months enters
+  through the same table. A stop shows only as a closure, a lower amount or the end of
+  an internal salary (`a1_salary_stopped`).
 - **Missing salary months count as 0** in the window total and the weakening check, except that
   with no internal salary in either window the weakening check compares the months with a value.
 - **Inputs follow the persona start.** `prm_casa_return_events`, `prm_casa_transactions`,

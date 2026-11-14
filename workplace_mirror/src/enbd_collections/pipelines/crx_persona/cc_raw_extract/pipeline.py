@@ -1,11 +1,10 @@
-"""Kedro pipeline: CRX CC raw DDI extract (5 intermediate datasets) for A3.
+"""Kedro pipeline: the CC raw extract for A3.
 
-build_cc_acct_windows reads the obs base and A4 (the episode anchor), so this runs
-after crx_cc_a4_deterioration and before crx_cc_a3_payment_credibility. The three A3
-extracts (transactions, balance, billing) read its window; build_cc_limits keeps its own
-spell-table window.
+``build_cc_acct_windows`` reads the obs base and A4 (the episode anchor), so this runs
+after ``crx_cc_a4_deterioration`` and before ``crx_cc_a3_payment_credibility``. The
+transactions, balance and billing extracts read its windows; ``build_cc_limits`` keeps
+its own spell-table window.
 
-Run with:
     kedro run --pipeline=crx_cc_raw_extract
 """
 
@@ -21,7 +20,7 @@ from .nodes import (
 
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """Five-node pipeline: build window-scoped CC raw extract intermediates."""
+    """The account windows and the four extracts."""
     return Pipeline(
         [
             node(

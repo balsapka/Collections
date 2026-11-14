@@ -12,9 +12,9 @@ compares with its thresholds:
 * income   — salary in each month: the larger of the internal credit and the bureau
              salary, a bureau row counting in its own month and the next (S14);
 * CASA     — money in and money out per month (the counted flow classes of
-             ``feat_cif_casa_flows_monthly``), the CASA average balance per month, whether
-             any counted leg falls in the window (the Unknown gate) and whether the
-             customer holds a CASA with us at all;
+             ``feat_cif_casa_flows_monthly``), the CASA average balance per month,
+             whether any counted leg falls in the window (the Unknown gate) and whether
+             the customer holds a CASA with us at all;
 * products — the customer's other products with us at the observation month (F4);
 * distress — a cheque return, a direct-debit (DDS) return or a new bureau bounce in
              the window;
@@ -97,7 +97,8 @@ def _by_month(value: str, prefix: str, months: int) -> list[Column]:
 
 
 def _in_window(obs: DataFrame, series: DataFrame, months: int, *aggs) -> DataFrame:
-    """``aggs`` over the ``(cif_id, month_end, …)`` rows of the last ``months`` months."""
+    """``aggs`` over the ``(cif_id, month_end, …)`` rows of the last ``months``
+    months."""
     return window_agg(obs, series, date_col="month_end", aggs=list(aggs), months=months)
 
 
@@ -142,9 +143,10 @@ def build_income_signals(
 ) -> DataFrame:
     """``income_m1 … income_m{2W}`` (S3, S12, S14): salary received per month — the
     larger of the internal salary (``feat_cif_internal_salary_monthly``) and the bureau
-    salary (``feat_cif_bureau_salary_monthly``, carried one month forward); NULL: no
-    salary that month. Also the largest month per source: ``internal_salary_w`` /
-    ``bureau_salary_w`` in the window, ``internal_salary_prior`` in the prior window.
+    salary (``feat_cif_bureau_salary_monthly``, carried ``BUREAU_CARRY_MONTHS`` months
+    forward); NULL: no salary that month. Also the largest month per source:
+    ``internal_salary_w`` / ``bureau_salary_w`` in the window, ``internal_salary_prior``
+    in the prior window.
     """
     require_columns(
         internal_salary,
@@ -202,9 +204,10 @@ def build_income_signals(
 
 
 def _casa_rows(casa_flows: DataFrame, casa_balance: DataFrame) -> DataFrame:
-    """CASA rows of both features by ``(cif_id, month_end)``: ``money_in`` / ``money_out``
-    (AED of the counted classes; NULL on a balance row), ``balance`` (NULL on a flow row),
-    ``counted`` (1: a counted leg) and ``held`` (1: any leg, or a positive balance)."""
+    """CASA rows of both features by ``(cif_id, month_end)``: ``money_in`` /
+    ``money_out`` (AED of the counted classes; NULL on a balance row), ``balance`` (NULL
+    on a flow row), ``counted`` (1: a counted leg) and ``held`` (1: any leg, or a
+    positive balance)."""
     null = F.lit(None).cast("double")
     counted_in = F.col("flow_class").isin(*MONEY_IN_CLASSES)
     counted_out = F.col("flow_class").isin(*MONEY_OUT_CLASSES)
@@ -243,11 +246,11 @@ def build_casa_signals(
     crx_persona: dict,
 ) -> DataFrame:
     """``in_m1 … in_mW`` / ``out_m1 … out_mW`` (money in / out per month, the counted
-    classes of ``feat_cif_casa_flows_monthly``; salary credits are income, not money in),
-    ``casa_m1 … casa_m{2W}`` (``feat_cif_casa_balance_monthly``), ``casa_active`` (a
-    counted leg in W: the Unknown gate) and ``casa_held`` (any CASA leg or a positive
-    balance in the last ``CASA_HELD_MONTHS`` months). CASA means the scheme-code accounts
-    of S16."""
+    classes of ``feat_cif_casa_flows_monthly``; salary credits are income, not money
+    in), ``casa_m1 … casa_m{2W}`` (``feat_cif_casa_balance_monthly``), ``casa_active``
+    (a counted leg in W: the Unknown gate) and ``casa_held`` (any CASA leg or a positive
+    balance in the last ``CASA_HELD_MONTHS`` months). CASA means the scheme-code
+    accounts of S16."""
     require_columns(
         casa_balance,
         ["cif_id", "month_end", "casa_balance"],

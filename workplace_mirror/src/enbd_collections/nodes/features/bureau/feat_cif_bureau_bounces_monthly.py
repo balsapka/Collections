@@ -1,9 +1,9 @@
 """Feature node: bureau-reported bounced cheques per customer and month.
 
 One row per ``(cif_id, month_end)`` with a bounce, dated by the bureau's return date
-(``dt_of_return``), not by the pull. A bounce is a ``(cif_id, dt_of_return)``: the same
-return date repeated in later pulls is one bounce, and several cheques returned on one
-day are one bounce with the largest amount.
+(``dt_of_return``), not by the pull (S15). A bounce is a ``(cif_id, dt_of_return)``:
+the same return date repeated in later pulls is one bounce, and several cheques
+returned on one day are one bounce with the largest amount.
 
 * ``bounce_events`` — bounce days in the month;
 * ``max_bounce_amount`` — the largest bounced amount of those days.

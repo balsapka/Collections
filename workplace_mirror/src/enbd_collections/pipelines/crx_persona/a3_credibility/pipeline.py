@@ -1,11 +1,12 @@
 """The A3 payment credibility pipeline for one product (``cc`` or ``rl``).
 
-    crx_<p>_obs_base, crx_<p>_a4_deterioration ─► episode ─┬───────────────────┐
-    product dues + payments (wrapper nodes) ─► cycle ledger ┼─ Dim B, Dim C ────┤
-    DCORE plans ─► instalments ┬─ promise events ───────────┼─ Dim A ───────────┼─► state
-    dcore_prm_followup_outcomes┴────────────────────────────┴─ contacts ────────┘
+    obs base + A4 ─► episode (every signal starts from it)
+    dues + payments (wrapper nodes) ─► cycle ledger ─► Dim B, Dim C signals
+    DCORE plans ─► instalments ─► promise events ─► Dim A signals
+    DCORE follow-up outcomes ─► contact signals
+    episode + the four signal tables ─► state
 
-Needs, for the model_id: the obs base, A4, the product's payment sources and the DCORE
+Needs, for the model_id: the obs base, A4, the product's dues and payments and the DCORE
 tables. Promises are judged by ``PROMISE_DEADLINE`` (at 60-180 CC the next statement, RL
 the month end; at 180+ the month end).
 """

@@ -1,5 +1,5 @@
-"""A3 source nodes shared by both products: the episode anchor, the cycle ledger and the
-DCORE plans."""
+"""A3 source builders shared by both products: the episode anchor, the cycle ledger and
+the DCORE plan instalments."""
 
 from enbd_collections.nodes.features.dcore._feat_dcore_utils import (
     null_cancelled_instalment_fields,
@@ -148,9 +148,10 @@ def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional
     """PTP and settlement instalments of the base's accounts (D-A3-7, D-A3-9).
 
     One row per instalment of a non-cancelled plan: ``account_id``, ``plan_id``,
-    ``plan_type``, ``plan_start`` (PTP: promise start, else event date; settlement: event
-    date, the only date DCORE keeps), ``due_date``, ``due_amount``, ``payment_amount``
-    (DCORE's). Cancelled instalments are nulled by DCORE's own rule and dropped.
+    ``plan_type``, ``plan_start`` (PTP: promise start, else event date; settlement:
+    event date, the only date DCORE keeps), ``due_date``, ``due_amount``,
+    ``payment_amount`` (DCORE's). Cancelled instalments are nulled by DCORE's own rule
+    and dropped.
     """
     _require_plan_sources(
         agreements, int_ptp, ptp_instalments, int_settlement, settlement_instalments

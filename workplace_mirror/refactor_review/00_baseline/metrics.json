@@ -14,10 +14,10 @@
   },
   "nodes/features/bureau/feat_cif_bureau_bounces_monthly.py": {
    "tier": "L",
-   "lines": 43,
-   "doc_comment_share": 0.278,
+   "lines": 45,
+   "doc_comment_share": 0.27,
    "functions_over_40": [],
-   "max_nesting": 2,
+   "max_nesting": 1,
    "spark_actions": 0,
    "pylint": 10.0,
    "ruff_findings": 0
@@ -30,7 +30,7 @@
    "max_nesting": 1,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 2
+   "ruff_findings": 0
   },
   "nodes/features/casa/__init__.py": {
    "tier": "X",
@@ -115,13 +115,13 @@
   },
   "nodes/features/products/feat_cif_cross_product.py": {
    "tier": "L",
-   "lines": 206,
-   "doc_comment_share": 0.22,
+   "lines": 207,
+   "doc_comment_share": 0.219,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 9
+   "ruff_findings": 0
   },
   "nodes/primary/casa/__init__.py": {
    "tier": "X",
@@ -179,13 +179,13 @@
   },
   "nodes/primary/products/prm_products.py": {
    "tier": "L",
-   "lines": 182,
-   "doc_comment_share": 0.18,
+   "lines": 179,
+   "doc_comment_share": 0.196,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 0,
-   "pylint": 7.37,
-   "ruff_findings": 8
+   "pylint": 7.22,
+   "ruff_findings": 1
   },
   "nodes/staging/digital_login/stg_digital_login.py": {
    "tier": "X",
@@ -224,8 +224,8 @@
   },
   "nodes/utils/frames.py": {
    "tier": "L",
-   "lines": 32,
-   "doc_comment_share": 0.238,
+   "lines": 38,
+   "doc_comment_share": 0.28,
    "functions_over_40": [],
    "max_nesting": 2,
    "spark_actions": 0,
@@ -268,8 +268,8 @@
   },
   "pipelines/bureau/salary_bounces.py": {
    "tier": "L",
-   "lines": 39,
-   "doc_comment_share": 0.25,
+   "lines": 40,
+   "doc_comment_share": 0.242,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 0,
@@ -352,13 +352,13 @@
   },
   "pipelines/crx_persona/_common.py": {
    "tier": "S",
-   "lines": 307,
-   "doc_comment_share": 0.275,
+   "lines": 297,
+   "doc_comment_share": 0.28,
    "functions_over_40": [],
    "max_nesting": 3,
-   "spark_actions": 4,
+   "spark_actions": 3,
    "pylint": 10.0,
-   "ruff_findings": 3
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/_dcore_codes.py": {
    "tier": "S",
@@ -494,8 +494,8 @@
   },
   "pipelines/crx_persona/a1_ability/__init__.py": {
    "tier": "L",
-   "lines": 19,
-   "doc_comment_share": 0.059,
+   "lines": 12,
+   "doc_comment_share": 0.2,
    "functions_over_40": [],
    "max_nesting": 0,
    "spark_actions": 0,
@@ -504,41 +504,42 @@
   },
   "pipelines/crx_persona/a1_ability/classify.py": {
    "tier": "L",
-   "lines": 261,
-   "doc_comment_share": 0.244,
+   "lines": 275,
+   "doc_comment_share": 0.251,
    "functions_over_40": [
-    "build_a1_ability:68"
+    "build_a1_ability:60"
    ],
    "max_nesting": 2,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 2
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/a1_ability/pipeline.py": {
    "tier": "L",
-   "lines": 120,
-   "doc_comment_share": 0.159,
+   "lines": 124,
+   "doc_comment_share": 0.162,
    "functions_over_40": [
-    "create_a1_pipeline:86"
+    "create_a1_pipeline:89"
    ],
    "max_nesting": 1,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 1
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/a1_ability/signals.py": {
    "tier": "L",
-   "lines": 455,
-   "doc_comment_share": 0.192,
+   "lines": 488,
+   "doc_comment_share": 0.19,
    "functions_over_40": [
-    "build_income_signals:62",
-    "build_casa_signals:57",
-    "build_distress_signals:45"
+    "build_income_signals:65",
+    "build_casa_signals:55",
+    "build_distress_signals:47",
+    "build_eosb_signals:42"
    ],
    "max_nesting": 2,
    "spark_actions": 1,
    "pylint": 10.0,
-   "ruff_findings": 7
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/a2_locatability/__init__.py": {
    "tier": "X",
@@ -589,28 +590,28 @@
   },
   "pipelines/crx_persona/a3_credibility/__init__.py": {
    "tier": "L",
-   "lines": 16,
-   "doc_comment_share": 0.067,
+   "lines": 14,
+   "doc_comment_share": 0.167,
    "functions_over_40": [],
    "max_nesting": 0,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 10
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/a3_credibility/classify.py": {
    "tier": "L",
-   "lines": 89,
-   "doc_comment_share": 0.145,
+   "lines": 90,
+   "doc_comment_share": 0.143,
    "functions_over_40": [],
-   "max_nesting": 1,
+   "max_nesting": 2,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 1
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/a3_credibility/constants.py": {
    "tier": "L",
-   "lines": 87,
-   "doc_comment_share": 0.224,
+   "lines": 89,
+   "doc_comment_share": 0.244,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 0,
@@ -619,25 +620,38 @@
   },
   "pipelines/crx_persona/a3_credibility/pipeline.py": {
    "tier": "L",
-   "lines": 145,
-   "doc_comment_share": 0.096,
+   "lines": 142,
+   "doc_comment_share": 0.106,
    "functions_over_40": [
     "create_a3_pipeline:109"
    ],
    "max_nesting": 2,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 4
+   "ruff_findings": 3
+  },
+  "pipelines/crx_persona/a3_credibility/promises.py": {
+   "tier": "L",
+   "lines": 262,
+   "doc_comment_share": 0.12,
+   "functions_over_40": [
+    "build_promise_events:51"
+   ],
+   "max_nesting": 2,
+   "spark_actions": 0,
+   "pylint": 10.0,
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/a3_credibility/signals.py": {
    "tier": "L",
-   "lines": 414,
-   "doc_comment_share": 0.113,
+   "lines": 470,
+   "doc_comment_share": 0.133,
    "functions_over_40": [
-    "build_commitment_signals:76",
-    "build_dlq_payment_signals:48",
-    "build_pre_dlq_payment_signals:52",
-    "build_contact_signals:113"
+    "build_commitment_signals:48",
+    "build_dlq_payment_signals:50",
+    "build_pre_dlq_payment_signals:54",
+    "_contact_summary:41",
+    "build_contact_signals:72"
    ],
    "max_nesting": 2,
    "spark_actions": 0,
@@ -646,17 +660,15 @@
   },
   "pipelines/crx_persona/a3_credibility/sources.py": {
    "tier": "L",
-   "lines": 372,
-   "doc_comment_share": 0.108,
+   "lines": 199,
+   "doc_comment_share": 0.144,
    "functions_over_40": [
-    "build_instalments:96",
-    "_followup_promises:54",
-    "build_promise_events:68"
+    "build_instalments:60"
    ],
-   "max_nesting": 2,
+   "max_nesting": 1,
    "spark_actions": 0,
-   "pylint": 6.86,
-   "ruff_findings": 1
+   "pylint": 3.89,
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/cc_a1_ability/__init__.py": {
    "tier": "L",
@@ -676,7 +688,7 @@
    "max_nesting": 2,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 1
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/cc_a1_ability/pipeline.py": {
    "tier": "L",
@@ -720,10 +732,10 @@
   },
   "pipelines/crx_persona/cc_a3_payment_credibility/nodes.py": {
    "tier": "L",
-   "lines": 130,
-   "doc_comment_share": 0.119,
+   "lines": 163,
+   "doc_comment_share": 0.171,
    "functions_over_40": [
-    "_balance_dues:46"
+    "_balance_dues:41"
    ],
    "max_nesting": 1,
    "spark_actions": 0,
@@ -784,8 +796,8 @@
   },
   "pipelines/crx_persona/cc_raw_extract/__init__.py": {
    "tier": "K",
-   "lines": 14,
-   "doc_comment_share": 0.8,
+   "lines": 6,
+   "doc_comment_share": 0.5,
    "functions_over_40": [],
    "max_nesting": 0,
    "spark_actions": 0,
@@ -794,8 +806,8 @@
   },
   "pipelines/crx_persona/cc_raw_extract/_window_utils.py": {
    "tier": "K",
-   "lines": 56,
-   "doc_comment_share": 0.489,
+   "lines": 41,
+   "doc_comment_share": 0.314,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 1,
@@ -804,26 +816,25 @@
   },
   "pipelines/crx_persona/cc_raw_extract/nodes.py": {
    "tier": "K",
-   "lines": 436,
-   "doc_comment_share": 0.517,
+   "lines": 289,
+   "doc_comment_share": 0.224,
    "functions_over_40": [
-    "build_cc_acct_windows:43",
-    "build_cc_transactions:103",
-    "build_cc_limits:68",
-    "build_cc_balance:82",
-    "build_cc_billing:86"
+    "build_cc_transactions:89",
+    "build_cc_limits:47",
+    "build_cc_balance:52",
+    "build_cc_billing:50"
    ],
    "max_nesting": 2,
    "spark_actions": 0,
-   "pylint": 7.92,
-   "ruff_findings": 2
+   "pylint": 7.87,
+   "ruff_findings": 1
   },
   "pipelines/crx_persona/cc_raw_extract/pipeline.py": {
    "tier": "K",
-   "lines": 72,
-   "doc_comment_share": 0.136,
+   "lines": 80,
+   "doc_comment_share": 0.108,
    "functions_over_40": [
-    "create_pipeline:50"
+    "create_pipeline:59"
    ],
    "max_nesting": 1,
    "spark_actions": 0,
@@ -884,18 +895,18 @@
   },
   "pipelines/crx_persona/rl_a1_ability/nodes.py": {
    "tier": "L",
-   "lines": 44,
-   "doc_comment_share": 0.211,
+   "lines": 48,
+   "doc_comment_share": 0.195,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 1
+   "ruff_findings": 0
   },
   "pipelines/crx_persona/rl_a1_ability/pipeline.py": {
    "tier": "L",
-   "lines": 29,
-   "doc_comment_share": 0.364,
+   "lines": 33,
+   "doc_comment_share": 0.308,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 0,
@@ -1144,13 +1155,13 @@
   },
   "pipelines/products/features.py": {
    "tier": "L",
-   "lines": 36,
-   "doc_comment_share": 0.259,
+   "lines": 37,
+   "doc_comment_share": 0.267,
    "functions_over_40": [],
    "max_nesting": 1,
    "spark_actions": 0,
    "pylint": 10.0,
-   "ruff_findings": 1
+   "ruff_findings": 0
   },
   "pipelines/products/primary.py": {
    "tier": "L",
@@ -1165,24 +1176,24 @@
  },
  "tiers": {
   "L": {
-   "files": 34,
-   "lines": 3162,
-   "doc_comment_share": 0.178,
-   "functions_over_40": 15,
+   "files": 35,
+   "lines": 3398,
+   "doc_comment_share": 0.186,
+   "functions_over_40": 16,
    "max_nesting": 3,
    "spark_actions": 1,
-   "pylint_line_weighted": 9.48,
-   "ruff_findings": 48
+   "pylint_line_weighted": 9.5,
+   "ruff_findings": 4
   },
   "S": {
    "files": 3,
-   "lines": 677,
-   "doc_comment_share": 0.248,
+   "lines": 667,
+   "doc_comment_share": 0.25,
    "functions_over_40": 0,
    "max_nesting": 3,
-   "spark_actions": 4,
+   "spark_actions": 3,
    "pylint_line_weighted": 10.0,
-   "ruff_findings": 6
+   "ruff_findings": 3
   },
   "A": {
    "files": 3,
@@ -1206,13 +1217,13 @@
   },
   "K": {
    "files": 4,
-   "lines": 578,
-   "doc_comment_share": 0.474,
-   "functions_over_40": 6,
+   "lines": 416,
+   "doc_comment_share": 0.215,
+   "functions_over_40": 5,
    "max_nesting": 2,
    "spark_actions": 1,
-   "pylint_line_weighted": 7.99,
-   "ruff_findings": 2
+   "pylint_line_weighted": 8.07,
+   "ruff_findings": 1
   },
   "X": {
    "files": 54,

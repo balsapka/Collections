@@ -239,9 +239,10 @@ def _obs_base(spine: DataFrame, id_col: str, crx_persona: dict) -> DataFrame:
 
 
 def build_cc_obs_base(cc_spine: DataFrame, crx_persona: dict) -> DataFrame:
-    """The CC observation base at month ends. Until ``cc_spine`` itself is month-end, each
-    billing-date row moves to its month end; an account's rows in one month become one
-    (the largest ``cif_id`` if they disagree). Remove the shift once the spine is month-end.
+    """The CC observation base at month ends. While ``cc_spine`` is dated at billing
+    dates, each row moves to its month end and an account's rows in one month become
+    one (the largest ``cif_id`` if they disagree); on a month-end spine this changes
+    nothing.
     """
     require_columns(cc_spine, ["contract_id", "observation_date", "cif_id"], "cc_spine")
     month_end = cc_spine.select(

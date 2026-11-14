@@ -51,6 +51,7 @@ def _anchor() -> Column:
 
 
 def _base(episode: DataFrame) -> DataFrame:
+    """``GRAIN`` and ``_anchor`` of every base row."""
     return episode.select(*GRAIN, _anchor().alias("_anchor"))
 
 
@@ -100,10 +101,11 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
 
     Promise events (``build_promise_events``) dated in the last 12 months up to the
     observation date, earlier delinquency episodes included (trustworthiness, not this
-    episode only), concluded once their cutoff is on or before the
-    observation date. Kept: paid; partial counts as not kept. Broken: the last 3
-    concluded all not kept (a broken event ranks first on a shared day), or at least 2
-    concluded and under 40% kept. Kept: at least 2 concluded and 80% kept.
+    episode only); concluded once their cutoff is on or before the observation date.
+    An event is kept when paid; partial counts as not kept. Broken: the last 3 concluded
+    all not kept (a broken event ranks first on a shared day), or at least 2 concluded
+    and under 40% kept. Kept: at least 2 concluded and 80% kept. Partly kept: any
+    kept event. Else thin.
     """
     require_columns(episode, EPISODE, "A3 episode")
     require_columns(events, EVENTS, "A3 promise events")
@@ -271,6 +273,7 @@ _DISPOSITIONS = [  # first match wins
 
 
 def _disposition(name: Column) -> Column:
+    """The ``_DISPOSITIONS`` label of a DCORE result name (NULL: not a contact)."""
     out = F.lit(None).cast("string")
     for label, names in reversed(_DISPOSITIONS):
         out = F.when(name.isin(*sorted(names)), label).otherwise(out)

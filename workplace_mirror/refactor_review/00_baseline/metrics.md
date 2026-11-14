@@ -11,52 +11,53 @@ candidates, X = out of scope, measured only). Paths under
 
 | Tier | Files | Lines | Doc share | Funcs > 40 | Max nesting | Actions | Pylint (line-weighted) | Ruff |
 |---|---|---|---|---|---|---|---|---|
-| L | 34 | 3162 | 18% | 15 | 3 | 1 | 9.48 | 48 |
-| S | 3 | 677 | 25% | 0 | 3 | 4 | 10.0 | 6 |
+| L | 35 | 3398 | 19% | 16 | 3 | 1 | 9.5 | 4 |
+| S | 3 | 667 | 25% | 0 | 3 | 3 | 10.0 | 3 |
 | A | 3 | 877 | 18% | 5 | 3 | 0 | 10.0 | 36 |
 | D | 9 | 923 | 34% | 4 | 2 | 7 | 10.0 | 9 |
-| K | 4 | 578 | 47% | 6 | 2 | 1 | 7.99 | 2 |
+| K | 4 | 416 | 22% | 5 | 2 | 1 | 8.07 | 1 |
 | X | 54 | 5492 | 24% | 25 | 6 | 4 | 9.2 | 118 |
 
 ## Per file (tiers L, S, A, D, K)
 
 | File | Tier | Lines | Doc share | Funcs > 40 (name:lines) | Nesting | Actions | Pylint | Ruff |
 |---|---|---|---|---|---|---|---|---|
-| `nodes/features/bureau/feat_cif_bureau_bounces_monthly.py` | L | 43 | 28% | — | 2 | 0 | 10.0 | 0 |
-| `nodes/features/bureau/feat_cif_bureau_salary_monthly.py` | L | 40 | 44% | — | 1 | 0 | 10.0 | 2 |
+| `nodes/features/bureau/feat_cif_bureau_bounces_monthly.py` | L | 45 | 27% | — | 1 | 0 | 10.0 | 0 |
+| `nodes/features/bureau/feat_cif_bureau_salary_monthly.py` | L | 40 | 44% | — | 1 | 0 | 10.0 | 0 |
 | `nodes/features/products/__init__.py` | L | 0 | 0% | — | 0 | 0 | None | 0 |
-| `nodes/features/products/feat_cif_cross_product.py` | L | 206 | 22% | — | 1 | 0 | 10.0 | 9 |
+| `nodes/features/products/feat_cif_cross_product.py` | L | 207 | 22% | — | 1 | 0 | 10.0 | 0 |
 | `nodes/primary/products/__init__.py` | L | 0 | 0% | — | 0 | 0 | None | 0 |
-| `nodes/primary/products/prm_products.py` | L | 182 | 18% | — | 1 | 0 | 7.37 | 8 |
-| `nodes/utils/frames.py` | L | 32 | 24% | — | 2 | 0 | 10.0 | 0 |
-| `pipelines/bureau/salary_bounces.py` | L | 39 | 25% | — | 1 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/a1_ability/__init__.py` | L | 19 | 6% | — | 0 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/a1_ability/classify.py` | L | 261 | 24% | build_a1_ability:68 | 2 | 0 | 10.0 | 2 |
-| `pipelines/crx_persona/a1_ability/pipeline.py` | L | 120 | 16% | create_a1_pipeline:86 | 1 | 0 | 10.0 | 1 |
-| `pipelines/crx_persona/a1_ability/signals.py` | L | 455 | 19% | build_income_signals:62, build_casa_signals:57, build_distress_signals:45 | 2 | 1 | 10.0 | 7 |
-| `pipelines/crx_persona/a3_credibility/__init__.py` | L | 16 | 7% | — | 0 | 0 | 10.0 | 10 |
-| `pipelines/crx_persona/a3_credibility/classify.py` | L | 89 | 14% | — | 1 | 0 | 10.0 | 1 |
-| `pipelines/crx_persona/a3_credibility/constants.py` | L | 87 | 22% | — | 1 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/a3_credibility/pipeline.py` | L | 145 | 10% | create_a3_pipeline:109 | 2 | 0 | 10.0 | 4 |
-| `pipelines/crx_persona/a3_credibility/signals.py` | L | 414 | 11% | build_commitment_signals:76, build_dlq_payment_signals:48, build_pre_dlq_payment_signals:52, build_contact_signals:113 | 2 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/a3_credibility/sources.py` | L | 372 | 11% | build_instalments:96, _followup_promises:54, build_promise_events:68 | 2 | 0 | 6.86 | 1 |
+| `nodes/primary/products/prm_products.py` | L | 179 | 20% | — | 1 | 0 | 7.22 | 1 |
+| `nodes/utils/frames.py` | L | 38 | 28% | — | 2 | 0 | 10.0 | 0 |
+| `pipelines/bureau/salary_bounces.py` | L | 40 | 24% | — | 1 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a1_ability/__init__.py` | L | 12 | 20% | — | 0 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a1_ability/classify.py` | L | 275 | 25% | build_a1_ability:60 | 2 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a1_ability/pipeline.py` | L | 124 | 16% | create_a1_pipeline:89 | 1 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a1_ability/signals.py` | L | 488 | 19% | build_income_signals:65, build_casa_signals:55, build_distress_signals:47, build_eosb_signals:42 | 2 | 1 | 10.0 | 0 |
+| `pipelines/crx_persona/a3_credibility/__init__.py` | L | 14 | 17% | — | 0 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a3_credibility/classify.py` | L | 90 | 14% | — | 2 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a3_credibility/constants.py` | L | 89 | 24% | — | 1 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a3_credibility/pipeline.py` | L | 142 | 11% | create_a3_pipeline:109 | 2 | 0 | 10.0 | 3 |
+| `pipelines/crx_persona/a3_credibility/promises.py` | L | 262 | 12% | build_promise_events:51 | 2 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a3_credibility/signals.py` | L | 470 | 13% | build_commitment_signals:48, build_dlq_payment_signals:50, build_pre_dlq_payment_signals:54, _contact_summary:41, build_contact_signals:72 | 2 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/a3_credibility/sources.py` | L | 199 | 14% | build_instalments:60 | 1 | 0 | 3.89 | 0 |
 | `pipelines/crx_persona/cc_a1_ability/__init__.py` | L | 5 | 33% | — | 0 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/cc_a1_ability/nodes.py` | L | 54 | 26% | — | 2 | 0 | 10.0 | 1 |
+| `pipelines/crx_persona/cc_a1_ability/nodes.py` | L | 54 | 26% | — | 2 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/cc_a1_ability/pipeline.py` | L | 33 | 31% | — | 1 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/cc_a3_payment_credibility/__init__.py` | L | 5 | 33% | — | 0 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/cc_a3_payment_credibility/nodes.py` | L | 130 | 12% | _balance_dues:46 | 1 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/cc_a3_payment_credibility/nodes.py` | L | 163 | 17% | _balance_dues:41 | 1 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/cc_a3_payment_credibility/pipeline.py` | L | 40 | 24% | — | 1 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/rl_a1_ability/__init__.py` | L | 5 | 33% | — | 0 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/rl_a1_ability/nodes.py` | L | 44 | 21% | — | 1 | 0 | 10.0 | 1 |
-| `pipelines/crx_persona/rl_a1_ability/pipeline.py` | L | 29 | 36% | — | 1 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/rl_a1_ability/nodes.py` | L | 48 | 20% | — | 1 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/rl_a1_ability/pipeline.py` | L | 33 | 31% | — | 1 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/rl_a3_payment_credibility/__init__.py` | L | 5 | 33% | — | 0 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/rl_a3_payment_credibility/nodes.py` | L | 60 | 12% | — | 1 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/rl_a3_payment_credibility/pipeline.py` | L | 36 | 24% | — | 1 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/scoring_engine.py` | L | 108 | 20% | score:42 | 3 | 0 | 10.0 | 0 |
 | `pipelines/products/__init__.py` | L | 0 | 0% | — | 0 | 0 | None | 0 |
-| `pipelines/products/features.py` | L | 36 | 26% | — | 1 | 0 | 10.0 | 1 |
+| `pipelines/products/features.py` | L | 37 | 27% | — | 1 | 0 | 10.0 | 0 |
 | `pipelines/products/primary.py` | L | 52 | 17% | — | 1 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/_common.py` | S | 307 | 28% | — | 3 | 4 | 10.0 | 3 |
+| `pipelines/crx_persona/_common.py` | S | 297 | 28% | — | 3 | 3 | 10.0 | 0 |
 | `pipelines/crx_persona/_dcore_codes.py` | S | 312 | 20% | — | 0 | 0 | 10.0 | 3 |
 | `pipelines/crx_persona/_dpd_journey/anchor.py` | S | 58 | 38% | — | 1 | 0 | 10.0 | 0 |
 | `nodes/features/casa/feat_cif_casa.py` | A | 618 | 18% | build_ext_card_payments:41, _flow_labels:50, build_casa_flow_legs:94 | 2 | 0 | 10.0 | 22 |
@@ -71,7 +72,7 @@ candidates, X = out of scope, measured only). Paths under
 | `pipelines/crx_persona/rl_spell_table/__init__.py` | D | 5 | 33% | — | 0 | 0 | 10.0 | 0 |
 | `pipelines/crx_persona/rl_spell_table/nodes.py` | D | 366 | 21% | build_rl_spell_table:214 | 2 | 4 | 10.0 | 3 |
 | `pipelines/crx_persona/rl_spell_table/pipeline.py` | D | 32 | 40% | — | 1 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/cc_raw_extract/__init__.py` | K | 14 | 80% | — | 0 | 0 | 10.0 | 0 |
-| `pipelines/crx_persona/cc_raw_extract/_window_utils.py` | K | 56 | 49% | — | 1 | 1 | 5.45 | 0 |
-| `pipelines/crx_persona/cc_raw_extract/nodes.py` | K | 436 | 52% | build_cc_acct_windows:43, build_cc_transactions:103, build_cc_limits:68, build_cc_balance:82, build_cc_billing:86 | 2 | 0 | 7.92 | 2 |
-| `pipelines/crx_persona/cc_raw_extract/pipeline.py` | K | 72 | 14% | create_pipeline:50 | 1 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/cc_raw_extract/__init__.py` | K | 6 | 50% | — | 0 | 0 | 10.0 | 0 |
+| `pipelines/crx_persona/cc_raw_extract/_window_utils.py` | K | 41 | 31% | — | 1 | 1 | 5.45 | 0 |
+| `pipelines/crx_persona/cc_raw_extract/nodes.py` | K | 289 | 22% | build_cc_transactions:89, build_cc_limits:47, build_cc_balance:52, build_cc_billing:50 | 2 | 0 | 7.87 | 1 |
+| `pipelines/crx_persona/cc_raw_extract/pipeline.py` | K | 80 | 11% | create_pipeline:59 | 1 | 0 | 10.0 | 0 |

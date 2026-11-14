@@ -1,7 +1,8 @@
 """Product feature pipeline: the customer's other products with us per month.
 
     prm_card_contracts, prm_card_month_end, prm_loan_month_end,
-    wm_fea_casa_eod_avg_balance, wm_fea_wealth_holdings_by_cif ► feat_cif_cross_product_monthly
+    wm_fea_casa_eod_avg_balance, wm_fea_wealth_holdings_by_cif
+        ► feat_cif_cross_product_monthly
 
 Needs ``product_primary`` for the model_id first.
 

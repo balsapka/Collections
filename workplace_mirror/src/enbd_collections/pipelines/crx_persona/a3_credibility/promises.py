@@ -137,7 +137,9 @@ def _consolidate(plans: DataFrame, promises: DataFrame) -> DataFrame:
 
 
 def _cutoff(events: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
-    """``events`` + ``promise_cutoff``: the last day a payment still counts."""
+    """``events`` + ``promise_cutoff``, the last day a payment still counts, by
+    ``deadline`` (``DEADLINES``). ``next_statement``: the first cycle end after the
+    event day, else ``STATEMENT_FALLBACK_D`` days after it."""
     day = F.col("event_date")
     fixed = {
         "month_end": F.last_day(day),
@@ -221,10 +223,9 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     """Promise events of the base's accounts, judged by payment (D-A3-25). ``EVENTS``.
 
     Events: every non-cancelled PTP and settlement plan (dated at its start) and every
-    follow-up promise run (``_dcore_codes.PROMISE_EVENT``; a follow-up after the run's
-    deadline starts a new run) no plan claims
-    (``event_kind`` matched / table_only / followup_only). Judged once: the payments
-    after the event day up to ``promise_cutoff`` (``deadline``, by default
+    follow-up promise run (``_dcore_codes.PROMISE_EVENT``, D-A3-29) no plan claims:
+    ``event_kind`` matched / table_only / followup_only. Judged once: the payments after
+    the event day up to ``promise_cutoff`` (``deadline``, by default
     ``promise_deadline(product, model_id)``) against ``promise_amount``, the due of the
     cycle open on the event day (the last known one, at least 100 AED). Paid: they reach
     it; partial: 100 AED or more; else none. RL cash is dated at the month end, so the

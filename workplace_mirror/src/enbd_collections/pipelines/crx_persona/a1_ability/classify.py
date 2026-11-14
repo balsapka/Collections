@@ -60,10 +60,12 @@ def _window(w: int) -> tuple[tuple[int, ...], tuple[int, ...]]:
 
 
 def _months(prefix: str, months: tuple[int, ...]) -> list[Column]:
+    """The ``{prefix}_m{i}`` columns of month indices ``months``."""
     return [F.col(f"{prefix}_m{i}") for i in months]
 
 
 def _count_at_least(cols: list[Column], floor: Column) -> Column:
+    """The number of ``cols`` reaching ``floor`` (NULL counts as 0)."""
     return sum((F.coalesce(c, F.lit(0.0)) >= floor).cast("int") for c in cols)
 
 
@@ -155,8 +157,8 @@ def money_out_level(anchor: Column, w: int) -> Column:
 
 def cross_product_level(anchor: Column, _w: int) -> Column:
     """F4 at the observation month end: strong on assets of max(floor, 3 x anchor) or a
-    current credit product whose instalment reaches max(floor, anchor); some on any other
-    current credit product or any asset."""
+    current credit product whose instalment reaches max(floor, anchor); some on any
+    other current credit product or any asset."""
     assets = F.coalesce(F.col("xp_assets_aed"), F.lit(0.0))
     instalment = F.coalesce(F.col("xp_instalment_max"), F.lit(0.0))
     strong = (assets >= F.greatest(F.lit(ASSET_FLOOR), ASSET_ANCHOR_MULT * anchor)) | (
@@ -223,16 +225,15 @@ def build_a1_ability(
     Families and points: family rule §2–§4; distress lowers the state one rung (S9).
 
     ``signals`` (income, CASA, cross-product, distress, EOSB: ``GRAIN`` + columns) and
-    ``anchor``
-    (``GRAIN + liquidity_anchor_amt``, product builder) are left-joined in that order.
-    ``a1_unknown_reason`` says why a row is unknown: ``no_casa`` (no CASA leg or
-    positive balance with us in 12 months) or ``dormant_casa``; ``a1_reason`` is the
-    strongest family (or ``distress``). Diagnostics, which change nothing:
-    ``a1_sweepable_balance_flag`` (the CASA balance is strong: money above the floor the
-    bank could still sweep), ``a1_eosb_flag`` (a DCORE end-of-service result in the window),
-    ``a1_income_source`` (who shows AED 1,000 or more in the window: ``internal``,
-    ``bureau``, ``both`` or ``none``), ``a1_salary_stopped`` (internal salary in the
-    prior window, none in the window).
+    ``anchor`` (``GRAIN + liquidity_anchor_amt``, from the product wrapper) are
+    left-joined in that order. ``a1_unknown_reason`` says why a row is unknown:
+    ``no_casa`` (no CASA leg or positive balance with us in 12 months) or
+    ``dormant_casa``; ``a1_reason`` is the strongest family (or ``distress``).
+    Diagnostics, which change nothing: ``a1_sweepable_balance_flag`` (the CASA balance
+    is strong: money above the floor the bank could still sweep), ``a1_eosb_flag`` (a
+    DCORE end-of-service result in the window), ``a1_income_source`` (who shows AED
+    1,000 or more in the window: ``internal``, ``bureau``, ``both`` or ``none``),
+    ``a1_salary_stopped`` (internal salary in the prior window, none in the window).
     """
     # join order follows the node inputs; output is the same (left joins on GRAIN)
     df = left_join_all(obs_base, [*signals.values(), anchor])

@@ -69,9 +69,9 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
 ) -> DataFrame:
     """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24, -27).
 
-    High from 4 points, Moderate from 2, else Low; a refusal takes one rung off. Unknown:
-    no episode anchor only (``a3_unknown_reason`` = ``no_episode``); an episode with no
-    evidence scores 0 points and is Low.
+    High from 4 points, Moderate from 2, else Low; a refusal takes one rung off.
+    Unknown: no episode anchor only (``a3_unknown_reason`` = ``no_episode``); an episode
+    with no evidence scores 0 points and is Low.
     """
     df = episode
     for part in (commitments, dlq_payments, pre_dlq, contacts):

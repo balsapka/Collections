@@ -1,20 +1,21 @@
 """Primary nodes: every customer's card contracts, card month ends and retail-loan month
 ends (the raw Way4 and loan-portfolio reads behind the A1 cross-product feature).
 
-* ``prm_card_contracts`` - one row per ``(cif_id, contract_id)``: every Way4 card contract
-  of a client, with ``parent_contract_id`` (the contract a newer one replaced; NULL for
-  none);
-* ``prm_card_month_end`` - one row per ``(contract_id, month_end)`` with a billing row in
-  the month: ``level`` (``BS_PMT_CYCLE_DUE`` of the month's latest billing row; 1 = not
-  overdue) and ``minimum_due`` (of the latest balance snapshot in the month's last
+* ``prm_card_contracts`` - one row per ``(cif_id, contract_id)``: every Way4 card
+  contract of a client, with ``parent_contract_id`` (the contract a newer one replaced;
+  NULL for none);
+* ``prm_card_month_end`` - one row per ``(contract_id, month_end)`` with a billing row
+  in the month: ``level`` (``BS_PMT_CYCLE_DUE`` of the month's latest billing row; 1 =
+  not overdue) and ``minimum_due`` (of the latest balance snapshot in the month's last
   ``BALANCE_TAIL_DAYS`` days; NULL without one);
 * ``prm_loan_month_end`` - one row per retail loan and monthly snapshot of
-  ``bo_rr_portf_actv_acct_mthly``: bucket, overdue days, instalment due and write-off date.
+  ``bo_rr_portf_actv_acct_mthly``: bucket, overdue days, instalment due and write-off
+  date.
 
-All customers, from the first of the last ``history_months`` months up to the persona
-start month on; values as in the source (which level or bucket is "current" is decided
-by the consumers). The spine-scoped ``prm_contract`` / ``prm_balance`` hold only the
-model's own accounts, so they cannot list a customer's other cards.
+All customers, from ``history_floor(persona_start_date, history_months)`` on; values as
+in the source (which level or bucket is "current" is decided by the consumers). The
+spine-scoped ``prm_contract`` / ``prm_balance`` hold only the model's own accounts, so
+they cannot list a customer's other cards.
 """
 
 from __future__ import annotations
@@ -90,9 +91,9 @@ def _card_levels(billing: DataFrame, lo: datetime.date) -> DataFrame:
 def _card_minimum_due(
     balance: DataFrame, account_group: DataFrame, lo: datetime.date
 ) -> DataFrame:
-    """Per ``(contract_id, month_end)``: the minimum due of the latest balance snapshot in
-    the month's last ``BALANCE_TAIL_DAYS`` days (``derive_billing_amounts``, the repo's
-    own minimum-due derivation)."""
+    """Per ``(contract_id, month_end)``: the minimum due of the latest balance snapshot
+    in the month's last ``BALANCE_TAIL_DAYS`` days (``derive_billing_amounts``, the
+    repo's own minimum-due derivation)."""
     require_columns(
         balance,
         [
@@ -129,8 +130,8 @@ def build_card_month_end(
     persona_start_date: str,
     history_months: int,
 ) -> DataFrame:
-    """``contract_id``, ``month_end``, ``level``, ``minimum_due`` for every card contract
-    with a billing row in the month."""
+    """``contract_id``, ``month_end``, ``level``, ``minimum_due`` for every card
+    contract with a billing row in the month."""
     floor = history_floor(persona_start_date, history_months)
     lo = _load_bound(floor)
     return (
@@ -148,8 +149,9 @@ def build_card_month_end(
 def build_loan_month_end(
     loan_portfolio: DataFrame, persona_start_date: str, history_months: int
 ) -> DataFrame:
-    """``cif_id``, ``account_id``, ``month_end``, ``delinquency_bucket``, ``overdue_days``,
-    ``instalment_due_aed`` and ``write_off_date`` of every monthly loan snapshot."""
+    """``cif_id``, ``account_id``, ``month_end``, ``delinquency_bucket``,
+    ``overdue_days``, ``instalment_due_aed`` and ``write_off_date`` of every monthly
+    loan snapshot."""
     require_columns(
         loan_portfolio,
         [
