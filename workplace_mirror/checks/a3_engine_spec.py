@@ -139,13 +139,16 @@ for r in SCORECARD.score(cells).collect():
 # SOFTPTP is no event; a settlement from 02-01, before the 04-01 episode, is in the window
 # (D-A3-26), unpaid -> 3 concluded, 1 kept -> broken; one from 2025-08-01 is outside. B: promise 05-03, paid
 # 200 on 05-10, after the 05-05 statement -> none (GRR), paid within 30 days. K: two
-# promises, each paid by its statement -> kept. M: plan 06-10 takes the nearer of two
-# promise runs (06-14), 06-05 stays alone; neither is paid -> broken (2 concluded, 0
-# kept).
+# promises, each paid by its statement -> kept. M: promises 06-05 and 06-14 and a plan
+# on 06-10 are one event (alive to the 07-05 statement, nothing paid) -> thin.
 # Bk: three promises never paid -> broken (streak).
 # N (D-A3-29): promises 07-02, 07-07, 07-09: 07-07 is after the 07-05 statement, the
 # deadline of the 07-02 event, so it starts a new event that 07-09 joins; with a month-end
 # deadline all three are one event.
+# P: promises 07-08, 07-15, 07-25, 150 paid on 07-12 against 100 -> the 07-08 event is
+# kept and ends; 07-15 starts a new one that 07-25 joins (10 days later, still alive),
+# nothing paid after -> none. Q: due 300, promises 07-08 and 07-15, 150 paid on 07-12 ->
+# partly paid, so the event stays alive and 07-15 joins it.
 stmts = [D(2026, m, 5) for m in range(1, 10)]
 
 
@@ -165,10 +168,16 @@ def plan_rows(rows):
     )
 
 
-A_ACCTS = ["A", "B", "K", "M", "Bk", "N"]
+A_ACCTS = ["A", "B", "K", "M", "Bk", "N", "P", "Q"]
 dues = df(
     [
-        (a, s, n, 300.0 if (a, s) == ("A", D(2026, 7, 5)) else 100.0, 100.0)
+        (
+            a,
+            s,
+            n,
+            300.0 if (a, s) in (("A", D(2026, 7, 5)), ("Q", D(2026, 7, 5))) else 100.0,
+            100.0,
+        )
         for a in A_ACCTS
         for s, n in zip(stmts, stmts[1:])
     ],
@@ -182,6 +191,8 @@ pays = df(
         ("B", D(2026, 5, 10), D(2026, 5, 10), 200.0),
         ("K", D(2026, 5, 20), D(2026, 5, 20), 150.0),
         ("K", D(2026, 6, 20), D(2026, 6, 20), 150.0),
+        ("P", D(2026, 7, 12), D(2026, 7, 12), 150.0),
+        ("Q", D(2026, 7, 12), D(2026, 7, 12), 150.0),
     ],
     "account_id string, pay_from date, pay_date date, amount double",
 )
@@ -203,6 +214,11 @@ a_followup = fu(
         ("N", "2026-07-02", "PROMISE TO PAY"),
         ("N", "2026-07-07", "WILL PAY AT SALARY"),
         ("N", "2026-07-09", "PROMISE TO PAY"),
+        ("P", "2026-07-08", "PROMISE TO PAY"),
+        ("P", "2026-07-15", "PROMISE TO PAY"),
+        ("P", "2026-07-25", "WILL PAY AT SALARY"),
+        ("Q", "2026-07-08", "PROMISE TO PAY"),
+        ("Q", "2026-07-15", "PROMISE TO PAY"),
     ]
 )
 a_agreements = df([(a, a) for a in A_ACCTS], "account_id string, agreement_id string")
@@ -245,8 +261,20 @@ check(
         (str(r["event_date"]), r["event_kind"])
         for r in ev.where("account_id = 'M'").collect()
     ),
-    [("2026-06-05", "followup_only"), ("2026-06-10", "matched")],
+    [("2026-06-05", "matched")],
 )
+for acct, want in (
+    ("P", [("2026-07-08", "paid"), ("2026-07-15", "none")]),
+    ("Q", [("2026-07-08", "partial")]),
+):
+    check(
+        f"events {acct}, alive until paid or the deadline",
+        sorted(
+            (str(r["event_date"]), r["promise_outcome"])
+            for r in ev.where(f"account_id = '{acct}'").collect()
+        ),
+        want,
+    )
 for name, deadline, want in (
     ("next statement", None, ["2026-07-02", "2026-07-07"]),
     ("month end", "month_end", ["2026-07-02"]),
@@ -293,9 +321,11 @@ check(
         "A": "broken",
         "B": "thin",
         "K": "kept",
-        "M": "broken",
+        "M": "thin",
         "Bk": "broken",
         "N": "broken",
+        "P": "partly_kept",
+        "Q": "thin",
     },
 )
 sig30 = build_commitment_signals(ep, events_for(deadline="30_days"))
@@ -419,9 +449,10 @@ check(
 # agreement = account id. R1 refuses on 07-01, nothing after -> refusal. R2 refuses, then
 # two 60 AED payments in two cycles -> still refusal (no cycle with 100). R3 refuses, then
 # 150 in one cycle -> not. R4 refuses and promises the same day -> latest is the promise.
-# R5 refuses, then a plan starts -> not. D1 disputes. H1 hangs up, then 3 ringing days.
+# R5 refuses, then a plan starts -> not. R6 refuses, the month's cash (RL: known only to
+# the month) may have come after -> not. R7 paid before the refusal -> refusal. D1 disputes. H1 hangs up, then 3 ringing days.
 fu_rows = []
-for a in ("R1", "R2", "R3", "R5"):
+for a in ("R1", "R2", "R3", "R5", "R6", "R7"):
     fu_rows.append((a, "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"))
 fu_rows += [
     ("R4", "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"),
@@ -439,7 +470,7 @@ followup = df(
     "agreement_id string, action_ts string, action_code string, "
     "result_category string, result_name string",
 ).withColumn("action_ts", F.to_timestamp("action_ts"))
-accts = ["R1", "R2", "R3", "R4", "R5", "D1", "H1", "P1"]
+accts = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "D1", "H1", "P1"]
 agreements = df([(a, a) for a in accts], "account_id string, agreement_id string")
 ep_ct = episode([(a, D(2026, 4, 1), False) for a in accts])
 c_dues = df(
@@ -452,6 +483,8 @@ c_pays = df(
         ("R2", D(2026, 7, 10), D(2026, 7, 10), 60.0),
         ("R2", D(2026, 8, 10), D(2026, 8, 10), 60.0),
         ("R3", D(2026, 7, 10), D(2026, 7, 10), 150.0),
+        ("R6", D(2026, 7, 1), D(2026, 7, 31), 150.0),
+        ("R7", D(2026, 6, 20), D(2026, 6, 20), 150.0),
     ],
     "account_id string, pay_from date, pay_date date, amount double",
 )
@@ -472,6 +505,8 @@ check(
         "R3": False,
         "R4": False,
         "R5": False,
+        "R6": False,
+        "R7": True,
         "D1": False,
         "H1": False,
         "P1": False,
