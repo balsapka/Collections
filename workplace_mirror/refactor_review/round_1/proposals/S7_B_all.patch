@@ -1,0 +1,277 @@
+--- a/workplace_mirror/src/enbd_collections/nodes/features/products/feat_cif_cross_product.py
++++ b/workplace_mirror/src/enbd_collections/nodes/features/products/feat_cif_cross_product.py
+@@ -41,7 +41,6 @@
+     wm_month,
+ )
+ 
+-PRODUCT_TYPES = ("deposit", "investment", "wm", "card", "loan")
+ COLUMNS = (
+     "cif_id",
+     "month_end",
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_common.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_common.py
+@@ -100,27 +100,25 @@
+     date_col: str,
+     value_cols: Sequence[str],
+     key: str = "cif_id",
+-    anchor: Column | None = None,
+     max_age_months: int | None = None,
+     inclusive: bool = False,
+ ) -> DataFrame:
+-    """Latest ``src`` row dated before each base row's anchor, per ``GRAIN``.
++    """Latest ``src`` row dated before each base row's ``observation_date``, per ``GRAIN``.
+ 
+-    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
+-    defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
+-    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar
+-    months (1 = its own month), so a stale record never stands in for a current one.
++    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. ``inclusive``
++    also accepts rows dated on it (same-day snapshots). ``max_age_months`` keeps only
++    rows in the last N calendar months of the observation date (1 = its own month), so a
++    stale record never stands in for a current one.
+     Ties on the date are broken by the values (largest first, NULL last), so reruns
+     agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
+     """
+-    anchor = F.col("observation_date") if anchor is None else anchor
+-    row_date, anchor_date = F.col("_d"), F.col("_anchor")
+-    cond = row_date <= anchor_date if inclusive else row_date < anchor_date
++    row_date, obs_date = F.col("_d"), F.col("observation_date")
++    cond = row_date <= obs_date if inclusive else row_date < obs_date
+     if max_age_months is not None:
+-        cond = cond & (row_date >= window_start(max_age_months, anchor_date))
++        cond = cond & (row_date >= window_start(max_age_months))
+     latest = F.max(F.struct("_d", *value_cols))
+     return (
+-        base.select(*GRAIN, key, anchor.alias("_anchor"))
++        base.select(*GRAIN, key)
+         .join(
+             scoped(
+                 src.select(key, F.col(date_col).alias("_d"), *value_cols), base, key
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/scoring_engine.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/scoring_engine.py
+@@ -1,4 +1,4 @@
+-"""Points -> state scoring shared by the axes (A1; A3 next). An axis declares a
++"""Points -> state scoring shared by the axes (A1 and A3). An axis declares a
+ ``Scorecard`` (dimensions with points per level, thresholds, overrides, state labels)
+ and builds its own level columns; ``Scorecard.score`` adds points, state, the override
+ that fired and the reason. Imported by the axes; not run on its own."""
+@@ -11,7 +11,6 @@
+ from pyspark.sql import Column, DataFrame
+ from pyspark.sql import functions as F
+ 
+-DEMOTE, CAP, FORCE = "demote", "cap", "force"  # Override modes
+ RUNGS = ("low", "moderate", "high")
+ LOW, MOD, HIGH = range(len(RUNGS))  # rung indices
+ 
+@@ -29,24 +28,21 @@
+ 
+ @dataclass(frozen=True)
+ class Override:
+-    """A boolean ``flag`` column that, when true, moves the state: ``DEMOTE`` one rung
+-    (never below Low), ``CAP`` at rung ``to``, or ``FORCE`` to rung ``to``."""
++    """A boolean ``flag`` column that, when true, lowers the state one rung (never
++    below Low)."""
+ 
+     name: str
+     flag: str
+-    mode: str = DEMOTE
+-    to: str = "low"
+ 
+ 
+ @dataclass(frozen=True)
+ class Scorecard:  # pylint: disable=too-many-instance-attributes,too-many-locals
+     """Points over ``dimensions`` -> High / Moderate / Low, overrides, an Unknown gate.
+ 
+-    Rungs from the points total (``high_from`` / ``moderate_from``, inclusive); High
+-    also needs ``high_min_dimensions`` dimensions with points, one in ``high_current``
+-    if given, else Moderate. The first override whose flag is true, in declared order,
+-    moves the rung (no stacking; a NULL flag does not fire). Unknown: every level silent
+-    or NULL, no override, and ``unknown_also``. ``labels``: rung or "unknown" -> value.
++    Rungs from the points total (``high_from`` / ``moderate_from``, inclusive). The
++    first override whose flag is true, in declared order, lowers the rung (no stacking;
++    a NULL flag does not fire). Unknown: every level silent or NULL, no override, and
++    ``unknown_also``. ``labels``: rung or "unknown" -> value.
+     """
+ 
+     prefix: str
+@@ -55,8 +51,6 @@
+     high_from: int
+     moderate_from: int
+     overrides: tuple[Override, ...] = ()
+-    high_min_dimensions: int = 0
+-    high_current: tuple[str, ...] = ()
+ 
+     def score(self, df: DataFrame, unknown_also: Column | None = None) -> DataFrame:
+         """``df`` + ``<prefix>_<dimension>_points``, ``_points_total``, ``_state``,
+@@ -67,19 +61,17 @@
+             for d in self.dimensions
+         }
+         total = sum(pts.values())
+-        scored = sum((c > 0).cast("int") for c in pts.values())
+-        high = (total >= self.high_from) & (scored >= self.high_min_dimensions)
+-        if self.high_current:
+-            high &= F.array_max(F.array(*[pts[n] for n in self.high_current])) > 0
+-        rung = F.when(high, HIGH).when(total >= self.moderate_from, MOD).otherwise(LOW)
++        rung = (
++            F.when(total >= self.high_from, HIGH)
++            .when(total >= self.moderate_from, MOD)
++            .otherwise(LOW)
++        )
+         fired = F.coalesce(
+             *[F.when(F.col(o.flag), F.lit(o.name)) for o in self.overrides],
+             F.lit(None).cast("string"),
+         )
+-        for o in self.overrides:
+-            to = F.lit(RUNGS.index(o.to))
+-            moved = {DEMOTE: F.greatest(rung - 1, F.lit(LOW)), CAP: F.least(rung, to)}
+-            rung = F.when(fired == o.name, {**moved, FORCE: to}[o.mode]).otherwise(rung)
++        lowered = F.greatest(rung - 1, F.lit(LOW))
++        rung = F.when(fired.isNotNull(), lowered).otherwise(rung)
+         unknown = F.lit(True) if unknown_also is None else unknown_also
+         unknown &= fired.isNull()
+         for d in self.dimensions:
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a1_ability/classify.py
+@@ -21,7 +21,7 @@
+ from pyspark.sql import functions as F
+ 
+ from .._common import GRAIN, left_join_all, log_latest_month, window_months
+-from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard, state_label
++from ..scoring_engine import Dimension, Override, Scorecard, state_label
+ 
+ # Thresholds (family rule §2; income: spec S2–S12): starting values, not tuned on PROD.
+ # Keyed by window length W (3 months at 60–180, 6 at 180+, S10).
+@@ -183,7 +183,7 @@
+ SCORECARD = Scorecard(
+     prefix="a1",
+     dimensions=tuple(dimension for _, dimension in FAMILIES),
+-    overrides=(Override("distress", "a1_distress_flag", DEMOTE),),  # S9
++    overrides=(Override("distress", "a1_distress_flag"),),  # S9
+     # state id = rung name; the display text is DISPLAY_NAMES
+     labels={s: s for s in ("high", "moderate", "low", "unknown")},
+     high_from=HIGH_FROM,
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a3_credibility/constants.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a3_credibility/constants.py
+@@ -2,7 +2,7 @@
+ ``specs/A3_credibility_spec.md``; "row n" = the DE sheet "A3 framework")."""
+ 
+ from .._common import SEG_60_180, SEG_180_PLUS, segment
+-from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard
++from ..scoring_engine import Dimension, Override, Scorecard
+ 
+ # ── Dimension A: promises kept (D-A3-9, D-A3-16, D-A3-25) ─────────────────────
+ COMMITMENT_MONTHS = 12  # promise events in the last 12 months of this episode (row 19)
+@@ -80,7 +80,7 @@
+             "pre_dlq_record", "a3_pre_dlq_payment_level", PRE_DLQ_POINTS, ("no_record",)
+         ),
+     ),
+-    overrides=(Override("refusal", "a3_refusal_flag", DEMOTE),),
++    overrides=(Override("refusal", "a3_refusal_flag"),),
+     labels=DISPLAY_NAMES,
+     high_from=HIGH_FROM,
+     moderate_from=MODERATE_FROM,
+--- a/workplace_mirror/checks/a1_engine_spec.py
++++ b/workplace_mirror/checks/a1_engine_spec.py
+@@ -420,31 +420,26 @@
+     obs, df([("A0", OBS, 2000.0), ("A1", OBS, 0.0), ("A2", date(2026, 6, 30), 1500.0)],
+             loan_schema)).collect()}
+ assert emi == {"A0": 2000.0, "A1": None}, emi  # 0 EMI → no anchor; a June snapshot is stale
+-# Scorecard: each override mode, the High gate, a NULL flag, override order, Unknown
++# Scorecard: the demoting override, a NULL flag, override order, Unknown
+ from enbd_collections.pipelines.crx_persona import scoring_engine as se  # noqa: E402
+ 
+ DIMS = (se.Dimension("a", "a_level", {"x": 4, "y": 2}), se.Dimension("b", "b_level", {"x": 2}))
+ LABELS = {r: r for r in (*se.RUNGS, "unknown")}
+ 
+ 
+-def card(*overrides, **gate):
+-    return se.Scorecard("t", DIMS, LABELS, 4, 2, overrides, **gate)
++def card(*overrides):
++    return se.Scorecard("t", DIMS, LABELS, 4, 2, overrides)
+ 
+ 
+-demote, refuse = se.Override("d", "f1"), se.Override("r", "f2", se.FORCE, "high")
++demote, second = se.Override("d", "f1"), se.Override("s", "f2")
+ sc_rows = [  # (a_level, b_level, f1, f2, scorecard, state, override, reason)
+     ("x", "none", False, False, card(demote), "high", None, "a"),
+     ("x", "none", True, False, card(demote), "moderate", "d", "d"),  # DEMOTE
+     ("y", "none", True, False, card(demote), "low", "d", "d"),
+-    ("x", "none", True, False, card(se.Override("c", "f1", se.CAP, "moderate")), "moderate", "c", "c"),
+-    ("y", "none", True, False, card(se.Override("c", "f1", se.CAP, "moderate")), "moderate", "c", "c"),
+-    ("none", "none", False, True, card(demote, refuse), "high", "r", "r"),  # FORCE
+-    ("x", "none", True, True, card(demote, refuse), "moderate", "d", "d"),  # first wins
++    ("x", "none", False, True, card(demote, second), "moderate", "s", "s"),  # 2nd override
++    ("x", "none", True, True, card(demote, second), "moderate", "d", "d"),  # first wins
+     ("x", "none", None, False, card(demote), "high", None, "a"),  # NULL flag: no fire
+-    ("x", "none", False, False, card(high_min_dimensions=2), "moderate", None, "a"),
+-    ("y", "x", False, False, card(high_min_dimensions=2), "high", None, "a"),  # tie: a first
+-    ("y", "x", False, False, card(high_current=("b",)), "high", None, "a"),
+-    ("x", "none", False, False, card(high_current=("b",)), "moderate", None, "a"),
++    ("y", "x", False, False, card(), "high", None, "a"),  # tie: a first
+     ("none", None, False, False, card(demote), "unknown", None, None),
+     ("none", "none", True, False, card(demote), "low", "d", "d"),
+ ]
+@@ -452,10 +447,5 @@
+ for i, (*_, sc, state, override, reason) in enumerate(sc_rows):
+     got = sc.score(sc_df).collect()[i]
+     assert (got["t_state"], got["t_override"], got["t_reason"]) == (state, override, reason), (i, got)
+-try:  # a mistyped override mode raises instead of acting as FORCE
+-    card(se.Override("m", "f1", "forse", "high")).score(sc_df)
+-    raise AssertionError("mistyped override mode did not raise")
+-except KeyError:
+-    pass
+ print(f"\n{len(expect) - fails}/{len(expect)} cases pass (+ dating, lanes, anchor, returns and Scorecard checks)")
+ sys.exit(1 if fails else 0)
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a1_ability/README.md
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a1_ability/README.md
+@@ -65,7 +65,7 @@
+ 
+ - **Threshold** = max(AED 3,000, 2 × anchor).
+ - **Stable** = the salary received in m1–m3 adds up to **2 × the threshold** (3 × at 180+),
+-  **and** it is at least 75% of what m4–m6 received (`D_INC = 0.25`; nothing in m4–m6 →
++  **and** it is at least 75% of what m4–m6 received (`INCOME_MAX_FALL = 0.25`; nothing in m4–m6 →
+   nothing to compare). The window total, not a count of months: an employer paying early
+   puts two salaries in one month and none in the next.
+ - **Weak** = otherwise, any month in m1–m3 ≥ AED 1,000 (no points, but evidence: Low rather
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a3_credibility/sources.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a3_credibility/sources.py
+@@ -77,8 +77,8 @@
+ 
+     One row per instalment of a non-cancelled plan: ``account_id``, ``plan_id``,
+     ``plan_type``, ``plan_start`` (PTP: promise start, else event date; settlement: event
+-    date, the only date DCORE keeps), ``due_date``, ``due_amount``, ``payment_amount``
+-    (DCORE's). Cancelled instalments are nulled by DCORE's own rule and dropped.
++    date, the only date DCORE keeps) and ``due_date``. Cancelled instalments are nulled
++    by DCORE's own rule and dropped.
+     """
+     require_columns(
+         agreements, ["account_id", "agreement_id"], "prm_dcore_account_agreements"
+@@ -157,8 +157,6 @@
+             "plan_type",
+             "plan_start",
+             F.col("due_date").cast("date").alias("due_date"),
+-            F.col("due_amount").cast("double").alias("due_amount"),
+-            F.col("payment_amount").cast("double").alias("payment_amount"),
+         )
+     )
+ 
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a3_credibility/signals.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/a3_credibility/signals.py
+@@ -307,7 +307,6 @@
+     payments: DataFrame,
+     dues: DataFrame,
+     model_id: str,
+-    max_months: int | None = DCORE_MAX_MONTHS,
+ ) -> DataFrame:
+     """The latest right-party contact in the episode and what it means (D-A3-19, -20).
+ 
+@@ -319,8 +318,7 @@
+     dispute, hung up, and no pickup on N days after it with no dead line in between.
+     """
+     base = _base(episode)
+-    lower = window_start(max_months) if max_months else None
+-    lower = F.col("_anchor") if lower is None else F.greatest(lower, F.col("_anchor"))
++    lower = F.greatest(window_start(DCORE_MAX_MONTHS), F.col("_anchor"))
+     events = (
+         base.join(dcore_account_events(episode, followup, agreements), on="account_id")
+         .filter((F.col("day") >= lower) & (F.col("day") <= F.col("observation_date")))

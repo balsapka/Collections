@@ -1,0 +1,1284 @@
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/_spine_utils.py
++++ /dev/null
+@@ -1,120 +0,0 @@
+-"""Shared spine and CIF utilities for crx_persona pipelines.
+-
+-Used by: cc_a1_ability, cc_a2_locatability, cc_a3_payment_credibility,
+-rl_a3_payment_credibility.
+-"""
+-
+-from pyspark.sql import DataFrame
+-from pyspark.sql import functions as F
+-
+-
+-def join_spine_to_spell(cc_spine: DataFrame, spell_table: DataFrame) -> DataFrame:
+-    """Join cc_spine to crx_cc_spell_table to obtain spell window columns.
+-
+-    Uses an equality-only join on ``contract_id == account_id`` so Spark can
+-    plan a hash/sort-merge join, then applies date-range filters as separate
+-    post-join steps.  This is more efficient than embedding the date conditions
+-    inside the ``on=`` clause (which forces a cross-join-with-filter plan).
+-
+-    Left join preserves all spine rows; spell columns are NULL for spine points
+-    with no active spell at that observation_date (e.g. new accounts added to
+-    the spine before the spell table is regenerated).
+-
+-    Args:
+-        cc_spine:    Model-id-scoped spine; required cols: contract_id,
+-            observation_date.
+-        spell_table: crx_cc_spell_table; required cols: account_id, spell_id,
+-            t0, spell_end.
+-
+-    Returns:
+-        DataFrame with columns:
+-            account_id       (string)  — alias of contract_id
+-            observation_date (date)
+-            spell_id         (int)     — NULL if no active spell
+-            t0               (date)    — NULL if no active spell
+-    """
+-    spine = cc_spine.alias("spine")
+-    spell = spell_table.select("account_id", "spell_id", "t0", "spell_end").alias(
+-        "spell"
+-    )
+-    return (
+-        spine.join(
+-            spell,
+-            on=F.col("spine.contract_id") == F.col("spell.account_id"),
+-            how="left",
+-        )
+-        .filter(
+-            F.col("spell.t0").isNull()
+-            | (F.col("spell.t0") <= F.col("spine.observation_date"))
+-        )
+-        .filter(
+-            F.col("spell.spell_end").isNull()
+-            | (F.col("spine.observation_date") <= F.col("spell.spell_end"))
+-        )
+-        .select(
+-            F.col("spine.contract_id").alias("account_id"),
+-            F.col("spine.observation_date"),
+-            F.col("spell.spell_id"),
+-            F.col("spell.t0"),
+-        )
+-    )
+-
+-
+-def _build_cif_bridge(contract: DataFrame, client: DataFrame) -> DataFrame:
+-    """Two-hop bridge: contract_id → cif_id.
+-
+-    prm_contract holds the link between account/contract numbers and the
+-    customer CIF.  prm_client carries the canonical cif_id field.
+-
+-    Returns DataFrame with columns: (contract_id, cif_id).
+-    """
+-    return (
+-        contract.select("contract_id", "client_id")
+-        .join(
+-            client.select("client_id", "cif_id"),
+-            on="client_id",
+-            how="inner",
+-        )
+-        .select("contract_id", "cif_id")
+-        .dropDuplicates(["contract_id"])
+-    )
+-
+-
+-def rl_spine_as_cc_shim(rl_a4_spine: DataFrame) -> "tuple[DataFrame, DataFrame]":
+-    """Reshape an RL spine into the (cc_spine, spell_table) column contract.
+-
+-    CC build functions such as build_a3_commitment_signals take a cc_spine +
+-    spell_table pair and call join_spine_to_spell() internally, which hard-codes
+-    cc_spine["contract_id"] == spell_table["account_id"]. RL spines use
+-    account_id (not contract_id) and already carry a broadcast spell_id/t0 per
+-    row — resolved once when crx_rl_a4_spine was built — rather than a separate
+-    spell table. This derives both shapes from that single spine so the CC
+-    function can run completely unchanged (R14 reuse / R18 additive — no CC
+-    code touched).
+-
+-    Args:
+-        rl_a4_spine: RL spine already joined to its T0/spell window — e.g.
+-            crx_rl_a4_spine. Required cols: account_id, observation_date,
+-            cif_id, spell_id, t0.
+-
+-    Returns:
+-        Tuple of:
+-            cc_spine_shim:    (contract_id, observation_date, cif_id) — one row
+-                per rl_a4_spine row.
+-            spell_table_shim: (account_id, spell_id, t0, spell_end) — one row
+-                per (account_id, spell_id); spell_end is always NULL (RL has no
+-                closed-spell concept at this grain — join_spine_to_spell only
+-                needs t0 <= observation_date, which NULL spell_end satisfies).
+-    """
+-    cc_spine_shim = rl_a4_spine.select(
+-        F.col("account_id").alias("contract_id"),
+-        F.col("observation_date"),
+-        F.col("cif_id"),
+-    )
+-    spell_table_shim = (
+-        rl_a4_spine.select("account_id", "spell_id", "t0")
+-        .where(F.col("spell_id").isNotNull())
+-        .dropDuplicates(["account_id", "spell_id"])
+-        .withColumn("spell_end", F.lit(None).cast("date"))
+-    )
+-    return cc_spine_shim, spell_table_shim
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_spell/nodes.py
++++ /dev/null
+@@ -1,237 +0,0 @@
+-"""T03 — Delinquency-spell table for Credit Cards.
+-
+-Build function: build_cc_spell_table(raw_stg_billing, cc_spine) -> DataFrame
+-
+-Output grain: (account_id, spell_id) — one row per delinquency episode.
+-T0 is the spell anchor for every A4 feature. Every A4 lookback window is
+-relative to T0, not to the calendar or observation date.
+-
+-Shared dependency (R18 cleanup, A4 pipeline retirement): this table now carries
+-only the columns its surviving consumers (cc_a1_ability, cc_a2_locatability,
+-cc_a3_payment_credibility, cc_departure_signature, cc_payment_trajectory,
+-cc_utilisation, cc_raw_extract) actually read — account_id, spell_id, t0,
+-spell_end, t0_censored_flag, prior_spell_end, days_to_dpd30, days_to_dpd60.
+-The superseded cc_a4_class pipeline and its spine-table consumers are removed;
+-crx_cc_a4_deterioration derives its own restructure signal directly from
+-crx_cc_full_history instead of this table's former censored_subtype column.
+-
+-Population scoping:
+-- cc_spine (model_id-namespaced) defines the target population for the current
+-  run (e.g. cc_60_180 or cc_180_plus). Only accounts appearing in cc_spine are
+-  processed. All their DLQ history rows are retained — not just M1 observations
+-  — because spell start/end detection requires the full temporal sequence
+-  including DLQ=0 rows.
+-
+-Known limitations (by design, not bugs):
+-- 24-month horizon / censoring: t0_censored_flag = 1 is emitted for spell_id = 1
+-  on any account whose earliest recorded observation is already delinquent
+-  (delinquency_bucket >= _CC_DELINQ_MIN, i.e. ≥ 2 on CC) — T0 genuinely fell
+-  outside the data window, or (R13) the account was opened mid-delinquency as
+-  part of a restructure. Cure is a return to code < _CC_DELINQ_MIN (≤ 1 on CC).
+-  Code 1 = 'due but not overdue' is ordinary revolver behaviour and is outside
+-  spells.
+-"""
+-
+-import logging
+-
+-from pyspark.sql import DataFrame, Window
+-from pyspark.sql import functions as F
+-from pyspark.sql.types import DateType
+-
+-LOG = logging.getLogger(__name__)
+-
+-# DPD30 and DPD60 entry thresholds (DLQ = max_ovd_bucket + 1):
+-# DLQ >= 3 → account has entered 31-60 DPD range (OVD_02 has balance)
+-# DLQ >= 4 → account has entered 61+ DPD range (M1 entry)
+-_DPD30_ENTRY_THRESHOLD = 3
+-_DPD60_ENTRY_THRESHOLD = 4
+-
+-# CC delinquency threshold: code 1 = "due but not overdue" (normal revolver behaviour).
+-# Delinquency starts at code 2 (0-30 DPD).  Retail loans use 1 — hence per-unit constant.
+-_CC_DELINQ_MIN = 2
+-
+-
+-def build_cc_spell_table(raw_stg_billing: DataFrame, cc_spine: DataFrame) -> DataFrame:
+-    """Build the delinquency-spell table for CC accounts.
+-
+-    One row per (account_id, spell_id). A spell is a continuous run of
+-    monthly observations with delinquency_bucket >= _CC_DELINQ_MIN (code ≥ 2
+-    on CC: code 1 = 'due but not overdue', delinquency starts at code 2).
+-    T0 = first such observation in the run. Cure = first observation with
+-    delinquency_bucket < _CC_DELINQ_MIN (≤ 1 on CC).
+-
+-    Args:
+-        raw_stg_billing: Raw billing staging table — full history, all DLQ
+-            levels (0-9), no date or DLQ filter applied. Required columns:
+-            contract_idt (Long), billing_date (Date), add_info (string —
+-            contains BS_PMT_CYCLE_DUE=<N> from which delinquency_bucket is
+-            extracted via regex).
+-        cc_spine: Model-namespace spine (produced by the spine pipeline for the
+-            current model_id). Used to scope raw_stg_billing to the target
+-            population via leftsemi join. Required column: contract_id (Long).
+-
+-    Returns:
+-        DataFrame at grain (account_id, spell_id) with schema:
+-            account_id          long
+-            spell_id            int     (1-indexed, per account, no gaps)
+-            t0                  date    (first DLQ>=DELINQ_MIN observation in the spell)
+-            spell_end           date    (nullable — first DLQ<DELINQ_MIN after spell, or NULL)
+-            prior_spell_end     date    (nullable — previous spell's cure date; NULL for spell_id=1)
+-            t0_censored_flag    int     (1 if T0 is outside the data window)
+-            days_to_dpd30       int     (nullable — datediff from t0 to first DLQ>=3)
+-            days_to_dpd60       int     (nullable — datediff from t0 to first DLQ>=4)
+-    """
+-    # -- Step 0: scope to target population + extract full DLQ history ---------
+-    # raw_stg_billing carries all DLQ levels (0-9) and all history — no date or
+-    # DLQ filter applied. leftsemi join on cc_spine limits the scan to accounts
+-    # in the current model_id population. Column name difference: billing uses
+-    # contract_idt (Long), cc_spine uses contract_id (Long).
+-    _spine_keys = cc_spine.select(F.col("contract_id").alias("contract_idt")).distinct()
+-
+-    df = (
+-        raw_stg_billing.join(F.broadcast(_spine_keys), "contract_idt", "leftsemi")
+-        .select(
+-            F.col("contract_idt").alias("account_id"),
+-            F.col("billing_date").cast(DateType()).alias("observation_date"),
+-            F.regexp_extract(F.col("add_info"), r"BS_PMT_CYCLE_DUE=(\d+)", 1)
+-            .cast("int")
+-            .alias("delinquency_bucket"),
+-        )
+-        .distinct()
+-    )
+-
+-    # -- Step 2: detect spell starts -----------------------------------------
+-    w_acct = Window.partitionBy("account_id").orderBy("observation_date")
+-
+-    df = df.withColumn("_prev_dlq", F.lag("delinquency_bucket").over(w_acct))
+-
+-    df = df.withColumn(
+-        "_spell_start",
+-        F.when(
+-            (F.col("delinquency_bucket") >= _CC_DELINQ_MIN)
+-            & ((F.col("_prev_dlq") < _CC_DELINQ_MIN) | F.col("_prev_dlq").isNull()),
+-            F.lit(1),
+-        ).otherwise(F.lit(0)),
+-    )
+-
+-    # -- Step 3: assign spell_id (cumulative sum of _spell_start) ----------
+-    w_acct_unbounded = (
+-        Window.partitionBy("account_id")
+-        .orderBy("observation_date")
+-        .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+-    )
+-    df = df.withColumn("spell_id", F.sum("_spell_start").over(w_acct_unbounded))
+-
+-    # -- Step 4: detect censored accounts ----------------------------------
+-    # An account is censored if its very first observation already has
+-    # dlq >= _CC_DELINQ_MIN. This means T0 fell outside the data window.
+-    # Only spell_id = 1 is flagged (the only one whose T0 might be unknown).
+-    w_first = Window.partitionBy("account_id").orderBy("observation_date")
+-    censored_accounts = (
+-        df.withColumn("_rn", F.row_number().over(w_first))
+-        .filter(F.col("_rn") == 1)
+-        .filter(F.col("delinquency_bucket") >= _CC_DELINQ_MIN)
+-        .select("account_id")
+-        .distinct()
+-        .withColumn("_is_censored", F.lit(1))
+-    )
+-
+-    # -- Step 5: aggregate spell-level metrics (in-spell rows only) --------
+-    in_spell = df.filter(F.col("delinquency_bucket") >= _CC_DELINQ_MIN)
+-
+-    spell_agg = in_spell.groupBy("account_id", "spell_id").agg(
+-        F.min("observation_date").alias("t0"),
+-        F.max("observation_date").alias("_spell_max_obs"),
+-        F.min(
+-            F.when(
+-                F.col("delinquency_bucket") >= _DPD30_ENTRY_THRESHOLD,
+-                F.col("observation_date"),
+-            )
+-        ).alias("_date_dlq3"),
+-        F.min(
+-            F.when(
+-                F.col("delinquency_bucket") >= _DPD60_ENTRY_THRESHOLD,
+-                F.col("observation_date"),
+-            )
+-        ).alias("_date_dlq4"),
+-    )
+-
+-    # -- Step 6: roll speed metrics ------------------------------------------
+-    spell_agg = spell_agg.withColumn(
+-        "days_to_dpd30",
+-        F.datediff(F.col("_date_dlq3"), F.col("t0")),
+-    ).withColumn(
+-        "days_to_dpd60",
+-        F.datediff(F.col("_date_dlq4"), F.col("t0")),
+-    )
+-
+-    # -- Step 7: cure date detection (self-join on account_id) ------------
+-    # For each spell, find the first DLQ<_CC_DELINQ_MIN observation strictly after
+-    # the spell's last DLQ>=_CC_DELINQ_MIN snapshot (_spell_max_obs).
+-    cure_candidates = df.filter(F.col("delinquency_bucket") < _CC_DELINQ_MIN).select(
+-        F.col("account_id"),
+-        F.col("observation_date").alias("_cure_obs"),
+-    )
+-
+-    cure_dates = (
+-        spell_agg.select("account_id", "spell_id", "_spell_max_obs")
+-        .join(cure_candidates, on="account_id", how="left")
+-        .filter(F.col("_cure_obs") > F.col("_spell_max_obs"))
+-        .groupBy("account_id", "spell_id")
+-        .agg(F.min("_cure_obs").alias("_cure_date"))
+-    )
+-
+-    spell_agg = spell_agg.join(cure_dates, on=["account_id", "spell_id"], how="left")
+-
+-    # spell_end: cure_date if known; NULL for active (no cure yet)
+-    spell_agg = spell_agg.withColumn(
+-        "spell_end",
+-        F.when(F.col("_cure_date").isNotNull(), F.col("_cure_date")).otherwise(
+-            F.lit(None).cast("date")
+-        ),
+-    )
+-
+-    # prior_spell_end: previous spell's cure date — NULL for spell_id=1.
+-    # T04b uses it to truncate W_pre at the prior spell boundary (§3.0b).
+-    _w_prev_spell = Window.partitionBy("account_id").orderBy("spell_id")
+-    spell_agg = spell_agg.withColumn(
+-        "prior_spell_end", F.lag("spell_end").over(_w_prev_spell)
+-    )
+-
+-    # -- Step 8: t0_censored_flag --------------------------------------------
+-    spell_agg = spell_agg.join(
+-        censored_accounts, on="account_id", how="left"
+-    ).withColumn(
+-        "t0_censored_flag",
+-        F.when(
+-            (F.col("spell_id") == 1) & (F.col("_is_censored") == 1),
+-            F.lit(1),
+-        ).otherwise(F.lit(0)),
+-    )
+-
+-    # -- Step 9: final select in schema order --------------------------------
+-    result = spell_agg.select(
+-        F.col("account_id").cast("long"),
+-        F.col("spell_id").cast("int"),
+-        F.col("t0").cast("date"),
+-        F.col("spell_end").cast("date"),
+-        F.col("prior_spell_end").cast("date"),
+-        F.col("t0_censored_flag").cast("int"),
+-        F.col("days_to_dpd30").cast("int"),
+-        F.col("days_to_dpd60").cast("int"),
+-    )
+-
+-    _log_spell_stats(result)
+-    return result
+-
+-
+-def _log_spell_stats(result: DataFrame) -> None:
+-    """Log basic spell table statistics."""
+-    try:
+-        total_spells = result.count()
+-        LOG.info(
+-            "CC spell table built: %d spells",  # total_accounts omitted: Filtering_Sensitive_Logs
+-            total_spells,
+-        )
+-    except Exception as e:  # pylint: disable=broad-except
+-        LOG.warning("Could not compute spell stats: %s (lazy eval context)", str(e))
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_spell/pipeline.py
++++ /dev/null
+@@ -1,30 +0,0 @@
+-"""Kedro pipeline: T03 — CC delinquency-spell table (raw_stg_billing → crx_cc_spell_table)."""
+-
+-from kedro.pipeline import Pipeline, node
+-
+-from .nodes import build_cc_spell_table
+-
+-
+-def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+-    """Single-node pipeline: [raw_stg_billing, cc_spine] → crx_cc_spell_table.
+-
+-    raw_stg_billing provides full DLQ history (all levels 0-9, all dates) for
+-    all accounts. cc_spine (model_id-namespaced) scopes the scan to the target
+-    population via leftsemi join. Must run after the spine pipeline for the
+-    relevant model_id (cc_60_180.spine or cc_180_plus.spine).
+-
+-    Run with:
+-        kedro run --pipeline=crx_cc_spell_table
+-    """
+-    return Pipeline(
+-        [
+-            node(
+-                func=build_cc_spell_table,
+-                inputs=["raw_stg_billing", "cc_spine"],
+-                outputs="crx_cc_spell_table",
+-                name="build_crx_cc_spell_table",
+-                tags=["crx", "spell", "t03"],
+-            ),
+-        ],
+-        tags=["crx_persona"],
+-    )
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/__init__.py
++++ /dev/null
+@@ -1,9 +0,0 @@
+-"""RL A4 Spine — structural spine/spell window projection for Retail Loans.
+-
+-Inputs: rl_spine, crx_rl_spell_table
+-Output: crx_rl_a4_spine
+-"""
+-
+-from .pipeline import create_pipeline
+-
+-__all__ = ["create_pipeline"]
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/nodes.py
++++ /dev/null
+@@ -1,89 +0,0 @@
+-"""RL A4 spine: the persona-window spine rows with their delinquency spell.
+-
+-Inputs: rl_spine, crx_rl_spell_table, params:crx_persona
+-Output: crx_rl_a4_spine
+-"""
+-
+-import logging
+-
+-from pyspark.sql import DataFrame
+-from pyspark.sql import functions as F
+-
+-LOG = logging.getLogger(__name__)
+-
+-
+-def build_rl_depart_spine(
+-    rl_spine: DataFrame,
+-    crx_rl_spell_table: DataFrame,
+-    crx_persona: dict,
+-) -> DataFrame:
+-    """Build spell-scoped spine for departure signal computation (Node 0 of 5).
+-
+-    Mirrors steps 1–4 of build_rl_a4_spine_projection WITHOUT the A4 label join,
+-    producing the raw spine grain used by all downstream departure nodes.
+-
+-    Join logic (mirrors join_spine_to_spell pattern from _spine_utils.py):
+-        rl_spine["account_id"] == t0_table["account_id"]
+-        AND t0 <= observation_date
+-        AND spell_end IS NULL (always passes — open spell for RL)
+-
+-    Args:
+-        rl_spine:           Model spine at (account_id, observation_date) grain.
+-        crx_rl_spell_table: T0 anchor. Required cols: account_id, spell_id, t0,
+-                            t0_censored_flag, spell_end, cif_id.
+-        crx_persona:        Persona param dict with persona_start_date /
+-                            persona_end_date.
+-
+-    Returns:
+-        DataFrame at (account_id, observation_date) grain with cols::
+-
+-            cif_id           string  NULL if no active non-censored spell
+-            account_id       string
+-            observation_date date
+-            spell_id         int     NULL if no active spell
+-            t0               date    NULL if no active spell
+-    """
+-    persona_start_date = crx_persona["persona_start_date"]
+-    persona_end_date = crx_persona["persona_end_date"]
+-
+-    # Step 1: non-censored active spells (spell_end IS NULL = current episode)
+-    t0_filtered = crx_rl_spell_table.filter(
+-        (F.col("t0_censored_flag") == 0) & F.col("spell_end").isNull()
+-    ).select("account_id", "spell_id", "t0", "spell_end", "cif_id")
+-
+-    # Step 2: left-join spine to spell info (all spine rows preserved)
+-    spine_for_join = (
+-        rl_spine.drop("cif_id") if "cif_id" in rl_spine.columns else rl_spine
+-    )
+-    spine_with_t0 = spine_for_join.join(t0_filtered, on="account_id", how="left")
+-
+-    # Step 3: date filter — t0 <= observation_date (spell_end IS NULL always passes)
+-    spine_filtered = spine_with_t0.filter(
+-        F.col("t0").isNull() | (F.col("t0") <= F.col("observation_date"))
+-    )
+-
+-    # Step 4: persona window filter
+-    start_dt = F.to_date(F.lit(persona_start_date))
+-    end_dt = F.to_date(F.lit(persona_end_date))
+-    result = spine_filtered.filter(
+-        (F.col("observation_date") >= start_dt) & (F.col("observation_date") <= end_dt)
+-    )
+-
+-    n_rows = result.count()
+-    n_with_spell = result.filter(F.col("spell_id").isNotNull()).count()
+-    LOG.info(
+-        "build_rl_depart_spine [%s → %s]: %d spine rows | with active spell: %d (%.1f%%)",
+-        persona_start_date,
+-        persona_end_date,
+-        n_rows,
+-        n_with_spell,
+-        100.0 * n_with_spell / max(n_rows, 1),
+-    )
+-
+-    return result.select(
+-        F.col("cif_id").cast("string"),
+-        F.col("account_id").cast("string"),
+-        F.col("observation_date").cast("date"),
+-        F.col("spell_id").cast("int"),
+-        F.col("t0").cast("date"),
+-    )
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_a4_spine/pipeline.py
++++ /dev/null
+@@ -1,35 +0,0 @@
+-"""Kedro pipeline: RL A4 Spine — structural spine/spell window projection.
+-
+-Replaces rl_a4_class's Node 2 (build_rl_a4_spine_projection), which broadcast a
+-now-superseded CASA/EMI classification onto the spine. crx_rl_a4_spine is now
+-a pure structural join — (account_id, cif_id, observation_date, spell_id, t0),
+-decoupled from any A4 classifier, scoped by crx_rl_a4_deterioration instead.
+-
+-Run with:
+-    kedro run --pipeline=crx_rl_a4_spine
+-"""
+-
+-from kedro.pipeline import Pipeline, node
+-
+-from .nodes import build_rl_depart_spine
+-
+-_TAGS = ["crx", "rl", "rl_a4_spine"]
+-
+-
+-def _spine_node(output: str) -> node:
+-    return node(
+-        func=build_rl_depart_spine,
+-        inputs=[
+-            "rl_spine",
+-            "crx_rl_spell_table",
+-            "params:crx_persona",
+-        ],
+-        outputs=output,
+-        name=f"build_{output}",
+-        tags=_TAGS,
+-    )
+-
+-
+-def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+-    """One-node pipeline: rl_spine + crx_rl_spell_table -> crx_rl_a4_spine."""
+-    return Pipeline([_spine_node("crx_rl_a4_spine")], tags=["crx_persona"])
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_spell_table/__init__.py
++++ /dev/null
+@@ -1,5 +0,0 @@
+-"""RL spell table pipeline: crx_rl_full_history + rl_spine → crx_rl_spell_table."""
+-
+-from .pipeline import create_pipeline
+-
+-__all__ = ["create_pipeline"]
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_spell_table/nodes.py
++++ /dev/null
+@@ -1,366 +0,0 @@
+-"""RL-B2 — T0 anchor table for Retail Loan persona pipeline.
+-
+-Build function: build_rl_spell_table(crx_rl_full_history, rl_spine) -> DataFrame
+-
+-Output grain: one row per (account_id, spell_id).
+-
+-A spell is a contiguous run of months where dlq_bucket >= 1.  Episode
+-boundaries are detected via a cumulative-sum of spell-start flags ordered by
+-month_end_date per account (mirrors cc_spell/nodes.py, adapted for RL threshold
+-dlq_bucket >= 1 vs CC dlq_bucket >= 2).
+-
+-T0 = min(month_end_date) where dlq_bucket >= 1 within the spell.
+-spell_end = first clean (dlq_bucket == 0) month_end_date strictly after the
+-last delinquent row of the spell; NULL for the active spell.
+-
+-t0_censored_flag = 1 for spell_id = 1 when the account's very first history row
+-is already delinquent (T0 predates the data window).
+-
+-For the ~0% of accounts with no DLQ >= 1 in history (censored with no episodes),
+-a single stub row is synthesised with spell_id = 1, t0 = min(rl_spine
+-.observation_date), t0_censored_flag = 1.
+-
+-Key behavioural columns derived per spell:
+-- restructure_blind_spot_flag: 1 if account was ever restructured in history (R13)
+-- pre_t0_months: count of history rows with month_end_date < t0
+-- prior_spell_cnt_12m: distinct prior DLQ-1+ episodes in 12m before T0
+-- w_pre_clean_m: consecutive DLQ-0 months immediately preceding T0
+-
+-Inputs: crx_rl_full_history (RL-B1 output), rl_spine (model-namespaced spine, requires cif_id)
+-"""
+-
+-import logging
+-
+-from pyspark.sql import DataFrame, Window
+-from pyspark.sql import functions as F
+-
+-LOG = logging.getLogger(__name__)
+-
+-
+-def build_rl_spell_table(  # pylint: disable=too-many-locals
+-    crx_rl_full_history: DataFrame,
+-    rl_spine: DataFrame,
+-) -> DataFrame:
+-    """Build the T0 anchor table for RL accounts.
+-
+-    Args:
+-        crx_rl_full_history: Full monthly history for RL spine accounts.
+-            Required columns: account_id (string), month_end_date (date),
+-            dlq_bucket (int), restructure_flag (int).
+-        rl_spine: Model-namespaced spine. Required columns:
+-            account_id (string), observation_date (date), cif_id (string).
+-
+-    Returns:
+-        DataFrame at grain (account_id, spell_id) with schema:
+-            account_id                  string
+-            cif_id                      string
+-            spell_id                    int     (1-indexed per account)
+-            t0                          date    (start of delinquency episode)
+-            t0_censored_flag            int     (1 if T0 before data window)
+-            restructure_blind_spot_flag int     (1 if ever restructured — R13)
+-            pre_t0_months               int     (months of history before T0)
+-            prior_spell_cnt_12m         int     (prior DLQ-1+ episodes in 12m before T0)
+-            w_pre_clean_m               int     (consecutive DLQ-0 months before T0)
+-            spell_end                   date    (NULL for active spell)
+-            computed_at                 timestamp
+-    """
+-    hist = crx_rl_full_history
+-
+-    # -- Step 1: spine_anchor — first spine observation and cif_id per account --
+-    spine_anchor = (
+-        rl_spine.select(
+-            F.col("account_id").cast("string"),
+-            F.col("observation_date").cast("date"),
+-            F.col("cif_id").cast("string"),
+-        )
+-        .groupBy("account_id")
+-        .agg(
+-            F.min("observation_date").alias("anchor_date"),
+-            F.first("cif_id").alias("cif_id"),
+-        )
+-    )
+-
+-    # -- Step 2: scope history to spine accounts only -------------------------
+-    hist_scoped = hist.join(
+-        spine_anchor.select("account_id"), on="account_id", how="inner"
+-    )
+-
+-    # -- Step 3: detect spell starts via lag and assign spell_id (cumsum) -----
+-    # Spell starts when dlq_bucket >= 1 and previous month was dlq_bucket == 0
+-    # (or no previous row). coalesce(lag, 0) treats first row as "clean before".
+-    w_acct = Window.partitionBy("account_id").orderBy("month_end_date")
+-    w_acct_unbounded = (
+-        Window.partitionBy("account_id")
+-        .orderBy("month_end_date")
+-        .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+-    )
+-
+-    labeled = (
+-        hist_scoped.withColumn(
+-            "_prev_dlq",
+-            F.coalesce(F.lag("dlq_bucket").over(w_acct), F.lit(0)),
+-        )
+-        .withColumn(
+-            "_spell_start",
+-            F.when(
+-                (F.col("dlq_bucket") >= 1) & (F.col("_prev_dlq") == 0),
+-                F.lit(1),
+-            ).otherwise(F.lit(0)),
+-        )
+-        .withColumn(
+-            "spell_id",
+-            F.sum("_spell_start").over(w_acct_unbounded).cast("int"),
+-        )
+-    )
+-
+-    # -- Step 4: censored detection — first history row already delinquent ----
+-    # Only spell_id = 1 can be censored (T0 before data window).
+-    censored_accts = (
+-        labeled.withColumn("_rn", F.row_number().over(w_acct))
+-        .filter((F.col("_rn") == 1) & (F.col("dlq_bucket") >= 1))
+-        .select("account_id")
+-        .distinct()
+-    )
+-
+-    # -- Step 5: per-spell aggregation (delinquent rows only) -----------------
+-    in_spell = labeled.filter(F.col("dlq_bucket") >= 1)
+-
+-    spell_agg = in_spell.groupBy("account_id", "spell_id").agg(
+-        F.min("month_end_date").alias("t0"),
+-        F.max("month_end_date").alias("_spell_max_obs"),
+-    )
+-
+-    # -- Step 6: spell_end detection — first clean month after last DLQ row ---
+-    clean_rows = hist_scoped.filter(F.col("dlq_bucket") == 0).select(
+-        F.col("account_id"),
+-        F.col("month_end_date").alias("_clean_date"),
+-    )
+-
+-    cure_dates = (
+-        spell_agg.select("account_id", "spell_id", "_spell_max_obs")
+-        .join(clean_rows, on="account_id", how="left")
+-        .filter(F.col("_clean_date") > F.col("_spell_max_obs"))
+-        .groupBy("account_id", "spell_id")
+-        .agg(F.min("_clean_date").alias("spell_end"))
+-    )
+-
+-    spell_agg = spell_agg.join(cure_dates, on=["account_id", "spell_id"], how="left")
+-
+-    # -- Step 7: t0_censored_flag and T0 fallback ------------------------------
+-    spell_agg = (
+-        spell_agg.join(
+-            censored_accts.withColumn("_is_censored", F.lit(1)),
+-            on="account_id",
+-            how="left",
+-        )
+-        .withColumn(
+-            "t0_censored_flag",
+-            F.when(
+-                (F.col("spell_id") == 1) & (F.col("_is_censored") == 1),
+-                F.lit(1),
+-            )
+-            .otherwise(F.lit(0))
+-            .cast("int"),
+-        )
+-        .drop("_is_censored")
+-    )
+-
+-    # -- Step 8: stub rows for ~0% accounts with no DLQ in history -----------
+-    # These have no rows in spell_agg; synthesise spell_id=1, t0=anchor_date.
+-    no_spell_accts = spine_anchor.select("account_id", "anchor_date").join(
+-        spell_agg.select("account_id").distinct(),
+-        on="account_id",
+-        how="left_anti",
+-    )
+-
+-    stubs = (
+-        no_spell_accts.withColumn("spell_id", F.lit(1).cast("int"))
+-        .withColumnRenamed("anchor_date", "t0")
+-        .withColumn("_spell_max_obs", F.lit(None).cast("date"))
+-        .withColumn("spell_end", F.lit(None).cast("date"))
+-        .withColumn("t0_censored_flag", F.lit(1).cast("int"))
+-    )
+-
+-    spell_agg = spell_agg.unionByName(stubs, allowMissingColumns=True)
+-
+-    # -- Step 9: join cif_id and restructure_blind_spot_flag ------------------
+-    restructure = hist_scoped.groupBy("account_id").agg(
+-        F.max("restructure_flag").cast("int").alias("restructure_blind_spot_flag")
+-    )
+-
+-    spell_agg = (
+-        spell_agg.join(
+-            spine_anchor.select("account_id", "cif_id"), on="account_id", how="left"
+-        )
+-        .join(restructure, on="account_id", how="left")
+-        .withColumn(
+-            "restructure_blind_spot_flag",
+-            F.coalesce(F.col("restructure_blind_spot_flag"), F.lit(0)).cast("int"),
+-        )
+-    )
+-
+-    # -- Step 10: per-spell ancillary metrics ---------------------------------
+-    # pre_t0_months, prior_spell_cnt_12m, w_pre_clean_m are per (account_id, spell_id).
+-    spell_t0s = spell_agg.select("account_id", "spell_id", "t0")
+-
+-    pre_t0_cnt = _compute_pre_t0_months(hist_scoped, spell_t0s)
+-    prior_spells = _compute_prior_spells(labeled, spell_t0s)
+-    w_clean_tbl = _compute_w_clean_m(hist_scoped, spell_t0s)
+-
+-    # -- Step 11: assemble and finalize ----------------------------------------
+-    result = (
+-        spell_agg.select(
+-            "account_id",
+-            "cif_id",
+-            "spell_id",
+-            "t0",
+-            "t0_censored_flag",
+-            "restructure_blind_spot_flag",
+-            "spell_end",
+-        )
+-        .join(pre_t0_cnt, on=["account_id", "spell_id"], how="left")
+-        .join(prior_spells, on=["account_id", "spell_id"], how="left")
+-        .join(w_clean_tbl, on=["account_id", "spell_id"], how="left")
+-        .withColumn("computed_at", F.current_timestamp())
+-        .withColumn(
+-            "pre_t0_months", F.coalesce(F.col("pre_t0_months"), F.lit(0)).cast("int")
+-        )
+-        .withColumn(
+-            "prior_spell_cnt_12m",
+-            F.coalesce(F.col("prior_spell_cnt_12m"), F.lit(0)).cast("int"),
+-        )
+-        .withColumn(
+-            "w_pre_clean_m",
+-            F.coalesce(F.col("w_pre_clean_m"), F.lit(0)).cast("int"),
+-        )
+-        .select(
+-            F.col("account_id").cast("string"),
+-            F.col("cif_id").cast("string"),
+-            F.col("spell_id"),
+-            F.col("t0"),
+-            F.col("t0_censored_flag"),
+-            F.col("restructure_blind_spot_flag"),
+-            F.col("pre_t0_months"),
+-            F.col("prior_spell_cnt_12m"),
+-            F.col("w_pre_clean_m"),
+-            F.col("spell_end"),
+-            F.col("computed_at"),
+-        )
+-    )
+-
+-    # -- Step 12: log stats --------------------------------------------------------
+-    _log_stats(result)
+-    return result
+-
+-
+-def _compute_pre_t0_months(
+-    hist_scoped: DataFrame,
+-    spell_t0s: DataFrame,
+-) -> DataFrame:
+-    """Count history rows with month_end_date < T0 per (account_id, spell_id)."""
+-    return (
+-        spell_t0s.join(
+-            hist_scoped.select("account_id", "month_end_date"),
+-            on="account_id",
+-            how="left",
+-        )
+-        .filter(F.col("month_end_date") < F.col("t0"))
+-        .groupBy("account_id", "spell_id")
+-        .agg(F.count("*").cast("int").alias("pre_t0_months"))
+-    )
+-
+-
+-def _compute_prior_spells(
+-    labeled: DataFrame,
+-    spell_t0s: DataFrame,
+-) -> DataFrame:
+-    """Count distinct prior DLQ-1+ episodes in the 12m window before each spell's T0."""
+-    # labeled carries spell_id (the episode each row belongs to).
+-    # For target spell N, count distinct prior spell_ids where rows fall in [T0-12m, T0).
+-    hist_dlq = labeled.filter(F.col("dlq_bucket") >= 1).select(
+-        F.col("account_id"),
+-        F.col("month_end_date"),
+-        F.col("spell_id").alias("_hist_spell_id"),
+-    )
+-
+-    return (
+-        spell_t0s.withColumnRenamed("spell_id", "_target_spell_id")
+-        .join(hist_dlq, on="account_id", how="left")
+-        .filter(
+-            (F.col("month_end_date") < F.col("t0"))
+-            & (F.col("month_end_date") >= F.add_months(F.col("t0"), -12))
+-            & (F.col("_hist_spell_id") != F.col("_target_spell_id"))
+-        )
+-        .groupBy("account_id", "_target_spell_id")
+-        .agg(F.countDistinct("_hist_spell_id").cast("int").alias("prior_spell_cnt_12m"))
+-        .withColumnRenamed("_target_spell_id", "spell_id")
+-    )
+-
+-
+-def _compute_w_clean_m(
+-    hist_scoped: DataFrame,
+-    spell_t0s: DataFrame,
+-) -> DataFrame:
+-    """Count consecutive DLQ-0 months immediately before each spell's T0."""
+-    pre_t0 = spell_t0s.join(
+-        hist_scoped.select("account_id", "month_end_date", "dlq_bucket"),
+-        on="account_id",
+-        how="left",
+-    ).filter(F.col("month_end_date") < F.col("t0"))
+-
+-    pre_t0_cnt = pre_t0.groupBy("account_id", "spell_id").agg(
+-        F.count("*").cast("int").alias("_pre_t0_cnt")
+-    )
+-
+-    w_desc = Window.partitionBy("account_id", "spell_id").orderBy(
+-        F.desc("month_end_date")
+-    )
+-
+-    first_nc = (
+-        pre_t0.withColumn("_rn_desc", F.row_number().over(w_desc))
+-        .filter(F.col("dlq_bucket") > 0)
+-        .groupBy("account_id", "spell_id")
+-        .agg(F.min("_rn_desc").alias("_first_nc_rn"))
+-    )
+-
+-    return (
+-        pre_t0_cnt.join(first_nc, on=["account_id", "spell_id"], how="left")
+-        .withColumn(
+-            "w_pre_clean_m",
+-            F.when(F.col("_first_nc_rn").isNull(), F.col("_pre_t0_cnt")).otherwise(
+-                (F.col("_first_nc_rn") - 1).cast("int")
+-            ),
+-        )
+-        .select("account_id", "spell_id", "w_pre_clean_m")
+-    )
+-
+-
+-def _log_stats(df: DataFrame) -> None:
+-    """Log spell count, censored%, and restructure_blind_spot%."""
+-    try:
+-        row_count = df.count()
+-        acct_count = df.select("account_id").distinct().count()
+-        agg_row = df.agg(
+-            F.sum("t0_censored_flag").alias("censored_cnt"),
+-            F.sum("restructure_blind_spot_flag").alias("restructure_cnt"),
+-        ).collect()[0]
+-        active_cnt = df.filter(F.col("spell_end").isNull()).count()
+-        censored_pct = (
+-            agg_row["censored_cnt"] / row_count * 100 if row_count > 0 else 0.0
+-        )
+-        restructure_pct = (
+-            agg_row["restructure_cnt"] / acct_count * 100 if acct_count > 0 else 0.0
+-        )
+-        LOG.info(
+-            "crx_rl_spell_table built: %d spells across %d accounts | "
+-            "active (spell_end NULL)=%d | censored=%.2f%% | restructure_blind_spot=%.2f%%",
+-            row_count,
+-            acct_count,
+-            active_cnt,
+-            censored_pct,
+-            restructure_pct,
+-        )
+-    except Exception as e:  # pylint: disable=broad-except
+-        LOG.warning(
+-            "Could not compute rl_spell_table stats: %s (lazy eval context)", str(e)
+-        )
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/rl_spell_table/pipeline.py
++++ /dev/null
+@@ -1,32 +0,0 @@
+-"""Kedro pipeline: RL-B2 — T0 anchor table for Retail Loan persona pipeline."""
+-
+-from kedro.pipeline import Pipeline, node
+-
+-from .nodes import build_rl_spell_table
+-
+-
+-def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+-    """Single-node pipeline: [crx_rl_full_history, rl_spine] → crx_rl_spell_table.
+-
+-    crx_rl_full_history (RL-B1) provides the full monthly history from which
+-    T0 (first DLQ >= 1 onset) is derived. rl_spine (model_id-namespaced) provides
+-    the censored fallback for the ~0% of accounts with no DLQ >= 1 in history.
+-
+-    No date filter applied — full history required to find true first delinquency
+-    onset. Date filtering is applied downstream in crx_rl_a4_spine.
+-
+-    Run with:
+-        kedro run --pipeline=crx_rl_spell_table
+-    """
+-    return Pipeline(
+-        [
+-            node(
+-                func=build_rl_spell_table,
+-                inputs=["crx_rl_full_history", "rl_spine"],
+-                outputs="crx_rl_spell_table",
+-                name="build_crx_rl_spell_table",
+-                tags=["crx", "rl", "rl_b2"],
+-            ),
+-        ],
+-        tags=["crx_persona"],
+-    )
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/nodes.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/nodes.py
+@@ -7,14 +7,12 @@
+                             once, read by the three extracts below.
+     build_cc_transactions : window-scoped transaction history with the prm_cc
+                             derivations (A3 payments).
+-    build_cc_limits       : credit-limit snapshots pivoted by type_code, on its own
+-                            spell-table window (no persona reader at present).
+     build_cc_balance      : window-scoped minimum_due / overdue buckets / total_due
+                             (A3 dues).
+     build_cc_billing      : window-scoped billing-cycle header (billing_date, due_date,
+                             next_billing_date) (A3 cycles).
+ 
+-Quality filter (transactions + limits): primary_entry_idt != 0, org == 100.
++Quality filter (transactions): primary_entry_idt != 0, org == 100.
+ Type cast: contract_idt (double -> long) at the DDI raw boundary.
+ """
+ 
+@@ -192,78 +190,8 @@
+         F.col("txn_category").cast("string"),
+         F.col("is_post_block_x_fee").cast("int"),
+     ).distinct()
+-
+-
+-def build_cc_limits(
+-    raw_stg_limit: DataFrame,
+-    crx_cc_spell_table: DataFrame,
+-) -> DataFrame:
+-    """Extract T0-anchored CC credit-limit snapshots, pivoted by type_code.
+-
+-    Scope: per-account window [min(T0) − 12m, max(T0)] from non-censored spells.
+-    Pivot logic replicates stg_limit.build() but uses type_code FIN_LIMIT and
+-    AVAILABLE only (ADD_LIMIT excluded; not needed for util_ratio computation).
+-
+-    Deliberately does NOT consume crx_cc_acct_windows — that window's forward
+-    edge is cc_spine-anchored (extends past T0), which this function does not
+-    need (see module docstring).
+-
+-    Args:
+-        raw_stg_limit:       Raw Way4 limit table (DDI-backed).
+-                             Required cols: contract_idt, banking_date,
+-                             type_code, amount.
+-        crx_cc_spell_table:  T03 output. Used for per-account T0 window.
+-
+-    Returns:
+-        DataFrame with schema::
+-
+-            contract_id (long), observation_date (date),
+-            credit_limit (double), available_limit (double)
+-    """
+-    # Excludes both censored subtypes — see build_cc_transactions Step 0 comment.
+-    spell = crx_cc_spell_table.filter(F.col("t0_censored_flag") == 0)
+-
+-    acct_windows = (
+-        spell.groupBy("account_id")
+-        .agg(
+-            F.add_months(F.trunc(F.min("t0"), "month"), -12).alias("acct_start"),
+-            F.trunc(F.max("t0"), "month").alias("acct_end"),
+-        )
+-        .select(
+-            F.col("account_id").alias("contract_idt"),
+-            "acct_start",
+-            "acct_end",
+-        )
+-    )
+ 
+-    # Scope + date filter via inner join on per-account windows (also casts
+-    # raw double contract_idt key to long before the join). This T0-only
+-    # acct_windows is the one built just above, NOT crx_cc_acct_windows —
+-    # see module/function docstring for why this window is deliberately kept
+-    # separate.
+-    scoped = scope_to_acct_window(raw_stg_limit, acct_windows, "banking_date")
+ 
+-    pivoted = (
+-        scoped
+-        # Only limit types needed for util_ratio: FIN_LIMIT (credit_limit) + AVAILABLE
+-        .filter(F.col("type_code").isin("FIN_LIMIT", "AVAILABLE"))
+-        # Pivot — max() is deterministic when multiple rows exist for same key
+-        # (highest approved limit wins; highest available = least alarming)
+-        .groupBy("contract_idt", "banking_date")
+-        .pivot("type_code", ["FIN_LIMIT", "AVAILABLE"])
+-        .agg(F.max("amount"))
+-        .withColumnRenamed("FIN_LIMIT", "credit_limit")
+-        .withColumnRenamed("AVAILABLE", "available_limit")
+-    )
+-
+-    return pivoted.select(
+-        F.col("contract_idt").alias("contract_id"),  # long
+-        F.col("banking_date").cast(DateType()).alias("observation_date"),
+-        F.col("credit_limit").cast("double"),
+-        F.col("available_limit").cast("double"),
+-    )
+-
+-
+ def build_cc_balance(
+     raw_stg_balance: DataFrame,
+     raw_stg_account_group: DataFrame,
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/pipeline.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/pipeline.py
+@@ -1,9 +1,8 @@
+-"""Kedro pipeline: CRX CC raw DDI extract (5 intermediate datasets) for A3.
++"""Kedro pipeline: CRX CC raw DDI extract (4 intermediate datasets) for A3.
+ 
+ build_cc_acct_windows reads the obs base and A4 (the episode anchor), so this runs
+ after crx_cc_a4_deterioration and before crx_cc_a3_payment_credibility. The three A3
+-extracts (transactions, balance, billing) read its window; build_cc_limits keeps its own
+-spell-table window.
++extracts (transactions, balance, billing) read its window.
+ 
+ Run with:
+     kedro run --pipeline=crx_cc_raw_extract
+@@ -15,13 +14,12 @@
+     build_cc_acct_windows,
+     build_cc_balance,
+     build_cc_billing,
+-    build_cc_limits,
+     build_cc_transactions,
+ )
+ 
+ 
+ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
+-    """Five-node pipeline: build window-scoped CC raw extract intermediates."""
++    """Four-node pipeline: build window-scoped CC raw extract intermediates."""
+     return Pipeline(
+         [
+             node(
+@@ -43,13 +41,6 @@
+                 tags=["crx", "t04c"],
+             ),
+             node(
+-                func=build_cc_limits,
+-                inputs=["raw_stg_limit", "crx_cc_spell_table"],
+-                outputs="crx_cc_limits",
+-                name="build_crx_cc_limits",
+-                tags=["crx", "t04c"],
+-            ),
+-            node(
+                 func=build_cc_balance,
+                 inputs=[
+                     "raw_stg_balance",
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/__init__.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/__init__.py
+@@ -5,7 +5,6 @@
+ 
+ Assets produced:
+     crx_cc_transactions : CC transaction history, T0-scoped, enriched schema
+-    crx_cc_limits       : CC credit-limit snapshots, T0-scoped
+     crx_cc_balance      : CC total_due billing history, T0-scoped
+ """
+ 
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/_window_utils.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_raw_extract/_window_utils.py
+@@ -1,9 +1,7 @@
+ """Shared per-account windowing helpers for cc_raw_extract's nodes.
+ 
+-Factors out two blocks that were duplicated near-verbatim across
+-build_cc_transactions / build_cc_balance / build_cc_billing (and, for the
+-join+filter mechanics only, build_cc_limits) — pure extraction, no behavior
+-change (2026-10-21).
++The two blocks shared by build_cc_transactions, build_cc_balance and
++build_cc_billing: partition pruning and the per-account window join.
+ """
+ 
+ from pyspark.sql import DataFrame
+@@ -40,11 +38,9 @@
+     """Cast contract_idt to long, inner-join to acct_windows, filter date_col
+     to [acct_start, acct_end].
+ 
+-    acct_windows: a DataFrame keyed by contract_idt with acct_start/acct_end
+-    columns — either crx_cc_acct_windows (re-keyed via _as_contract_windows)
+-    or build_cc_limits' own locally-built, T0-only window. date_col is the
+-    only thing that varies across call sites ("banking_date" or
+-    "billing_date").
++    acct_windows: crx_cc_acct_windows re-keyed by contract_idt (acct_start/acct_end
++    columns). date_col is the only thing that varies across call sites
++    ("banking_date" or "billing_date").
+     """
+     return (
+         raw_df.withColumn("contract_idt", F.col("contract_idt").cast("long"))
+--- a/workplace_mirror/conf/base/catalog/catalog_crx.yml
++++ b/workplace_mirror/conf/base/catalog/catalog_crx.yml
+@@ -33,13 +33,6 @@
+   save_args:
+     mode: overwrite
+ 
+-crx_cc_limits:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_limits"
+-  save_args:
+-    mode: overwrite
+-
+ crx_cc_balance:
+   type: spark.SparkDataset
+   file_format: parquet
+@@ -67,18 +60,6 @@
+   save_args:
+     mode: overwrite
+ 
+-# -- T03: Delinquency-spell table (CC) ----------------------------------------
+-# Grain: (account_id, spell_id). One row per delinquency episode.
+-# T0 = spell anchor for all A4 features.
+-# Built from raw_stg_billing (no date/DLQ filter; leftsemi-scoped to cc_spine).
+-# model_id-namespaced so cc_60_180 and cc_180_plus runs do not overwrite each other.
+-crx_cc_spell_table:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_spell_table"
+-  save_args:
+-    mode: overwrite
+-
+ # -- CC A4 deterioration: DPD journey (one shuffle + per-account Python engine) --
+ # Built from crx_cc_full_history by the shared crx_persona/_dpd_journey/ package
+ # (CC scheme; RL uses the same package with its own scheme).
+@@ -265,8 +246,8 @@
+ # ── RL Foundation (RL-B1) ───────────────────────────────────────────────────
+ # Grain: (account_id, month_end_date). Full pre-delinquency monthly history for
+ # all RL spine accounts. Source: int_loan_master (month-end snapshots).
+-# No date window — full history required for T0 identification (RL-B2) and
+-# pre-T0 A4 lookback (RL-A4-2). Date filter applied downstream in crx_rl_a4_spine.
++# No date window — full history required for the A4 journey and its pre-episode
++# lookback.
+ crx_rl_full_history:
+   type: spark.SparkDataset
+   file_format: parquet
+@@ -274,30 +255,6 @@
+   save_args:
+     mode: overwrite
+ 
+-# ── RL Foundation (RL-B2) ───────────────────────────────────────────────────
+-# Grain: one row per account_id. T0 anchor table with first delinquency onset
+-# date and pre-T0 behavioural metadata. spell_id=1 / spell_end=NULL adapter
+-# makes this compatible with join_spine_to_spell() (R18).
+-crx_rl_spell_table:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_spell_table"
+-  save_args:
+-    mode: overwrite
+-
+-# ── RL A4 Spine (structural — superseded CASA/EMI classifier removed) ───────
+-
+-# Spine-grain structural projection (windowed to persona_start_date / persona_end_date).
+-# Grain: (account_id, observation_date). Carries cif_id, spell_id, t0 (sourced from
+-# crx_rl_spell_table) — no classification columns. Built by the rl_a4_spine pipeline.
+-# Filter point per TASKS_RL.md.
+-crx_rl_a4_spine:
+-  type: spark.SparkDataset
+-  file_format: parquet
+-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_spine"
+-  save_args:
+-    mode: overwrite
+-
+ # ── RL A4 deterioration: DPD journey (one shuffle + per-account Python engine) ──
+ # Built from crx_rl_full_history by the shared crx_persona/_dpd_journey/ package
+ # (RL scheme; CC uses the same package with its own scheme).
+--- a/workplace_mirror/conf/base/parameters/parameters_crx_persona.yml
++++ b/workplace_mirror/conf/base/parameters/parameters_crx_persona.yml
+@@ -1,14 +1,10 @@
+ ##################################################
+ # CRX PERSONA PIPELINE CONFIGURATION
+ ##################################################
+-# Evaluation window for the RL persona pipeline.
+-# These dates control which spine rows are included in persona outputs
+-# (crx_rl_a4_spine and all downstream assets).
++# Evaluation window of the persona pipelines: the observation-base months
++# (persona_start_date to persona_end_date) the axes score. Full history is read
++# before the window, not filtered by it.
+ #
+-# Filter is applied at the spine-join step (RL-A4-2), NOT on raw history
+-# or T0 tables — full history is required for T0 identification and
+-# pre-T0 feature lookback.
+-#
+ # Orthogonal to modelling.start_date / modelling.end_date (training spine window).
+ ##################################################
+ 
+--- a/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_a4_deterioration/nodes.py
++++ b/workplace_mirror/src/enbd_collections/pipelines/crx_persona/cc_a4_deterioration/nodes.py
+@@ -20,9 +20,9 @@
+ from .._common import require_columns
+ from .._dpd_journey import CC, build_deterioration, build_dpd_sequences, journey_params
+ 
+-# Same value as cc_spell's _RESTRUCTURE_DLQ_THRESHOLD: an account whose earliest
+-# billing row is already at this dlq_bucket or above was opened mid-delinquency by a
+-# restructure, not merely cut off by the data depth (conformance D2).
++# An account whose earliest billing row is already at this dlq_bucket or above was
++# opened mid-delinquency by a restructure, not merely cut off by the data depth
++# (conformance D2).
+ _RESTRUCTURE_DLQ_THRESHOLD = 4
+ 
+ 
+--- a/workplace_mirror/checks/golden_inputs.py
++++ b/workplace_mirror/checks/golden_inputs.py
+@@ -936,20 +936,6 @@
+             " edp_load_date date, settl_amount double, direction int, txn_code string,"
+             " txn_description string, add_info string, trans_mcc int, trans_date date,"
+             " card_idt int, service_class string",
+-        ),
+-        "crx_cc_spell_table": df(
+-            [(K, D(2026, 4, 10), 0), (K + 1, D(2026, 4, 10), 1)],
+-            "account_id long, t0 date, t0_censored_flag int",
+-        ),
+-        "raw_stg_limit": df(
+-            [
+-                (float(K), D(2026, 3, 1), "FIN_LIMIT", 10000.0),
+-                (float(K), D(2026, 3, 1), "AVAILABLE", 2000.0),
+-                (float(K), D(2026, 3, 1), "ADD_LIMIT", 500.0),
+-                (float(K), D(2024, 1, 1), "FIN_LIMIT", 9000.0),
+-                (float(K + 1), D(2026, 3, 1), "FIN_LIMIT", 7000.0),
+-            ],
+-            "contract_idt double, banking_date date, type_code string, amount double",
+         ),
+     }
+ 
+--- a/workplace_mirror/checks/refactor_golden.py
++++ b/workplace_mirror/checks/refactor_golden.py
+@@ -428,8 +428,6 @@
+      lambda f: bool(f.where("is_post_block_x_fee = 1").limit(1).count())),
+     ("billing", "latest cycle has no next statement",
+      lambda f: bool(f.where("next_billing_date IS NULL").limit(1).count())),
+-    ("limits", "limits pivoted from non-censored spells",
+-     lambda f: bool(f.limit(1).count())),
+     ("bureau_bounces_monthly", "two cheques on one day count once",
+      lambda f: bool(f.where("cif_id = '9' AND bounce_events = 1"
+                             " AND max_bounce_amount = 800").limit(1).count())),
+@@ -489,8 +487,6 @@
+     "`product_features`' card minimum due and `crx_cc_balance` come through the"
+     " `prm_cc` stand-in: the oracle fixes what our code does with them, not Way4's"
+     " derivation.",
+-    "Dead candidates (`cc_spell`, `rl_spell_table`, `rl_a4_spine`, `_spine_utils`) are"
+-    " not run; `crx_cc_limits` (no reader) is run from a synthetic spell table.",
+ ]
+ 
+ 
