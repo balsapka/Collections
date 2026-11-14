@@ -1,6 +1,6 @@
 # crx_persona A3 credibility + A1 ability: council review and refactor plan (run 2)
 
-Status: **§10 answered 2026-11-13; Phase 0 running.** U0 (scope, rubrics, dead list) is the next checkpoint.
+Status: **U0 approved 2026-11-14; round 1 running.**
 
 Run 1 (all axes, signed off 2026-11-06, shipped as bundles 15 and 16) is on branch
 `refactor/persona_review`; its plan is kept here as `run1/PLAN.md` (with its decisions, questions and final report). Since then A3 was built as an

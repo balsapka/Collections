@@ -11,3 +11,4 @@
 | D-0-1 | 2026-11-14 | Baseline accepted: oracle 188 datasets in 23 runs, pass (Master re-run, 153 s); smoke fails with the six `cc_raw_extract` import lines only; ruff 101 findings; spec tests pass. | Master |
 | D-0-2 | 2026-11-14 | Oracle checkpoints every node output and runs in UTC (2 GB driver stalled in GC without it). | Cartographer |
 | D-0-3 | 2026-11-14 | Dead list for U0: `_spine_utils.py`, `rl_a4_spine/`, `rl_spell_table/`, and `cc_spell/` with `build_cc_limits` / `crx_cc_limits`. The mirror cannot rule out workplace-only readers: a UAT grep is needed first (`inventory.md` §6). | Cartographer |
+| D-U0 | 2026-11-14 | U0 approved: scope, reused rubrics (frozen); round 1 starts. Dead-code deletions are held until the workplace grep (`inventory.md` §6) is back. | user |
