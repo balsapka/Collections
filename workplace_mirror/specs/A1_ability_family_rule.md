@@ -1,0 +1,230 @@
+# A1 ability: the evidence-family rule
+
+This is the rule that replaces today's income + liquidity ladder (`A1_ability_spec.md`, S1–S16) once
+GRR agrees. It comes from the family-redesign rounds 1–3 (`bundle_helpers/a1_final/
+family_redesign_results_60_180.md`, `family_redesign_results_r3_60_180.md`; rule R4 there), plus the
+CASA balance folded into Money in (user, 2026-11-10; not run as a separate check).
+
+Built as **bundle 21** (`bundles/21_a1_evidence_family_rule.md`, stage branch
+`refactor/a1_family`, `8f9d69e..b159b5b`; spec test `checks/a1_engine_spec.py` 92/92). Its check
+(`crx_<p>_a1_check`) is the first PROD run of the full rule, including the balance. Filled in UAT
+from the round-3 code: the cross-product feature body, the WM "self" column, the class table
+against the flow dictionary, the check's outcome block.
+
+## 1. What stays from today
+
+- **Grain and dates.** One state per `(account_id, observation_date)`; observation dates are month
+  ends.
+- **Window W.** The observation month plus the months before it: 3 at 60–180, 6 at 180+
+  (`_common.window_months`). `MIN_MONTHS = {3: 2, 6: 3}`.
+- **No pre-delinquency data** (GRR): every signal comes from W or from the observation-month
+  snapshot.
+- **Anchor**, which is what the customer must find now:
+  - CC 60–180: the oldest non-zero overdue bucket on the observation-month snapshot;
+  - RL: one EMI;
+  - 180+ or missing: flat floors only.
+- **CIF level.** All customer signals cover every account of the `cif_id`.
+- **Income (F1).** Computed exactly as today's `income_level` (S12, S14).
+- **The bureau salary source is swappable** (user, 2026-11-10). **Next source:** the DE's
+  `feat_bureau_salary_unified` (handoff 66, `bundle_helpers/a1_final/bureau_salary_unified_handover.md`;
+  `cif_id long`, `salary_month_end`, `monthly_salary`, `salary_source` alert > salary_credit >
+  bureau_salary). It is the long-term source: GRR's frequent bureau salary feed will land in it (user,
+  2026-11-11). Swapped in its own bundle after bundle 21. Exploration back 2026-11-11
+  (`bundle_helpers/a1_final/bureau_unified_exploration_results.md`); cast its `cif_id` to string, cap it
+  at the persona months. **The three sources are all bureau data** (user, 2026-11-12; handoff 66 and
+  the exploration's reading of `salary_credit` were wrong):
+  - `alert`: today's series; an alert fires when the salary changes (forward fill under study).
+  - `salary_credit`: a bureau table of salary history across all providers, captured as a look-back
+    at the time the customer applies for a new product with us. Most delinquent customers never
+    apply again, so they have none; recent months thin out because the look-back ends at the
+    application. It equals our internal salary where the salary is paid to us (95% of shared months).
+  - `bureau_salary`: the bank's ad-hoc bulk bureau pull for a set of customers, aggregates across all
+    banks (`_1m`, `_3m`, ...); the DE infers the monthly amounts back from those aggregates (caveat:
+    the month pattern is inferred, not observed; today one pull, rows 2025-09 .. 2026-08). This is
+    the source GRR is pushing to cover every 61–180 customer.
+  So every unified row is bureau salary: it goes into `bureau_salary` of the contract as is, with
+  `salary_source` kept for reporting; no internal / bureau label decision.
+  **Direction (user, 2026-11-12):** the bulk pull becomes the primary source; pulled every ~2 months its
+  aggregates pin each month's salary and the alerts are no longer needed. Until then the plan was to shape the
+  pull's monthly amounts by the alerts (a change alert marks the month the level moves) instead of a
+  flat spread of each aggregate. **Bulk pull read 2026-11-12** (`bundle_helpers/a1_final/bulk_pull_results.md`,
+  4 model_ids): one load (2026-09), all `bulk`, ~1% of 61–180 CIFs (0.8% CC / 1.4% RL; 180+ ≤ 0.1%), not ~5%;
+  the precedence hides only 10–17% of pull months. The DE books `_1m` to the month before
+  `EDP_LOAD_DATE` and splits the nested differences evenly back 12 months (no one-month shift in the
+  code; the anchor is the load stamp, not the response date). The flat spread sits > 25% below internal
+  salary in 19–34% of CIF-months and misses ~4 in 5 internal changes / stops; the alert-shaped rebuild
+  sees more stops but fits levels no better (30–48% conflicts), changes < 10 A1 rows: not adopted, flat
+  spread kept until pulls repeat. Codes 232–235 = salaries reported for the last 1 / 3 / 6 / 12 months, cumulative (AECB documentation,
+  `bureau_fill_whatif_results.md`; the DE's nested reading is right). Open with the DE: the look-back's
+  reference date (response date vs the load stamp), where the ~5% went
+  (CIF resolution / scope), pull schedule, later 0 hidden by an earlier positive.
+  Either way the A1 contract does not change. The alert table loads daily in PROD (`edp_load_date`) and is complete
+  from 2024-01 on (user, 2026-11-12): silence before 2024 is not "no change". GRR is building a bureau salary
+  feature layer (`cif_id` / `month_end` / salary amount), to be followed by a bulk salary load. The
+  engine therefore reads bureau salary through one contract only:
+  - **Contract:** `feat_cif_bureau_salary_monthly`, one row per `(cif_id, month_end)` with
+    `bureau_salary` (AED; 0 = salary account closed, which ends the series).
+  - **To swap the source,** rebuild that dataset from the new layer: map its amount column to
+    `bureau_salary` in the feature node. The engine, catalog name and persona pipelines stay as
+    they are.
+  - **Built in bundle 24** (`bundles/24_a1_product_primaries_bureau_swap.md`, 2026-11-12): the feature node
+    reads `feat_bureau_salary_unified`; the carry stays, the RL loan salary is dropped.
+  - **Two alert-specific pieces stay in `a1_ability/signals.py` until then:**
+    - the **one-month carry** (S14, `_with_next_month`) **stays** after the swap, until bureau salary
+      sourcing is fixed (user, 2026-11-11, replacing the 2026-11-10 plan): the unified series is
+      event-like, and dropping the carry would cut Stable by 0.8–3.6pp;
+    - **fill until change — tested 2026-11-12** (`bundle_helpers/a1_final/bureau_fill_whatif_results.md`,
+      4 model_ids). The deciding question is the data's (user): does silence mean no change? Partly
+      supported: the feed stays live for 77–95% of silent CIFs, and when another source disagrees an
+      alert follows in 65–91% of credit / pull cases (half within 1–3 months); missed stops are rare up
+      to 6 months (0.8–3.8% of fill months with internal history) but reach 9–11% at 7–12 and 28–32% at
+      13+. Not settled: the 37–67% disagreement while filled has no fresh-alert baseline (sources may
+      differ by definition), 0 alerts hidden behind `salary_credit` rows inflate missed stops, and the
+      pull may be shifted a month. **Baseline rerun 2026-11-12** (`bureau_fill_baseline_results.md`, raw
+      alerts, 4 model_ids): silence = no change holds to alert age 3 (internal agreement within CIF no lower
+      than at age 0; net stops 0.2–0.5% of fill months, most early stops are bank moves), is unclear at 4–6
+      (net stops 1.3–3.1%) and fails from 7 (net stops 7–8%, 21–31% at 13–24). Fresh alerts already disagree
+      with every source (internal within 10% in 18–22% at age 0), so disagreement alone never decides. The
+      pull is not booked a month late (DE label kept). 34–43% of the first run's missed stops are
+      `salaryaccountclosed` alerts the DE drops (no amount); precedence hides only 2–8%. **Decided (user,
+      2026-11-12): keep the one-month carry for now.** Ready option, not forgotten: a carry of up to 3
+      months (ages 1–3, ended by a newer row or a 0) is what the data support; switching is one constant in
+      `signals.py` (`_with_next_month`) plus the spec cases. 4–6 months only after the DE maps every closed
+      alert to 0; never beyond 6. **Closure rule (user,
+      2026-11-12):** the bureau mixes added / closed, so `salaryaccountclosed` and
+      `salaryaccountisadded/closed` are decided by their amount: 0 or NULL = a stop (0) for both; > 0 =
+      that month's salary, carried for `isadded/closed` (a level, like an added alert) but **not carried**
+      for `salaryaccountclosed`. Added / changed alerts are unchanged. DE ask
+      (`bundle_helpers/a1_final/de_bureau_asks.md`): apply this in `int_bureau_alert_salary_monthly` and
+      add `is_closure` (true only on positive `salaryaccountclosed` rows) to the unified table; then our
+      feature passes it through and `_with_next_month` skips the carry for those rows (a later A1 bundle,
+      once the column is in PROD);
+    - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
+      the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
+      `loan_features` input and the `product == "rl"` branch.
+  - The S12 level check for windows where only the bureau shows salary stays in the engine, because
+    it is about how much a bureau amount is trusted, not where it comes from. Review it when the
+    bulk load arrives.
+- **Distress.** Cheque returns, DDS and bureau bounces (S15).
+
+## 2. Families
+
+Each family is **strong**, **some** or **none** (NULL = no data). Only strong scores, with 2 points.
+"Some" scores 0 but still counts as evidence: it makes a row Low rather than Unknown.
+
+| Family | Strong (2 points) | Some (evidence, 0 points) |
+|---|---|---|
+| **F1 Income** | today's `income_level` = stable | weak |
+| **F2 Money in or held** | either inflow or balance (below) is strong | inflow some |
+| **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 1,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 500 |
+| **F4 Cross-product** | deposits / investments / WM assets (AUM; kept, user 2026-11-10) ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
+
+### F2 Money in or held
+
+- **Inflow strong:** credits in the counted classes (§3) ≥ max(AED 1,000, 1 × anchor) in
+  ≥ `MIN_MONTHS` months of W. Salary-flagged credits are left out, since salary is F1.
+- **Inflow some:** any month of W with ≥ AED 1,000 of counted credits.
+- **Balance strong:** the CASA average balance (`feat_cif_casa_balance_monthly`, WM's 49 CASA scheme
+  codes, CIF level) ≥ max(AED 3,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W, and the window
+  average is no more than 50% below the prior window's. This is today's liquidity "adequate"
+  condition on balances (`F_CASA`, `K_CASA`, `D_CASA`).
+- **Balance below strong does nothing.** It scores no points and is not evidence. A small balance
+  alone does not take a row out of Unknown (S11 as today: dormant accounts keep residual balances,
+  and WM may fill missing months with 0).
+- **Why the balance is back.** GRR said balances are swept against the overdue amount, so R3 dropped
+  liquidity. The sweep is operational and manual (user, 2026-11-10), so a balance that survives it
+  is real money held. It is rare (old liquidity "adequate" fired for 1.0% of CC and 1.4% of RL), and
+  it belongs with money in rather than in a fifth family that would almost never be strong.
+- **Dropped from old liquidity:** the external card payment branch (`ext_card_payment_max`). Payments
+  to other lenders are invisible in our data (round 3: 3–4% of WM's external payments show as CASA
+  debits) and made no difference to any state.
+- **Kept apart from F4:** F4 balances are term deposits, investments and WM assets. They never
+  include the CASA balance counted here.
+
+## 3. Which transactions count (inclusion list)
+
+A leg counts only if its class is positively identified; everything else is out. The classes come
+from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_excluding` ×
+`tran_particular_code` × WM label × lane, plus two narration-stem rules.
+
+| Class | F2 | F3 | Evidence (round 3) |
+|---|---|---|---|
+| `third_party_in` (transfers in, remittances, non-flagged salary-like credits) | yes | | positive lift in CC |
+| `cash_in` (cash deposits) | yes | | CC cure +5.6pp, pay +19.8pp; dropping it demotes rows that perform at or above their state |
+| `chosen_spend` (POS, ATM, bills, transfers to others) | | yes | every dominant type lifts alike |
+| `reversal_return` (reversals, returned cheques / DDS, refunds, and the presentment they undo) | no | no | `CHQ RTN` / `CHQ NO` credits are 100% mirrored the same day; round 2 counted AED 186M (CC) / 264M (RL) of them as income |
+| `own_out_external` (debits to the customer's own account at another bank: WM label `self`, or the own-account remittance types such as `OUTWARD REMITTANCE 120`) | | yes | money leaving our bank that the customer controls (user, 2026-11-10). Largest such type: CC 33,785 legs / AED 76.8M, RL 9,688 / AED 30.2M |
+| `own_in_external` (credits from the customer's own account at another bank: WM label `self` on credits, or the own-account inward types) | yes | | money brought into our bank from elsewhere (user, 2026-11-10); round 2: own-account credits lift in CC (cure +7.8pp, pay +9.1pp) |
+| `own_transfer` (between the customer's own accounts with us, auto-save) | no | no | the money never leaves our bank; no new evidence |
+| `bank_initiated` (sweeps, fees, interest, disbursements, recoveries) | no | no | |
+| `debt_elsewhere` | no | no | AED 0.2–1.0M; no state changes |
+| `debt_to_us` (own card / own loan) | no | no | A3 |
+| `unplaced` | no | no | meaning not established |
+
+- **Lane before the self label on the wash lane** (user, 2026-11-10, handoff 57). A wash-lane leg
+  (direct-debit returns, DDS legs) stays `own_transfer` / `reversal_return` even when WM labels it
+  `self`, as the flow dictionary orders it: these are returns, not money moved to another bank
+  (CC ~AED 19M, RL ~5M, almost all mirrored). The self label decides only outside that lane.
+- **Fees and possible own-loan payments** (dictionary, step 4): a debit WM labels `fees_charges` is
+  `bank_initiated`; a debit with WM's loan-payment flag and no bank counterparty is `unplaced`.
+- **Pairs that cancel are netted.** A leg mirrored by an opposite leg of the same amount (±1%) within
+  0–3 days on any account of the CIF is dropped together with its mirror when the pair is a bounce,
+  reversal, sweep or round trip. Sweep-matched debits stay out of F3.
+- **Salary flag:** `wm_pri_labelled_transactions.salary_txn_flag`, joined on
+  `cif_id, tran_id, tran_date` (94–97% of keys match, 1.00 legs per key).
+- **The class table lives in code** as a constant next to `feat_cif_casa.transaction_lane`, built
+  from `flow_dictionary_<model_id>.md`. An allow-list replaces today's
+  `economic` / `ambiguous` split for A1.
+
+## 4. State
+
+| State | Rule |
+|---|---|
+| High | 2 or more strong families (4+ points) |
+| Moderate | exactly 1 strong family |
+| Low | no strong family, but some evidence (any "some", F1 weak, or F4 some) |
+| Unknown | no evidence in any family |
+
+- **Distress** lowers the state one rung (High → Moderate → Low). Low stays Low.
+- **Reason column:** the strongest family, or `distress` when the demotion fired. Unknown keeps
+  `a1_unknown_reason` (`no_casa` / `dormant_casa`) as a description only, because it does not
+  separate outcomes (round 3 B0).
+- **Diagnostic flag, not part of the state:** `a1_sweepable_balance_flag` = balance strong in the
+  observation month. It marks a delinquent customer holding money above the floor now, an
+  operational lead for GRR.
+
+## 5. Evidence for the rule (60–180, cohort Jan–May 2026, without the balance)
+
+- **CC (R4):** High 1.4% / Moderate 15.1% / Low 30.1% / Unknown 53.4%. Cure / pay / roll:
+  High 33.1 / 61.9 / 49.1, Moderate 16.4 / 42.3 / 72.5, Low 10.8 / 28.7 / 82.8, Unknown
+  7.4 / 18.9 / 87.9. Every gap excludes 0.
+- **RL (R4):** High 1.0 / 9.9 / 52.4 / 36.7%. Pay and roll order. High (117 cohort rows) cures
+  below Moderate (−4.6pp, interval includes 0), so no cure claim at High.
+- **Orthogonality:** R3 against A2 has Cramér's V 0.18–0.20, the same as today's rule.
+- **Balance, expected effect:** small. Round 1's V2 (liquidity added while "some" still scored)
+  added 72 High rows in CC and 37 in RL. With "some" at 0 and only the balance branch, fewer rows
+  move. The bundle check reports the rows the balance moves and their outcomes.
+
+## 6. Open (decisions for the user / GRR)
+
+1. **Own-account transfers with another bank count both ways** (user, 2026-11-10): out in F3, in in
+   F2. WM `self` and our wash lane disagree on CC 224,903 legs / AED 861M and RL 62,523 / AED 240M.
+   The bundle check reports how many states these legs move. A transfer that returns within 3 days
+   is still netted as a round trip, so moving money out and back does not count twice.
+2. **The `MIN_MONTHS` knob** (2 of 3, 3 of 6) is the only one that moves more than 5% of rows (CC
+   5.8%, RL 13.6%). GRR to confirm.
+3. **The Unknown estimate** (round 3 B2) is a separate `a1_estimate` column, never part of the
+   state.
+   - **Not a working state estimate.** Direct evidence (B1) found nothing. In CC, a model (FamGBM)
+     passes the formal criteria but only ranks Unknown customers by likelihood to pay (pay gap
+     +8–10pp between its top and bottom groups); its labels are not levels ("moderate" for 56% of
+     Unknown, who pay 19% vs 42% for real Moderate), and with abstention most rows are only "not high".
+   - RL did not run (singular matrix).
+   - It uses risk-model-style features, so GRR decides.
+   - Before any use: absolute rates per group, and the F4 model's AUC of 0.93 checked for leakage
+     from the holdings features.
+4. **180+ has not run in any round.** At 180+ there is no anchor and Unknown is 87–90%.
+5. **Today's A1 gate** (A6): 0.2% CC / 0.7% RL of rows leave Unknown only on legs round 3 called
+   non-evidence. The largest of those, `OUTWARD REMITTANCE 120` to own accounts elsewhere, is now
+   evidence (`own_out_external`), so the remaining gap is smaller still. The allow-list in §3 settles
+   the rest when this rule ships.

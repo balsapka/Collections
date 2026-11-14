@@ -22,6 +22,10 @@ customer will pay on this debt. Two kinds of evidence:
 
 Not A3: capacity to pay (A1), reachability / location (A2), the DPD path itself (A4).
 
+Dimension A and Dimension B differ in time as well as in kind (user, 2026-11-09): A characterises the
+customer's trustworthiness over the last 12 months, earlier episodes included (D-A3-26), B establishes recency (the last 3
+months, 6 at 180+). A payment rule for A that only re-reads recent payments repeats B.
+
 A **strong negative** earns its place only when all four hold:
 1. it adds evidence the points do not already carry;
 2. the data behind it is reliable;
@@ -77,7 +81,8 @@ Measured, not assumed (V2, V3).
 - **D-A3-9: commitments counted once, from the instalments** (user, 2026-11-03, provisional on V1).
   Kept / concluded counts and the broken streak come from one rule over the PTP and settlement
   instalments: concluded = due on or before the observation date and paid or overdue (pending ones
-  do not count), window = `[max(latest spell start, obs − 12 m), obs]` (spec rows 19, 76; O75, O83).
+  do not count), window = `[max(latest spell start, obs − 12 m), obs]` (spec rows 19, 76; O75, O83;
+  the window is the last 12 months since D-A3-26).
   `dcore_feat_ptp` / `dcore_feat_settlement` are no longer read.
 
 - **D-A3-10: keep `cc_a3_history_floor_date` (2024-01-01) and measure it** (user, 2026-11-03, O77).
@@ -147,12 +152,101 @@ Measured, not assumed (V2, V3).
   every other threshold moves ≤ 4%. High from 3 is the lever if High (today reachable only with DCORE
   commitments) should open to regular payments plus a clean record. Both are for the GRR calibration,
   not this bundle.
-- **D-A3-27: Unknown = no episode only** (user, 2026-11-10). No payment while delinquent is evidence
-  (Dimension B `none` = 0 points, no longer a silent level), so a row with an observed episode and
-  no points in any dimension is Low, not Unknown. These were mostly early payment defaults (thin
-  promises, no payment, no record before). Unknown stays only for rows with no episode anchor
-  (`a3_unknown_reason` = `no_episode`); the `no_evidence` reason is gone. High and Moderate don't
-  move.
+
+- **D-A3-24: Moderate from 2 points, High from 4** (user, 2026-11-09, from the threshold what-if,
+  `bundle_helpers/a3_final/threshold_whatif_summary_60_180.md`; replaces D-A3-16's Moderate cut-off).
+  A clean pre-delinquency record alone (1 point) no longer makes a customer Moderate: 85% of the CC
+  rows it moves made no promise and paid nothing while delinquent, the group that rolls most (V1f Q8).
+  60–180 states: CC 1.3 / 14.5 / 71.8 / 12.4 (High / Moderate / Low / Unknown), RL 1.6 / 24.0 / 67.6 /
+  6.9. Ships in the next A3 bundle (`MODERATE_FROM = 2`).
+
+- **D-A3-25: Dimension A = promise events judged by a sufficient payment, on GRR's deadline**
+  (user, 2026-11-09, from V1f / V1g, `bundle_helpers/a3_final/thresholds_v1f_review.md`;
+  replaces D-A3-11's instalment rule, ships in bundle 20).
+  - Events: every non-cancelled PTP and settlement plan (dated at its start), plus every
+    follow-up promise (`_dcore_codes.PROMISE_EVENT`: promise to pay, scheduled, digital collect,
+    pay at salary; any action code) that no plan claims. Follow-up promises less than 8 days
+    apart are one event, dated at the first; a plan takes its nearest follow-up promise within
+    7 days, each at most once. SOFTPTP, RETAIN PTP, arrangement names without a plan and payment
+    reports are not events. Account level.
+  - Judged once: payments after the event day up to the deadline against the due of the cycle
+    open on the event day (the last known one, at least 100 AED). Paid: they reach it; partial:
+    100 AED or more (counts as not kept); else none. Concluded once the deadline is on or before
+    the observation date.
+  - Deadline (GRR; replaced by D-A3-28): CC the next statement after the event day, however close (no statement yet:
+    31 days); RL the end of the next month (cash is month-level; the event month's cash counts
+    in full). The 30-day alternative (V1g: higher AUC, CC 0.740 vs 0.714) is built in
+    (`PROMISE_DEADLINE`) and logged by the bundle check, pending GRR.
+  - The ladder and points are unchanged (Kept 2 / Partly kept 1 / Thin 0 / Broken −1).
+  - Contact disposition: payment reports (`_dcore_codes.PAYMENT_REPORTED`) read `paid`.
+
+- **D-A3-26: Dimension A's window = the last 12 months, regardless of the episode start** (user,
+  2026-11-09; ships in bundle 20). A characterises trustworthiness, so promises from an earlier
+  episode within 12 months count (`[obs − 12 m, obs]`, calendar months). This departs from D6 for
+  Dimension A only: contacts and the refusal flag stay on the current episode, B on recency. Accepted
+  overlaps: with C (a repeat delinquent's earlier episode can cost in both) and a little with B. The
+  bundle 20 check measures it (state / level with the episode window vs 12 months, events before the
+  episode start) before the logic is final.
+
+- **D-A3-27: Unknown = no episode only** (user, 2026-11-10; ships in bundle 23, which absorbed
+  bundle 22). No payment while delinquent (Dimension B `none`) is evidence that scores 0 points, not a
+  silent level, so a row with an observed episode and no points in any dimension (mostly early
+  payment defaults) is Low. Unknown stays only for rows with no episode anchor
+  (`a3_unknown_reason = no_episode`); `no_evidence` no longer occurs.
+
+- **D-A3-28: promise deadline = GRR's threshold, whatever date was promised** (GRR Teams answer,
+  handoff 64, `bundle_helpers/a3_final/grr_broken_ptp_thresholds_handoff64.md`; user 2026-11-11:
+  the promised date is ignored; ships in bundle 23 with D-A3-27, pending its check). Replaces D-A3-25's deadline:
+  61–180 cards by the next statement after the promise day (unchanged); 61–180 loans by the end of
+  the promise month (was the end of the next month); 180+ cards and loans by the end of the promise
+  month. Paying on the deadline day counts. `PROMISE_DEADLINE` is keyed by segment (from
+  `params:model_id`) and product; the 30-day and next-month-end options stay.
+
+- **D-A3-29: a follow-up promise after the event's deadline is a new event** (user, 2026-11-13;
+  ships in bundle 25, sized by V1j Q0). Today `_followup_promises` chains rows less than 8 days
+  after the previous row into one run judged by the first row's deadline, so a follow-up after
+  that deadline (a new promise after a broken one) is never judged, and a chain can span weeks.
+  New rule: a follow-up starts a new event when it is more than 7 days after the previous one
+  **or** after the current event's `promise_cutoff`. Not a running sum any more: each row's own
+  cutoff first, then a per-account fold over the date-ordered rows (`F.aggregate`, no Python UDF).
+  Related, for V1j Q0 to size: at 180+ on cards (month-end deadline) a promise made on the last
+  day of the month has an empty payment window (loans unaffected: cash is dated at month end).
+
+- **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
+- **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.
+- **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
+  `bundle_helpers/b17_a3/a3_check_review.md`). An instalment is kept when the payments since the plan
+  start reach the plan's cumulative due by the first statement on or after the due date (CC) / the end
+  of the next month (RL). The two judges agree on 96.2% (CC) / 97.2% (RL) of states; DCORE credited
+  twice the kept instalments on CC (427 Highs rest only on it). The cumulative rule's cascade adds 1.8%
+  Broken on CC (accepted for now). The `dcore` option and `params:a3_kept_by` go in the next A3
+  bundle.
+- **D-A3-22: council answers taken into the engine** (user, 2026-11-05, refactor review
+  `questions.md`): anchor = the first day of the episode month (Q-11); rows A4 does not score are
+  Unknown, `a3_unknown_reason = no_episode` (Q-12); calendar-month windows (Q-13); DCORE windows
+  inclusive at the observation date (Q-22 / Q-27); a censored anchor (A4 cropped the history and the
+  episode ran from its first kept month) counts as unknown: windows from the observation lookback,
+  Dimension C No record, `pre_dlq_reason = censored` (Q-25); same-day ties on the latest right-party
+  contact: a non-refusal counts as later, then the largest disposition (Q-28); "a payment of 100 AED
+  after the refusal" = one cycle (CC) / month (RL) with 100 AED or more paid after the refusal day
+  (Q-29); DCORE read at most 24 months back, both products, the bundle check reports the refusals the
+  cap removes (Q-30); the onset cycle is in neither B nor C (Q-31); the instalments are an A3 source
+  node (Q-32 (a), until the DE adds a DCORE primary).
+- **D-A3-23: Broken scores −1 and is not a strong negative; refusal is the only one** (proposal
+  2026-11-05, in bundle 17). The weight (today's override / 0 / −1 / −2) is reported by the bundle
+  check's `A3 BROKEN` block; V1e part 2 (outcome) can still confirm it.
+
+## Bundle 17 (built 2026-11-06)
+
+`bundles/17_a3_credibility_engine.md`, on `611b23c..bf3b141` (branch `refactor/a3_stage`), after the
+refactor bundles 15 (dead code) and 16 (shared layer, A4, A2, A1). Engine `a3_credibility/`
+(constants, sources, signals, classify, pipeline) with CC / RL wrappers that build only the dues and
+payments; spec test `checks/a3_engine_spec.py` (72-cell map, both judges, grace, windows, contacts,
+instalments, Kedro runs of both products, the check). **Both D-A3-11 options ship**
+(`params:a3_kept_by`: `payments` with grace to the first statement on or after the due date (CC) /
+the end of the next month (RL), or `dcore`); the check `crx_<p>_a3_check` scores the latest month
+both ways against today's output. The user picks the judge from the check blocks; the losing option
+and the parameter then go in a small follow-up bundle.
 
 ## Validations before the bundle
 
@@ -221,8 +315,22 @@ whether the delinquency behaves as if paid). The user also questions how strict 
 
 ## Open (asked 2026-11-03)
 
+- **GRR's alternative Dimension A (user, 2026-11-09): promise events judged by a sufficient payment.**
+  A promise comes from the PTP / settlement tables and the DCORE follow-up result names; it is paid
+  when payments by the next statement (CC) / next month end (RL) cover the minimum payable due (oldest
+  bucket / EMI), partial when some but not enough; DPD bucket movement as the indirect reading (also at
+  180+). Exploration V1f, `bundle_helpers/a3_final/sonnet_a3_v1f_promise_events_prompt.md`: the
+  follow-up promise set, coverage gain, outcome by payment vs bucket movement, overlap with Dimension
+  B, levels, and which ranks next-3-month outcomes better. Bundle 17's instalment rule is the baseline.
+  V1f back 2026-11-09 for 60_180 (`bundle_helpers/a3_final/v1f_summary_60_180.md`, review
+  `thresholds_v1f_review.md`): follow-up promises raise coverage (33.5% vs 23.3% CC accounts) and are
+  paid as often as table plans, but the payment reading depends on the grace window's length (a fixed
+  window is needed), bucket movement adds nothing independent at 60–180, and A overlaps B in the
+  recent months (A's own information is in older events). 180+ not run.
+
+
 - Required inputs: settled by D2 (all A3 sources exist in PROD, so all are required; O73).
-- D-A3-11 (incl. the due-date grace): pending V1d.
+- D-A3-11: V1d back (2026-11-06, `v1d_summary_60_180.md`): the ledger is complete, DCORE 'paid' is premature (PTP) or late (settlement). Both options ship in bundle 17 for the comparison; proposal: payments, grace to the next statement. Open with it: the payments judge's cumulative rule breaks a settlement instalment that sits behind an earlier miss (V1d cascade addendum, `v1d_cascade_cc_60_180.md`: 65% of CC settlement G1 is behind an earlier miss, 72% pays its own amount by the cut-off); the user applies bundle 17 as is (2026-11-06) and reads the effect from the check (`A3 COMMITMENTS`, `A3 BROKEN`) before choosing.
 - **Broken commitments, proposal (user, 2026-11-05): Broken scores negative points and leaves the
   strong-negative list; refusal stays the only strong negative.** Today Broken scores 0 and fires a
   negative; without A the maximum is 3 points (< High's 4), so it always means Low, even for a regular
