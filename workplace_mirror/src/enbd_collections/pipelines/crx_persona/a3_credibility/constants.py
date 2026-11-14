@@ -12,20 +12,14 @@ BROKEN_RATE = 0.40  # Broken below (row 76)
 BROKEN_STREAK = 3  # Broken when the last 3 concluded were all broken (row 77)
 # The deadline a promise is judged by, whatever date was promised (D-A3-28): at 60-180 a
 # card promise by the next statement after the promise day, however close; a loan
-# promise, and every promise at 180+, by the end of the promise month. Other options:
-# "30_days" from the promise, "30_days_month_end", "next_month_end".
-DEADLINES = (
-    "next_statement",
-    "month_end",
-    "next_month_end",
-    "30_days",
-    "30_days_month_end",
-)
+# promise, and every promise at 180+, by the end of the promise month. The options and
+# their cutoffs: promises.CUTOFFS.
 PROMISE_DEADLINE = {
     SEG_60_180: {"cc": "next_statement", "rl": "month_end"},
     SEG_180_PLUS: {"cc": "month_end", "rl": "month_end"},
 }
 STATEMENT_FALLBACK_D = 31  # no statement after the promise day yet: 31 days
+PROMISE_DAYS = 30  # the "30_days" options: 30 days after the promise
 
 
 def promise_deadline(product: str, model_id: str, override: str | None = None) -> str:
@@ -37,6 +31,9 @@ def promise_deadline(product: str, model_id: str, override: str | None = None) -
 # ── Dimension B: payments while delinquent (D-A3-3, -5, -6) ───────────────────
 QUALIFYING_SHARE = 1.0  # a cycle qualifies at 100% of one month's due (row 80)
 MIN_PAYMENT_AED = 100  # and at least 100 AED; also "any payment" (D-A3-5)
+# Dimension A: the smallest promised amount and a partial payment (D-A3-29); the same
+# 100 AED today, kept apart so the two can move separately.
+PROMISE_MIN_AED = MIN_PAYMENT_AED
 REGULAR_FROM = {SEG_60_180: 2, SEG_180_PLUS: 3}  # qualifying cycles (rows 81, 89)
 ANY_PAYMENT_MONTHS = {SEG_60_180: 3, SEG_180_PLUS: 12}  # the Some window (row 25)
 

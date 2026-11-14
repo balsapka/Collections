@@ -40,6 +40,10 @@ def create_a3_pipeline(
     p = f"crx_{product}_a3"
     episode, ledger, inst = f"{p}_episode", LEDGER[product], f"{p}_instalments"
     events = f"{p}_promise_events"
+    commitments = f"{p}_commitment_signals"
+    dlq = f"{p}_dlq_payment_signals_single_payment_cycle_count"
+    pre_dlq = f"{p}_pre_dlq_payment_signals_single_payment_cycle_count"
+    contacts = f"{p}_strong_negative_signals"
 
     def step(func, inputs: dict, out: str, name: str) -> Node:
         return node(
@@ -95,19 +99,19 @@ def create_a3_pipeline(
             step(
                 build_commitment_signals,
                 {"episode": episode, "events": events},
-                f"{p}_commitment_signals",
-                f"{p}_commitment_signals",
+                commitments,
+                commitments,
             ),
             step(
                 build_dlq_payment_signals,
                 {"episode": episode, "ledger": ledger, "model_id": "params:model_id"},
-                f"{p}_dlq_payment_signals_single_payment_cycle_count",
+                dlq,
                 f"{p}_dlq_payment_signals",
             ),
             step(
                 build_pre_dlq_payment_signals,
                 {"episode": episode, "ledger": ledger},
-                f"{p}_pre_dlq_payment_signals_single_payment_cycle_count",
+                pre_dlq,
                 f"{p}_pre_dlq_payment_signals",
             ),
             step(
@@ -121,17 +125,17 @@ def create_a3_pipeline(
                     "dues": f"{p}_dues",
                     "model_id": "params:model_id",
                 },
-                f"{p}_strong_negative_signals",
+                contacts,
                 f"{p}_contact_signals",
             ),
             step(
                 partial(build_a3_credibility, product=product, deadline=deadline),
                 {
                     "episode": episode,
-                    "commitments": f"{p}_commitment_signals",
-                    "dlq_payments": f"{p}_dlq_payment_signals_single_payment_cycle_count",
-                    "pre_dlq": f"{p}_pre_dlq_payment_signals_single_payment_cycle_count",
-                    "contacts": f"{p}_strong_negative_signals",
+                    "commitments": commitments,
+                    "dlq_payments": dlq,
+                    "pre_dlq": pre_dlq,
+                    "contacts": contacts,
                     "model_id": "params:model_id",
                     "persona_end_date": "params:crx_persona.persona_end_date",
                 },

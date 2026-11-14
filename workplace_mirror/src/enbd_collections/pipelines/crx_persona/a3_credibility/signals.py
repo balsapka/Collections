@@ -272,6 +272,11 @@ _DISPOSITIONS = [  # first match wins
 ]
 
 
+# Contacts on the same day: the one later in this order counts as the latest (Q-28: a
+# refusal never outranks another contact of its day).
+_SAME_DAY_ORDER = ("refusal", "dispute", "hung_up", "paid", "ptp", "success")
+
+
 def _disposition(name: Column) -> Column:
     """The ``_DISPOSITIONS`` label of a DCORE result name (NULL: not a contact)."""
     out = F.lit(None).cast("string")
@@ -341,15 +346,16 @@ def _contact_events(
 
 def _contact_summary(events: DataFrame) -> DataFrame:
     """Per base row: the latest right-party contact (``last_rpc_date``,
-    ``last_rpc_disposition``), the call days (``contact_dates_n``), the days with no
-    pickup after the contact (``no_pickup_days_n``) and ``_dead``, 1 when a dead-line
-    result came after it."""
+    ``last_rpc_disposition``; on one day, the latest by ``_SAME_DAY_ORDER``), the call
+    days (``contact_dates_n``), the days with no pickup after the contact
+    (``no_pickup_days_n``) and ``_dead``, 1 when a dead-line result came after it."""
+    same_day_rank = F.lit(None).cast("int")
+    for rank, label in enumerate(_SAME_DAY_ORDER):
+        same_day_rank = F.when(F.col("_disp") == label, rank).otherwise(same_day_rank)
     latest = F.max(
         F.when(
             F.col("_disp").isNotNull(),
-            F.struct(
-                "day", (F.col("_disp") != "refusal").cast("int").alias("later"), "_disp"
-            ),
+            F.struct("day", same_day_rank.alias("same_day_rank"), "_disp"),
         )
     )
     no_pickup = F.col("name").isin(
