@@ -1,40 +1,40 @@
-"""Golden outputs of the live crx_persona pipelines (refactor gate 4, PLAN §5 Phase 0).
+"""Behaviour oracle of the persona pipelines (refactor gate 4, PLAN §5 / §6).
 
     JAVA_HOME=/opt/homebrew/opt/openjdk@17 \
-        python workplace_mirror/checks/refactor_golden.py [--record]
+        python workplace_mirror/checks/refactor_golden.py [--record] [--only SUBSTR]
 
-Runs every tier-L pipeline (obs bases, A1, A2, full histories + A4; CC and RL) through
-Kedro's SequentialRunner on small synthetic inputs, once per model_id, and checks every
-dataset the pipelines write:
+Runs the pipelines on the synthetic inputs of ``golden_inputs.py`` through Kedro's
+SequentialRunner (MemoryDatasets, Spark local, one job at a time), once per model_id,
+and checks every dataset they write:
 
-* ``--record`` saves ``refactor_review/00_baseline/golden/<run>/<dataset>.parquet``
-  (gitignored), ``manifest.json`` (rows, schema, order-independent hash per dataset) and
-  ``harness_coverage.md`` (which states and rule branches the inputs reach);
-* the default compares schema and rows (``exceptAll`` both ways) with the parquet, or
-  with the manifest hash when the parquet is absent, and exits 1 naming the dataset
-  and example rows.
+* tier L: A1 and A3 (CC and RL, both segments; A3 also with the other promise
+  deadlines), ``product_primary`` + ``product_features``, ``bureau_salary_bounces``;
+* tier K: ``crx_cc_raw_extract`` (in the CC A3 runs);
+* regression guard (tier S is editable): the obs bases, A2, the full histories + A4.
 
-Inputs: A1 = the cases of ``a1_engine_spec.py`` (executed for its feature frames);
-A2 = the cases of ``a2_engine_spec.py`` (captured from its ``main``); A4 = the journeys
-below, one per state and per history rule. ``computed_at`` (the run clock) is ignored.
-Three guard runs must fail: a mid-month RL spine, a missing required column, an unknown
-dpd_journey key.
+``--record`` saves ``refactor_review/00_baseline/golden/<run>/<dataset>.parquet``
+(gitignored), ``manifest.json`` (rows, schema, order-independent hash per dataset) and
+``harness_coverage.md`` (the values the state columns reach, and what is not covered).
+The default compares schema and rows (``exceptAll`` both ways) with the parquet, or with
+the manifest hash when the parquet is absent, and exits 1 naming the dataset and example
+rows. ``computed_at`` (the run clock) is ignored. Guard runs must raise.
 """
 
-import contextlib
+# pylint: disable=wrong-import-position
 import datetime as dt
-import functools
 import hashlib
-import io
 import json
 import logging
 import os
 import pathlib
 import sys
 import time
+import warnings
 
 HERE = pathlib.Path(__file__).resolve().parent
 os.environ.setdefault("JAVA_HOME", "/opt/homebrew/opt/openjdk@17")
+os.environ["TZ"] = "UTC"  # naive datetimes in the inputs are UTC, as the session
+time.tzset()
 sys.path[:0] = [str(HERE.parent / "src"), str(HERE)]
 
 from kedro.io import DataCatalog, MemoryDataset  # noqa: E402
@@ -44,24 +44,38 @@ from pyspark.sql import functions as F  # noqa: E402
 
 spark = (
     SparkSession.builder.master("local[2]")
+    .config("spark.driver.memory", "2g")
     .config("spark.sql.shuffle.partitions", "4")
     .config("spark.ui.enabled", "false")
     .config("spark.ui.showConsoleProgress", "false")
     .config("spark.sql.session.timeZone", "UTC")
+    .config("spark.driver.extraJavaOptions", "-Duser.timezone=UTC")
     .getOrCreate()
 )
 spark.sparkContext.setLogLevel("ERROR")
 logging.getLogger().setLevel(logging.WARNING)
 logging.getLogger("kedro").setLevel(logging.CRITICAL)  # the guard runs log their errors
+warnings.filterwarnings("ignore", message=".*'partial' function.*")
 
+import golden_inputs as gi  # noqa: E402
+
+STUBBED = gi.install_workplace_stubs()
+
+from enbd_collections.pipelines.bureau import salary_bounces  # noqa: E402
 from enbd_collections.pipelines.crx_persona import (  # noqa: E402
     cc_a1_ability,
     cc_a2_locatability,
+    cc_a3_payment_credibility,
+    cc_raw_extract,
     obs_base,
     rl_a1_ability,
     rl_a2_locatability,
+    rl_a3_payment_credibility,
     rl_a4_deterioration,
     rl_full_history,
+)
+from enbd_collections.pipelines.crx_persona.a3_credibility import (  # noqa: E402
+    create_a3_pipeline,
 )
 from enbd_collections.pipelines.crx_persona.cc_a4_deterioration import (  # noqa: E402
     pipeline as cc_a4_deterioration,
@@ -69,410 +83,159 @@ from enbd_collections.pipelines.crx_persona.cc_a4_deterioration import (  # noqa
 from enbd_collections.pipelines.crx_persona.cc_full_history import (  # noqa: E402
     pipeline as cc_full_history,
 )
-
-import a2_engine_spec  # noqa: E402
-from a4_chain_spec import month_end  # noqa: E402
+from enbd_collections.pipelines.products import features as product_features  # noqa
+from enbd_collections.pipelines.products import primary as product_primary  # noqa
 
 OUT = HERE.parent / "refactor_review" / "00_baseline"
 GOLDEN = OUT / "golden"
 IGNORED = ["computed_at"]
-CC_MODELS, RL_MODELS = ("cc_60_180", "cc_180_plus"), ("rl_60_180", "rl_180_plus")
-df = spark.createDataFrame
-
-
-# ── A1 and A2: the spec tests' cases ──────────────────────────────────────────
-
-
-@functools.cache
-def a1_inputs() -> tuple[dict, dict, dict]:
-    """CC inputs, RL inputs and the persona dates of the A1 spec cases, plus a few
-    obs-base rows: two billing dates in one month with different CIFs, a row without a
-    CIF and one before the persona months."""
-    ns: dict = {
-        "__name__": "a1_engine_spec",
-        "__file__": str(HERE / "a1_engine_spec.py"),
-    }
-    code = compile((HERE / "a1_engine_spec.py").read_text(), ns["__file__"], "exec")
-    # the spec gate reports a failure; the frames are built before its asserts
-    with contextlib.redirect_stdout(io.StringIO()), contextlib.suppress(
-        SystemExit, AssertionError
-    ):
-        exec(code, ns)  # pylint: disable=exec-used
-    obs = ns["OBS"]
-    extra = [
-        ("Z1", dt.date(2026, 7, 3), 5000),
-        ("Z1", dt.date(2026, 7, 28), 5001),
-        ("Z2", obs, None),
-        ("Z3", dt.date(2026, 5, 31), 5003),
-    ]
-    spine = ns["rows"]["spine"] + extra
-    shared = {
-        "feat_cif_internal_salary_monthly": ns["internal_salary"],
-        "feat_cif_bureau_salary_monthly": ns["bureau_salary"],
-        "feat_cif_casa_balance_monthly": ns["casa_balance"],
-        "feat_cif_ext_card_payment_monthly": ns["payments"],
-        "feat_cif_casa_activity_monthly": ns["activity"],
-        "feat_cif_returns_monthly": ns["returns"],
-        "feat_cif_bureau_bounces_monthly": ns["bounces"],
-        "dcore_prm_followup_outcomes": ns["followup"],
-        "prm_dcore_account_agreements": ns["agreements"],
-    }
-    cc = {
-        **shared,
-        "cc_spine": df(spine, "contract_id string, observation_date date, cif_id long"),
-        "prm_balance": ns["balance"],
-    }
-    june = dt.date(2026, 6, 30)
-    rl = {
-        **shared,
-        "rl_spine": df(
-            [r for r in spine if r[1] == obs],
-            "account_id string, observation_date date, cif_id long",
-        ),
-        "int_loan_master": df(
-            [
-                ("A0", obs, 2000.0),
-                ("A1", obs, 0.0),
-                ("A2", june, 1500.0),
-                ("A6", obs, 3000.0),
-            ],
-            "account_id string, observation_date date, installment_due_amount double",
-        ),
-        "feature_retail_loans": df(
-            [
-                ("A0", obs, ns["m"](2, 10), 6000.0),
-                ("A1", obs, ns["m"](0, 5), 7000.0),
-                ("A5", obs, ns["m"](1, 10), 2500.0),
-            ],
-            "account_id string, observation_date date, aecb_bureau_pull_date date,"
-            " aecb_last_salary_credit_amount double",
-        ),
-    }
-    return cc, rl, ns["PERSONA"]
-
-
-COMBOS = {
-    "AX1": ("01", "R7"),
-    "AX2": ("02", "R1"),
-    "AX3": ("01", "R1"),
-    "AX4": ("02", "R7"),
-}
-
-
-@functools.cache
-def a2_inputs() -> tuple[dict, dict]:
-    """CC and RL inputs of the A2 spec cases (``main`` runs once with the signal
-    builders wrapped to keep their first inputs), plus the ``COMBOS`` accounts."""
-    seen: dict = {}
-
-    def keep(name):
-        real = getattr(a2_engine_spec, name)
-
-        def wrapper(*args):
-            seen.setdefault(name, args)
-            return real(*args)
-
-        setattr(a2_engine_spec, name, wrapper)
-
-    for name in (
-        "build_location_signals",
-        "build_dcore_signals",
-        "build_way4_deceased",
-        "build_demographics_deceased",
-    ):
-        keep(name)
-    with contextlib.redirect_stdout(io.StringIO()):
-        a2_engine_spec.main()
-    base, features, _ = seen["build_location_signals"]
-    _, followup, agreements, _ = seen["build_dcore_signals"]
-    _, contracts, clients = seen["build_way4_deceased"]
-    # location × reachability pairs no case has: one case's customer, another's calls
-    for account, (place, calls) in COMBOS.items():
-        base = base.unionByName(
-            base.filter(F.col("account_id") == f"A{place}").withColumn(
-                "account_id", F.lit(account)
-            )
-        )
-        agreements = agreements.unionByName(
-            agreements.filter(F.col("account_id") == f"A{calls}").withColumn(
-                "account_id", F.lit(account)
-            )
-        )
-    shared = {
-        "feat_cif_location_monthly": features,
-        "dcore_prm_followup_outcomes": followup,
-        "prm_dcore_account_agreements": agreements,
-        "prm_contract": contracts,
-        "prm_client": clients,
-        "feat_demographics_cif": seen["build_demographics_deceased"][1],
-    }
-    spine = base.select("account_id", "observation_date", "cif_id")
-    return (
-        {**shared, "cc_spine": spine.withColumnRenamed("account_id", "contract_id")},
-        {**shared, "rl_spine": spine},
-    )
-
-
-# ── A4: one journey per state and per history rule ────────────────────────────
-# Month i = month_end(i) (0 = Jan 2024); the persona ends in month 29 (Jun 2026).
-# Buckets are CC native (canonical); None = no row that month. RL uses canonical - 1.
-END = 29
-JOURNEYS = {  # account: (first month, buckets, what it exercises)
-    0: (-8, [1] * 38, "clean all along: not classified; earliest source month"),
-    1: (24, [1, 1, 2, 3, 4, 5], "early_payment_default"),
-    2: (
-        12,
-        [1, 1, None, 1, 1, 1, 1, 1, 2, 3, 4, 5, 5, 5, 5, 5, 5, 5],
-        "stabilized; gap filled",
-    ),
-    3: (10, [1] * 6 + [2, 3] + [1] * 4 + [2, 3, 4, 5, 6, 7, 7, 7], "repeat_delinquent"),
-    4: (
-        8,
-        [1] * 16 + [2, 3, 4, None, 6, 7],
-        "straight_roller_seasoned; straight-roll gap",
-    ),
-    5: (18, [1] * 6 + [2, 3, 4, 5, 6, 7], "straight_roller_early_life"),
-    6: (16, [1] * 6 + [2, 2, 3, 3, 4, 5, 6, 7], "slow_roller"),
-    7: (
-        -3,
-        [3, 4, 5, 6, 7, 8] + [9] * 27,
-        "unknown: history before the CC floor (cropped)",
-    ),
-    8: (20, [5] * 10, "Q0 stabilized: CC opened delinquent (restructure blind spot)"),
-    9: (
-        14,
-        [1, 1, 1, 4, 1, 1, 2, 3, 3, 5, 6, None, 4, 5, 6, 7],
-        "glitch, +2 jump (repaired on CC), inferred gap",
-    ),
-    10: (
-        10,
-        [1] * 5 + [None] * 4 + [4, 5, 6, 7, 8, 9, 9, 9, 9, 9, 9],
-        "unresolvable gap: truncated, or dropped (alt run)",
-    ),
-}
-SPINE_MONTHS = {
-    2: [27],
-    7: [1],
-    5: [17],
-    1: [31],
-}  # extra rows: earlier / outside history
-A4_PERSONA = {
-    "persona_start_date": "2026-01-01",
-    "persona_end_date": str(month_end(END)),
-}
-ALT = {  # every dpd_journey switch flipped
-    "cc_history_floor_date": None,
-    "rl_history_floor_date": "2024-01-01",
-    "on_unresolvable_gap": "drop",
-    "fill_straight_roll_gaps": False,
-    "repair_cycle_shift": False,
-    "max_inferred_gap_months": 0,
-    "log_stats": True,
-}
-
-
-def _months(first, buckets):
-    for i, b in enumerate(buckets):
-        if b is not None:
-            yield first + i, b
-
-
-@functools.cache
-def cc_a4_inputs() -> dict:
-    """raw_stg_billing + cc_spine (mid-month billing dates). Beyond JOURNEYS: account 11
-    has a cycle shift (two bills in a month next to an empty one) and two bills in a
-    month with both neighbours present; 12 has no valid bucket (none, out of range,
-    NULL); 13 has rows only before the floor; 99 is not on the spine; 4 has two rows on
-    one date."""
-    rows = [
-        (a, month_end(i).replace(day=15), f"X;BS_PMT_CYCLE_DUE={b}")
-        for a, (first, buckets, _) in JOURNEYS.items()
-        for i, b in _months(first, buckets)
-    ]
-    shift = [1] * 4 + [None, 1] + [1] * 4 + [2, 3, 4, 5]  # months 16..29, 20 empty
-    rows += [
-        (11, month_end(i).replace(day=15), f"BS_PMT_CYCLE_DUE={b}")
-        for i, b in _months(16, shift)
-    ]
-    rows += [
-        (11, month_end(21).replace(day=1), "BS_PMT_CYCLE_DUE=1"),  # moves to month 20
-        (11, month_end(25).replace(day=2), "BS_PMT_CYCLE_DUE=1"),  # duplicate month
-        (12, month_end(25).replace(day=15), "NO_BUCKET"),
-        (13, month_end(-6).replace(day=15), "BS_PMT_CYCLE_DUE=4"),
-        (99, month_end(28).replace(day=15), "BS_PMT_CYCLE_DUE=5"),
-        (12, month_end(22).replace(day=15), "BS_PMT_CYCLE_DUE=12"),  # out of range
-        (12, month_end(23).replace(day=15), None),
-        (4, month_end(9).replace(day=15), "BS_PMT_CYCLE_DUE=0"),  # same date as a 1
-    ]
-    billing = df(
-        [(float(a), d, info) for a, d, info in rows],
-        "contract_idt double, billing_date date, add_info string",
-    ).withColumn(
-        "billing_date", F.col("billing_date").cast("timestamp")
-    )  # UTC midnight
-    accounts = [*JOURNEYS, 11, 12, 13]
-    spine = [(a, month_end(END).replace(day=12), f"C{a}") for a in accounts]
-    spine += [(a, month_end(i), f"C{a}") for a, ms in SPINE_MONTHS.items() for i in ms]
-    return {
-        "raw_stg_billing": billing,
-        "cc_spine": df(spine, "contract_id long, observation_date date, cif_id string"),
-    }
-
-
-@functools.cache
-def rl_a4_inputs() -> dict:
-    """int_loan_master, rl_spine, int_loan_restructure_link, feature_retail_loans.
-    JOURNEYS on the RL scale (canonical 9 caps at RL 7; L7 starts in the source's first
-    month, so it is the cropped one), plus the chain cases of a4_chain_spec: L20 linked,
-    L21 linked late (the row before the link reads its own history), L22 restructured
-    with no original (blind), L23 raw flag only, L24 a chain of two originals."""
-
-    def rl(buckets):
-        return [None if b is None else min(max(b - 1, 0), 7) for b in buckets]
-
-    journeys = {
-        f"L{a}": (first, rl(buckets)) for a, (first, buckets, _) in JOURNEYS.items()
-    }
-    journeys["L7"] = (-12, rl([3] * 9 + JOURNEYS[7][1]))  # the earliest source month
-    journeys |= {
-        "L20": (26, [0, 1, 2, 3]),
-        "L21": (26, [0, 1, 2, 3]),
-        "L22": (25, [2, 2, 2, 2, 3]),
-        "L23": (26, [0, 1, 2, 3]),
-        "L24": (27, [1, 2, 3]),
-        "O20": (10, [0] * 15 + [1, 2, 3]),
-        "O21": (10, [0] * 15 + [1, 2, 3]),
-        "O24a": (14, [0] * 10 + [1, 2]),
-        "O24b": (8, [0] * 6 + [1, 1, 0]),
-    }
-    closed = {("O20", 28), ("O21", 28), ("O24a", 27)}
-    master = [
-        (
-            f"C{a}",
-            a,
-            month_end(i),
-            b,
-            1.0,
-            1000.0,
-            int(a == "L23"),
-            "Personal",
-            "ACTIVE",
-        )
-        for a, (first, buckets) in journeys.items()
-        for i, b in _months(first, buckets)
-    ] + [
-        (f"C{a}", a, month_end(i), 0, 1.0, 0.0, 0, "Personal", "CLOSED")
-        for a, i in closed
-    ]
-    on_spine = [a for a in journeys if a.startswith("L")]
-    spine = [(a, month_end(END), f"C{a}") for a in on_spine]
-    spine += [
-        (f"L{a}", month_end(i), f"CL{a}") for a, ms in SPINE_MONTHS.items() for i in ms
-    ]
-    spine += [("L21", month_end(28), "CL21")]
-    link = [
-        ("L20", "O20", month_end(28), month_end(28), "one_to_one", 1),
-        ("L21", "O21", month_end(29), month_end(28), "one_to_one", 1),
-        ("L22", None, month_end(29), None, None, 0),
-        ("L24", "O24a", month_end(27), month_end(27), "one_to_one", 1),
-        ("O24a", "O24b", month_end(17), month_end(16), "many_to_one", 3),
-    ]
-    flagged = {"L8", "L20", "L21", "L22", "L24"}
-    return {
-        "int_loan_master": df(
-            master,
-            "cif_id string, account_id string, observation_date date,"
-            " dpd_bucket int, emi_coverage_ratio double, outstanding_balance"
-            " double, is_restructured int, loan_type string,"
-            " account_status string",
-        ),
-        "rl_spine": df(
-            spine, "account_id string, observation_date date, cif_id string"
-        ),
-        "int_loan_restructure_link": df(
-            link,
-            "account_id string, orig_account_id string,"
-            " restr_flagged_date date, orig_close_date date,"
-            " match_type string, candidate_count int",
-        ),
-        "feature_retail_loans": df(
-            [(a, month_end(END), int(a in flagged)) for a in on_spine],
-            "account_id string, observation_date date,"
-            " has_restructured_loan_flag int",
-        ),
-    }
+MODELS = {"cc": ("cc_60_180", "cc_180_plus"), "rl": ("rl_60_180", "rl_180_plus")}
+A3_FLOOR = "2024-01-01"  # params:cc_a3_history_floor_date (conf/base)
 
 
 # ── Runs ──────────────────────────────────────────────────────────────────────
 
 
-PRODUCTS = {  # models, obs base, A1, A2, full history, A4
-    "cc": (CC_MODELS, obs_base.create_cc_pipeline, cc_a1_ability, cc_a2_locatability,
-           cc_full_history, cc_a4_deterioration),
-    "rl": (RL_MODELS, obs_base.create_rl_pipeline, rl_a1_ability, rl_a2_locatability,
-           rl_full_history, rl_a4_deterioration),
-}  # fmt: skip
+def _a3(product: str, deadline: str | None = None):
+    """The product's A3 pipeline; CC also builds its raw extract first."""
+    wrapper = {"cc": cc_a3_payment_credibility, "rl": rl_a3_payment_credibility}
+    module = wrapper[product]
+    if deadline is None:
+        a3 = module.create_pipeline()
+    else:  # the extension point: another promise deadline, same nodes
+        a3 = create_a3_pipeline(
+            product,
+            f"crx_{product}_a3_payment_credibility",
+            module.pipeline.DUES,
+            module.pipeline.PAYMENTS,
+            deadline,
+        )
+    return cc_raw_extract.create_pipeline() + a3 if product == "cc" else a3
 
 
-def runs() -> list[tuple[str, object, str, dict, dict]]:
-    """(run name, pipeline, model_id, crx_persona, inputs): each product's A1, A2 and A4
-    per model_id, and A4 once more with ``ALT``."""
-    a1_cc, a1_rl, persona = a1_inputs()
-    a2_cc, a2_rl = a2_inputs()
-    inputs = {
-        "cc": (a1_cc, a2_cc, cc_a4_inputs()),
-        "rl": (a1_rl, a2_rl, rl_a4_inputs()),
+def runs() -> list[tuple[str, object, str, dict, object]]:
+    """(run name, pipeline, model_id, params, inputs builder)."""
+    a1 = {"cc": cc_a1_ability, "rl": rl_a1_ability}
+    a2 = {"cc": cc_a2_locatability, "rl": rl_a2_locatability}
+    a4 = {
+        "cc": cc_full_history.create_pipeline() + cc_a4_deterioration.create_pipeline(),
+        "rl": rl_full_history.create_pipeline() + rl_a4_deterioration.create_pipeline(),
     }
+    obs = {"cc": obs_base.create_cc_pipeline, "rl": obs_base.create_rl_pipeline}
+    built = {  # product: (A1, A2, A4, A3 inputs), each a builder (cached)
+        "cc": (lambda: gi.a1_inputs()[0], lambda: gi.a2_inputs()[0], gi.cc_a4_inputs,
+               gi.cc_a3_inputs),
+        "rl": (lambda: gi.a1_inputs()[1], lambda: gi.a2_inputs()[1], gi.rl_a4_inputs,
+               gi.rl_a3_inputs),
+    }  # fmt: skip
+    a1_persona = {"crx_persona": gi.A1_PERSONA}
+    a3_params = {"crx_persona": gi.A3_PERSONA, "cc_a3_history_floor_date": A3_FLOOR}
     out = []
-    for product, (models, obs, a1, a2, history, a4) in PRODUCTS.items():
-        in_a1, in_a2, in_a4 = inputs[product]
-        journey = history.create_pipeline() + a4.create_pipeline()
+    for p, models in MODELS.items():
+        in_a1, in_a2, in_a4, in_a3 = built[p]
         for m in models:
             out += [
-                (f"crx_{product}_a1_ability.{m}", obs() + a1.create_pipeline(), m,
-                 persona, in_a1),
-                (f"crx_{product}_a2_locatability.{m}", obs() + a2.create_pipeline(), m,
-                 persona, in_a2),
-                (f"crx_{product}_a4_deterioration.{m}", journey, m, A4_PERSONA, in_a4),
+                (f"crx_{p}_a1_ability.{m}", obs[p]() + a1[p].create_pipeline(), m,
+                 a1_persona, in_a1),
+                (f"crx_{p}_a3_payment_credibility.{m}", obs[p]() + _a3(p), m,
+                 a3_params, in_a3),
+                (f"crx_{p}_a2_locatability.{m}", obs[p]() + a2[p].create_pipeline(), m,
+                 a1_persona, in_a2),
+                (f"crx_{p}_a4_deterioration.{m}", a4[p], m,
+                 {"crx_persona": gi.A4_PERSONA}, in_a4),
             ]  # fmt: skip
-        alt = {**A4_PERSONA, "dpd_journey": ALT}
+        m = models[0]
+        alt = {"crx_persona": {**gi.A4_PERSONA, "dpd_journey": gi.A4_ALT}}
+        out.append((f"crx_{p}_a4_deterioration.{m}_alt", a4[p], m, alt, in_a4))
+    # the other promise deadlines; the CC run also moves the history floor past
+    # the first statements
+    for p, deadline, floor in (
+        ("cc", "30_days", "2025-06-01"),
+        ("rl", "next_month_end", A3_FLOOR),
+        ("rl", "30_days_month_end", A3_FLOOR),
+    ):
+        params = {**a3_params, "cc_a3_history_floor_date": floor}
         out.append(
-            (f"crx_{product}_a4_deterioration.{models[0]}_alt", journey, models[0], alt,
-             in_a4)
+            (f"crx_{p}_a3_payment_credibility.{MODELS[p][0]}_{deadline}",
+             obs[p]() + _a3(p, deadline), MODELS[p][0], params, built[p][3])
         )  # fmt: skip
+    products = product_primary.create_pipeline() + product_features.create_pipeline()
+    out += [
+        ("product_primary+product_features", products, "cc_60_180",
+         gi.PRODUCTS_PARAMS, gi.product_inputs),
+        ("bureau_salary_bounces", salary_bounces.create_pipeline(), "cc_60_180", {},
+         gi.bureau_inputs),
+    ]  # fmt: skip
     return out
 
 
-def guards(persona: dict, a1_cc: dict) -> list[tuple[str, object, str, dict, dict]]:
+def guards() -> list[tuple[str, object, str, dict, dict]]:
     """Runs that must raise."""
-    bad_spine = df(
+    a1_cc, persona = gi.a1_inputs()[0], gi.A1_PERSONA
+    bad_spine = gi.df(
         [("X", dt.date(2026, 7, 15), 1)],
         "account_id string, observation_date date, cif_id long",
     )
     no_bucket = {**a1_cc, "prm_balance": a1_cc["prm_balance"].drop("overdue_bucket_06")}
-    stale_key = {**A4_PERSONA, "dpd_journey": {"det_option": 1}}
+    stale_key = {"crx_persona": {**gi.A4_PERSONA, "dpd_journey": {"det_option": 1}}}
     cc_journey = (
         cc_full_history.create_pipeline() + cc_a4_deterioration.create_pipeline()
     )
+    rl_a3 = gi.rl_a3_inputs()
+    no_paid = {**rl_a3, "int_loan_master": rl_a3["int_loan_master"].drop("total_paid")}
+    a3_params = {"crx_persona": gi.A3_PERSONA}
+    bureau = gi.bureau_inputs()
+    no_source = {
+        **bureau,
+        "feat_bureau_salary_unified": bureau["feat_bureau_salary_unified"].drop(
+            "salary_source"
+        ),
+    }
+    products = gi.product_inputs()
+    no_woff = {
+        **products,
+        "bo_rr_portf_actv_acct_mthly": products["bo_rr_portf_actv_acct_mthly"].drop(
+            "ra_woff_dt"
+        ),
+    }
+    rl_obs = obs_base.create_rl_pipeline()
     return [
-        ("mid-month RL spine", obs_base.create_rl_pipeline(), "rl_60_180", persona,
+        ("mid-month RL spine", rl_obs, "rl_60_180", {"crx_persona": persona},
          {"rl_spine": bad_spine}),
         ("prm_balance without overdue_bucket_06", obs_base.create_cc_pipeline()
-         + cc_a1_ability.create_pipeline(), "cc_60_180", persona, no_bucket),
-        ("unknown dpd_journey key", cc_journey, "cc_60_180", stale_key, cc_a4_inputs()),
+         + cc_a1_ability.create_pipeline(), "cc_60_180", {"crx_persona": persona},
+         no_bucket),
+        ("unknown dpd_journey key", cc_journey, "cc_60_180", stale_key,
+         gi.cc_a4_inputs()),
+        ("unknown promise deadline", rl_obs + _a3("rl", "tomorrow"), "rl_60_180",
+         a3_params, rl_a3),
+        ("int_loan_master without total_paid (RL A3)", rl_obs + _a3("rl"),
+         "rl_60_180", a3_params, no_paid),
+        ("feat_bureau_salary_unified without salary_source",
+         salary_bounces.create_pipeline(), "cc_60_180", {}, no_source),
+        ("loan portfolio without ra_woff_dt", product_primary.create_pipeline(),
+         "cc_60_180", gi.PRODUCTS_PARAMS, no_woff),
     ]  # fmt: skip
 
 
 class _Kept(MemoryDataset):
-    """A MemoryDataset the runner cannot release, so intermediates can be read after."""
+    """A MemoryDataset the runner cannot release, so intermediates can be read after.
+    A saved DataFrame is checkpointed (computed once, lineage cut), as a persisted
+    catalog dataset would be: without it the last node's plan holds the whole
+    pipeline and the 2 GB driver spends its time in garbage collection."""
+
+    def save(self, data) -> None:
+        if hasattr(data, "localCheckpoint"):
+            data = data.localCheckpoint(eager=True)
+        super().save(data)
 
     def _release(self) -> None:
         pass
 
 
-def run_pipeline(pipeline, model_id: str, persona: dict, inputs: dict) -> dict:
+def run_pipeline(pipeline, model_id: str, params: dict, inputs: dict) -> dict:
     """Every dataset ``pipeline`` writes, run on MemoryDatasets."""
-    params = {"model_id": model_id, "crx_persona": persona}
+    params = {"model_id": model_id, **params}
     data = {}
     for name in pipeline.datasets():
         if name.startswith("params:"):
@@ -525,25 +288,62 @@ def compare(
     return lines
 
 
-# Columns whose values show which rule branches the inputs reach.
+# ── Coverage ──────────────────────────────────────────────────────────────────
+# Per output kind (the dataset name without the crx_<product>_ prefix): the values a
+# column should reach; "NULL" stands for a missing value.
 STATE_COLUMNS = {
     "a1_ability": {
         "a1_state": ["high", "moderate", "low", "unknown"],
-        "a1_income_level": ["stable", "weak", "none"],
-        "a1_liquidity_level": ["adequate", "weak", "none"],
+        "a1_reason": ["income", "money_in", "money_out", "cross_product", "distress"],
         "a1_unknown_reason": ["no_casa", "dormant_casa"],
-        "a1_income_source": ["internal", "bureau", "both", "none"],
-        "a1_points_total": [0, 1, 2, 3, 4],
+        "a1_income_level": ["stable", "weak", "none"],
+        "a1_money_in_level": ["strong", "some", "none", "NULL"],
+        "a1_money_out_level": ["strong", "some", "none", "NULL"],
+        "a1_cross_product_level": ["strong", "some", "none"],
+        "a1_points_total": [0, 2, 4, 6],
         "a1_distress_flag": [0, 1],
+        "a1_sweepable_balance_flag": [0, 1],
         "a1_eosb_flag": [0, 1],
+        "a1_income_source": ["internal", "bureau", "both", "none"],
         "a1_salary_stopped": [0, 1],
-    },
-    "a1_distress_signals": {
-        "distress_cheque": [0, 1],
-        "distress_dds": [0, 1],
-        "distress_bureau": [0, 1],
+        "liquidity_anchor_amt": ["NULL", "value"],
     },
     "a1_liquidity_anchor": {"liquidity_anchor_amt": ["NULL", "value"]},
+    "a3_payment_credibility": {
+        "a3_state": [f"payment_credibility_{s}" for s in ("high", "moderate", "low",
+                                                          "unknown")],
+        "a3_commitments_level": ["kept", "partly_kept", "thin", "broken"],
+        "a3_dlq_payment_level": ["regular", "some", "none"],
+        "a3_pre_dlq_payment_level": ["clean", "not_clean", "no_record"],
+        "pre_dlq_reason": ["no_episode", "censored", "NULL"],
+        "a3_unknown_reason": ["no_episode", "NULL"],
+        "a3_override": ["refusal", "NULL"],
+        "a3_promise_deadline": ["next_statement", "month_end", "next_month_end",
+                                "30_days", "30_days_month_end"],
+        "last_rpc_disposition": ["paid", "refusal", "dispute", "hung_up", "ptp",
+                                 "success", "NULL"],
+        "a3_refusal_flag": [True, False],
+        "refusal_followed_by_plan": [True, False],
+        "refusal_followed_by_payment": [True, False],
+        "a3_dispute_flag": [True, False],
+        "a3_hung_up_last": [True, False],
+        "a3_no_pickup_after_contact": [True, False],
+        "episode_left_censored": [True, False, "NULL"],
+        "a3_points_total": [-1, 0, 1, 2, 3, 4, 5],
+    },
+    "a3_promise_events": {
+        "event_kind": ["matched", "table_only", "followup_only"],
+        "event_source": ["ptp", "settlement", "followup"],
+        "promise_outcome": ["paid", "partial", "none"],
+    },
+    "cross_product_monthly": {
+        "product_type": ["deposit", "investment", "wm", "card", "loan"],
+        "is_current": [0, 1, "NULL"],
+    },
+    "card_month_end": {"minimum_due": ["NULL", "value"]},
+    "bureau_salary_monthly": {
+        "salary_source": ["alert", "salary_credit", "bureau_salary"]
+    },
     "a2_locatability": {
         "location_rule": ["L1", "L2", "L3", "L4"],
         "location_unknown_reason": ["no_evidence", "domestic_before_window"],
@@ -558,31 +358,21 @@ STATE_COLUMNS = {
         ],
     },
     "dpd_sequences": {
-        "build_status": [
-            "ok",
-            "no_valid_rows",
-            "no_rows_in_window",
-            "dropped_unresolvable_gap",
-        ],
+        "build_status": ["ok", "no_valid_rows", "no_rows_in_window",
+                         "dropped_unresolvable_gap"],
         "history_cropped": [True, False],
         "restructure_blind_spot_flag": [0, 1],
         "legacy_drop": [True, False],
     },
     "a4_deterioration": {
-        "det_state": [
-            "unknown",
-            "early_payment_default",
-            "stabilized",
-            "repeat_delinquent",
-            "straight_roller_seasoned",
-            "straight_roller_early_life",
-            "slow_roller",
-        ],
+        "det_state": ["unknown", "early_payment_default", "stabilized",
+                      "repeat_delinquent", "straight_roller_seasoned",
+                      "straight_roller_early_life", "slow_roller"],
         "restructure_blind_spot_flag": [0, 1],
         "chain_stitched_flag": [0, 1],
     },
     "restructure_chains": {"chain_n_originals": [1, 2]},
-}
+}  # fmt: skip
 # Counters of a history rule: covered when some row is above 0.
 RULE_COUNTERS = {
     "dpd_sequences": [
@@ -604,81 +394,163 @@ RULE_COUNTERS = {
 }
 
 
+def _probe_two_runs(frame) -> bool:
+    """D-A3-29: two follow-up events of one account less than 8 days apart (only a
+    deadline between them splits a run)."""
+    fu = frame.where("event_kind = 'followup_only'").select("account_id", "event_date")
+    pairs = fu.alias("a").join(fu.alias("b"), "account_id")
+    gap = F.datediff("b.event_date", "a.event_date")
+    return bool(pairs.where((gap > 0) & (gap <= 7)).limit(1).count())
+
+
+# Branches the state columns cannot show: (kind, label, test on the frame).
+PROBES = [
+    ("a3_promise_events",
+     "D-A3-29: a follow-up after the run's deadline starts an event",
+     _probe_two_runs),
+    ("a3_promise_events", "next-statement fallback: no statement after the promise"
+     " (cutoff = day + 31)",
+     lambda f: bool(f.where(F.datediff("promise_cutoff", "event_date") == 31)
+                    .limit(1).count())),
+    ("a3_promise_events", "event outside the 12-month window (not counted)",
+     lambda f: bool(f.where("event_date < '2025-09-01'").limit(1).count())),
+    ("a3_payment_credibility", "refusal demotes a rung (points >= 2, Low or Moderate)",
+     lambda f: bool(f.where("a3_override = 'refusal' AND a3_points_total >= 2")
+                    .limit(1).count())),
+    ("a3_payment_cycles", "bucket-08 due: due from the minimum-due baseline",
+     lambda f: bool(f.where("billed_amount IS NULL AND due_amount IS NOT NULL")
+                    .limit(1).count())),
+    ("a3_dlq_cycles", "RL EMI missing: the last known EMI carries",
+     lambda f: bool(f.where("cycle_end >= '2026-05-31'").groupBy("account_id")
+                    .agg(F.countDistinct("due_amount").alias("n"))
+                    .where("n = 1").limit(1).count())),
+    ("transactions", "post-block fee row flagged",
+     lambda f: bool(f.where("is_post_block_x_fee = 1").limit(1).count())),
+    ("billing", "latest cycle has no next statement",
+     lambda f: bool(f.where("next_billing_date IS NULL").limit(1).count())),
+    ("limits", "limits pivoted from non-censored spells",
+     lambda f: bool(f.limit(1).count())),
+    ("bureau_bounces_monthly", "two cheques on one day count once",
+     lambda f: bool(f.where("cif_id = '9' AND bounce_events = 1"
+                            " AND max_bounce_amount = 800").limit(1).count())),
+]  # fmt: skip
+
+
+def _kind(name: str) -> str:
+    """``crx_cc_a1_ability`` -> ``a1_ability``; ``feat_cif_x`` -> ``x``."""
+    for prefix in ("crx_cc_", "crx_rl_", "feat_cif_", "prm_"):
+        if name.startswith(prefix):
+            return name[len(prefix) :]
+    return name
+
+
 def coverage(name: str, frame) -> dict[str, set]:
-    """Values the state columns of dataset ``name`` take, and counters above 0."""
-    kind = name.split("_", 2)[-1]
-    seen = {}
+    """Values the state columns of dataset ``name`` take, counters above 0, probes."""
+    kind = _kind(name)
+    seen: dict[str, set] = {}
     for col in [c for c in STATE_COLUMNS.get(kind, {}) if c in frame.columns]:
         values = {r[0] for r in frame.select(col).distinct().collect()}
-        if col == "liquidity_anchor_amt":
+        if col in ("liquidity_anchor_amt", "minimum_due"):
             values = {"NULL" if v is None else "value" for v in values}
-        if col == "deceased_source":
+        elif col == "deceased_source":
             values = {s for v in values if v for s in v.split(",")}
-        seen[col] = values
+        seen[col] = {"NULL" if v is None else v for v in values}
     for col in RULE_COUNTERS.get(kind, []):
         if frame.filter(F.col(col).cast("int") > 0).limit(1).count():
             seen.setdefault("rule counters > 0", set()).add(col)
+    for probe_kind, label, test in PROBES:
+        if probe_kind == kind and test(frame):
+            seen.setdefault("probes", set()).add(label)
     return seen
 
 
-# Branches the outputs above cannot show.
 NOT_COVERED = [
-    "A1 `build_distress_signals(payment_order=...)`: the optional"
-    " prm_bureau_payment_order source is not wired in any pipeline (not in PROD).",
+    "`feat_cif_casa.py` lines 438-487 are not photographed, so `casa_features` is not"
+    " run: A1 reads synthetic feature tables built by the spec test's calls to the CASA"
+    " builders (`build_casa_balance`, `build_casa_flow_legs`, `build_casa_flows`,"
+    " `build_returns`, `build_internal_salary`). Tier A is reviewed only, never"
+    " edited.",
+    "Stand-ins for workplace modules the mirror lacks (simple, deterministic; the"
+    " oracle"
+    " checks our code around them): " + "; ".join(STUBBED) + ".",
+    "`casa_primary`, `location_features`, `digital_login`: not run (A2 reads the spec"
+    " test's `feat_cif_location_monthly`; tier X).",
+    "A1 `build_distress_signals(payment_order=...)` and other optional sources not"
+    " wired in any pipeline.",
     "`dpd_journey.cc_history_floor_date_180_plus` set apart from the 60-180 floor (same"
     " default; the alt run changes only the shared keys).",
-    "`log_stats` / `log_latest_month` / `_log_state_stats`: logging only, run but not"
-    " checked; `_ship_by_value` pickling matters on real executors only.",
-    "Guards (must raise, checked by exception type only): mid-month RL spine, a missing"
-    " required column, an unknown dpd_journey key; the returns-coverage guard of"
-    " `build_distress_signals` is checked by a1_engine_spec.py.",
+    "`log_latest_month` / `log_stats` / `_log_state_stats`: logging only, run but not"
+    " checked.",
+    "Guards are checked by exception only (the run must raise); the returns-coverage"
+    " guard of `build_distress_signals` is checked by a1_engine_spec.py.",
+    "Options no pipeline passes: `build_contact_signals(max_months=None)`, the"
+    " `next_statement` deadline for RL, the alternative deadlines at 180+ (they run at"
+    " 60-180 only), `create_pipeline(output=...)` names other than the default.",
+    "`product_features`' card minimum due and `crx_cc_balance` come through the"
+    " `prm_cc` stand-in: the oracle fixes what our code does with them, not Way4's"
+    " derivation.",
+    "Dead candidates (`cc_spell`, `rl_spell_table`, `rl_a4_spine`, `_spine_utils`) are"
+    " not run; `crx_cc_limits` (no reader) is run from a synthetic spell table.",
 ]
 
 
-def write_coverage(seen: dict) -> None:
+def write_coverage(seen: dict, timings: dict) -> None:
     """``harness_coverage.md``: values reached per dataset kind, and what is not."""
     lines = [
-        "# Golden harness coverage",
+        "# Behaviour oracle coverage",
         "",
-        "Generated by `checks/refactor_golden.py --record`. Per output kind (CC and",
-        "RL, all model_ids together): the values each state column reaches, then the",
-        "ones it does not.",
+        "Generated by `checks/refactor_golden.py --record` (do not edit by hand). Per",
+        "output kind (CC and RL, every model_id together): the values each state",
+        "column reaches; **not reached** marks a gap. Then the probes (branches a",
+        "column cannot show) and what the oracle does not cover.",
+        "",
+        "## Runs",
+        "",
+        "| Run | Datasets | Seconds |",
+        "|---|---|---|",
+        *[f"| `{r}` | {n} | {s:.1f} |" for r, (n, s) in timings.items()],
         "",
     ]
-    for kind in sorted(seen):
-        lines.append(f"## {kind}")
-        lines.append("")
+    for kind in sorted(STATE_COLUMNS.keys() | RULE_COUNTERS.keys()):
+        lines += [f"## {kind}", ""]
         expected = {**STATE_COLUMNS.get(kind, {})}
         if kind in RULE_COUNTERS:
             expected["rule counters > 0"] = RULE_COUNTERS[kind]
+        got_kind = seen.get(kind, {})
         for col, values in expected.items():
-            got = seen[kind].get(col, set())
+            got = got_kind.get(col, set())
             missing = [v for v in values if v not in got]
             note = (
                 f" — **not reached: {', '.join(map(str, missing))}**" if missing else ""
             )
-            lines.append(
-                f"- `{col}`: {', '.join(str(v) for v in values if v in got)}{note}"
-            )
+            reached = ", ".join(str(v) for v in values if v in got) or "(none)"
+            lines.append(f"- `{col}`: {reached}{note}")
         lines.append("")
-    lines += ["## Not covered by the outputs", "", *[f"- {n}" for n in NOT_COVERED], ""]
+    lines += ["## Probes", ""]
+    for kind, label, _ in PROBES:
+        hit = label in seen.get(kind, {}).get("probes", set())
+        lines.append(f"- {'reached' if hit else '**not reached**'}: `{kind}` — {label}")
+    lines += ["", "## Not covered", "", *[f"- {n}" for n in NOT_COVERED], ""]
     (OUT / "harness_coverage.md").write_text("\n".join(lines))
 
 
-def main() -> int:
+def main() -> int:  # pylint: disable=too-many-locals
     record = "--record" in sys.argv
+    only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else ""
     manifest_path = OUT / "manifest.json"
     manifest = {} if record else json.loads(manifest_path.read_text())
-    problems, seen = [], {}
-    for run, pipeline, model_id, persona, inputs in runs():
+    problems, seen, timings = [], {}, {}
+    start_all = time.perf_counter()
+    for run, pipeline, model_id, params, inputs in runs():
+        if only not in run:
+            continue
         start = time.perf_counter()
-        outputs = run_pipeline(pipeline, model_id, persona, inputs)
+        outputs = run_pipeline(pipeline, model_id, params, inputs())
         for name, frame in outputs.items():
             frame = frame.persist()
             path = GOLDEN / run / f"{name}.parquet"
-            kind = name.split("_", 2)[-1]
             for col, values in coverage(name, frame).items():
-                seen.setdefault(kind, {}).setdefault(col, set()).update(values)
+                seen.setdefault(_kind(name), {}).setdefault(col, set()).update(values)
             if record:
                 frame.coalesce(1).write.mode("overwrite").parquet(str(path))
                 manifest.setdefault(run, {})[name] = {
@@ -687,27 +559,28 @@ def main() -> int:
                     "hash": content_hash(frame),
                 }
             else:
-                problems += compare(
-                    f"{run}/{name}", frame, path, manifest.get(run, {}).get(name)
-                )
+                entry = manifest.get(run, {}).get(name)
+                problems += compare(f"{run}/{name}", frame, path, entry)
             frame.unpersist()
-        print(
-            f"{run:<45} {len(outputs):>2} datasets  {time.perf_counter() - start:5.1f}s"
-        )
-    a1_cc, _, persona = a1_inputs()
-    for label, pipeline, model_id, params, inputs in guards(persona, a1_cc):
-        try:
-            run_pipeline(pipeline, model_id, params, inputs)
-            problems.append(f"guard did not fire: {label}")
-        except Exception as exc:  # pylint: disable=broad-except
-            print(f"guard ok: {label} ({type(exc).__name__})")
+        spark.catalog.clearCache()
+        timings[run] = (len(outputs), time.perf_counter() - start)
+        print(f"{run:<55} {len(outputs):>2} datasets  {timings[run][1]:5.1f}s")
+    if not only:
+        for label, pipeline, model_id, params, inputs in guards():
+            try:
+                run_pipeline(pipeline, model_id, params, inputs)
+                problems.append(f"guard did not fire: {label}")
+            except Exception as exc:  # pylint: disable=broad-except
+                print(f"guard ok: {label} ({type(exc).__name__})")
     if record:
         manifest_path.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n")
-        write_coverage(seen)
+        write_coverage(seen, timings)
         print(f"recorded {sum(map(len, manifest.values()))} datasets to {GOLDEN}")
     for line in problems:
         print(f"DIFF {line}")
-    print("golden: " + ("FAIL" if problems else "pass"))
+    total = sum(n for n, _ in timings.values())
+    print(f"golden: {'FAIL' if problems else 'pass'} ({total} datasets,"
+          f" {time.perf_counter() - start_all:.0f}s)")  # fmt: skip
     return 1 if problems else 0
 
 

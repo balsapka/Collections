@@ -33,6 +33,13 @@ council's zero-difference rule is measured against the post-D-A3-29 tree. The re
 bundle 25 list (promise points, deadline, 180+ cut-offs, RL dispute codes) is still undecided and
 stays out; the council leaves extension points for it. A1's carry / closure change waits on the DE.
 
+**Corrections from Phase 0** (`00_baseline/inventory.md` §7): tier L is 3,162 lines after D-A3-29;
+`scoring_engine.state_label` is also imported by `a2_locatability/classify.py`; `cc_spell/` is dead
+only together with `build_cc_limits` / `crx_cc_limits` in `cc_raw_extract`; `a1_ability/signals.py`
+imports `MONEY_IN_CLASSES` / `MONEY_OUT_CLASSES` from tier A `feat_cif_casa`; `cc_raw_extract` does
+not import in the mirror (`config.EDP_LOAD_DATE_BUFFER_MONTHS` missing: the smoke baseline's six
+failures); 12 workplace A3 catalog names are not in the mirror's `catalog_crx.yml`.
+
 ## 3. Hard rules (every agent prompt includes them)
 
 1. **No behaviour change.** Same rows, columns, types and values. A suspected bug or spec mismatch
@@ -56,8 +63,8 @@ stays out; the council leaves extension points for it. A1's carry / closure chan
 8. **Docstrings** say what the code does now: no bundle, ticket or O-number history.
 9. **Tiers.** The focus is A3 and A1; any other file may be edited only when an accepted A1 / A3
    proposal needs it. Tier A files and the DE bureau chain are never edited here (handoff only).
-   Imports must keep working, including the workplace-only `casa_windows` imports of `_cif` / `_require`
-   from `feat_cif_casa`.
+   Imports must keep working, including the workplace-only `casa_windows` imports of `_cif` / `_require` /
+   `_wm_month` from `feat_cif_casa`.
 
 ## 4. Roles
 
