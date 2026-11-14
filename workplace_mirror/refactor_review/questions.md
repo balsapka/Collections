@@ -200,3 +200,11 @@ Options: (a) keep in bundle 25; (b) take it out.
 Recommendation: (a).
 Answer:
 ```
+
+```
+Q-R-09 [prm_products.py `_latest_in_month` · S2-10, applied] The latest row per card and month is now `max(struct(day, value))` instead of `row_number` ordered by day.
+Now: identical when a card has one row on its latest day in the month. With two rows on that day the old pick was arbitrary (it could change between runs); the new one always takes the larger `level` / `minimum_due`.
+Options: (a) keep (deterministic; the bundle check counts cards with two rows on the latest day); (b) revert to the window.
+Recommendation: (a).
+Answer:
+```
