@@ -208,3 +208,11 @@ Options: (a) keep (deterministic; the bundle check counts cards with two rows on
 Recommendation: (a).
 Answer:
 ```
+
+```
+Q-R-10 [a3_credibility/signals.py `_contact_summary` · R-I N-1] When an account's latest contact day has several dispositions, the one kept is decided last by the alphabetical order of the labels.
+Now: unchanged from before the refactor in outcome (the oracle passes), but the order is not written anywhere as a rule. Round 2 names it as a constant with the same order.
+Options: (a) keep today's order and write it into the spec (Q-28); (b) give the order you want (for example refusal > promise > contact > no pick-up).
+Recommendation: (a) for bundle 25; say so if GRR has an order.
+Answer:
+```
