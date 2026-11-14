@@ -74,7 +74,7 @@ def _cifs(obs_base: DataFrame) -> DataFrame:
     )
 
 
-def _floor(crx_persona: dict, months: int) -> str:
+def persona_floor(crx_persona: dict, months: int) -> str:
     """ISO first day of the earliest observation's ``months``-month window: the obs base
     starts in the persona start month, so no window reaches older source rows."""
     return history_floor(crx_persona["persona_start_date"], months).isoformat()
@@ -116,11 +116,7 @@ def _with_carry(bureau: DataFrame) -> DataFrame:
         [
             bureau.select(
                 "cif_id",
-                (
-                    F.col("month_end")
-                    if age == 0
-                    else F.last_day(F.add_months("month_end", age))
-                ).alias("month_end"),
+                F.last_day(F.add_months("month_end", age)).alias("month_end"),
                 F.lit(age).alias("_age"),
                 "bureau_salary",
             )
@@ -128,6 +124,7 @@ def _with_carry(bureau: DataFrame) -> DataFrame:
         ],
     )
     newest = [F.max(F.when(F.col("_age") == a, F.col("bureau_salary"))) for a in ages]
+    # the newest non-NULL amount wins: a 0 row is a value, so it hides the older rows
     return rows.groupBy("cif_id", "month_end").agg(
         F.coalesce(*newest).alias("bureau_salary")
     )
@@ -160,7 +157,7 @@ def build_income_signals(
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
-    since = _floor(crx_persona, 2 * w)
+    since = persona_floor(crx_persona, 2 * w)
     internal = internal_salary.select(
         "cif_id",
         "month_end",
@@ -264,7 +261,7 @@ def build_casa_signals(
     obs = _cifs(obs_base)
     w = window_months(model_id)
     rows = _casa_rows(casa_flows, casa_balance).filter(
-        F.col("month_end") >= F.lit(_floor(crx_persona, CASA_HELD_MONTHS))
+        F.col("month_end") >= F.lit(persona_floor(crx_persona, CASA_HELD_MONTHS))
     )
     in_w = _month_index(F.col("month_end")) <= w
     signals = left_join_all(
@@ -423,7 +420,7 @@ def build_distress_signals(  # pylint: disable=too-many-arguments
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
-    since = _floor(crx_persona, w)
+    since = persona_floor(crx_persona, w)
     _require_returns_from(returns, since)
     events = _distress_events(returns, bureau_bounces, payment_order, since)
     hits = _in_window(
@@ -481,7 +478,7 @@ def build_eosb_signals(
             F.to_date("action_ts").alias("day"),
         )
         .join(F.broadcast(mine), on="agreement_id")
-        .filter(F.col("day") >= F.lit(_floor(crx_persona, w)))
+        .filter(F.col("day") >= F.lit(persona_floor(crx_persona, w)))
     )
     hits = window_agg(
         obs, notes, date_col="day", aggs=[F.max(F.lit(1)).alias("eosb_flag")], months=w
