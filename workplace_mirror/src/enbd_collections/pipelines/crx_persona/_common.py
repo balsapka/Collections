@@ -100,27 +100,25 @@ def pit_latest(  # pylint: disable=too-many-arguments
     date_col: str,
     value_cols: Sequence[str],
     key: str = "cif_id",
-    anchor: Column | None = None,
     max_age_months: int | None = None,
     inclusive: bool = False,
 ) -> DataFrame:
-    """Latest ``src`` row dated before each base row's anchor, per ``GRAIN``.
+    """Latest ``src`` row dated before each base row's observation date, per ``GRAIN``.
 
-    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
-    defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
-    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar
-    months (1 = its own month), so a stale record never stands in for a current one.
+    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. ``inclusive``
+    also accepts rows dated on it (same-day snapshots). ``max_age_months`` keeps only
+    rows in the last N calendar months of the observation date (1 = its own month), so a
+    stale record never stands in for a current one.
     Ties on the date are broken by the values (largest first, NULL last), so reruns
     agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
     """
-    anchor = F.col("observation_date") if anchor is None else anchor
-    row_date, anchor_date = F.col("_d"), F.col("_anchor")
-    cond = row_date <= anchor_date if inclusive else row_date < anchor_date
+    row_date, obs_date = F.col("_d"), F.col("observation_date")
+    cond = row_date <= obs_date if inclusive else row_date < obs_date
     if max_age_months is not None:
-        cond = cond & (row_date >= window_start(max_age_months, anchor_date))
+        cond = cond & (row_date >= window_start(max_age_months))
     latest = F.max(F.struct("_d", *value_cols))
     return (
-        base.select(*GRAIN, key, anchor.alias("_anchor"))
+        base.select(*GRAIN, key)
         .join(
             scoped(
                 src.select(key, F.col(date_col).alias("_d"), *value_cols), base, key

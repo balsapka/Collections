@@ -307,7 +307,6 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
     payments: DataFrame,
     dues: DataFrame,
     model_id: str,
-    max_months: int | None = DCORE_MAX_MONTHS,
 ) -> DataFrame:
     """The latest right-party contact in the episode and what it means (D-A3-19, -20).
 
@@ -319,8 +318,7 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
     dispute, hung up, and no pickup on N days after it with no dead line in between.
     """
     base = _base(episode)
-    lower = window_start(max_months) if max_months else None
-    lower = F.col("_anchor") if lower is None else F.greatest(lower, F.col("_anchor"))
+    lower = F.greatest(window_start(DCORE_MAX_MONTHS), F.col("_anchor"))
     events = (
         base.join(dcore_account_events(episode, followup, agreements), on="account_id")
         .filter((F.col("day") >= lower) & (F.col("day") <= F.col("observation_date")))

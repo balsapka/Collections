@@ -65,7 +65,7 @@ the window's largest month per source (`internal_salary_w`, `bureau_salary_w`) a
 
 - **Threshold** = max(AED 3,000, 2 × anchor).
 - **Stable** = the salary received in m1–m3 adds up to **2 × the threshold** (3 × at 180+),
-  **and** it is at least 75% of what m4–m6 received (`D_INC = 0.25`; nothing in m4–m6 →
+  **and** it is at least 75% of what m4–m6 received (`INCOME_MAX_FALL = 0.25`; nothing in m4–m6 →
   nothing to compare). The window total, not a count of months: an employer paying early
   puts two salaries in one month and none in the next.
 - **Weak** = otherwise, any month in m1–m3 ≥ AED 1,000 (no points, but evidence: Low rather

@@ -41,7 +41,6 @@ from enbd_collections.nodes.utils.frames import (
     wm_month,
 )
 
-PRODUCT_TYPES = ("deposit", "investment", "wm", "card", "loan")
 COLUMNS = (
     "cif_id",
     "month_end",
