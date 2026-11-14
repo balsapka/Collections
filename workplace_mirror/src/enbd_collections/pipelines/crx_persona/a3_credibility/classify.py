@@ -3,7 +3,7 @@
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, left_join_all, log_latest_month
+from .._common import GRAIN, log_latest_month
 from .constants import DISPLAY_NAMES, SCORECARD, promise_deadline
 
 # Every input of the decision is carried (D-A3-17).
@@ -73,9 +73,10 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     no episode anchor only (``a3_unknown_reason`` = ``no_episode``); an episode with no
     evidence scores 0 points and is Low.
     """
-    df = left_join_all(
-        episode, [episode, commitments, dlq_payments, pre_dlq, contacts]
-    ).withColumn(
+    df = episode
+    for part in (commitments, dlq_payments, pre_dlq, contacts):
+        df = df.join(part, on=list(GRAIN), how="left")
+    df = df.withColumn(
         "a3_promise_deadline", F.lit(promise_deadline(product, model_id, deadline))
     )
     scored = SCORECARD.score(df)

@@ -8,7 +8,7 @@ No record. Dimension B starts the month after the episode month, Dimension C end
 before it, so the onset cycle is in neither.
 """
 
-from pyspark.sql import Column, DataFrame
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .. import _dcore_codes as codes
@@ -275,9 +275,13 @@ def _paid_after_refusal(
 ) -> DataFrame:
     """Rows with a cycle (CC) / month (RL) holding 100 AED or more paid after the
     refusal day, up to the observation date (Q-29)."""
-    cycles = dues.select("account_id", "cycle_start", "cycle_end")
+    accounts = F.broadcast(refusals.select("account_id").distinct())
+    cycles = dues.select("account_id", "cycle_start", "cycle_end").join(
+        accounts, on="account_id", how="left_semi"
+    )
     pays = (
-        payments.alias("p")
+        payments.join(accounts, on="account_id", how="left_semi")
+        .alias("p")
         .join(
             cycles.alias("c"),
             (F.col("p.account_id") == F.col("c.account_id"))
@@ -345,24 +349,33 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
             ),
         )
     )
-    summary = events.groupBy(*GRAIN).agg(
-        latest["day"].alias("last_rpc_date"),
-        latest["_disp"].alias("last_rpc_disposition"),
-        F.countDistinct(
-            F.when(F.col("action_code").isin(*codes.CALL_CODES), F.col("day"))
-        ).alias("contact_dates_n"),
-    )
-    after = events.join(summary.select(*GRAIN, "last_rpc_date"), on=list(GRAIN)).filter(
-        F.col("day") > F.col("last_rpc_date")
-    )
     no_pickup = F.col("name").isin(
         *sorted(set(codes.RINGING) | set(NO_PICKUP_NAMES))
     ) & F.col("action_code").isin(*codes.OUTBOUND_CODES)
-    quiet = after.groupBy(*GRAIN).agg(
-        F.countDistinct(F.when(no_pickup, F.col("day"))).alias("no_pickup_days_n"),
-        F.max(F.col("name").isin(*sorted(codes.NOT_REACHABLE)).cast("int")).alias(
-            "_dead"
-        ),
+    last_day = F.col("_last")["day"]
+    after = F.col("day") > last_day
+    summary = (
+        events.withColumn("_last", latest.over(Window.partitionBy(*GRAIN)))
+        .groupBy(*GRAIN)
+        .agg(
+            F.max("_last")["day"].alias("last_rpc_date"),
+            F.max("_last")["_disp"].alias("last_rpc_disposition"),
+            F.size(
+                F.collect_set(
+                    F.when(F.col("action_code").isin(*codes.CALL_CODES), F.col("day"))
+                )
+            )
+            .cast("long")
+            .alias("contact_dates_n"),
+            F.size(F.collect_set(F.when(after & no_pickup, F.col("day"))))
+            .cast("long")
+            .alias("no_pickup_days_n"),
+            F.max(
+                F.when(
+                    after, F.col("name").isin(*sorted(codes.NOT_REACHABLE)).cast("int")
+                )
+            ).alias("_dead"),
+        )
     )
     refusals = summary.where(F.col("last_rpc_disposition") == "refusal").select(
         *GRAIN, "last_rpc_date"
@@ -385,7 +398,6 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
     return (
         base.select(*GRAIN)
         .join(summary, on=list(GRAIN), how="left")
-        .join(quiet, on=list(GRAIN), how="left")
         .join(planned, on=list(GRAIN), how="left")
         .join(paid, on=list(GRAIN), how="left")
         .select(

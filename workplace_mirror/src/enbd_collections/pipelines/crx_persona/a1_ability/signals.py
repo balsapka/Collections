@@ -44,6 +44,7 @@ from .._common import (
     GRAIN,
     left_join_all,
     require_columns,
+    scoped,
     window_agg,
     window_months,
 )
@@ -304,7 +305,8 @@ def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> Dat
         F.coalesce(F.col("is_current").cast("int"), F.lit(0)) == 1
     )
     rows = (
-        obs.join(
+        F.broadcast(obs)
+        .join(
             products.select(
                 F.col("cif_id").cast("string").alias("cif_id"),
                 F.col("month_end").alias("observation_date"),
@@ -456,19 +458,21 @@ def build_eosb_signals(
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
+    mine = scoped(
+        agreements.select(
+            F.col("agreement_id").cast("string").alias("agreement_id"),
+            F.col("cif_id").cast("string").alias("cif_id"),
+        ).distinct(),
+        obs,
+        "cif_id",
+    )
     notes = (
         followup.filter(F.upper(F.col("result_name")).contains(EOSB))
         .select(
             F.col("agreement_id").cast("string").alias("agreement_id"),
             F.to_date("action_ts").alias("day"),
         )
-        .join(
-            agreements.select(
-                F.col("agreement_id").cast("string").alias("agreement_id"),
-                F.col("cif_id").cast("string").alias("cif_id"),
-            ).distinct(),
-            on="agreement_id",
-        )
+        .join(F.broadcast(mine), on="agreement_id")
         .filter(F.col("day") >= F.lit(_floor(crx_persona, w)))
     )
     hits = window_agg(

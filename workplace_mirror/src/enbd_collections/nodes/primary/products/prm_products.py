@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import datetime
 
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType
 
@@ -38,16 +38,13 @@ def _window(persona_start_date: str, history_months: int) -> tuple:
     return floor, floor - datetime.timedelta(days=LOAD_LAG_DAYS)
 
 
-def _latest_in_month(df: DataFrame, key: str, day: str) -> DataFrame:
-    """``df`` with ``month_end`` = the month end of ``day``, keeping each ``key``'s latest
-    ``day`` row per month."""
-    month_end = F.last_day(day)
-    latest = Window.partitionBy(key, month_end).orderBy(F.col(day).desc())
+def _latest_in_month(df: DataFrame, key: str, day: str, value: str) -> DataFrame:
+    """``key``, ``month_end`` (the month end of ``day``) and ``value`` of each ``key``'s
+    latest ``day`` row per month."""
     return (
-        df.withColumn("month_end", month_end)
-        .withColumn("_rn", F.row_number().over(latest))
-        .filter(F.col("_rn") == 1)
-        .drop("_rn")
+        df.groupBy(key, F.last_day(day).alias("month_end"))
+        .agg(F.max(F.struct(day, value)).alias("_latest"))
+        .select(key, "month_end", F.col(f"_latest.{value}").alias(value))
     )
 
 
@@ -88,9 +85,7 @@ def _card_levels(billing: DataFrame, lo: datetime.date) -> DataFrame:
         .cast("int")
         .alias("level"),
     )
-    return _latest_in_month(rows, "contract_id", "billing_date").select(
-        "contract_id", "month_end", "level"
-    )
+    return _latest_in_month(rows, "contract_id", "billing_date", "level")
 
 
 def _card_minimum_due(
@@ -121,10 +116,10 @@ def _card_minimum_due(
         )
     )
     amounts = derive_billing_amounts(tail, account_group)
-    return _latest_in_month(amounts, "contract_idt", "banking_date").select(
-        F.col("contract_idt").alias("contract_id"),
-        "month_end",
-        F.col("minimum_due").cast("double").alias("minimum_due"),
+    return (
+        _latest_in_month(amounts, "contract_idt", "banking_date", "minimum_due")
+        .withColumnRenamed("contract_idt", "contract_id")
+        .withColumn("minimum_due", F.col("minimum_due").cast("double"))
     )
 
 

@@ -197,36 +197,44 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     )
     promises = _followup_promises(obs_base, followup, agreements, dues, deadline)
     events = _consolidate(plans, promises)
-    keys = ["account_id", "event_date"]
-    due = (
-        events.select(*keys)
-        .distinct()
-        .join(dues.select("account_id", "cycle_start", "due_amount"), on="account_id")
-        .where(F.col("cycle_start") <= F.col("event_date"))
-        .groupBy(*keys)
+    day = F.col("event_date")
+    cycles = dues.select(
+        F.col("account_id").alias("_c_account"), "cycle_start", "due_amount"
+    )
+    pays = payments.select(
+        F.col("account_id").alias("_p_account"),
+        "pay_from",
+        "pay_date",
+        F.col("amount").alias("_amount"),
+    )
+    after = (F.col("pay_date") > day) | (
+        (F.col("pay_date") == day) & (F.col("pay_from") < F.col("pay_date"))
+    )
+    with_due = (
+        events.join(
+            cycles,
+            (F.col("account_id") == F.col("_c_account"))
+            & (F.col("cycle_start") <= day),
+            "left",
+        )
+        .groupBy(*events.columns)
         .agg(F.max(F.struct("cycle_start", "due_amount"))["due_amount"].alias("_due"))
     )
-    after = (F.col("pay_date") > F.col("event_date")) | (
-        (F.col("pay_date") == F.col("event_date"))
-        & (F.col("pay_from") < F.col("pay_date"))
-    )
-    paid = (
-        events.select(*keys, "promise_cutoff")
-        .distinct()
-        .join(
-            payments.select("account_id", "pay_from", "pay_date", "amount"),
-            "account_id",
+    judged = (
+        with_due.join(
+            pays,
+            (F.col("account_id") == F.col("_p_account"))
+            & after
+            & (F.col("pay_date") <= F.col("promise_cutoff")),
+            "left",
         )
-        .where(after & (F.col("pay_date") <= F.col("promise_cutoff")))
-        .groupBy(*keys, "promise_cutoff")
-        .agg(F.sum("amount").alias("promise_paid_amount"))
+        .groupBy(*with_due.columns)
+        .agg(F.sum("_amount").alias("promise_paid_amount"))
     )
     amount = F.greatest(F.coalesce("_due", F.lit(0.0)), F.lit(float(MIN_PAYMENT_AED)))
     got = F.coalesce("promise_paid_amount", F.lit(0.0))
     return (
-        events.join(due, on=keys, how="left")
-        .join(paid, on=[*keys, "promise_cutoff"], how="left")
-        .withColumn("promise_amount", amount)
+        judged.withColumn("promise_amount", amount)
         .withColumn("promise_paid_amount", got)
         .withColumn(
             "promise_outcome",

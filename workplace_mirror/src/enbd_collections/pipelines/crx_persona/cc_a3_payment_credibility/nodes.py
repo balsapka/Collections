@@ -79,15 +79,15 @@ def _balance_dues(balance: DataFrame) -> DataFrame:
             & _nonzero("overdue_bucket_08")
         ).alias("_stagnated"),
     )
-    since = (
-        rows.where("_stagnated")
-        .groupBy("account_id")
-        .agg(F.min("cycle_start").alias("_since"))
+    rows = rows.withColumn(
+        "_since",
+        F.min(F.when(F.col("_stagnated"), F.col("cycle_start"))).over(
+            Window.partitionBy("account_id")
+        ),
     )
     recent = Window.partitionBy("account_id").orderBy(F.col("_month").desc())
     baseline = (
-        rows.join(since, "account_id")
-        .where(_nonzero("minimum_due") & (F.col("cycle_start") < F.col("_since")))
+        rows.where(_nonzero("minimum_due") & (F.col("cycle_start") < F.col("_since")))
         .groupBy("account_id", F.trunc("cycle_start", "month").alias("_month"))
         .agg(F.avg("minimum_due").alias("_m"))
         .withColumn("_r", F.row_number().over(recent))

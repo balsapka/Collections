@@ -119,6 +119,7 @@ def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional
         obs_base,
         "account_id",
     )
+    mine = F.broadcast(links.select("agreement_id").distinct())
 
     def plans(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         plan: DataFrame, seq: str, start, kind: str, rows: DataFrame, cancelled
@@ -130,6 +131,7 @@ def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional
             F.lit(kind).alias("plan_type"),
             start.cast("date").alias("plan_start"),
         )
+        live = live.join(mine, on="agreement_id", how="left_semi")
         return null_cancelled_instalment_fields(
             live.join(rows.select(seq, *cols), on=seq), cancelled
         ).drop(seq)
