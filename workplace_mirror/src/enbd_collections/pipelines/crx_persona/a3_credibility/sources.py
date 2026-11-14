@@ -16,6 +16,18 @@ from .._dpd_journey.anchor import episode_start
 
 DUES = ["account_id", "cycle_start", "cycle_end", "due_amount", "billed_amount"]
 PAYMENTS = ["account_id", "pay_from", "pay_date", "amount"]
+# Columns of the tables the A3 builders pass on: each consumer requires them.
+EPISODE = [*GRAIN, "cif_id", "episode_start", "episode_left_censored"]
+CYCLE_LEDGER = [*DUES, "paid_amount"]
+INSTALMENTS = [
+    "account_id",
+    "plan_id",
+    "plan_type",
+    "plan_start",
+    "due_date",
+    "due_amount",
+    "payment_amount",
+]
 
 
 def build_a3_episode(obs_base: DataFrame, deterioration: DataFrame) -> DataFrame:

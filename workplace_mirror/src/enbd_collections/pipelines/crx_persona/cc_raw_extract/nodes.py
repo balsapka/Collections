@@ -30,6 +30,7 @@ from enbd_collections.nodes.utils.config import (
     POST_BLOCK_X_SENTINEL_DATE,
     TXN_CATEGORIES,
 )
+from enbd_collections.pipelines.crx_persona._common import require_columns
 from enbd_collections.pipelines.crx_persona.cc_raw_extract._window_utils import (
     prune_by_edp_load_date,
     scope_to_acct_window,
@@ -38,6 +39,9 @@ from enbd_collections.pipelines.crx_persona.cc_raw_extract._window_utils import 
 
 def _as_contract_windows(acct_windows: DataFrame) -> DataFrame:
     """crx_cc_acct_windows, keyed as contract_idt to join against raw DDI tables."""
+    require_columns(
+        acct_windows, ["account_id", "acct_start", "acct_end"], "crx_cc_acct_windows"
+    )
     return acct_windows.select(
         F.col("account_id").alias("contract_idt"), "acct_start", "acct_end"
     )
@@ -87,6 +91,26 @@ def build_cc_transactions(
             merchant_category_code (int), is_international (int),
             txn_category (string), is_post_block_x_fee (int)
     """
+    require_columns(
+        raw_transaction,
+        [
+            "primary_entry_idt",
+            "org",
+            "contract_idt",
+            "banking_date",
+            "edp_load_date",
+            "settl_amount",
+            "direction",
+            "txn_code",
+            "txn_description",
+            "add_info",
+            "trans_mcc",
+            "trans_date",
+            "card_idt",
+            "service_class",
+        ],
+        "raw_transaction",
+    )
     acct_windows = _as_contract_windows(crx_cc_acct_windows)
 
     df = (
@@ -269,6 +293,17 @@ def build_cc_balance(
             stmt_balance (double), total_due (double),
             overdue_bucket_01 (double) .. overdue_bucket_08 (double)
     """
+    require_columns(
+        raw_stg_balance,
+        [
+            "contract_idt",
+            "banking_date",
+            "edp_load_date",
+            "account_group_id",
+            "balance",
+        ],
+        "raw_stg_balance",
+    )
     acct_windows = _as_contract_windows(crx_cc_acct_windows)
 
     scoped_balance = (
@@ -356,6 +391,11 @@ def build_cc_billing(
             contract_id (long), observation_date (date, = billing_date),
             due_date (date), next_billing_date (date), dlq_level_m (int, nullable)
     """
+    require_columns(
+        raw_stg_billing,
+        ["contract_idt", "billing_date", "edp_load_date", "due_date", "add_info"],
+        "raw_stg_billing",
+    )
     acct_windows = _as_contract_windows(crx_cc_acct_windows)
 
     # Partition prune on edp_load_date before the join (see docstring), then

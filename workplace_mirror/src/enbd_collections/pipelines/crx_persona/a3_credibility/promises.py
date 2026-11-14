@@ -5,7 +5,7 @@ from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .. import _dcore_codes as codes
-from .._common import dcore_account_events
+from .._common import dcore_account_events, require_columns
 from .constants import (
     DEADLINES,
     FOLLOWUP_RUN_DAYS,
@@ -14,6 +14,7 @@ from .constants import (
     STATEMENT_FALLBACK_D,
     promise_deadline,
 )
+from .sources import DUES, INSTALMENTS, PAYMENTS
 
 EVENTS = [
     "account_id",
@@ -180,6 +181,9 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     it; partial: 100 AED or more; else none. RL cash is dated at the month end, so the
     event month's cash counts in full.
     """
+    require_columns(instalments, INSTALMENTS, "A3 instalments")
+    require_columns(dues, DUES, "A3 dues")
+    require_columns(payments, PAYMENTS, "A3 payments")
     deadline = promise_deadline(product, model_id, deadline)
     plans = _cutoff(
         instalments.select(

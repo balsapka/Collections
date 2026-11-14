@@ -19,6 +19,7 @@ from enbd_collections.nodes.features.bureau import (
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     """The two monthly bureau features."""
+    tags = ["bureau", "features"]
     return Pipeline(
         [
             node(
@@ -26,14 +27,14 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 inputs={"unified": "feat_bureau_salary_unified"},
                 outputs="feat_cif_bureau_salary_monthly",
                 name="build_feat_cif_bureau_salary_monthly",
-                tags=["bureau", "features"],
+                tags=tags,
             ),
             node(
                 func=feat_cif_bureau_bounces_monthly.build,
                 inputs={"alerts": "prm_bureau_alert_enriched"},
                 outputs="feat_cif_bureau_bounces_monthly",
                 name="build_feat_cif_bureau_bounces_monthly",
-                tags=["bureau", "features"],
+                tags=tags,
             ),
         ]
     )

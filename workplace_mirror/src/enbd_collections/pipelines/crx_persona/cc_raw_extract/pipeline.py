@@ -26,43 +26,52 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
         [
             node(
                 func=build_cc_acct_windows,
-                inputs=[
-                    "crx_cc_obs_base",
-                    "crx_cc_a4_deterioration",
-                    "params:cc_a3_history_floor_date",
-                ],
+                inputs={
+                    "obs_base": "crx_cc_obs_base",
+                    "deterioration": "crx_cc_a4_deterioration",
+                    "history_floor_date": "params:cc_a3_history_floor_date",
+                },
                 outputs="crx_cc_acct_windows",
                 name="build_crx_cc_acct_windows",
                 tags=["crx", "t04c"],
             ),
             node(
                 func=build_cc_transactions,
-                inputs=["raw_transaction", "crx_cc_acct_windows"],
+                inputs={
+                    "raw_transaction": "raw_transaction",
+                    "crx_cc_acct_windows": "crx_cc_acct_windows",
+                },
                 outputs="crx_cc_transactions",
                 name="build_crx_cc_transactions",
                 tags=["crx", "t04c"],
             ),
             node(
                 func=build_cc_limits,
-                inputs=["raw_stg_limit", "crx_cc_spell_table"],
+                inputs={
+                    "raw_stg_limit": "raw_stg_limit",
+                    "crx_cc_spell_table": "crx_cc_spell_table",
+                },
                 outputs="crx_cc_limits",
                 name="build_crx_cc_limits",
                 tags=["crx", "t04c"],
             ),
             node(
                 func=build_cc_balance,
-                inputs=[
-                    "raw_stg_balance",
-                    "raw_stg_account_group",
-                    "crx_cc_acct_windows",
-                ],
+                inputs={
+                    "raw_stg_balance": "raw_stg_balance",
+                    "raw_stg_account_group": "raw_stg_account_group",
+                    "crx_cc_acct_windows": "crx_cc_acct_windows",
+                },
                 outputs="crx_cc_balance",
                 name="build_crx_cc_balance",
                 tags=["crx", "t04c"],
             ),
             node(
                 func=build_cc_billing,
-                inputs=["raw_stg_billing", "crx_cc_acct_windows"],
+                inputs={
+                    "raw_stg_billing": "raw_stg_billing",
+                    "crx_cc_acct_windows": "crx_cc_acct_windows",
+                },
                 outputs="crx_cc_billing",
                 name="build_crx_cc_billing",
                 tags=["crx", "t04c"],

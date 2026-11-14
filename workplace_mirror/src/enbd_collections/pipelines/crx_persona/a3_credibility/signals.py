@@ -16,6 +16,7 @@ from .._common import (
     GONE_DARK_DAYS,
     GRAIN,
     dcore_account_events,
+    require_columns,
     segment,
     window_agg,
     window_months,
@@ -37,6 +38,8 @@ from .constants import (
     QUALIFYING_SHARE,
     REGULAR_FROM,
 )
+from .promises import EVENTS
+from .sources import CYCLE_LEDGER, DUES, EPISODE, INSTALMENTS, PAYMENTS
 
 
 def _anchor() -> Column:
@@ -64,6 +67,8 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
     concluded all not kept (a broken event ranks first on a shared day), or at least 2
     concluded and under 40% kept. Kept: at least 2 concluded and 80% kept.
     """
+    require_columns(episode, EPISODE, "A3 episode")
+    require_columns(events, EVENTS, "A3 promise events")
     base = episode.select(*GRAIN)
     lower = window_start(COMMITMENT_MONTHS)
     obs = F.col("observation_date")
@@ -145,6 +150,8 @@ def build_dlq_payment_signals(
     (61-180) / 3 of 6 (180+). Some: a cycle with 100 AED or more in the last 3 / 12
     months.
     """
+    require_columns(episode, EPISODE, "A3 episode")
+    require_columns(ledger, CYCLE_LEDGER, "A3 cycle ledger")
     seg = segment(model_id)
     base = _base(episode).withColumn("dlq_from", F.add_months("_anchor", 1))
     regular_from = F.greatest(window_start(window_months(model_id)), F.col("dlq_from"))
@@ -196,6 +203,8 @@ def build_pre_dlq_payment_signals(episode: DataFrame, ledger: DataFrame) -> Data
     100 AED floor). Fewer than 3 months with a due: No record; also when the anchor is
     censored or missing (``pre_dlq_reason``).
     """
+    require_columns(episode, EPISODE, "A3 episode")
+    require_columns(ledger, CYCLE_LEDGER, "A3 cycle ledger")
     base = episode.select(
         *GRAIN,
         _anchor().alias("_anchor"),
@@ -317,6 +326,10 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
     cycle / month with 100 AED or more paid followed. Diagnostics (not in the state):
     dispute, hung up, and no pickup on N days after it with no dead line in between.
     """
+    require_columns(episode, EPISODE, "A3 episode")
+    require_columns(instalments, INSTALMENTS, "A3 instalments")
+    require_columns(payments, PAYMENTS, "A3 payments")
+    require_columns(dues, DUES, "A3 dues")
     base = _base(episode)
     lower = F.greatest(window_start(DCORE_MAX_MONTHS), F.col("_anchor"))
     events = (
