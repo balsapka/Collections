@@ -416,10 +416,11 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
     """The latest right-party contact in the episode and what it means (D-A3-19, -20).
 
     DCORE events of the account in ``[max(episode start, last 24 months), observation
-    date]``. Latest right-party contact: on the same day a non-refusal counts as later
-    (a same-day promise followed the refusal); a remaining tie takes the largest
-    disposition (Q-28). ``a3_refusal_flag``: it was a refusal and no plan started and no
-    cycle / month with 100 AED or more paid followed. Diagnostics (not in the state):
+    date]``. Latest right-party contact: on one day, the latest by ``_SAME_DAY_ORDER``
+    (a refusal ranks below the other contacts: a same-day promise followed it, Q-28).
+    ``a3_refusal_flag``: it was a refusal, no plan started after it and no cycle / month
+    with 100 AED or more paid may have come after it (D-A3-30). Diagnostics (not in the
+    state):
     dispute, hung up, and no pickup on N days after it with no dead line in between.
     """
     require_columns(episode, EPISODE, "A3 episode")

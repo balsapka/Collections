@@ -64,7 +64,8 @@ prior window's internal salary (`internal_salary_prior`).
 
 **Step 2: the level** (`income_level`, spec S12).
 
-- **Threshold** = max(AED 3,000, 2 × anchor).
+- **Threshold** = the strong amount, max(AED 3,000, 2 × anchor) (`STRONG_FLOOR`,
+  `STRONG_ANCHOR_MULT`), the same for income, money in, money out, the balance and assets.
 - **Stable** = the salary received in m1–m3 adds up to **2 × the threshold** (3 × at 180+),
   **and** it is at least 75% of what m4–m6 received (`INCOME_MAX_FALL = 0.25`; nothing in m4–m6 →
   nothing to compare). The window total, not a count of months: an employer paying early
@@ -101,20 +102,20 @@ is dropped (a bounce, a reversal, a sweep).
 
 ## 3. F2 Money in or held, F3 Money out — Strong (2) / Some (evidence) / None
 
-- **F2 strong** = money in ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3 (3 of 6 at 180+),
-  **or** the CASA balance ≥ max(AED 3,000, 1 × anchor) in 2 of m1–m3 and not more than 50%
+- **F2 strong** = money in ≥ max(AED 3,000, 2 × anchor) in 2 of m1–m3 (3 of 6 at 180+),
+  **or** the CASA balance ≥ max(AED 3,000, 2 × anchor) in 2 of m1–m3 and not more than 50%
   below the m4–m6 average (money held: the bank's sweep is manual, so a balance can survive
-  it). **Some** = any month with ≥ AED 1,000 of money in. A balance below strong is not
-  evidence.
-- **F3 strong** = money out ≥ max(AED 1,000, 1 × anchor) in 2 of m1–m3. **Some** = any month
-  ≥ AED 500.
+  it). **Some** = any month with ≥ AED 1,000 of money in (`FLOW_SOME`). A balance below
+  strong is not evidence.
+- **F3 strong** = money out ≥ max(AED 3,000, 2 × anchor) in 2 of m1–m3. **Some** = any month
+  ≥ AED 1,000 (`FLOW_SOME`).
 - `a1_sweepable_balance_flag` = the balance is strong: money above the floor the bank could
   still sweep (a lead for collections; it changes nothing).
 
 ## 4. F4 Cross-product — Strong (2) / Some (evidence) / None
 
 At the observation month end, the customer's other products with us (the scored account
-left out): **strong** = deposits + investments + WM assets ≥ max(AED 10,000, 3 × anchor), or
+left out): **strong** = deposits + investments + WM assets ≥ max(AED 3,000, 2 × anchor), or
 another credit product (incl. other cards) that is current with an instalment / minimum due
 ≥ max(AED 1,000, 1 × anchor); **some** = any other current credit product or any asset.
 

@@ -40,7 +40,7 @@ def _load_bound(floor: datetime.date) -> datetime.date:
 
 def _latest_in_month(df: DataFrame, key: str, day: str, value: str) -> DataFrame:
     """``key``, ``month_end`` (the month end of ``day``) and ``value`` of each ``key``'s
-    latest ``day`` row per month."""
+    latest ``day`` row per month; two rows on that day: the larger ``value``."""
     return (
         df.groupBy(key, F.last_day(day).alias("month_end"))
         .agg(F.max(F.struct(day, value)).alias("_latest"))
