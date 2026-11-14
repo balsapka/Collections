@@ -32,10 +32,9 @@ BALANCE_TAIL_DAYS = 5  # a card's minimum due is read from the last days of the 
 LOAD_LAG_DAYS = 40  # edp_load_date bound before the first month (load lag)
 
 
-def _window(persona_start_date: str, history_months: int) -> tuple:
-    """The first month kept and the ``edp_load_date`` bound that covers it."""
-    floor = history_floor(persona_start_date, history_months)
-    return floor, floor - datetime.timedelta(days=LOAD_LAG_DAYS)
+def _load_bound(floor: datetime.date) -> datetime.date:
+    """The ``edp_load_date`` bound that covers the month of ``floor`` (load lag)."""
+    return floor - datetime.timedelta(days=LOAD_LAG_DAYS)
 
 
 def _latest_in_month(df: DataFrame, key: str, day: str, value: str) -> DataFrame:
@@ -132,7 +131,8 @@ def build_card_month_end(
 ) -> DataFrame:
     """``contract_id``, ``month_end``, ``level``, ``minimum_due`` for every card contract
     with a billing row in the month."""
-    floor, lo = _window(persona_start_date, history_months)
+    floor = history_floor(persona_start_date, history_months)
+    lo = _load_bound(floor)
     return (
         _card_levels(billing, lo)
         .filter(F.col("month_end") >= F.lit(floor))
@@ -163,7 +163,7 @@ def build_loan_month_end(
         ],
         "bo_rr_portf_actv_acct_mthly",
     )
-    floor, _ = _window(persona_start_date, history_months)
+    floor = history_floor(persona_start_date, history_months)
     return loan_portfolio.filter(F.to_date("ss_dt") >= F.lit(floor)).select(
         F.col("cust_num").cast("string").alias("cif_id"),
         F.trim(F.col("acct_num").cast("string")).alias("account_id"),

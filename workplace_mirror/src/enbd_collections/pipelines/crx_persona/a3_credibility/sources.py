@@ -8,7 +8,7 @@ from enbd_collections.nodes.utils.config_dcore import (
     PTP_INSTALMENT_STATUS_CANCELLED,
     SETTLEMENT_INSTALMENT_STATUS_CANCELLED,
 )
-from pyspark.sql import DataFrame
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
 from .._common import GRAIN, require_columns, scoped, string_key
@@ -68,21 +68,18 @@ def build_cycle_ledger(dues: DataFrame, payments: DataFrame) -> DataFrame:
     )
 
 
-def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    obs_base: DataFrame,
+_INSTALMENT_FIELDS = ["due_date", "due_amount", "payment_amount", "instalment_status"]
+
+
+# pylint: disable-next=too-many-arguments,too-many-positional-arguments
+def _require_plan_sources(
     agreements: DataFrame,
     int_ptp: DataFrame,
     ptp_instalments: DataFrame,
     int_settlement: DataFrame,
     settlement_instalments: DataFrame,
-) -> DataFrame:
-    """PTP and settlement instalments of the base's accounts (D-A3-7, D-A3-9).
-
-    One row per instalment of a non-cancelled plan: ``account_id``, ``plan_id``,
-    ``plan_type``, ``plan_start`` (PTP: promise start, else event date; settlement: event
-    date, the only date DCORE keeps), ``due_date``, ``due_amount``, ``payment_amount``
-    (DCORE's). Cancelled instalments are nulled by DCORE's own rule and dropped.
-    """
+) -> None:
+    """Raise when a DCORE source of ``build_instalments`` lacks a column it reads."""
     require_columns(
         agreements, ["account_id", "agreement_id"], "prm_dcore_account_agreements"
     )
@@ -102,14 +99,61 @@ def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional
         ["agreement_id", "rps_seqno", "event_date", "is_cancelled"],
         "dcore_int_settlement",
     )
-    cols = ["due_date", "due_amount", "payment_amount", "instalment_status"]
     require_columns(
-        ptp_instalments, ["promise_seqno", *cols], "dcore_prm_promise_instalments"
+        ptp_instalments,
+        ["promise_seqno", *_INSTALMENT_FIELDS],
+        "dcore_prm_promise_instalments",
     )
     require_columns(
         settlement_instalments,
-        ["rps_seqno", *cols],
+        ["rps_seqno", *_INSTALMENT_FIELDS],
         "dcore_prm_settlement_schedule_instalments",
+    )
+
+
+# pylint: disable-next=too-many-arguments,too-many-positional-arguments
+def _plan_instalments(
+    plan: DataFrame,
+    seq: str,
+    start: Column,
+    kind: str,
+    rows: DataFrame,
+    cancelled: object,
+    agreement_ids: DataFrame,
+) -> DataFrame:
+    """The instalments of the non-cancelled plans of one ``kind`` (``plan_id`` =
+    ``kind:seq``, ``plan_start`` = ``start``) on the agreements in ``agreement_ids``;
+    ``cancelled`` is DCORE's cancelled instalment status."""
+    live = plan.where(F.coalesce(F.col("is_cancelled"), F.lit(0)) != 1).select(
+        F.col("agreement_id").cast("string").alias("agreement_id"),
+        seq,
+        F.concat_ws(":", F.lit(kind), F.col(seq).cast("string")).alias("plan_id"),
+        F.lit(kind).alias("plan_type"),
+        start.cast("date").alias("plan_start"),
+    )
+    live = live.join(agreement_ids, on="agreement_id", how="left_semi")
+    return null_cancelled_instalment_fields(
+        live.join(rows.select(seq, *_INSTALMENT_FIELDS), on=seq), cancelled
+    ).drop(seq)
+
+
+def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    obs_base: DataFrame,
+    agreements: DataFrame,
+    int_ptp: DataFrame,
+    ptp_instalments: DataFrame,
+    int_settlement: DataFrame,
+    settlement_instalments: DataFrame,
+) -> DataFrame:
+    """PTP and settlement instalments of the base's accounts (D-A3-7, D-A3-9).
+
+    One row per instalment of a non-cancelled plan: ``account_id``, ``plan_id``,
+    ``plan_type``, ``plan_start`` (PTP: promise start, else event date; settlement: event
+    date, the only date DCORE keeps), ``due_date``, ``due_amount``, ``payment_amount``
+    (DCORE's). Cancelled instalments are nulled by DCORE's own rule and dropped.
+    """
+    _require_plan_sources(
+        agreements, int_ptp, ptp_instalments, int_settlement, settlement_instalments
     )
     links = scoped(
         agreements.select(
@@ -120,37 +164,23 @@ def build_instalments(  # pylint: disable=too-many-arguments,too-many-positional
         "account_id",
     )
     mine = F.broadcast(links.select("agreement_id").distinct())
-
-    def plans(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        plan: DataFrame, seq: str, start, kind: str, rows: DataFrame, cancelled
-    ) -> DataFrame:
-        live = plan.where(F.coalesce(F.col("is_cancelled"), F.lit(0)) != 1).select(
-            F.col("agreement_id").cast("string").alias("agreement_id"),
-            seq,
-            F.concat_ws(":", F.lit(kind), F.col(seq).cast("string")).alias("plan_id"),
-            F.lit(kind).alias("plan_type"),
-            start.cast("date").alias("plan_start"),
-        )
-        live = live.join(mine, on="agreement_id", how="left_semi")
-        return null_cancelled_instalment_fields(
-            live.join(rows.select(seq, *cols), on=seq), cancelled
-        ).drop(seq)
-
-    ptp = plans(
+    ptp = _plan_instalments(
         int_ptp,
         "promise_seqno",
         F.coalesce(F.col("promise_start"), F.col("event_date")),
         "ptp",
         ptp_instalments,
         PTP_INSTALMENT_STATUS_CANCELLED,
+        mine,
     )
-    settlement = plans(
+    settlement = _plan_instalments(
         int_settlement,
         "rps_seqno",
         F.col("event_date"),
         "settlement",
         settlement_instalments,
         SETTLEMENT_INSTALMENT_STATUS_CANCELLED,
+        mine,
     )
     return (
         ptp.unionByName(settlement)

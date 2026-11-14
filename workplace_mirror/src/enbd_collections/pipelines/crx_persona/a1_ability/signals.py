@@ -36,9 +36,13 @@ from enbd_collections.nodes.features.casa.feat_cif_casa import (
     MONEY_OUT_CLASSES,
 )
 from enbd_collections.nodes.features.products.feat_cif_cross_product import (
+    ASSET_TYPES,
+    CREDIT_TYPES,
+)
+from enbd_collections.nodes.features.products.feat_cif_cross_product import (
     COLUMNS as CROSS_PRODUCT_COLUMNS,
 )
-from enbd_collections.nodes.utils.frames import history_floor
+from enbd_collections.nodes.utils.frames import cif_column, history_floor
 
 from .._common import (
     GRAIN,
@@ -300,15 +304,15 @@ def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> Dat
         products, list(CROSS_PRODUCT_COLUMNS), "feat_cif_cross_product_monthly"
     )
     obs = _cifs(obs_base).select(*GRAIN, "cif_id")
-    asset = F.col("product_type").isin("deposit", "investment", "wm")
-    current_credit = F.col("product_type").isin("card", "loan") & (
+    asset = F.col("product_type").isin(*ASSET_TYPES)
+    current_credit = F.col("product_type").isin(*CREDIT_TYPES) & (
         F.coalesce(F.col("is_current").cast("int"), F.lit(0)) == 1
     )
     rows = (
         F.broadcast(obs)
         .join(
             products.select(
-                F.col("cif_id").cast("string").alias("cif_id"),
+                cif_column(),
                 F.col("month_end").alias("observation_date"),
                 F.col("product_account_id").cast("string").alias("_acct"),
                 "product_type",
@@ -346,8 +350,8 @@ def _require_returns_from(returns: DataFrame, since: str) -> None:
     if first is None or first.isoformat()[:7] > since[:7]:
         raise ValueError(
             f"feat_cif_returns_monthly starts at {first}, but the observations need "
-            f"returns from {since}: rerun casa_primary and casa_features after changing "
-            "crx_persona.persona_start_date"
+            f"returns from {since}: rerun casa_primary and casa_features after "
+            "changing crx_persona.persona_start_date"
         )
 
 
@@ -371,7 +375,7 @@ def _distress_events(
         )
         events = events.unionByName(
             payment_order.filter(F.col("reason_code").isNotNull()).select(
-                F.col("cif_id").cast("string").alias("cif_id"),
+                cif_column(),
                 F.last_day(F.to_date("return_date")).alias("month_end"),
                 F.lit(REASON_BUREAU_BOUNCE).alias("reason"),
             )
@@ -461,7 +465,7 @@ def build_eosb_signals(
     mine = scoped(
         agreements.select(
             F.col("agreement_id").cast("string").alias("agreement_id"),
-            F.col("cif_id").cast("string").alias("cif_id"),
+            cif_column(),
         ).distinct(),
         obs,
         "cif_id",

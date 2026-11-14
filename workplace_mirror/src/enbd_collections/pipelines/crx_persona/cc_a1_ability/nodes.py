@@ -11,7 +11,7 @@ from .._common import GRAIN, SEG_60_180, pit_latest, require_columns, segment
 # OVD_k holds the amount k cycles overdue (DPD bucket k+1): OVD_01 1-30 … OVD_06
 # 151-180 DPD. OVD_07 (181-210) and the catch-all OVD_08 (211+) never anchor.
 _OVERDUE_BUCKETS = [f"overdue_bucket_{i:02d}" for i in range(1, 7)]
-# No balance snapshot in the observation month means the card stopped reporting; no anchor.
+# No balance snapshot in the observation month: the card stopped reporting, no anchor.
 _BALANCE_MAX_AGE_M = 1
 
 

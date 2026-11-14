@@ -19,7 +19,7 @@ up customer-level sources by ``cif_id``. The helpers here encode the conventions
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F

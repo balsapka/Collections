@@ -30,6 +30,36 @@ EVENTS = [
 ]
 
 
+def _run_step(run: Column, row: Column) -> Column:
+    """Fold one follow-up row into ``run`` (``firsts``: the first row of every run so
+    far with its cutoff, ``prev``: the previous row's date, ``cutoff``: the current
+    run's deadline)."""
+    starts = (
+        run["prev"].isNull()
+        | (F.datediff(row["event_date"], run["prev"]) > FOLLOWUP_RUN_DAYS)
+        | (row["event_date"] > run["cutoff"])
+    )
+    first = F.struct(row["event_date"], row["name"], row["promise_cutoff"])
+    return F.struct(
+        F.when(starts, F.concat(run["firsts"], F.array(first)))
+        .otherwise(run["firsts"])
+        .alias("firsts"),
+        row["event_date"].alias("prev"),
+        F.when(starts, row["promise_cutoff"]).otherwise(run["cutoff"]).alias("cutoff"),
+    )
+
+
+def _no_runs() -> Column:
+    """The empty ``_run_step`` accumulator."""
+    return F.struct(
+        F.array()
+        .cast("array<struct<event_date:date,name:string,promise_cutoff:date>>")
+        .alias("firsts"),
+        F.lit(None).cast("date").alias("prev"),
+        F.lit(None).cast("date").alias("cutoff"),
+    )
+
+
 def _followup_promises(
     obs_base: DataFrame,
     followup: DataFrame,
@@ -48,37 +78,12 @@ def _followup_promises(
         dues,
         deadline,
     )
-
-    def step(run: Column, row: Column) -> Column:
-        starts = (
-            run["prev"].isNull()
-            | (F.datediff(row["event_date"], run["prev"]) > FOLLOWUP_RUN_DAYS)
-            | (row["event_date"] > run["cutoff"])
-        )
-        first = F.struct(row["event_date"], row["name"], row["promise_cutoff"])
-        return F.struct(
-            F.when(starts, F.concat(run["firsts"], F.array(first)))
-            .otherwise(run["firsts"])
-            .alias("firsts"),
-            row["event_date"].alias("prev"),
-            F.when(starts, row["promise_cutoff"])
-            .otherwise(run["cutoff"])
-            .alias("cutoff"),
-        )
-
-    start = F.struct(
-        F.array()
-        .cast("array<struct<event_date:date,name:string,promise_cutoff:date>>")
-        .alias("firsts"),
-        F.lit(None).cast("date").alias("prev"),
-        F.lit(None).cast("date").alias("cutoff"),
-    )
     ordered = F.array_sort(
         F.collect_list(F.struct("event_date", "name", "promise_cutoff"))
     )
     return (
         rows.groupBy("account_id")
-        .agg(F.aggregate(ordered, start, step)["firsts"].alias("_firsts"))
+        .agg(F.aggregate(ordered, _no_runs(), _run_step)["firsts"].alias("_firsts"))
         .select("account_id", F.explode("_firsts").alias("_first"))
         .select(
             "account_id",
@@ -158,7 +163,51 @@ def _cutoff(events: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
     )
 
 
-def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def _with_due(events: DataFrame, dues: DataFrame) -> DataFrame:
+    """``events`` + ``_due``: the due of the cycle open on the event day (the latest
+    cycle starting on or before it)."""
+    cycles = dues.select(
+        F.col("account_id").alias("_c_account"), "cycle_start", "due_amount"
+    )
+    return (
+        events.join(
+            cycles,
+            (F.col("account_id") == F.col("_c_account"))
+            & (F.col("cycle_start") <= F.col("event_date")),
+            "left",
+        )
+        .groupBy(*events.columns)
+        .agg(F.max(F.struct("cycle_start", "due_amount"))["due_amount"].alias("_due"))
+    )
+
+
+def _with_paid(events: DataFrame, payments: DataFrame) -> DataFrame:
+    """``events`` + ``promise_paid_amount``: the payments after the event day up to its
+    ``promise_cutoff`` (a payment on the event day counts when it started earlier)."""
+    day = F.col("event_date")
+    pays = payments.select(
+        F.col("account_id").alias("_p_account"),
+        "pay_from",
+        "pay_date",
+        F.col("amount").alias("_amount"),
+    )
+    after = (F.col("pay_date") > day) | (
+        (F.col("pay_date") == day) & (F.col("pay_from") < F.col("pay_date"))
+    )
+    return (
+        events.join(
+            pays,
+            (F.col("account_id") == F.col("_p_account"))
+            & after
+            & (F.col("pay_date") <= F.col("promise_cutoff")),
+            "left",
+        )
+        .groupBy(*events.columns)
+        .agg(F.sum("_amount").alias("promise_paid_amount"))
+    )
+
+
+def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     obs_base: DataFrame,
     followup: DataFrame,
     agreements: DataFrame,
@@ -196,41 +245,7 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
         deadline,
     )
     promises = _followup_promises(obs_base, followup, agreements, dues, deadline)
-    events = _consolidate(plans, promises)
-    day = F.col("event_date")
-    cycles = dues.select(
-        F.col("account_id").alias("_c_account"), "cycle_start", "due_amount"
-    )
-    pays = payments.select(
-        F.col("account_id").alias("_p_account"),
-        "pay_from",
-        "pay_date",
-        F.col("amount").alias("_amount"),
-    )
-    after = (F.col("pay_date") > day) | (
-        (F.col("pay_date") == day) & (F.col("pay_from") < F.col("pay_date"))
-    )
-    with_due = (
-        events.join(
-            cycles,
-            (F.col("account_id") == F.col("_c_account"))
-            & (F.col("cycle_start") <= day),
-            "left",
-        )
-        .groupBy(*events.columns)
-        .agg(F.max(F.struct("cycle_start", "due_amount"))["due_amount"].alias("_due"))
-    )
-    judged = (
-        with_due.join(
-            pays,
-            (F.col("account_id") == F.col("_p_account"))
-            & after
-            & (F.col("pay_date") <= F.col("promise_cutoff")),
-            "left",
-        )
-        .groupBy(*with_due.columns)
-        .agg(F.sum("_amount").alias("promise_paid_amount"))
-    )
+    judged = _with_paid(_with_due(_consolidate(plans, promises), dues), payments)
     amount = F.greatest(F.coalesce("_due", F.lit(0.0)), F.lit(float(MIN_PAYMENT_AED)))
     got = F.coalesce("promise_paid_amount", F.lit(0.0))
     return (

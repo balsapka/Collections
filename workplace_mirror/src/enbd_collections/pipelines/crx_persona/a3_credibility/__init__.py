@@ -1,5 +1,7 @@
 """A3 payment credibility engine shared by the CC and RL credibility pipelines."""
 
+# ruff: noqa: F401
+
 from .classify import build_a3_credibility
 from .pipeline import create_a3_pipeline
 from .promises import build_promise_events

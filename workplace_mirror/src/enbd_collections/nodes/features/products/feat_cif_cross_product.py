@@ -52,6 +52,8 @@ COLUMNS = (
 )
 # Fixed ids of the per-customer asset rows (one row per customer, month and type).
 ASSET_IDS = {"deposit": "ITD", "investment": "INV", "wm": "WM_AUM"}
+ASSET_TYPES = tuple(ASSET_IDS)
+CREDIT_TYPES = ("card", "loan")
 CARD_CURRENT_MAX_LEVEL = 1  # billing level of a current card (Way4: 1 = not overdue)
 
 

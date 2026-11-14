@@ -153,7 +153,7 @@ def money_out_level(anchor: Column, w: int) -> Column:
     return _flow_level("out", MONEY_OUT_SOME, anchor, w)
 
 
-def cross_product_level(anchor: Column, w: int) -> Column:  # pylint: disable=W0613
+def cross_product_level(anchor: Column, _w: int) -> Column:
     """F4 at the observation month end: strong on assets of max(floor, 3 x anchor) or a
     current credit product whose instalment reaches max(floor, anchor); some on any other
     current credit product or any asset."""
@@ -185,13 +185,33 @@ SCORECARD = Scorecard(
     dimensions=tuple(dimension for _, dimension in FAMILIES),
     overrides=(Override("distress", "a1_distress_flag", DEMOTE),),  # S9
     # state id = rung name; the display text is DISPLAY_NAMES
-    labels={s: s for s in ("high", "moderate", "low", "unknown")},
+    labels={state: state for state in DISPLAY_NAMES},
     high_from=HIGH_FROM,
     moderate_from=MODERATE_FROM,
 )
 
 
-def build_a1_ability(  # pylint: disable=too-many-locals
+def _income_source() -> Column:
+    """Who shows ``MIN_EVIDENCE_AMT`` or more in the window: both, internal, bureau or
+    none."""
+    internal = _shows_evidence("internal_salary_w")
+    bureau = _shows_evidence("bureau_salary_w")
+    return (
+        F.when(internal & bureau, "both")
+        .when(internal, "internal")
+        .when(bureau, "bureau")
+        .otherwise("none")
+    )
+
+
+def _salary_stopped() -> Column:
+    """Internal salary in the prior window and none in the window."""
+    return _shows_evidence("internal_salary_prior") & ~_shows_evidence(
+        "internal_salary_w"
+    )
+
+
+def build_a1_ability(
     obs_base: DataFrame,
     anchor: DataFrame,
     model_id: str,
@@ -226,9 +246,6 @@ def build_a1_ability(  # pylint: disable=too-many-locals
     unknown_reason = F.when(F.col("casa_held") == 1, "dormant_casa").otherwise(
         "no_casa"
     )
-    internal_w = _shows_evidence("internal_salary_w")
-    bureau_w = _shows_evidence("bureau_salary_w")
-    internal_prior = _shows_evidence("internal_salary_prior")
     out = df.select(
         *GRAIN,
         "a1_state",
@@ -249,12 +266,8 @@ def build_a1_ability(  # pylint: disable=too-many-locals
         F.col("liquidity_anchor_amt").cast("double"),
         balance_strong(amt, w).cast("int").alias("a1_sweepable_balance_flag"),
         F.col("eosb_flag").cast("int").alias("a1_eosb_flag"),
-        F.when(internal_w & bureau_w, "both")
-        .when(internal_w, "internal")
-        .when(bureau_w, "bureau")
-        .otherwise("none")
-        .alias("a1_income_source"),
-        (internal_prior & ~internal_w).cast("int").alias("a1_salary_stopped"),
+        _income_source().alias("a1_income_source"),
+        _salary_stopped().cast("int").alias("a1_salary_stopped"),
         F.current_date().alias("computed_at"),
     )
     log_latest_month(out, "a1_state", f"a1_ability [{model_id}]", persona_end_date)

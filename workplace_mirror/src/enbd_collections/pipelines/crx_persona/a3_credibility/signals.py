@@ -57,20 +57,10 @@ def _base(episode: DataFrame) -> DataFrame:
 # ── Dimension A: promises kept ────────────────────────────────────────────────
 
 
-def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame:
-    """Dimension A: kept / partly kept / thin / broken (D-A3-9, -25, -26).
-
-    Promise events (``build_promise_events``) dated in the last 12 months up to the
-    observation date, earlier delinquency episodes included (trustworthiness, not this
-    episode only), concluded once their cutoff is on or before the
-    observation date. Kept: paid; partial counts as not kept. Broken: the last 3
-    concluded all not kept (a broken event ranks first on a shared day), or at least 2
-    concluded and under 40% kept. Kept: at least 2 concluded and 80% kept.
-    """
-    require_columns(episode, EPISODE, "A3 episode")
-    require_columns(events, EVENTS, "A3 promise events")
-    base = episode.select(*GRAIN)
-    lower = window_start(COMMITMENT_MONTHS)
+def _commitment_counts(base: DataFrame, events: DataFrame, lower: Column) -> DataFrame:
+    """Per base row with an event in ``[lower, observation date]``: the concluded, kept
+    and partly kept counts and ``commitments_last_broken_n``, the not-kept events among
+    the last ``BROKEN_STREAK`` concluded."""
     obs = F.col("observation_date")
     rows = (
         base.join(events, on="account_id")
@@ -93,7 +83,7 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
         1,
         BROKEN_STREAK,
     )
-    agg = rows.groupBy(*GRAIN).agg(
+    return rows.groupBy(*GRAIN).agg(
         F.sum(F.col("_concluded").cast("int")).alias("commitments_concluded"),
         F.sum(F.col("_kept").cast("int")).alias("commitments_kept"),
         F.sum(
@@ -103,6 +93,23 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
             "commitments_last_broken_n"
         ),
     )
+
+
+def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame:
+    """Dimension A: kept / partly kept / thin / broken (D-A3-9, -25, -26).
+
+    Promise events (``build_promise_events``) dated in the last 12 months up to the
+    observation date, earlier delinquency episodes included (trustworthiness, not this
+    episode only), concluded once their cutoff is on or before the
+    observation date. Kept: paid; partial counts as not kept. Broken: the last 3
+    concluded all not kept (a broken event ranks first on a shared day), or at least 2
+    concluded and under 40% kept. Kept: at least 2 concluded and 80% kept.
+    """
+    require_columns(episode, EPISODE, "A3 episode")
+    require_columns(events, EVENTS, "A3 promise events")
+    base = episode.select(*GRAIN)
+    lower = window_start(COMMITMENT_MONTHS)
+    agg = _commitment_counts(base, events, lower)
     done, ok = F.col("commitments_concluded"), F.col("commitments_kept")
     rate = F.when(done > 0, ok / done)
     level = (
@@ -312,35 +319,26 @@ def _paid_after_refusal(
     )
 
 
-def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-    episode: DataFrame,
-    followup: DataFrame,
-    agreements: DataFrame,
-    instalments: DataFrame,
-    payments: DataFrame,
-    dues: DataFrame,
-    model_id: str,
+def _contact_events(
+    episode: DataFrame, followup: DataFrame, agreements: DataFrame
 ) -> DataFrame:
-    """The latest right-party contact in the episode and what it means (D-A3-19, -20).
-
-    DCORE events of the account in ``[max(episode start, last 24 months), observation
-    date]``. Latest right-party contact: on the same day a non-refusal counts as later
-    (a same-day promise followed the refusal); a remaining tie takes the largest
-    disposition (Q-28). ``a3_refusal_flag``: it was a refusal and no plan started and no
-    cycle / month with 100 AED or more paid followed. Diagnostics (not in the state):
-    dispute, hung up, and no pickup on N days after it with no dead line in between.
-    """
-    require_columns(episode, EPISODE, "A3 episode")
-    require_columns(instalments, INSTALMENTS, "A3 instalments")
-    require_columns(payments, PAYMENTS, "A3 payments")
-    require_columns(dues, DUES, "A3 dues")
-    base = _base(episode)
+    """The account's DCORE events in ``[max(episode start, last DCORE_MAX_MONTHS
+    months), observation date]`` with their ``_disp`` disposition (NULL: not a
+    contact)."""
     lower = F.greatest(window_start(DCORE_MAX_MONTHS), F.col("_anchor"))
-    events = (
-        base.join(dcore_account_events(episode, followup, agreements), on="account_id")
+    return (
+        _base(episode)
+        .join(dcore_account_events(episode, followup, agreements), on="account_id")
         .filter((F.col("day") >= lower) & (F.col("day") <= F.col("observation_date")))
         .withColumn("_disp", _disposition(F.col("name")))
     )
+
+
+def _contact_summary(events: DataFrame) -> DataFrame:
+    """Per base row: the latest right-party contact (``last_rpc_date``,
+    ``last_rpc_disposition``), the call days (``contact_dates_n``), the days with no
+    pickup after the contact (``no_pickup_days_n``) and ``_dead``, 1 when a dead-line
+    result came after it."""
     latest = F.max(
         F.when(
             F.col("_disp").isNotNull(),
@@ -354,7 +352,7 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
     ) & F.col("action_code").isin(*codes.OUTBOUND_CODES)
     last_day = F.col("_last")["day"]
     after = F.col("day") > last_day
-    summary = (
+    return (
         events.withColumn("_last", latest.over(Window.partitionBy(*GRAIN)))
         .groupBy(*GRAIN)
         .agg(
@@ -377,10 +375,11 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
             ).alias("_dead"),
         )
     )
-    refusals = summary.where(F.col("last_rpc_disposition") == "refusal").select(
-        *GRAIN, "last_rpc_date"
-    )
-    planned = (
+
+
+def _plan_after_refusal(refusals: DataFrame, instalments: DataFrame) -> DataFrame:
+    """Rows whose plan started after the refusal day, by the observation date."""
+    return (
         refusals.join(
             instalments.select("account_id", "plan_start").distinct(), on="account_id"
         )
@@ -392,11 +391,42 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
         .distinct()
         .withColumn("_planned", F.lit(True))
     )
+
+
+def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    episode: DataFrame,
+    followup: DataFrame,
+    agreements: DataFrame,
+    instalments: DataFrame,
+    payments: DataFrame,
+    dues: DataFrame,
+    model_id: str,
+) -> DataFrame:
+    """The latest right-party contact in the episode and what it means (D-A3-19, -20).
+
+    DCORE events of the account in ``[max(episode start, last 24 months), observation
+    date]``. Latest right-party contact: on the same day a non-refusal counts as later
+    (a same-day promise followed the refusal); a remaining tie takes the largest
+    disposition (Q-28). ``a3_refusal_flag``: it was a refusal and no plan started and no
+    cycle / month with 100 AED or more paid followed. Diagnostics (not in the state):
+    dispute, hung up, and no pickup on N days after it with no dead line in between.
+    """
+    require_columns(episode, EPISODE, "A3 episode")
+    require_columns(instalments, INSTALMENTS, "A3 instalments")
+    require_columns(payments, PAYMENTS, "A3 payments")
+    require_columns(dues, DUES, "A3 dues")
+    events = _contact_events(episode, followup, agreements)
+    summary = _contact_summary(events)
+    refusals = summary.where(F.col("last_rpc_disposition") == "refusal").select(
+        *GRAIN, "last_rpc_date"
+    )
+    planned = _plan_after_refusal(refusals, instalments)
     paid = _paid_after_refusal(refusals, payments, dues)
     disp = F.col("last_rpc_disposition")
     days = F.coalesce(F.col("no_pickup_days_n"), F.lit(0))
     return (
-        base.select(*GRAIN)
+        _base(episode)
+        .select(*GRAIN)
         .join(summary, on=list(GRAIN), how="left")
         .join(planned, on=list(GRAIN), how="left")
         .join(paid, on=list(GRAIN), how="left")

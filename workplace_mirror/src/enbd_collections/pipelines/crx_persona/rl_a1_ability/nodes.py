@@ -10,7 +10,7 @@ from enbd_collections.nodes.utils.frames import history_floor
 
 from .._common import GRAIN, pit_latest, require_columns
 
-# int_loan_master is a month-end snapshot; none in the observation month means no anchor.
+# int_loan_master is a month-end snapshot; none in the observation month: no anchor.
 _LOAN_MAX_AGE_M = 1
 
 

@@ -52,7 +52,7 @@ def build_cc_acct_windows(
     )
 
 
-def _nonzero(col: str):
+def _nonzero(col: str) -> Column:
     """Way4 writes an empty bucket as 0, not NULL."""
     return F.col(col).isNotNull() & (F.col(col) != 0.0)
 
@@ -65,19 +65,14 @@ def _balance_dues(balance: DataFrame) -> DataFrame:
     is the average positive minimum due of the 12 months before that point (D-A3-12);
     ``billed_amount`` (Dimension C) has no such fallback.
     """
+    billed = F.coalesce(*[F.when(_nonzero(c), F.col(c)) for c in _LADDER])
     rows = balance.select(
         string_key(balance, "contract_id").alias("account_id"),
         F.col("observation_date").cast("date").alias("cycle_start"),
         "minimum_due",
-        F.coalesce(*[F.when(_nonzero(c), F.col(c)) for c in _LADDER]).alias(
-            "billed_amount"
-        ),
-        (
-            ~F.coalesce(
-                *[F.when(_nonzero(c), F.lit(True)) for c in _LADDER], F.lit(False)
-            )
-            & _nonzero("overdue_bucket_08")
-        ).alias("_stagnated"),
+        billed.alias("billed_amount"),
+        # only the accumulator holds money: no bucket 07..01 and no minimum due open
+        (billed.isNull() & _nonzero("overdue_bucket_08")).alias("_stagnated"),
     )
     rows = rows.withColumn(
         "_since",
@@ -122,9 +117,8 @@ def build_cc_a3_dues(
         ["contract_id", "observation_date", "overdue_bucket_08", *_LADDER],
         "crx_cc_balance",
     )
-    start, end = F.col("observation_date").cast("date"), F.col(
-        "next_billing_date"
-    ).cast("date")
+    start = F.col("observation_date").cast("date")
+    end = F.col("next_billing_date").cast("date")
     floor = _history_floor(history_floor_date)
     cycles = (
         billing.where(
