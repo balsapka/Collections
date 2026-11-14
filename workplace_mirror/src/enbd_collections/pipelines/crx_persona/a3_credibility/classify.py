@@ -86,5 +86,5 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
         "a3_unknown_reason", F.when(no_episode, "no_episode")
     ).withColumn("a3_state", F.when(no_episode, unknown).otherwise(F.col("a3_state")))
     out = out.select(*OUTPUT_COLUMNS)
-    log_latest_month(out, "a3_state", "A3 credibility", persona_end_date)
+    log_latest_month(out, "a3_state", f"a3_credibility [{model_id}]", persona_end_date)
     return out

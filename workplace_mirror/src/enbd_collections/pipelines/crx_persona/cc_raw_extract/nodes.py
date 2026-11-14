@@ -200,13 +200,7 @@ def build_cc_balance(
     """
     require_columns(
         raw_stg_balance,
-        [
-            "contract_idt",
-            "banking_date",
-            "edp_load_date",
-            "account_group_id",
-            "balance",
-        ],
+        ["contract_idt", "banking_date", "edp_load_date"],
         "raw_stg_balance",
     )
     acct_windows = _as_contract_windows(crx_cc_acct_windows)
