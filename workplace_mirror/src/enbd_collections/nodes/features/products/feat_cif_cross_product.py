@@ -36,7 +36,7 @@ from pyspark.sql import functions as F
 
 from enbd_collections.nodes.utils.frames import (
     cif_column,
-    months_back,
+    history_floor,
     require_columns,
     wm_month,
 )
@@ -196,7 +196,7 @@ def build(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     ``product_primary`` (same parameter).
 
     Raises ``ValueError`` naming the source when a column is missing."""
-    floor = months_back(persona_start_date, history_months - 1)
+    floor = history_floor(persona_start_date, history_months)
     parts = [
         *_assets(wm_balances, wm_holdings, floor),
         _loans(loan_month_end),

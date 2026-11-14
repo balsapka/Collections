@@ -16,18 +16,14 @@ from kedro.pipeline import Pipeline, node
 from kedro.pipeline.node import Node
 
 from .classify import build_a3_credibility
+from .promises import build_promise_events
 from .signals import (
     build_commitment_signals,
     build_contact_signals,
     build_dlq_payment_signals,
     build_pre_dlq_payment_signals,
 )
-from .sources import (
-    build_a3_episode,
-    build_cycle_ledger,
-    build_instalments,
-    build_promise_events,
-)
+from .sources import build_a3_episode, build_cycle_ledger, build_instalments
 
 TAGS = ["crx_persona", "crx", "a3", "payment_credibility", "persona_axis"]
 # Ledger names as in the workplace catalog.

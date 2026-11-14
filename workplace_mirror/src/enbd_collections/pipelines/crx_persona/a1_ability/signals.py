@@ -26,6 +26,8 @@ account_id alone (an RL account_id is not a CASA account).
 
 from __future__ import annotations
 
+from functools import reduce
+
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
@@ -36,15 +38,14 @@ from enbd_collections.nodes.features.casa.feat_cif_casa import (
 from enbd_collections.nodes.features.products.feat_cif_cross_product import (
     COLUMNS as CROSS_PRODUCT_COLUMNS,
 )
+from enbd_collections.nodes.utils.frames import history_floor
 
 from .._common import (
     GRAIN,
     left_join_all,
-    lookback_floor,
     require_columns,
     window_agg,
     window_months,
-    window_start,
 )
 
 # prm_casa_return_events reasons that count as distress; it also carries "RETURNS"
@@ -57,6 +58,8 @@ CASA_HELD_MONTHS = 12
 EOSB = "EOSB"  # in a DCORE result name: end-of-service benefits expected / received
 # Which source a salary row comes from, in ``build_income_signals``.
 SOURCE_INTERNAL, SOURCE_BUREAU = "int", "bur"
+# S14: a bureau salary also counts in the next N months that have no row of their own.
+BUREAU_CARRY_MONTHS = 1
 
 
 def _cifs(obs_base: DataFrame) -> DataFrame:
@@ -64,6 +67,12 @@ def _cifs(obs_base: DataFrame) -> DataFrame:
     return obs_base.filter(F.col("cif_id").isNotNull()).withColumn(
         "cif_id", F.col("cif_id").cast("string")
     )
+
+
+def _floor(crx_persona: dict, months: int) -> str:
+    """ISO first day of the earliest observation's ``months``-month window: the obs base
+    starts in the persona start month, so no window reaches older source rows."""
+    return history_floor(crx_persona["persona_start_date"], months).isoformat()
 
 
 def _month_index(date: Column) -> Column:
@@ -90,25 +99,31 @@ def _in_window(obs: DataFrame, series: DataFrame, months: int, *aggs) -> DataFra
 # ── Income ────────────────────────────────────────────────────────────────────
 
 
-def _with_next_month(bureau: DataFrame) -> DataFrame:
-    """One bureau salary per ``(cif_id, month_end)``: each row's month, and the month
-    after it unless that month has its own row (never before a row; pulls every 2 months
-    make a continuous series). A row of 0 ends the carry.
+def _with_carry(bureau: DataFrame) -> DataFrame:
+    """One bureau salary per ``(cif_id, month_end)``: the month's own row, else the
+    newest row of the ``BUREAU_CARRY_MONTHS`` months before it (never before a row;
+    pulls every 2 months make a continuous series). A row of 0 ends the carry.
     """
-    none = F.lit(None).cast("double")
-    own = bureau.select("cif_id", "month_end", "bureau_salary", none.alias("_carried"))
-    carried = bureau.select(
-        "cif_id",
-        F.last_day(F.add_months("month_end", 1)).alias("month_end"),
-        none.alias("bureau_salary"),
-        F.col("bureau_salary").alias("_carried"),
+    ages = range(BUREAU_CARRY_MONTHS + 1)  # 0: the row's own month
+    rows = reduce(
+        DataFrame.unionByName,
+        [
+            bureau.select(
+                "cif_id",
+                (
+                    F.col("month_end")
+                    if age == 0
+                    else F.last_day(F.add_months("month_end", age))
+                ).alias("month_end"),
+                F.lit(age).alias("_age"),
+                "bureau_salary",
+            )
+            for age in ages
+        ],
     )
-    return (
-        own.unionByName(carried)
-        .groupBy("cif_id", "month_end")
-        .agg(
-            F.coalesce(F.max("bureau_salary"), F.max("_carried")).alias("bureau_salary")
-        )
+    newest = [F.max(F.when(F.col("_age") == a, F.col("bureau_salary"))) for a in ages]
+    return rows.groupBy("cif_id", "month_end").agg(
+        F.coalesce(*newest).alias("bureau_salary")
     )
 
 
@@ -117,6 +132,8 @@ def build_income_signals(
     internal_salary: DataFrame,
     bureau_salary: DataFrame,
     model_id: str,
+    *,
+    crx_persona: dict,
 ) -> DataFrame:
     """``income_m1 … income_m{2W}`` (S3, S12, S14): salary received per month — the
     larger of the internal salary (``feat_cif_internal_salary_monthly``) and the bureau
@@ -136,7 +153,7 @@ def build_income_signals(
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
-    since = lookback_floor(obs, 2 * w)
+    since = _floor(crx_persona, 2 * w)
     internal = internal_salary.select(
         "cif_id",
         "month_end",
@@ -145,7 +162,7 @@ def build_income_signals(
     )
     bureau = bureau_salary.select("cif_id", "month_end", "bureau_salary")
     sources = internal.unionByName(
-        _with_next_month(bureau).select(
+        _with_carry(bureau).select(
             "cif_id",
             "month_end",
             F.col("bureau_salary").alias("amount"),
@@ -238,10 +255,8 @@ def build_casa_signals(
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
-    # The obs base starts in the persona start month: no window reaches older rows.
-    first = F.lit(str(crx_persona["persona_start_date"])).cast("date")
     rows = _casa_rows(casa_flows, casa_balance).filter(
-        F.col("month_end") >= window_start(CASA_HELD_MONTHS, first)
+        F.col("month_end") >= F.lit(_floor(crx_persona, CASA_HELD_MONTHS))
     )
     in_w = _month_index(F.col("month_end")) <= w
     signals = left_join_all(
@@ -368,12 +383,14 @@ def _distress_events(
     )
 
 
-def build_distress_signals(
+def build_distress_signals(  # pylint: disable=too-many-arguments
     obs_base: DataFrame,
     returns: DataFrame,
     bureau_bounces: DataFrame,
     model_id: str,
     payment_order: DataFrame | None = None,
+    *,
+    crx_persona: dict,
 ) -> DataFrame:
     """``distress_flag`` (S9) and its parts in the window, each 0 / 1:
 
@@ -396,7 +413,7 @@ def build_distress_signals(
     )
     obs = _cifs(obs_base)
     w = window_months(model_id)
-    since = lookback_floor(obs, w)
+    since = _floor(crx_persona, w)
     _require_returns_from(returns, since)
     events = _distress_events(returns, bureau_bounces, payment_order, since)
     hits = _in_window(
@@ -419,7 +436,12 @@ def build_distress_signals(
 
 
 def build_eosb_signals(
-    obs_base: DataFrame, followup: DataFrame, agreements: DataFrame, model_id: str
+    obs_base: DataFrame,
+    followup: DataFrame,
+    agreements: DataFrame,
+    model_id: str,
+    *,
+    crx_persona: dict,
 ) -> DataFrame:
     """``eosb_flag`` (S13): 1 when a DCORE result on any of the customer's agreements
     names an end-of-service benefit (EOSB expected / awaited / received) in the
@@ -447,7 +469,7 @@ def build_eosb_signals(
             ).distinct(),
             on="agreement_id",
         )
-        .filter(F.col("day") >= F.lit(lookback_floor(obs, w)))
+        .filter(F.col("day") >= F.lit(_floor(crx_persona, w)))
     )
     hits = window_agg(
         obs, notes, date_col="day", aggs=[F.max(F.lit(1)).alias("eosb_flag")], months=w

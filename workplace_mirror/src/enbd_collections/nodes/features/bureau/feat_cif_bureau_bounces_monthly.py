@@ -16,14 +16,16 @@ from __future__ import annotations
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from enbd_collections.nodes.utils.frames import require_columns
+
 
 def build(alerts: DataFrame) -> DataFrame:
     """Bounce days per month from ``prm_bureau_alert_enriched``."""
-    missing = sorted(
-        {"cif_id", "dt_of_return", "bounced_cheque_amount"} - set(alerts.columns)
+    require_columns(
+        alerts,
+        ["cif_id", "dt_of_return", "bounced_cheque_amount"],
+        "prm_bureau_alert_enriched",
     )
-    if missing:
-        raise ValueError(f"prm_bureau_alert_enriched is missing columns: {missing}")
     amount = F.col("bounced_cheque_amount").cast("double")
     bounces = (
         alerts.filter(

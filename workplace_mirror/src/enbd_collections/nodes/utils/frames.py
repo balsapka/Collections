@@ -15,6 +15,12 @@ def months_back(day: str | date, months: int) -> date:
     return date(year, month + 1, 1)
 
 
+def history_floor(persona_start_date: str | date, months: int) -> date:
+    """First day of the ``months``-month history that ends in the persona start month
+    (that month included): the oldest month a source read keeps."""
+    return months_back(persona_start_date, months - 1)
+
+
 def require_columns(df: DataFrame, columns: list[str], source: str) -> None:
     """Raise ``ValueError`` naming ``source`` when ``df`` lacks any of ``columns``."""
     missing = sorted(set(columns) - set(df.columns))

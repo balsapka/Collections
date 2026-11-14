@@ -26,7 +26,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DateType
 
 from enbd_collections.nodes.primary.cc_way4.prm_cc import derive_billing_amounts
-from enbd_collections.nodes.utils.frames import months_back, require_columns
+from enbd_collections.nodes.utils.frames import history_floor, require_columns
 
 BALANCE_TAIL_DAYS = 5  # a card's minimum due is read from the last days of the month
 LOAD_LAG_DAYS = 40  # edp_load_date bound before the first month (load lag)
@@ -34,7 +34,7 @@ LOAD_LAG_DAYS = 40  # edp_load_date bound before the first month (load lag)
 
 def _window(persona_start_date: str, history_months: int) -> tuple:
     """The first month kept and the ``edp_load_date`` bound that covers it."""
-    floor = months_back(persona_start_date, history_months - 1)
+    floor = history_floor(persona_start_date, history_months)
     return floor, floor - datetime.timedelta(days=LOAD_LAG_DAYS)
 
 

@@ -2,9 +2,9 @@
 
 # pylint: disable=too-many-locals
 
-    build_cc_acct_windows : per-account [acct_start, acct_end] window from the A3
-                            episode anchor (A4) and the observation rows; persisted
-                            once, read by the three extracts below.
+    crx_cc_acct_windows   : per-account [acct_start, acct_end] window, built by
+                            cc_a3_payment_credibility.nodes.build_cc_acct_windows;
+                            read by the three extracts below.
     build_cc_transactions : window-scoped transaction history with the prm_cc
                             derivations (A3 payments).
     build_cc_limits       : credit-limit snapshots pivoted by type_code, on its own
@@ -30,56 +30,10 @@ from enbd_collections.nodes.utils.config import (
     POST_BLOCK_X_SENTINEL_DATE,
     TXN_CATEGORIES,
 )
-from enbd_collections.pipelines.crx_persona._dpd_journey.anchor import episode_start
 from enbd_collections.pipelines.crx_persona.cc_raw_extract._window_utils import (
     prune_by_edp_load_date,
     scope_to_acct_window,
 )
-
-
-def build_cc_acct_windows(
-    crx_cc_obs_base: DataFrame,
-    crx_cc_a4_deterioration: DataFrame,
-    history_floor_date: str,
-) -> DataFrame:
-    """Shared per-account [acct_start, acct_end] window for the A3 extracts.
-
-    acct_start covers 12 months plus one cycle before the earliest episode start the
-    account's observation rows have (A3 Dimension C, D-A3-2), and at least 13 months
-    before its first observation (A3 Dimensions A and B); never before
-    history_floor_date minus 35 days (the statement just before the floor).
-    acct_end = the account's last observation date.
-
-    Persisted once and consumed by build_cc_transactions, build_cc_balance and
-    build_cc_billing.
-
-    Args:
-        crx_cc_obs_base: account_id, observation_date, cif_id.
-        crx_cc_a4_deterioration: the A4 rows the episode anchor is read from.
-        history_floor_date: ISO date (params:cc_a3_history_floor_date).
-
-    Returns:
-        DataFrame with columns (account_id, acct_start, acct_end).
-    """
-    episodes = episode_start(crx_cc_obs_base, crx_cc_a4_deterioration)
-    first = (
-        crx_cc_obs_base.join(
-            episodes, on=["account_id", "observation_date"], how="left"
-        )
-        .groupBy("account_id")
-        .agg(
-            F.least(
-                F.min("episode_start"), F.trunc(F.min("observation_date"), "month")
-            ).alias("_first"),
-            F.max("observation_date").alias("acct_end"),
-        )
-    )
-    floor = F.date_sub(F.lit(str(history_floor_date)).cast(DateType()), 35)
-    return first.select(
-        "account_id",
-        F.greatest(F.add_months(F.col("_first"), -13), floor).alias("acct_start"),
-        "acct_end",
-    )
 
 
 def _as_contract_windows(acct_windows: DataFrame) -> DataFrame:

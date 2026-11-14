@@ -11,8 +11,8 @@ Run with:
 
 from kedro.pipeline import Pipeline, node
 
+from ..cc_a3_payment_credibility.nodes import build_cc_acct_windows
 from .nodes import (
-    build_cc_acct_windows,
     build_cc_balance,
     build_cc_billing,
     build_cc_limits,

@@ -8,8 +8,8 @@ up customer-level sources by ``cif_id``. The helpers here encode the conventions
   ends) and the months before it;
 * point-in-time lookups read before the observation date and can be bounded in age
   (``pit_latest``), window aggregates read the last N months (``window_agg``);
-* source partition floors follow from the earliest observation month
-  (``lookback_floor``);
+* source partition floors follow from ``crx_persona.persona_start_date``, the first
+  observation month (``nodes.utils.frames.history_floor``);
 * each axis logs its state distribution for the latest observation month only
   (``log_latest_month``);
 * DCORE events are read per scored account, through its agreements
@@ -19,7 +19,6 @@ up customer-level sources by ``cif_id``. The helpers here encode the conventions
 from __future__ import annotations
 
 import logging
-from datetime import date
 from typing import Sequence
 
 from pyspark.sql import Column, DataFrame, Window
@@ -163,13 +162,6 @@ def window_agg(  # pylint: disable=too-many-arguments
     )
 
 
-def lookback_floor(base: DataFrame, months: int) -> str:
-    """ISO start of the earliest observation's ``months``-month window (the partition
-    floor for a source read)."""
-    first: date = base.agg(window_start(months, F.min("observation_date"))).first()[0]
-    return first.isoformat()
-
-
 def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
     """Left-join every part onto ``base.select(*GRAIN)`` on ``GRAIN``."""
     result = base.select(*GRAIN)
@@ -288,9 +280,8 @@ def dcore_account_events(
     require_columns(
         agreements, ["account_id", "agreement_id"], "prm_dcore_account_agreements"
     )
-    accounts = obs_base.select("account_id").distinct()
-    scope = agreements.select("account_id", "agreement_id").join(
-        F.broadcast(accounts), on="account_id", how="leftsemi"
+    scope = scoped(
+        agreements.select("account_id", "agreement_id"), obs_base, "account_id"
     )
 
     def text(col: str) -> Column:

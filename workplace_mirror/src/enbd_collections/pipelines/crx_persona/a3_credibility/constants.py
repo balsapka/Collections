@@ -32,9 +32,10 @@ PROMISE_DEADLINE = {
 STATEMENT_FALLBACK_D = 31  # no statement after the promise day yet: 31 days
 
 
-def promise_deadline(product: str, model_id: str) -> str:
-    """The ``PROMISE_DEADLINE`` of ``product`` in ``model_id``'s segment."""
-    return PROMISE_DEADLINE[segment(model_id)][product]
+def promise_deadline(product: str, model_id: str, override: str | None = None) -> str:
+    """``override`` if given, else the ``PROMISE_DEADLINE`` of ``product`` in
+    ``model_id``'s segment."""
+    return override or PROMISE_DEADLINE[segment(model_id)][product]
 
 
 # ── Dimension B: payments while delinquent (D-A3-3, -5, -6) ───────────────────
@@ -52,10 +53,12 @@ CLEAN_SHARE = 0.80  # Clean from (row 84)
 DCORE_MAX_MONTHS = 24  # DCORE events read at most 24 months back (Q-30)
 NO_PICKUP_NAMES = ("NO ANSWER", "LEFT_MSG")  # with _dcore_codes.RINGING
 
-# ── CC cycles (D-A3-12, -15) ──────────────────────────────────────────────────
-CYCLE_MAX_DAYS = 62  # a longer "cycle" spans missing statements: dropped
-FLOOR_LOOKBACK_DAYS = 35  # keep the statement just before the history floor
-BUCKET08_BASELINE_MONTHS = 12  # months of positive minimum due averaged (D-A3-12)
+# ── Source history ────────────────────────────────────────────────────────────
+# Months of payment history read before the earliest window a dimension opens (the
+# episode start, or the first observation month): the longest window and one cycle.
+HISTORY_MONTHS = (
+    max(PRE_DLQ_MONTHS, COMMITMENT_MONTHS, *ANY_PAYMENT_MONTHS.values()) + 1
+)
 
 # ── State (D-A3-16, -19, -20, -22, -24) ───────────────────────────────────────────────
 DISPLAY_NAMES = {

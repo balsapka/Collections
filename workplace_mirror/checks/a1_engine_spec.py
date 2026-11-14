@@ -359,11 +359,12 @@ def run(model_id):
         build_cc_liquidity_anchor(o, balance, model_id),
         model_id,
         PERSONA["persona_end_date"],
-        income=build_income_signals(o, internal_salary, bureau_salary, model_id),
+        income=build_income_signals(o, internal_salary, bureau_salary, model_id,
+                                    crx_persona=PERSONA),
         casa=build_casa_signals(o, casa_balance, flows, model_id, crx_persona=PERSONA),
         cross_product=build_cross_product_signals(o, products),
-        distress=build_distress_signals(o, returns, bounces, model_id),
-        eosb=build_eosb_signals(o, followup, agreements, model_id),
+        distress=build_distress_signals(o, returns, bounces, model_id, crx_persona=PERSONA),
+        eosb=build_eosb_signals(o, followup, agreements, model_id, crx_persona=PERSONA),
     ).collect()
 
 
@@ -410,7 +411,7 @@ assert fc.build_returns(loan_return, accounts).count() == 0
 # a returns feature that starts after the first observation window stops the run
 try:
     build_distress_signals(obs, fc.build_returns(df(rows["ret"], ret_schema), accounts), bounces,
-                           "cc_180_plus")
+                           "cc_180_plus", crx_persona=PERSONA)
     raise AssertionError("returns coverage guard did not fire")
 except ValueError as e:
     assert "persona_start_date" in str(e)
@@ -418,7 +419,7 @@ except ValueError as e:
 loan_schema = "account_id string, observation_date date, installment_due_amount double"
 emi = {r["account_id"]: r["liquidity_anchor_amt"] for r in build_rl_liquidity_anchor(
     obs, df([("A0", OBS, 2000.0), ("A1", OBS, 0.0), ("A2", date(2026, 6, 30), 1500.0)],
-            loan_schema)).collect()}
+            loan_schema), PERSONA).collect()}
 assert emi == {"A0": 2000.0, "A1": None}, emi  # 0 EMI → no anchor; a June snapshot is stale
 # Scorecard: each override mode, the High gate, a NULL flag, override order, Unknown
 from enbd_collections.pipelines.crx_persona import scoring_engine as se  # noqa: E402

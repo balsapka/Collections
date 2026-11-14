@@ -76,7 +76,7 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     df = left_join_all(
         episode, [episode, commitments, dlq_payments, pre_dlq, contacts]
     ).withColumn(
-        "a3_promise_deadline", F.lit(deadline or promise_deadline(product, model_id))
+        "a3_promise_deadline", F.lit(promise_deadline(product, model_id, deadline))
     )
     scored = SCORECARD.score(df)
     no_episode = F.col("episode_start").isNull()

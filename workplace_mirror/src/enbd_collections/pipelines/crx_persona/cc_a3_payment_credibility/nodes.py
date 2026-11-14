@@ -1,16 +1,55 @@
-"""CC A3 sources: statement cycles with one month's due, and card payments."""
+"""CC A3 sources: the history window of the raw extract, statement cycles with one
+month's due, and card payments."""
 
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from .._common import require_columns, string_key
-from ..a3_credibility.constants import (
-    BUCKET08_BASELINE_MONTHS,
-    CYCLE_MAX_DAYS,
-    FLOOR_LOOKBACK_DAYS,
-)
+from .._dpd_journey.anchor import episode_start
+from ..a3_credibility.constants import HISTORY_MONTHS
 
+# ── CC cycles (D-A3-12, -15) ──────────────────────────────────────────────────
+CYCLE_MAX_DAYS = 62  # a longer "cycle" spans missing statements: dropped
+FLOOR_LOOKBACK_DAYS = 35  # keep the statement just before the history floor
+BUCKET08_BASELINE_MONTHS = 12  # months of positive minimum due averaged (D-A3-12)
 _LADDER = [f"overdue_bucket_0{i}" for i in range(7, 0, -1)] + ["minimum_due"]
+
+
+def _history_floor(history_floor_date: str) -> Column:
+    """The first statement day kept: ``history_floor_date`` less ``FLOOR_LOOKBACK_DAYS``
+    (the statement just before the floor)."""
+    return F.date_sub(F.lit(str(history_floor_date)).cast("date"), FLOOR_LOOKBACK_DAYS)
+
+
+def build_cc_acct_windows(
+    obs_base: DataFrame, deterioration: DataFrame, history_floor_date: str
+) -> DataFrame:
+    """``account_id``, ``acct_start``, ``acct_end``: the raw history the CC A3 extracts
+    read per account (``crx_cc_raw_extract``).
+
+    ``acct_start``: ``HISTORY_MONTHS`` before the earlier of the account's earliest
+    episode start (A4) and its first observation month, never before the history floor;
+    ``acct_end``: its last observation date.
+    """
+    episodes = episode_start(obs_base, deterioration)
+    first = (
+        obs_base.join(episodes, on=["account_id", "observation_date"], how="left")
+        .groupBy("account_id")
+        .agg(
+            F.least(
+                F.min("episode_start"), F.trunc(F.min("observation_date"), "month")
+            ).alias("_first"),
+            F.max("observation_date").alias("acct_end"),
+        )
+    )
+    return first.select(
+        "account_id",
+        F.greatest(
+            F.add_months(F.col("_first"), -HISTORY_MONTHS),
+            _history_floor(history_floor_date),
+        ).alias("acct_start"),
+        "acct_end",
+    )
 
 
 def _nonzero(col: str):
@@ -86,7 +125,7 @@ def build_cc_a3_dues(
     start, end = F.col("observation_date").cast("date"), F.col(
         "next_billing_date"
     ).cast("date")
-    floor = F.date_sub(F.lit(str(history_floor_date)).cast("date"), FLOOR_LOOKBACK_DAYS)
+    floor = _history_floor(history_floor_date)
     cycles = (
         billing.where(
             end.isNotNull()

@@ -15,7 +15,11 @@ from .nodes import build_rl_liquidity_anchor
 
 _ANCHOR = node(
     func=build_rl_liquidity_anchor,
-    inputs={"obs_base": "crx_rl_obs_base", "int_loan_master": "int_loan_master"},
+    inputs={
+        "obs_base": "crx_rl_obs_base",
+        "int_loan_master": "int_loan_master",
+        "crx_persona": "params:crx_persona",
+    },
     outputs="crx_rl_a1_liquidity_anchor",
     name="build_crx_rl_a1_liquidity_anchor",
     tags=TAGS,
