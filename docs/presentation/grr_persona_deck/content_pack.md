@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 33 slides (with 10b), in order: every word, number and speaker note as it stands in v98 (2026-11-15). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 33 slides (with 10b), in order: every word, number and speaker note as it stands in v99 (2026-11-15). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -389,30 +389,24 @@ Notes:
 
 ## 14 · Where the value sits
 
-Layout: on the left (about 60%), three rows of paired horizontal bars on one common scale (0–40%): a grey bar for share of card balance and a blue bar for share of money collected, with recovery as a large number at the right of each row; a small line under the rows. On the right, a light grey panel with three short facts, each with a blue rule on its left.
+Layout: two full-width strips, one above the other, each cut into the same three groups in the same colours (blue = the 46 personas, light grey = all other personas, navy = the 10 largest personas); segment widths proportional to the shares. Under the strips, a three-column legend, each with a coloured rule on its left.
 
 - Section label: Where the value sits
-- Headline: **The balance sits where little is paid; reachable customers who keep promises bring in over three times their share**
+- Headline: **46 personas hold 11% of the card balance and bring in 37% of the money collected**
 
-Chart label: Share of card balance vs share of money collected (legend: balance grey, money blue)
+Strip 1, label "Share of the card balance": **11%** (blue) · **49%** all other personas (light grey) · **40%** the 10 largest personas (navy)
 
-| Row | Share of balance | Share of money | Recovered |
-|---|---|---|---|
-| The 10 largest personas | 40% | 10% | 0.8% |
-| Reachable and keep their promises · High or Moderate credibility, any family | 11% | 37% | 10.6% |
-| High credibility or High ability | 5% | 17% | 10.6% |
+Strip 2, label "Share of the money collected in the next three months": **37%** 46 personas: reachable, with credibility (blue) · **53%** all other personas (light grey) · **10%** (navy)
 
-Line under the rows: Card average recovery: 3.1% · the second and third groups overlap · in the second group, a third of the money comes from customers who are not curing now
-
-Right panel, title: **High credibility or High ability: rare, and they pay**
-- **55%** make a payment within three months, against 17% of other customers.
-- They recover more within each family that has enough of them: **+2.5 to +3.8 points**.
-- Same persona, different ability: Cured before · in country · reachable · low credibility recovers **8.2%** with High ability and 5.1% with Low.
+Legend:
+- **46 personas we can reach, with High or Moderate credibility**: They recover 10.6% of their balance in three months. A third of their money comes from customers who are not curing now.
+- **All other personas**: They bring in about what their size suggests: close to the card average of 3.1%.
+- **The 10 largest personas**: They recover 0.8%. All have Low credibility, and most cannot be reached.
 
 Footer: Cards 61–180 · accounts January–May 2026, payments to August 2026 · nearly 9 in 10 personas stayed on the same side of the card average in May as in January–April
 
 Notes:
-> The previous slide said there are hundreds of personas. This slide says we don't need to treat them alike. In the first row, the ten largest personas hold 40 percent of the card balance but bring in only 10 percent of the money; they recover less than one percent in three months. The second row is the opposite: customers we can reach and who have kept promises, High or Moderate credibility, in any family. They hold 11 percent of the balance and bring in 37 percent of the money, more than three times their share. About a third of that money comes from customers who are not curing now, and they still recover more than twice the average. The third row cuts across the book: customers with High credibility or High ability. They are rare, but more than half of them pay, against 17 percent of everyone else, and that holds inside each family. The ranking is stable: nearly nine in ten personas stayed on the same side of the average in May as in January to April. These are payments under today's handling. Loans point the same way, on a thinner book.
+> The previous slide said there are hundreds of personas. This one shows that size and value sit in different places. The top strip is the card balance, the bottom strip is the money collected over the next three months, and the colours are the same groups. Look at the dark block: the ten largest personas hold 40 percent of the balance but bring in only 10 percent of the money. Now the blue block: 46 personas, customers we can reach who have High or Moderate credibility. They hold 11 percent of the balance and bring in 37 percent of the money. A third of that comes from customers who are not curing now. Everything else, in grey, pays about in line with its size. These are payments under today's handling, and the picture was the same in May as in January to April.
 
 ## 15 · The deliverable
 
