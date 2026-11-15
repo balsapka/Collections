@@ -56,7 +56,7 @@ Q-S6-06 [A1 · a1_ability/classify.py:250] (L, bug against the spec; diagnostic 
 Now: `balance_strong(amt, w)`: ≥ max(3000, anchor) in 2 of 3 (3 of 6) months **and** not > 50% below the prior window. A customer whose balance was swept in the observation month (m1 = 100, m2 = m3 = 3500) is flagged. One who holds 9,000 in m1 only is not. | Spec: family rule §4 "`a1_sweepable_balance_flag` = balance strong in the observation month. It marks a delinquent customer holding money above the floor now."
 Options: (a) keep and change the spec text ("the balance branch of F2 is strong"). (b) flag = `casa_m1 ≥ max(3000, anchor)`.
 Recommendation: ask the user. (b) matches the stated purpose (an operational lead "now"). | Impact: diagnostic column only, no state moves. Crosstab old vs new flag per model_id.
-Answer:
+Answer: (b) the flag is the observation month's CASA balance at or above the strong amount max(3,000, 2 × anchor); diagnostic only; being applied in bundle 25 (user, 2026-11-15).
 ```
 
 ```
@@ -64,7 +64,7 @@ Q-S6-07 [A1 · a1_ability/classify.py:224-225; spec test `checks/a1_engine_spec.
 Now: `unknown_also = casa_active == 0`, so a row with counted legs below the "some" floors (money in < 1000, money out < 500 every month) and no family evidence is **Low**. The spec test encodes this ("0 points, a third-party credit -> Low"). | Spec: family rule §4 "Unknown: no evidence in any family"; §2 F2 and §6.5 imply the S11 gate is kept with the counted classes.
 Options: (a) keep; add "and no counted CASA leg in the window (S11)" to §4. (b) drop the gate, so §4 is literal (rows move Low → Unknown).
 Recommendation: (a). Code and spec test agree, and §6.5 sizes the gate. | Impact: none for (a). For (b), rows whose only evidence is a small counted leg.
-Answer:
+Answer: (a) keep the code; the spec table gets the missing condition (user, 2026-11-15).
 ```
 
 ```
@@ -80,7 +80,7 @@ Q-S6-09 [A3 · a3_credibility/classify.py:76-88; signals.py:321-323] (L, output 
 Now: with no anchor, every builder falls back to the observation lookback (contacts: the last 24 months), so a refusal, points and a reason are computed. Only `a3_state` is overwritten to Unknown. A row can read Unknown + `a3_override = refusal`. | Spec: D-A3-27 "Unknown stays only for rows with no episode anchor"; D-A3-17 wants every input carried, but says nothing about override / reason on Unknown rows.
 Options: (a) keep (the signals are informative; the state says Unknown). (b) NULL `a3_override` / `a3_reason` (and points?) on Unknown rows, as A1 does for `a1_unknown_reason`.
 Recommendation: (a) plus one line in the output doc; (b) only if GRR reads `a3_override` without the state. | Impact: no_episode rows with a refusal in the last 24 months; no state change.
-Answer:
+Answer: (a) keep; one line in the A3 output description (written by the A3 session) (user, 2026-11-15).
 ```
 
 ```
@@ -96,7 +96,7 @@ Q-S6-11 [A3 · rl_a3_payment_credibility/nodes.py:30-45] (L, data check) At rl_1
 Now: `due_amount` = the month's EMI, else the last non-NULL one. An EMI of 0 is kept (not NULL), and `qualifies` needs `due > 0`. D-A3-13 covers only a missing snapshot. | Spec: D-A3-13 (missing EMI only); D-A3-12 gives CC a fallback; RL has none.
 Options: (a) keep. (b) treat 0 as missing (the last positive EMI).
 Recommendation: data check first: rl_180_plus latest month, rows whose B-window months have `monthly_emi_due` = 0 / NULL / > 0. Ask the user only if 0 is common. | Impact: rl_180_plus Dimension B level (Regular vs Some).
-Answer:
+Answer: count EMI = 0 / NULL / > 0 at rl_180_plus in the bundle 25 check; decide after (user, 2026-11-15).
 ```
 
 ```
@@ -112,7 +112,7 @@ Q-S6-13 [A1 · nodes/features/bureau/feat_cif_bureau_salary_monthly.py:25-40; a1
 Now: a pull loaded 2026-09 gives rows for 2025-09..2026-08, which a 2026-03 observation already reads. | Spec: family rule §1 "every signal comes from W or the observation-month snapshot" (window, not knowledge time); the source description itself says the pull is inferred back.
 Options: (a) accept and say so (~1% of 61–180 CIFs, `bulk_pull_results.md`). (b) cap each row at its load date (needs a load stamp on the unified table: DE ask).
 Recommendation: (a) now; add the load stamp to the DE asks for when pulls repeat. | Impact: history rows of ~1% of CIFs (bulk) plus salary_credit rows (0.0–0.6%). Matters for outcome validation, not for latest-month scoring.
-Answer: (b) cap each bureau salary row at its load date, so an observation reads only rows already loaded by then; not coded yet (user, 2026-11-15).
+Answer: (b) cap each bureau salary row at its load date, so an observation reads only rows already loaded by then; not coded yet (user, 2026-11-15). Addition: application-time salary rows (`salary_credit`) are capped at the application date; with (b) this is a DE ask (`REQUESTS.md` R15), outside bundle 25 (user, 2026-11-15).
 ```
 
 ```
@@ -120,7 +120,7 @@ Q-S6-14 [A1 · nodes/features/products/feat_cif_cross_product.py:136-139 `_cards
 Now: every contract named as a parent is dropped as "replaced". If Way4 uses `parent_contract_idt` for card contracts under their account contract, account contracts with cards are dropped and card-level contracts stay. F4 could then count the scored account's own card contracts (≠ `account_id`) as "another card", or miss the CIF's other accounts. | Spec: family rule §2 F4 "the customer's other cards, not supplementaries of the same contract".
 Options: (a) keep (B24 found products "as expected"; bundle 21's logic). (b) Sonnet aggregate: share of `prm_card_contracts` parents that are account-level contracts, and of `prm_card_month_end` rows whose contract has a parent.
 Recommendation: (b), one aggregate before GRR reads F4 card results. | Impact: F4 card branch (`xp_current`, `xp_instalment_max`) on CC and RL.
-Answer: (b) one aggregate from the workplace before GRR reads the F4 card results (user, 2026-11-15).
+Answer: (b) one aggregate from the workplace before GRR reads the F4 card results (user, 2026-11-15). Changed delivery: the parent-link aggregate runs as a block of the bundle 25 check, not as a separate prompt (user, 2026-11-15).
 ```
 
 ```
@@ -128,7 +128,7 @@ Q-S6-15 [A1 · cc_a1_ability/nodes.py:38, rl_a1_ability/nodes.py:29, a1_ability/
 Now: A1 anchors and the cross-product feature use plain `cast("string")` on `contract_id` / `account_id` / `product_account_id` / `cust_num`. A3 uses `_common.string_key`, which casts doubles to long and trims. The bureau salary `cif_id` is trimmed, the bounces `cif_id` is not, and Way4 `ident_number` is trimmed. | Expected: run 1 Q-21 (b) "one key helper on every axis" (accepted 2026-11-05).
 Options: (a) keep. (b) `string_key` everywhere in A1 (a refactor proposal for S1/S3; the oracle proves no value changes with today's types).
 Recommendation: (b), with the golden check; flag any source whose type would change a value. | Impact: none with today's types; guards a double / padded source.
-Answer: (b) `_common.string_key` on every A1 key (user, 2026-11-15). Applied at the persona-pipeline sites (CC / RL anchors, `a1_ability/signals.py`); the `nodes/` sites (bureau bounces and salary, `prm_products.py`) wait on the user: the helper would have to move to `nodes/utils`.
+Answer: (b) `_common.string_key` on every A1 key (user, 2026-11-15). Applied at the persona-pipeline sites (CC / RL anchors, `a1_ability/signals.py`); the `nodes/` sites (bureau bounces and salary, `prm_products.py`) wait on the user: the helper would have to move to `nodes/utils`. Update: the `nodes/` part is decided: the key helper moves to the shared utilities and is used in the bureau bounce / salary features and the product primary; being applied, gated by the oracle (user, 2026-11-15).
 ```
 
 ```
@@ -146,7 +146,7 @@ Q-R-01 [dead code · tier D?] Delete `_spine_utils.py`, `rl_a4_spine/`, `rl_spel
 Now: Cartographer and S7 both find no reader in the mirror. The mirror cannot rule out workplace-only readers.
 Needs: the workplace grep (`00_baseline/inventory.md` §6) pasted back; then the user's approval of the list. The registry lines (imports 75, 98, 100; entries 238, 250, 251) and 4 catalog entries go as named edits by the UAT Sonnet.
 Recommendation: delete once the grep is clean.
-Answer:
+Answer: delete in its own bundle after 25, once the workplace grep is clean (user, 2026-11-15).
 ```
 
 ```
@@ -154,14 +154,14 @@ Q-R-02 [scoring_engine.py · S7 B-04] Scorecard options nothing uses: override m
 Now: neither A1 nor A3 passes them. Run 1 (D-2-3) kept them for the A1 redesign and A3; both are built now without them.
 Options: (a) remove; (b) keep until promise points / Broken +1 and the A1 High options are decided.
 Recommendation: (b) for bundle 25: the undecided A3 points rules and A1's "internal Stable -> High" option are the cases they were kept for.
-Answer:
+Answer: (b) keep the unused scorecard options for bundle 25 (user, 2026-11-15).
 ```
 
 ```
 Q-R-03 [a3_credibility `build_instalments` · S7 B-06] The persisted instalments table carries `due_amount` and `payment_amount`, which nothing reads since promises are judged by payment (D-A3-25).
 Options: (a) drop the two columns (output columns of a persisted dataset: hard rule 5); (b) keep.
 Recommendation: (b) until the promise-amount question (Q-S6-10) is settled; they are the DCORE promised amounts.
-Answer:
+Answer: (b) keep the two columns (user, 2026-11-15).
 ```
 
 ```
@@ -175,7 +175,7 @@ Answer: ANSWERED 2026-11-14 (D-U1-5): persist, after the UAT listing of the work
 Q-R-05 [`_common.require_columns` vs `frames.require_columns` · S3-01] Two helpers do the same check with different error text.
 Options: (a) one helper (the error text of a failing run changes; workplace tests that assert the text need an update); (b) keep both.
 Recommendation: left to R-O's ruling in the round 1 review; say so if you have a preference.
-Answer:
+Answer: (b) keep both helpers for bundle 25 (user, 2026-11-15).
 ```
 
 ```
@@ -189,14 +189,14 @@ Answer: (a) keep the exception in bundle 25; moving the raw Way4 reads to the CC
 Q-R-07 [casa features, tier A · S2-H1, S3-H1, S7 H-01] `feat_cif_casa_activity_monthly` and `feat_cif_ext_card_payment_monthly` have no reader in the mirror; the activity node scans the whole CASA transaction history.
 Needs: a workplace reader grep. If none: stop building them (through the Sonnet handoff).
 Recommendation: add both names to the workplace grep of Q-R-01.
-Answer:
+Answer: stop building the two CASA features through the CASA handoff if the workplace grep shows no reader (both names are in the preflight prompt) (user, 2026-11-15).
 ```
 
 ```
 Q-R-08 [A1 source floors · S1-01, applied] The A1 income / distress / EOSB / RL anchor nodes now take `params:crx_persona` and floor their sources at the persona start minus the look-back, instead of four Spark actions on the obs base (run 1 D-2-5). Outputs are identical; one error path differs: the "returns history too short" guard can fire when the obs base has no row in the persona start month.
 Options: (a) keep in bundle 25; (b) take it out.
 Recommendation: (a).
-Answer:
+Answer: (a) keep (user, 2026-11-15).
 ```
 
 ```
@@ -204,7 +204,7 @@ Q-R-09 [prm_products.py `_latest_in_month` · S2-10, applied] The latest row per
 Now: identical when a card has one row on its latest day in the month. With two rows on that day the old pick was arbitrary (it could change between runs); the new one always takes the larger `level` / `minimum_due`.
 Options: (a) keep (deterministic; the bundle check counts cards with two rows on the latest day); (b) revert to the window.
 Recommendation: (a).
-Answer:
+Answer: (a) keep (user, 2026-11-15).
 ```
 
 ```
@@ -212,7 +212,7 @@ Q-R-10 [a3_credibility/signals.py `_contact_summary` · R-I N-1] When an account
 Now: unchanged from before the refactor in outcome (the oracle passes), but the order is not written anywhere as a rule. Round 2 names it as a constant with the same order.
 Options: (a) keep today's order and write it into the spec (Q-28); (b) give the order you want (for example refusal > promise > contact > no pick-up).
 Recommendation: (a) for bundle 25; say so if GRR has an order.
-Answer:
+Answer: order on a shared contact day, strongest first: promise > payment reported > refusal > dispute > contact > hung up; coded in bundle 25 (replaces "a refusal never outranks another contact of its day") (user, 2026-11-15).
 ```
 
 ```
@@ -264,7 +264,7 @@ Q-S6-21 [A3 · a3_credibility/promises.py:208-234 `_events`, :121-150] (L, repor
 Now: the paid amount is the start day's sum of payments after the event day up to its cutoff. A payment after a later event's day counts in both. Outcomes cannot change: the early end needs payments ≥ the amount before the later promise, and adding more keeps `paid`. Only the reported amount and any sum of `promise_paid_amount` across events are inflated. | Decision: D-U1-1 "a new event … counts only its own payments" (met for the new event). Nothing is said about what the old event reports.
 Options: (a) keep and document the column ("payments up to the cutoff"). (b) cap the old event's sum at the next event's day.
 Recommendation: (a), with one line in the column doc; nobody should sum the column across events. | Impact: none on state.
-Answer:
+Answer: (a) keep; column documented (user, 2026-11-15).
 ```
 
 ```
@@ -272,6 +272,6 @@ Q-S6-22 [docs · `docs/ability/build_a1_workbook.py` on `feature/persona_redesig
 Now: the worktree's copy is the older four-book workbook. The authoritative builder (main checkout) has the family layout with the pre-D-U1-3 numbers. | Decision: D-U1-3 / D-U1-4, family rule §2.
 Options: (a) update the builder's Logic / Examples text when bundle 25's threshold step is back (its results cells need the new run anyway).
 Recommendation: (a); not refactor work. | Impact: GRR document only.
-Answer:
+Answer: (a) update the A1 workbook when bundle 25's results are back (user, 2026-11-15).
 ```
 

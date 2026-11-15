@@ -82,8 +82,19 @@ outputs are the reference; all four model_ids.
   capped at 31 days, amount changed), A3-2 (refusal flag, loan month cash and card same-day lifts
   apart), A3 state moves split by cause, A1-1 (old vs new state, rows moved by family, payment and cure
   per level), run times on cc_180_plus.
-- **Before the build:** the three answers above; the UAT listing of the workplace A3 catalog entries
-  (persisted dues / payments go in only if it is back, else the next A3 bundle); the workplace grep for
-  removed and moved symbols; rebase onto the workplace-equivalent head and re-run every gate;
-  `--exclude _dcore_codes.py`; no registry edit.
+- **Behaviour steps beyond the three listed (user, 2026-11-15):** D-A3-31 card due at bucket 08 (see
+  `decisions.md` D-UF-4); the same-day contact order, strongest first: promise > payment reported >
+  refusal > dispute > contact > hung up (Q-R-10); `a1_sweepable_balance_flag` = the observation month's
+  CASA balance at or above max(3,000, 2 × anchor), diagnostic only (Q-S6-06).
+- **Data checks folded into the bundle check (one PROD run, no separate prompts):** F1 / F2 / F3 strong
+  crosstab (8 cells) with payment and cure rates per cell (cc/rl 60_180); CC accounts with bucket 08
+  open and no statement before it, and Dimension B level old vs new (mainly cc_180_plus); the card
+  parent-link aggregates as specified in `bundle_helpers/b25_council/sonnet_a1_card_parent_link_prompt.md`
+  (that prompt is not sent; it is the spec for the block); rl_180_plus B-window months with EMI = 0 /
+  NULL / > 0; rows whose latest-contact disposition changes under the new same-day order; old vs new
+  `a1_sweepable_balance_flag` crosstab.
+- **Before the build:** the three answers are in (2026-11-15); still needed: the UAT preflight answer
+  (the workplace A3 catalog listing, so persisted dues / payments go in only if it is back, else the
+  next A3 bundle; the workplace grep for removed and moved symbols); rebase onto the workplace-equivalent
+  head and re-run every gate; `--exclude _dcore_codes.py`; no registry edit.
 - **Not in bundle 25:** the dead-package deletion (S7 group A), the CASA handoff prompt, S2-12.

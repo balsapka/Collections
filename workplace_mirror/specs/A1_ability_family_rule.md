@@ -190,7 +190,7 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
 | High | 2 or more strong families (4+ points) |
 | Moderate | exactly 1 strong family |
 | Low | no strong family, but some evidence (any "some", F1 weak, or F4 some) |
-| Unknown | no evidence in any family |
+| Unknown | no evidence in any family and no counted CASA leg in the window (S11) |
 
 - **Distress** lowers the state one rung (High → Moderate → Low). Low stays Low.
 - **Reason column:** the strongest family, or `distress` when the demotion fired. Unknown keeps
