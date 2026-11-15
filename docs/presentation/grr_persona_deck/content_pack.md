@@ -276,6 +276,44 @@ Footer: Roll rates: back-test, 3-month outcomes compared within each DPD band
 Notes:
 > Credibility is about this customer on this debt. Three sources earn points: promises kept in the last twelve months; paying while delinquent, two points for paying the monthly due in two of the last three months, one for any smaller payment; and the record before delinquency. Four points or more is High, two or three Moderate, below two Low. An explicit refusal moves one band down. Because points build up as customers pay, and paying keeps the bucket low, we compare outcomes within the same DPD band: at 91 to 120 days, how often High and Low credibility customers roll further: 42 percent against 90 percent for cards. At 180+ almost everyone is Low: 97 percent of cards and 95 percent of loans. 59 percent of card customers made no promise to pay in the last twelve months, so their credibility rests on payments alone: this is where the transcript signals will add the most.
 
+## 10b · A3 · Payment credibility, alternative scoring
+
+Layout: the same as slide 10; only the promise points, the mix and the stat boxes change.
+
+- Section label: A3 · Payment credibility
+- Tag: Alternative scoring
+- Headline: **Alternative: every promise earns credit, keeping it earns more**
+
+Left, "How a customer gets a label": Three sources earn points; we add them up.
+
+| Source | Detail | Points |
+|---|---|---|
+| Promises kept | last 12 months · no promise = 0 | Kept +3 · Partly +2 · Broken or open +1 |
+| Paying while delinquent | regular = the monthly due paid in 2 of the last 3 months | Regular +2 · Some +1 |
+| Record before | clean = paid as billed before falling behind | Clean +1 |
+
+Band bar and refusal rule as slide 10.
+
+Right, "March–May mix with the alternative" (today's share in small grey under each value):
+
+| | High | Moderate | Low |
+|---|---|---|---|
+| Cards 61–180 | 11.8% (today 4.0%) | 32.9% (21.7%) | 55.3% (74.3%) |
+| Loans 61–180 | 11.0% (3.8%) | 33.7% (26.4%) | 55.3% (69.8%) |
+| Cards 180+ | [__] (0.0%) | [__] (2.6%) | [__] (97.4%) |
+| Loans 180+ | [__] (0.2%) | [__] (3.6%) | [__] (96.2%) |
+
+Below it: Rows only move up: every promise gains a point, bands unchanged
+
+Stat boxes:
+- **45% vs 26%**: of card customers at 61–180 DPD are in High or Moderate: alternative vs today.
+- **+6 pts**: higher payment rate for card customers who broke a promise vs those who never made one.
+
+Footer: Back-test, March–May 2026, 3-month outcomes; at 61–180 the better ranking holds in every month and DPD band
+
+Notes:
+> This is an alternative to the scoring on the previous slide, for discussion. Only the promise points change: any promise in the last twelve months earns a point, even one that was broken or is still open, and keeping it earns more: three for kept, two for partly kept. No promise stays at zero. Paying while delinquent, the record before, the bands and the refusal rule are unchanged. Penalising a broken promise sounds logical: if customers break their word, we should believe them less. The data say otherwise, for three reasons. First, the warning sign is silence, not a missed promise. Card customers who broke a promise paid six points more often than comparable customers who never made one: same bucket, same payment record, same reachability. Second, most broken promises are not a walk-away. Close to half of broken card promises still had money behind them, paid in part or late, and those customers pay like partly kept. Third, a strict deadline marks late payers as broken, yet customers who pay a promise a few weeks late go on to pay like those who paid on time. Reliability still counts: kept stays above partly kept, and partly kept above broken. We are not rewarding a broken promise; we stop treating it as worse than never engaging at all. Because every promise gains a point and the bands stay the same, customers only move up. At 61 to 180, High or Moderate grows from 26 to 45 percent of card customers, and those moving up to High pay their due 51 percent of the time, against 27 percent for those who stay Moderate. The ranking improves in every month and every DPD band. And with this scoring the choice of deadline barely matters: the month-end deadline costs almost nothing against 30 days.
+
 ## 11 · A4 · Ability
 
 Layout: an axis slide with step 3 active. The left side holds four evidence cards in a 2 × 2 grid and a band bar; the right side the August mix and an amber "Needs" box. Two stat boxes run across the bottom.
