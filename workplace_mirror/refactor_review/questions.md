@@ -11,7 +11,7 @@ Q-S6-01 [A3 · a3_credibility/sources.py:182-235 `_followup_promises`, :238-275 
 Now: the fold splits runs on each first row's `promise_cutoff`. `_consolidate` then gives a matched run the plan's `event_date`, and `_cutoff` is recomputed from that date (line 333). Example (month_end, RL 61-180 / all 180+): PTP plan 03-28, follow-ups 04-02, 04-08, 04-14 form one run (cutoff 04-30), and the plan takes it (|04-02 − 03-28| = 5 ≤ 7). The event is judged 03-28..03-31, so the April promises are never judged, though all three come after the event's deadline (03-31). With next_statement, the plan can also sit before a statement that the run's first row is after. | Spec: D-A3-29 "a follow-up starts a new event when it is … after the current event's `promise_cutoff`". For a matched run the current event is the plan event, so the literal reading splits on the plan's cutoff. D-A3-25 matches "nearest follow-up promise within 7 days", which says nothing about the run's later rows.
 Options: (a) keep (D-P-6): a matched run takes the plan's date and deadline; its later rows ride with it. (b) match plans to follow-up rows first, then fold: a matched row gives the run the plan's date and cutoff, and a later row after that cutoff starts a new event. (c) keep the split as today, but drop the match when the run's first row is after the plan's cutoff (the run becomes followup_only).
 Recommendation: ask the user. (b) is the literal D-A3-29 reading and the rule GRR would expect ("a new promise after a broken one is a new event"). (a) is simpler and what V1j Q0 sized, if Q0 ran on today's code. | Impact: matched events whose run crosses the plan's cutoff. Mostly month_end books, where a plan in the last days of a month meets an early-next-month run. Not visible in the oracle (no such case). Count in the bundle 25 check: matched events with a run row after the plan's cutoff, per model_id. Add a spec case: plan 03-28 + run 04-02..04-14 at month_end.
-Answer:
+Answer: CLOSED 2026-11-14 (D-U1-1): a promise event is alive until its deadline passes or the promised amount is paid.
 ```
 
 ```
@@ -19,7 +19,7 @@ Q-S6-02 [A3 · a3_credibility/sources.py:238-275 `_consolidate`; signals.py:57-7
 Now: matching is done once over all history, not as of each observation. Follow-up run 03-25 (month_end: cutoff 03-31, concluded at obs 03-31), DCORE plan 04-01 (distance 7): the pair becomes one event dated 04-01. At obs 03-31 the event is outside the window (`event_date <= obs`), so the concluded 03-25 event disappears. The 04-01 plan was not known on 03-31. The scored latest month never sees future plans, so PROD latest-month output differs from the same month re-scored later, and back-tests on earlier persona months (V1h/V1i style) differ too. | Spec: D-A3-2/D6 point in time; D-A3-25 "concluded once the deadline is on or before the observation date".
 Options: (a) accept (only history rows, small) and say so in the spec. (b) match only plans whose start is ≤ the observation date (an as-of match per observation row; a performance cost). (c) let a matched event keep the earlier of the two dates.
 Recommendation: (a) for bundle 25, with one spec line. Size it before deciding on (b)/(c), because the persona outputs feed outcome validation. | Impact: month_end books only (RL 61-180, all 180+): follow-up runs in a month's last 7 days that a plan in the next month's first days claims. Next_statement CC is not affected (a run that late is never concluded at month end). Check: Sonnet aggregate per model_id over the persona months, counting matched events with `fu_date ≤ obs < plan_start` and the follow-up concluded at obs.
-Answer:
+Answer: MOOT 2026-11-14: plan matching is gone (D-U1-1); the new grouping has no look-ahead.
 ```
 
 ```
@@ -27,7 +27,7 @@ Q-S6-03 [A1 · rl_a1_ability/nodes.py:15-44 `build_rl_liquidity_anchor`] (M, amb
 Now: the RL anchor has no segment check: rl_180_plus scales every threshold with the EMI (income max(3000, 2×EMI), flows max(1000, EMI), assets max(10000, 3×EMI)). CC returns NULL at 180+ (`cc_a1_ability/nodes.py:28-31`). | Spec: `A1_ability_spec.md` S1 "CC 180+: no anchor …; RL: one EMI" (no segment). `A1_ability_family_rule.md` §1: "CC 60–180: oldest bucket; RL: one EMI; **180+ or missing: flat floors only**". CLAUDE.local "A1 essentials" follows S1.
 Options: (a) keep: RL keeps the EMI at 180+ (S1); fix the family rule text. (b) NULL at 180+ for both products (family rule §1), in a fix bundle.
 Recommendation: ask the user. A written-off loan's EMI is a contractual, not a current, amount (the same reason CC drops its anchor at 180+), which favours (b). | Impact: rl_180_plus rows with a positive `installment_due_amount` in the observation month. The A1 state moves only where an amount sits between the flat floor and the EMI-scaled floor. Check: rl_180_plus crosstab of `liquidity_anchor_amt IS NULL` × state, and old vs new with the anchor nulled (Sonnet what-if).
-Answer:
+Answer: CLOSED 2026-11-14 (D-U1-2): the RL anchor stays the EMI at 180+.
 ```
 
 ```
@@ -50,7 +50,7 @@ Answer:
 Q-01 [A3 · rl_a3_payment_credibility/nodes.py:48-60 + a3_credibility/signals.py:290 `_paid_after_refusal`] (L, conforms to D-A3-14; asymmetric with D-A3-25)
 Assessment: the code follows the spec. D-A3-14 says "`total_paid` ≥ 100 AED in **a month after the refusal month**". `pay_from` (the 1st) > the refusal day gives exactly that, including a refusal on the 1st (equal, so it does not count). D-A3-22 (Q-29) "a month with 100 AED or more paid after the refusal day" is looser, but it was meant as the unit (cycle / month), not as a change to D-A3-14. What is worth writing down: the promise rule handles the same month-level uncertainty the other way. D-A3-25 counts the event month's cash in full (`sources.py:343-346`), even cash that came before the promise. So on loans the month's cash favours the customer for a promise and counts against them for a refusal. Cards treat both by day.
 Recommendation: (a) keep, and add one line to D-A3-14 / D-A3-22: "RL: the refusal month's cash never lifts a refusal (cash is dated only to the month, so it may predate the refusal); promise events count the event month in full." Revisit with the "RL exact payments" option (`prm_loan_payments`), which would remove both approximations. | Impact: RL refusal rows whose only cash after the refusal is in the refusal month. Bundle 25 check: per rl model_id, `a3_refusal_flag` rows whose refusal month has `total_paid` ≥ 100.
-Answer:
+Answer: CLOSED 2026-11-14 (D-U1-7 / D-A3-30): the refusal month's cash lifts a loan refusal.
 ```
 
 ```
@@ -74,7 +74,7 @@ Q-S6-08 [A3 · a3_credibility/sources.py:205] (L, ambiguity; boundary) A follow-
 Now: `row.event_date > run.cutoff` (strict). With next_statement, a promise made on the statement day S that ends the current run joins it. The run's payment window ends that day, so the new promise (its own cutoff is the next statement) gets no window. With month_end, a promise on the last day joins too; on cards its own window would be empty anyway (D-A3-29's V1j note), on loans it is the same month's cash. Exactly 7 days apart = same run, 8 = new run: conforms ("less than 8 days apart"). | Spec: D-A3-29 "after the current event's `promise_cutoff`" (the cutoff day itself is not "after"); D-A3-28 "paying on the deadline day counts".
 Options: (a) keep (literal; the cutoff day belongs to the old event). (b) `>=`: a promise on the cutoff day starts a new event.
 Recommendation: (a), with a spec case (next_statement, follow-up on the statement day) so the boundary is pinned. The spec test has no cutoff-day, 7-vs-8-day or same-day-two-names case today. | Impact: CC 61-180 follow-ups made on a statement day inside a run; small.
-Answer:
+Answer: CLOSED 2026-11-14 (D-U1-1): a promise on the deadline day belongs to the old event.
 ```
 
 ```
@@ -90,7 +90,7 @@ Q-S6-10 [A3 · a3_credibility/sources.py:335-342 (`_due`)] (L, ambiguity) "The d
 Now: `max(struct(cycle_start, due_amount))` over cycles with `cycle_start ≤ event_date`. (1) If the latest cycle's due is NULL (CC: no balance row, or nothing due), `promise_amount` = 100 AED instead of the last known due. (2) RL cycles start on the previous month end, so a promise on 03-31 picks the April cycle and April's EMI. That snapshot postdates an obs of 03-31 (look-ahead), and at the latest month it does not exist yet, so the same event reads March's EMI there. | Spec: D-A3-25 "the due of the cycle open on the event day (the last known one, at least 100 AED)".
 Options: (a) keep. (b) skip NULL dues (`max` over non-NULL `due_amount`) and use `cycle_start < event_date` for RL.
 Recommendation: (a); revisit with the promise-points work (bundle 25's undecided list). | Impact: EMI changes are rare and NULL dues mostly mean nothing due, so few outcomes move. Check: events whose chosen due is NULL; RL events on a month end.
-Answer:
+Answer: CLOSED 2026-11-14 (D-U1-6): the latest non-empty due; 100 AED only when no due exists.
 ```
 
 ```
@@ -170,7 +170,7 @@ Answer:
 Q-R-04 [catalog · S2-03] `crx_<p>_a3_dues` and `crx_<p>_a3_payments` are memory-only and read by three nodes each, so the CC dues plan is computed three times.
 Options: (a) persist both (two catalog entries per product; needs the workplace catalog checked first); (b) keep.
 Recommendation: (a), after a UAT look at the workplace catalog; the largest remaining A3 cost in PROD.
-Answer:
+Answer: ANSWERED 2026-11-14 (D-U1-5): persist, after the UAT listing of the workplace A3 catalog entries.
 ```
 
 ```
@@ -232,3 +232,48 @@ Options: (a) keep (same-day payment lifts); (b) cards need a payment on a later 
 Recommendation: (a), the same principle as on loans.
 Answer:
 ```
+
+## C. From the check of the newly coded rules (S6, round 2)
+
+Q-S6-17 (an exact full payment could fall a hair short in double arithmetic) was a defect in the new code and is fixed: paid since the event start is rounded to the cent; spec case S.
+
+```
+Q-S6-18 [A3 · a3_credibility/signals.py:100-125 `build_commitment_signals`] (L, ambiguity raised by D-U1-1) An event that ended early because it was paid in full still counts as concluded only once its deadline has passed.
+Now: `_concluded = promise_cutoff <= observation_date`. A card promise on 08-10, paid in full on 08-12, has its cutoff at the 09-05 statement. At obs 08-31 it is not concluded, so it adds neither kept nor broken, though it is settled and its outcome is known. | Decision: D-A3-25 "concluded once the deadline is on or before the observation date" (unchanged). D-U1-1 now lets payment end an event early, but says nothing about when it counts.
+Options: (a) keep (an event counts after its deadline). (b) also concluded when the payments after the event day up to the observation date reach the amount (kept at once). That needs a paid-by-obs sum per row and event, not the cutoff sum.
+Recommendation: ask the user with the promise-points work; (a) for bundle 25. | Impact: the latest month's kept counts on CC 61–180 and the 30-day options (cutoff after the month end). None on month_end books. Check: events with `promise_cutoff > obs` and payments by obs ≥ amount, per model_id.
+Answer:
+```
+
+```
+Q-S6-19 [A3 · a3_credibility/promises.py:107-109 `_with_terms`] (L, ambiguity: spec text vs code) The 100 AED floor also lifts a known due below 100. The spec says 100 AED only when no due exists.
+Now: `promise_amount = greatest(coalesce(_due, 0), 100)`, so a known due of 60 becomes 100. | Decision: D-U1-6 / D-A3-29 "100 AED only when no due exists (rare)". D-A3-25's older text says "at least 100 AED".
+Options: (a) keep the floor on every due (D-A3-25) and change D-A3-29's wording. (b) floor only a missing due.
+Recommendation: (a). A promise below 100 AED would be "paid" by a payment that is not even a "partial" (which needs 100 AED), and the partial / none split would no longer line up with the amount. Fix the spec sentence. | Impact: dues below 100 AED (small residual buckets on cards; RL EMIs almost never). Check: events with `_due < 100`.
+Answer:
+```
+
+```
+Q-S6-20 [A3 · a3_credibility/signals.py:391-404 `_plan_after_refusal`] (L, consistency with D-B-2 (2)) A payment on the refusal day lifts the refusal (order within the day unknown), but a plan that starts on the refusal day does not.
+Now: payments use `pay_date >= last_rpc_date` (D-A3-30, D-B-2). Plans use `plan_start > last_rpc_date`. A same-day follow-up promise already lifts it through `_SAME_DAY_ORDER`, so only a plan with no follow-up record on that day is left out. | Decision: D-A3-30 "counted only when it is certain"; D-B-2 (2) applies "order unknown" to payments only.
+Options: (a) keep. (b) `>=` for plans too, under the same "penalise only when certain" reading.
+Recommendation: put it to the user together with D-B-2 (2), which is open anyway; (b) if they confirm D-B-2 (2). | Impact: refusal rows with a DCORE plan starting on the refusal day and no same-day promise call; likely very few.
+Answer:
+```
+
+```
+Q-S6-21 [A3 · a3_credibility/promises.py:208-234 `_events`, :121-150] (L, reporting) `promise_paid_amount` of an event that ended early also includes payments made after the next event started, so one payment can be reported on two events.
+Now: the paid amount is the start day's sum of payments after the event day up to its cutoff. A payment after a later event's day counts in both. Outcomes cannot change: the early end needs payments ≥ the amount before the later promise, and adding more keeps `paid`. Only the reported amount and any sum of `promise_paid_amount` across events are inflated. | Decision: D-U1-1 "a new event … counts only its own payments" (met for the new event). Nothing is said about what the old event reports.
+Options: (a) keep and document the column ("payments up to the cutoff"). (b) cap the old event's sum at the next event's day.
+Recommendation: (a), with one line in the column doc; nobody should sum the column across events. | Impact: none on state.
+Answer:
+```
+
+```
+Q-S6-22 [docs · `docs/ability/build_a1_workbook.py` on `feature/persona_redesign`, lines 369-377, 432-456, 580] (L, out of the bundle) The A1 model workbook still states the old thresholds: flows max(1,000, 1×), Some 500 out, balance max(3,000, 1×), assets max(10,000, 3×).
+Now: the worktree's copy is the older four-book workbook. The authoritative builder (main checkout) has the family layout with the pre-D-U1-3 numbers. | Decision: D-U1-3 / D-U1-4, family rule §2.
+Options: (a) update the builder's Logic / Examples text when bundle 25's threshold step is back (its results cells need the new run anyway).
+Recommendation: (a); not refactor work. | Impact: GRR document only.
+Answer:
+```
+

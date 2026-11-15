@@ -148,7 +148,9 @@ for r in SCORECARD.score(cells).collect():
 # P: promises 07-08, 07-15, 07-25, 150 paid on 07-12 against 100 -> the 07-08 event is
 # kept and ends; 07-15 starts a new one that 07-25 joins (10 days later, still alive),
 # nothing paid after -> none. Q: due 300, promises 07-08 and 07-15, 150 paid on 07-12 ->
-# partly paid, so the event stays alive and 07-15 joins it.
+# partly paid, so the event stays alive and 07-15 joins it. S: small payments earlier, then
+# exactly the promised 100 on 07-12 -> kept and ended (paid since the start is rounded to
+# the cent), 07-15 is a new event.
 stmts = [D(2026, m, 5) for m in range(1, 10)]
 
 
@@ -168,7 +170,7 @@ def plan_rows(rows):
     )
 
 
-A_ACCTS = ["A", "B", "K", "M", "Bk", "N", "P", "Q"]
+A_ACCTS = ["A", "B", "K", "M", "Bk", "N", "P", "Q", "S"]
 dues = df(
     [
         (
@@ -193,6 +195,10 @@ pays = df(
         ("K", D(2026, 6, 20), D(2026, 6, 20), 150.0),
         ("P", D(2026, 7, 12), D(2026, 7, 12), 150.0),
         ("Q", D(2026, 7, 12), D(2026, 7, 12), 150.0),
+        ("S", D(2026, 5, 10), D(2026, 5, 10), 0.1),
+        ("S", D(2026, 5, 20), D(2026, 5, 20), 0.2),
+        ("S", D(2026, 6, 20), D(2026, 6, 20), 33.33),
+        ("S", D(2026, 7, 12), D(2026, 7, 12), 100.0),
     ],
     "account_id string, pay_from date, pay_date date, amount double",
 )
@@ -219,6 +225,8 @@ a_followup = fu(
         ("P", "2026-07-25", "WILL PAY AT SALARY"),
         ("Q", "2026-07-08", "PROMISE TO PAY"),
         ("Q", "2026-07-15", "PROMISE TO PAY"),
+        ("S", "2026-07-08", "PROMISE TO PAY"),
+        ("S", "2026-07-15", "PROMISE TO PAY"),
     ]
 )
 a_agreements = df([(a, a) for a in A_ACCTS], "account_id string, agreement_id string")
@@ -266,6 +274,7 @@ check(
 for acct, want in (
     ("P", [("2026-07-08", "paid"), ("2026-07-15", "none")]),
     ("Q", [("2026-07-08", "partial")]),
+    ("S", [("2026-07-08", "paid"), ("2026-07-15", "none")]),
 ):
     check(
         f"events {acct}, alive until paid or the deadline",
@@ -326,6 +335,7 @@ check(
         "N": "broken",
         "P": "partly_kept",
         "Q": "thin",
+        "S": "partly_kept",
     },
 )
 sig30 = build_commitment_signals(ep, events_for(deadline="30_days"))

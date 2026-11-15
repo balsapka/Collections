@@ -155,7 +155,8 @@ def _event_step(live: Column, day: Column) -> Column:
     joins it while its deadline has not passed and the payments since the event day,
     before this day, have not reached its promised amount; otherwise the day starts a
     new event. ``starts``: the event start of every day so far."""
-    paid_since_start = day["_paid_before"] - live["paid_at_start"]
+    # to the cent: a difference of two sums can fall a hair short of an exact payment
+    paid_since_start = F.round(day["_paid_before"] - live["paid_at_start"], 2)
     joins = (
         live["start"].isNotNull()
         & (day["event_date"] <= live["cutoff"])
