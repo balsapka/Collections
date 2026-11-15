@@ -1,8 +1,8 @@
 # Synthesized Features: speaker script
 
-This is what to say on each slide, start to finish, for deck version 101 (33 slides). Slides 1–15 are the main talk, about 22 minutes. Slides 16–22 are Part 3, for discussion: use them if there is time and GRR wants to go into allocation, about 8 minutes. Slides 23–32 are backup: use them only when a question calls for them.
+This is what to say on each slide, start to finish, for deck version 102 (33 slides). Slides 1–16 are the main talk, about 22 minutes. Slides 17–23 are Part 3, for discussion: use them if there is time and GRR wants to go into allocation, about 8 minutes. Slides 24–33 are backup: use them only when a question calls for them.
 
-Slide numbers follow the artifact and the content pack, where the alternative credibility slide is 10b. In the PDF and PowerPoint that slide is number 11, so every later slide is one number higher there.
+Slide numbers are the same in the artifact, the PDF and the PowerPoint.
 
 ---
 
@@ -144,7 +144,7 @@ Two more things. At 180+ almost everyone is Low: 97 percent of cards and 95 perc
 
 We plan to close this axis by 20 November.
 
-### Slide 10b · Alternative: every promise earns credit, keeping it earns more
+### Slide 11 · Alternative: every promise earns credit, keeping it earns more
 
 *Optional: show it right after slide 10 if the discussion turns to how promises score.*
 
@@ -162,7 +162,7 @@ Reliability still counts: kept stays above partly kept, and partly kept above br
 
 Because every promise gains a point and the bands stay the same, customers only move up. At 61 to 180, High or Moderate grows from 26 to 45 percent of card customers, and those moving up to High pay their due 51 percent of the time, against 27 percent for those who stay Moderate. The ranking improves in every month and every DPD band. And with this scoring the choice of deadline barely matters: the month-end deadline costs almost nothing against 30 days.
 
-### Slide 11 · A4 Ability: ability tells us what a customer can realistically be offered
+### Slide 12 · A4 Ability: ability tells us what a customer can realistically be offered
 
 Ability is still in progress.
 
@@ -185,11 +185,11 @@ We aim to close ability by 20 November too, but it may follow slightly later.
 
 ## Part 2 · From states to personas
 
-### Slide 12 · From states to personas
+### Slide 13 · From states to personas
 
 Part 2 puts the four states together into personas. Combined, they give far more personas than anyone could act on, so I'll show where the value actually sits, and finish with what we hand over: every account's persona, every month.
 
-### Slide 13 · Combined, the states give hundreds of personas: far too many to give each a strategy
+### Slide 14 · Combined, the states give hundreds of personas: far too many to give each a strategy
 
 A persona is one combination of states: one of six deterioration states, one of nine locatability cells, one of three credibility bands and one of four ability bands. That's 648 possible personas, before anything from UC1.
 
@@ -199,7 +199,7 @@ Many of these combinations really occur. On cards in August, 393 do, and 171 of 
 
 Nobody can write and run a separate strategy for hundreds of personas. The good news is on the next slide: size and value sit in different personas.
 
-### Slide 14 · 46 personas hold 11% of the card balance and bring in 37% of the money collected
+### Slide 15 · 46 personas hold 11% of the card balance and bring in 37% of the money collected
 
 This slide shows that we don't need to treat every persona alike.
 
@@ -213,7 +213,7 @@ Everything else, in grey, pays about in line with its size.
 
 These are payments under today's handling. And it is not a one-month result: I checked May on its own against January to April, and nearly nine in ten personas paid above or below the average in both.
 
-### Slide 15 · What we hand over: every account's persona, every month
+### Slide 16 · What we hand over: every account's persona, every month
 
 This is the deliverable. A persona is the combination of all four states, plus whatever we distil from the UC1 call transcripts. Every month, every account gets its persona.
 
@@ -227,11 +227,11 @@ That's the end of the main story. Thank you. If there's time, Part 3 takes it on
 
 ## Part 3 · For discussion · use if there is time
 
-### Slide 16 · A data-driven view of allocation
+### Slide 17 · A data-driven view of allocation
 
 This part is for discussion and has not been agreed with GRR. It looks at allocation through the data: which cases need a strategy of their own, how personas could be sorted into tiers from what they have actually paid, how stable those tiers are from month to month, and where the UC1 signals add most. The decisions stay with GRR.
 
-### Slide 17 · Only the cases we keep in-house need a strategy of their own
+### Slide 18 · Only the cases we keep in-house need a strategy of their own
 
 If we take it further, the way through the many personas is the first decision every case meets: allocation.
 
@@ -241,7 +241,7 @@ Only the cases we keep in-house need one: which offer, which agent, which channe
 
 So the question changes. It's no longer "a strategy for every persona". It's "which personas earn in-house effort, and what do we do with them".
 
-### Slide 18 · How an account gets a tier: by what its persona actually paid
+### Slide 19 · How an account gets a tier: by what its persona actually paid
 
 Here's how we'd sort personas into tiers, in three steps.
 
@@ -258,7 +258,7 @@ Testing added two refinements:
 
 The cut itself matters far more than anything else. Moving it twenty percent either way takes the card in-house list from 70 personas to 44. Changing how we define reachability swaps only a handful.
 
-### Slide 19 · In-house would take a sixth of card accounts and half the money collected
+### Slide 20 · In-house would take a sixth of card accounts and half the money collected
 
 With those illustrative cut-offs, and tested on unseen months:
 
@@ -272,7 +272,7 @@ Look at the call days: the non-workable pool still takes nearly 11 call days per
 
 On loans the order holds as well, but the book is smaller and the list thinner. How stable these tiers are is on the next slide.
 
-### Slide 20 · Keeping the tier list stable from month to month
+### Slide 21 · Keeping the tier list stable from month to month
 
 This is work in progress. A tier list is only useful if it stays put from one run to the next, so we checked how often an account changes tier while its persona stays the same.
 
@@ -290,13 +290,13 @@ A cut that moves with the book, or that keeps a fixed share of accounts, doesn't
 
 Next, we want to pool over a longer window, using history from before 2026; try broader groups that keep location; and re-run the list every three months, with triggers for an earlier re-run if the in-house paid rate or the book's collection level leaves its usual range. All of this rests on five months of data, so we'll confirm it on later months once the payment data runs past August.
 
-### Slide 21 · In-house is where we talk to customers, so that is where UC1 adds its signals
+### Slide 22 · In-house is where we talk to customers, so that is where UC1 adds its signals
 
 The transcript work, UC1, only has something to say where a conversation took place, and that differs sharply across the groups. In the last three months, 89 percent of in-house card accounts had a right-party contact, against 45 percent of the agency group and 16 percent of the non-workable pool.
 
 The transcript signals are what customers tell us: their intent to pay, a change in income or job, a hardship reason, a dispute, a promise made on the call. These come from what customers say on calls, so most of them will come from the in-house cases. That's exactly where a strategy is needed, and where the extra detail is worth the most.
 
-### Slide 22 · The in-house personas become a short list for GRR to give each a strategy
+### Slide 23 · The in-house personas become a short list for GRR to give each a strategy
 
 This is where it leads. Most personas fall to the agency or the non-workable pool and need nothing more from us. The in-house tier is a much shorter list: 51 personas on cards, and just 26 of them cover 80 percent of in-house accounts. On loans it's 11 of 16.
 
@@ -314,11 +314,11 @@ That's the end of the discussion part. Thank you. Happy to take questions; the a
 
 ## Appendix · use only when asked
 
-### Slide 23 · Signals, rules and governance
+### Slide 24 · Signals, rules and governance
 
 The backup slides: where each signal comes from, the exact rules, and the status of each axis.
 
-### Slide 24 · What each group could mean, for discussion
+### Slide 25 · What each group could mean, for discussion
 
 For discussion only, not agreed with GRR. Each group is paired with a treatment the policy already provides; nothing here is a new process.
 
@@ -327,7 +327,7 @@ For discussion only, not agreed with GRR. Each group is paired with a treatment 
 - **Non-workable:** customers who stopped suddenly or never paid and can't be reached. The policy allows either referral to agencies with HOD approval, or no calling with dunning only, as for Dead Beat accounts.
 - **At 180+:** the 12 percent with a positive signal are lifted out of the pool for an in-house attempt.
 
-### Slide 25 · How a pilot could test it, if the strategy workshop takes it forward
+### Slide 26 · How a pilot could test it, if the strategy workshop takes it forward
 
 If the workshop takes this forward, a pilot would test each group against business as usual, with a random split inside each tier for three months:
 
@@ -339,7 +339,7 @@ We'd measure meaningful payments and roll rates, the amount collected per accoun
 
 On sizing: for cards, the agency and non-workable tiers fill both arms in a single month for a five-point lift. In-house needs a ten-point target, and loans need ten points and pooling over months. The same policy and compliance rules apply to every arm, with a monthly readout and a stop rule.
 
-### Slide 26 · Risk score: personas rank payers far better than the bucket
+### Slide 27 · Risk score: personas rank payers far better than the bucket
 
 Is a risk score still worth building? We tested it on accounts and months the method had not seen.
 
@@ -352,11 +352,11 @@ Ranking power is measured as the area under the curve, where 0.5 is chance and 1
 
 So a model adds a little, consistently. Risk score modelling is planned for Phase 2, where a fuller model, using bureau and other domains the axes don't use yet, can be tested against the personas.
 
-### Slide 27 · Appendix A: Signals and their sources
+### Slide 28 · Appendix A: Signals and their sources
 
 Every source is an existing dataset we already run; no new data feed is needed. Customer signals such as salary, CASA, bounces and logins are read across all of the customer's accounts, because the delinquent account is usually not where the salary lands. Windows are short and end at the month end: three months at 61 to 180, six at 180+.
 
-### Slide 28 · Appendix B: The scoring rules at a glance
+### Slide 29 · Appendix B: The scoring rules at a glance
 
 The exact rules, for detailed questions:
 
@@ -367,11 +367,11 @@ The exact rules, for detailed questions:
 
 Every threshold is in that axis's model specification document.
 
-### Slide 29 · Appendix C: How a journey state is assigned
+### Slide 30 · Appendix C: How a journey state is assigned
 
 Deterioration is a short ordered tree. First a guard: if the history starts already delinquent, we can't see how the customer fell in, so the state is Unknown unless the account is stabilized. Then come early payment default, stabilized, repeat delinquent, straight roller split by tenure, and everything else is a slow roller. One-month glitches and billing-cycle jumps are repaired before the tree runs, and every repair is counted.
 
-### Slide 30 · Appendix: New ability rule vs the old
+### Slide 31 · Appendix: New ability rule vs the old
 
 This is how the new ability rule compares with the old one, which rested on income plus the CASA balance.
 
@@ -382,7 +382,7 @@ The old High needed a CASA balance above a floor. The bank sweeps balances again
 
 Remember: Unknown means we can't see the customer's money, not that they have none.
 
-### Slide 31 · Appendix: A 30-day window to keep a promise ranks customers best
+### Slide 32 · Appendix: A 30-day window to keep a promise ranks customers best
 
 The credibility axis judges each promise to pay as kept or broken by whether the customer paid by a deadline. We back-tested three deadlines:
 
@@ -400,7 +400,7 @@ We also checked the accounts with no promise or payment record, which now sit in
 
 So the data favour 30 days: the most lenient rule for the customer is also the most predictive. The choice of rule is GRR's.
 
-### Slide 32 · Appendix D: Status and sign-off
+### Slide 33 · Appendix D: Status and sign-off
 
 Where each axis stands:
 
