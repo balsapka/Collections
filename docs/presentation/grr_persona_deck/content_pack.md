@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 33 slides (with 10b), in order: every word, number and speaker note as it stands in v100 (2026-11-15). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 33 slides (with 10b), in order: every word, number and speaker note as it stands in v101 (2026-11-15). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -57,7 +57,7 @@ Right column, "What it shows" (three stat boxes):
 
 | Number | Text |
 |---|---|
-| 54% | of card collections came from just a fifth of the accounts, picked out in advance by the framework. |
+| Half | of card collections came from just a fifth of the accounts, picked out in advance by the framework. |
 | 8× | Within the same DPD bucket (91–120), some loan customers pay 8 times as often as others. |
 | 12% | of 180+ accounts show a positive signal; one in five of them pays, against under 3% of the rest. |
 
@@ -71,7 +71,7 @@ Timeline, "Next":
 | From 4 Jan | Pilot |
 
 Notes:
-> Three messages. One: beyond 60 DPD there is no model; cases are allocated by bucket and product, and the late buckets are where data runs dry. Two: the UC2 synthesized features take signals from every data domain and condense them each month into four answers per account: how did they get here, can we reach them, will they pay, and can they pay. Three: what it shows. If we had told collectors at the start of the month which fifth of card accounts to focus on, that fifth would have brought in 54 percent of everything collected over the next three months. Each account was scored by what customers with the same four answers had paid before, on months and accounts the test had not seen. Within the same DPD bucket, 91 to 120, groups of loan customers pay anywhere from 9 to 76 percent of the time within three months, depending on their answers: about eight times apart. At 180+, 12 percent of accounts show a positive signal, and about one in five of them pays, against under 3 percent of the rest. Next: by 20 November the UC2 synthesized features are signed off; one, ability, may follow later, pending bureau data and the framework. From 20 November to 11 December, the UC1 transcript signals and UC2 are combined, with action support. Pilot selection from 11 to 20 December, and the pilot from 4 January.
+> Three messages. One: beyond 60 DPD there is no model; cases are allocated by bucket and product, and the late buckets are where data runs dry. Two: the UC2 synthesized features take signals from every data domain and condense them each month into four answers per account: how did they get here, can we reach them, will they pay, and can they pay. Three: what it shows. If we had told collectors at the start of the month which fifth of card accounts to focus on, that fifth would have brought in about half of everything collected over the next three months. Each account was scored by what customers with the same four answers had paid before, on months and accounts the test had not seen. Within the same DPD bucket, 91 to 120, groups of loan customers pay anywhere from 9 to 76 percent of the time within three months, depending on their answers: about eight times apart. At 180+, 12 percent of accounts show a positive signal, and about one in five of them pays, against under 3 percent of the rest. Next: by 20 November the UC2 synthesized features are signed off; one, ability, may follow later, pending bureau data and the framework. From 20 November to 11 December, the UC1 transcript signals and UC2 are combined, with action support. Pilot selection from 11 to 20 December, and the pilot from 4 January.
 
 ## 3 · Where we start
 
@@ -236,7 +236,7 @@ Stat boxes:
 No footer.
 
 Notes:
-> Locatability tells us how a case can be worked. Two rules: where did we last see the customer, from logins and in-person card use, with travel purchases and collector notes as signs of departure, latest evidence wins; and do our calls connect. The matrix shows how they combine. Only about one in five card customers and one in four loan customers at 61 to 180 are reachable. The largest group, about a third, look abroad and do not answer: these are candidates for tracing or an agency rather than in-house calls. At 180+ we look only for positives, and being reachable counts as one: 3.7 percent of card accounts and 4.8 percent of loans. Reachability carries real information: customers who look credible or able but cannot be reached pay about a third as often as reachable customers with the same profile, although they get as many call days. It is not a filter, though: in the tier test about one in five in-house card accounts and two in five loan accounts are not reachable, and the tiers barely change if we define reachability differently, for example six failed call days instead of three.
+> Locatability tells us how a case can be worked. Two rules: where did we last see the customer, from logins and in-person card use, with travel purchases and collector notes as signs of departure, latest evidence wins; and do our calls connect. The matrix shows how they combine. Only about one in five card customers and one in four loan customers at 61 to 180 are reachable. The largest group, about a third, look abroad and do not answer: for them, tracing matters most. At 180+ we look only for positives, and being reachable counts as one: 3.7 percent of card accounts and 4.8 percent of loans. Reachability carries real information: customers who look credible or able but cannot be reached pay about a third as often as reachable customers with the same profile, although they get as many call days. It is not a filter, though: it informs how we work a case, by phone or with tracing.
 
 ## 10 · A3 · Payment credibility
 
@@ -364,7 +364,7 @@ Layout: section divider.
 - Subtitle: Too many personas · where the value sits · what we hand over
 
 Notes:
-> Part 2 puts the four states together into personas. Combined, they give far more personas than anyone could act on, but the customers most likely to pay sit in a few dozen of them. It ends with what we hand over: every account's persona, every month, with what each persona has paid.
+> Part 2 puts the four states together into personas. Combined, they give far more personas than anyone could act on, but size and value sit in different personas: a select set brings in several times its share of the money. It ends with what we hand over: every account's persona, every month.
 
 ## 13 · Combining the states
 
@@ -515,7 +515,7 @@ Layout: a table on the left (or a bar of the money share above the table); two d
 Footer: Cards 61–180 · table out-of-sample (5 folds, Jan–May 2026); call days: August · cuts AED 1,250 / 175 · loans: same order, thresholds less stable
 
 Notes:
-> A first look; nothing here has been discussed with GRR. With the illustrative cut-offs, in-house would take about a sixth of card accounts and half the money collected. In-house is mostly customers curing now or cured before who are credible or able; the non-workable pool is mostly those who stopped suddenly or never paid and cannot be reached, which also gives the policy's non-workable pool a definition. Tested on unseen months and accounts, the top fifth of card accounts by persona hold 54 percent of the money collected. The illustrative cut-offs give three groups: in-house, 17 percent of accounts and 48 percent of the money, recovering about 10 percent of principal in three months; agency, 54 percent and 46 percent; and the non-workable pool, 29 percent of accounts, about 6 percent of the money, recovering just over half a percent, yet still taking nearly 11 call days per account. The groups keep their order on every unseen month. We also checked how stable the tiers are. Rebuilt from one month alone, the card list keeps about half its personas from one month to the next; pooled over months with the band, about 80 percent, and only about one card account in twenty changes tier while its persona stays the same, down from one in eight, with no loss in money collected. On loans the order holds too, but the book is smaller and the list thinner: even pooled, about one loan account in seven changes tier with the same persona, so the loan tiers are provisional. The cut-offs are illustrations; the commission rate card and the in-house cost would set them properly.
+> A first look; nothing here has been discussed with GRR. With the illustrative cut-offs, in-house would take about a sixth of card accounts and half the money collected. In-house is mostly customers curing now or cured before who are credible or able; the non-workable pool is mostly those who stopped suddenly or never paid and cannot be reached, which also gives the policy's non-workable pool a definition. Tested on unseen months and accounts, the top fifth of card accounts by persona hold about half of the money collected. The illustrative cut-offs give three groups: in-house, 17 percent of accounts and 48 percent of the money, recovering about 10 percent of principal in three months; agency, 54 percent and 46 percent; and the non-workable pool, 29 percent of accounts, about 6 percent of the money, recovering just over half a percent, yet still taking nearly 11 call days per account. The groups keep their order on every unseen month. We also checked how stable the tiers are. Rebuilt from one month alone, the card list keeps about half its personas from one month to the next; pooled over months with the band, about 80 percent, and only about one card account in twenty changes tier while its persona stays the same, down from one in eight, with no loss in money collected. On loans the order holds too, but the book is smaller and the list thinner: even pooled, about one loan account in seven changes tier with the same persona, so the loan tiers are provisional. The cut-offs are illustrations; the commission rate card and the in-house cost would set them properly.
 
 ## 20 · Keeping the tiers stable
 
@@ -682,7 +682,7 @@ Findings:
 Footer: Paid = meaningful payment within 3 months (the risk score's target) · strict and rolling time splits give the same picture
 
 Notes:
-> Is a risk score still worth building? We tested out-of-sample: the payment rates of each view were learned on some accounts and months and scored on others, January to May 2026, in five folds, and confirmed with time splits. Ranking power is the area under the curve, where 0.5 is chance and 1 is perfect. The DPD bucket alone reaches 0.65 on cards and 0.62 on loans. The personas reach 0.83 and 0.77: far better, in every test, and the top fifth of card accounts by persona hold 54 percent of the money collected, against 30 percent by bucket. Adding the bucket to the personas adds almost nothing. A simple model on the axis states and the bucket adds about two points of AUC over the personas. So a model on the same inputs adds a little, consistently. The risk score modelling is planned for Phase 2, where a full Retail 360 model, using bureau and other domains the axes do not use yet, can be tested against the personas.
+> Is a risk score still worth building? We tested out-of-sample: the payment rates of each view were learned on some accounts and months and scored on others, January to May 2026, in five folds, and confirmed with time splits. Ranking power is the area under the curve, where 0.5 is chance and 1 is perfect. The DPD bucket alone reaches 0.65 on cards and 0.62 on loans. The personas reach 0.83 and 0.77: far better, in every test, and the top fifth of card accounts by persona hold about half of the money collected, against 30 percent by bucket. Adding the bucket to the personas adds almost nothing. A simple model on the axis states and the bucket adds about two points of AUC over the personas. So a model on the same inputs adds a little, consistently. The risk score modelling is planned for Phase 2, where a full Retail 360 model, using bureau and other domains the axes do not use yet, can be tested against the personas.
 
 ## 27 · Appendix A: Signals and their sources
 

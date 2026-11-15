@@ -1,6 +1,6 @@
 # Synthesized Features: speaker script
 
-This is what to say on each slide, start to finish, for deck version 100 (33 slides). Slides 1–15 are the main talk, about 22 minutes. Slides 16–22 are Part 3, for discussion: use them if there is time and GRR wants to go into allocation, about 8 minutes. Slides 23–32 are backup: use them only when a question calls for them.
+This is what to say on each slide, start to finish, for deck version 101 (33 slides). Slides 1–15 are the main talk, about 22 minutes. Slides 16–22 are Part 3, for discussion: use them if there is time and GRR wants to go into allocation, about 8 minutes. Slides 23–32 are backup: use them only when a question calls for them.
 
 Slide numbers follow the artifact and the content pack, where the alternative credibility slide is 10b. In the PDF and PowerPoint that slide is number 11, so every later slide is one number higher there.
 
@@ -24,7 +24,7 @@ Second, what we built. The UC2 synthesized features take signals from every data
 
 Third, what it shows. Three numbers:
 
-- If we had told collectors at the start of the month which fifth of card accounts to focus on, that fifth would have brought in 54 percent of everything collected over the next three months. That was tested on months and accounts the method had never seen.
+- If we had told collectors at the start of the month which fifth of card accounts to focus on, that fifth would have brought in about half of everything collected over the next three months. That was tested on months and accounts the method had never seen.
 - Within the same DPD bucket, 91 to 120, some groups of loan customers pay 9 percent of the time and others 76 percent. That's about eight times apart, inside a single bucket.
 - At 180+, 12 percent of accounts show a positive signal. About one in five of them pays, against under 3 percent of the rest.
 
