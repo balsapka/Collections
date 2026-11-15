@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 33 slides (with 10b), in order: every word, number and speaker note as it stands in v99 (2026-11-15). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 33 slides (with 10b), in order: every word, number and speaker note as it stands in v100 (2026-11-15). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -403,10 +403,10 @@ Legend:
 - **All other personas**: They bring in about what their size suggests: close to the card average of 3.1%.
 - **The 10 largest personas**: They recover 0.8%. All have Low credibility, and most cannot be reached.
 
-Footer: Cards 61–180 · accounts January–May 2026, payments to August 2026 · nearly 9 in 10 personas stayed on the same side of the card average in May as in January–April
+Footer: Cards 61–180 · January–May 2026 accounts · payments to August 2026
 
 Notes:
-> The previous slide said there are hundreds of personas. This one shows that size and value sit in different places. The top strip is the card balance, the bottom strip is the money collected over the next three months, and the colours are the same groups. Look at the dark block: the ten largest personas hold 40 percent of the balance but bring in only 10 percent of the money. Now the blue block: 46 personas, customers we can reach who have High or Moderate credibility. They hold 11 percent of the balance and bring in 37 percent of the money. A third of that comes from customers who are not curing now. Everything else, in grey, pays about in line with its size. These are payments under today's handling, and the picture was the same in May as in January to April.
+> The previous slide said there are hundreds of personas. This one shows that size and value sit in different places. The top strip is the card balance, the bottom strip is the money collected over the next three months, and the colours are the same groups. Look at the dark block: the ten largest personas hold 40 percent of the balance but bring in only 10 percent of the money. Now the blue block: 46 personas, customers we can reach who have High or Moderate credibility. They hold 11 percent of the balance and bring in 37 percent of the money. A third of that comes from customers who are not curing now. Everything else, in grey, pays about in line with its size. These are payments under today's handling. And it is not a one-month result: I checked May on its own against January to April, and nearly nine in ten personas paid above or below the average in both.
 
 ## 15 · The deliverable
 
