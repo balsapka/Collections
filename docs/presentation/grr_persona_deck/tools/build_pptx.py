@@ -96,8 +96,9 @@ def add_wedge(sl, it):
         px_ = (1 - t) ** 2 * 136 + 2 * (1 - t) * t * 104
         py_ = (1 - t) ** 2 * 250 + 2 * (1 - t) * t * 64
         pts.append((px_, py_))
-    fb = sl.shapes.build_freeform(round(x * E), round(y * E), scale=E)
-    fb.add_line_segments([(p[0], p[1]) for p in pts], close=True)
+    # pen start and segments are in local px (scaled by E); the slide position is the origin below
+    fb = sl.shapes.build_freeform(pts[0][0], pts[0][1], scale=E)
+    fb.add_line_segments(pts[1:], close=True)
     shp = fb.convert_to_shape(round(x * E), round(y * E))
     shp.fill.solid()
     shp.fill.fore_color.rgb = RGBColor(0x07, 0x24, 0x47)
