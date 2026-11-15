@@ -23,7 +23,10 @@ from collections.abc import Sequence
 
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
-from pyspark.sql import types as T
+
+# Re-exported: the axes import the key helper from here.
+# pylint: disable-next=unused-import
+from enbd_collections.nodes.utils.frames import string_key  # noqa: F401
 
 LOG = logging.getLogger(__name__)
 
@@ -67,15 +70,6 @@ def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
     missing = [c for c in columns if c not in df.columns]
     if missing:
         raise ValueError(f"{source} is missing required columns {missing}")
-
-
-def string_key(df: DataFrame, col: str = "account_id") -> Column:
-    """``col`` as a trimmed string join key. A double or decimal id is cast to ``long``
-    first: cast straight to string it reads ``1.23456789E8`` and matches nothing."""
-    key = F.col(col)
-    if isinstance(df.schema[col].dataType, (T.DoubleType, T.FloatType, T.DecimalType)):
-        key = key.cast("long")
-    return F.trim(key.cast("string"))
 
 
 def window_start(months: int, anchor: Column | None = None) -> Column:

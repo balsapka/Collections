@@ -139,6 +139,12 @@ def balance_strong(anchor: Column, w: int) -> Column:
     )
 
 
+def _balance_strong_now(anchor: Column) -> Column:
+    """The observation month's CASA balance (``casa_m1``; NULL counts as 0) reaches the
+    strong amount."""
+    return F.coalesce(F.col("casa_m1"), F.lit(0.0)) >= _strong_amount(anchor)
+
+
 def _flow_level(prefix: str, anchor: Column, w: int) -> Column:
     """strong / some / none / NULL (no flow in the window) of a monthly flow."""
     last = _months(prefix, _window(w)[0])
@@ -232,10 +238,11 @@ def build_a1_ability(
     left-joined in that order. ``a1_unknown_reason`` says why a row is unknown:
     ``no_casa`` (no CASA leg or positive balance with us in 12 months) or
     ``dormant_casa``; ``a1_reason`` is the strongest family (or ``distress``).
-    Diagnostics, which change nothing: ``a1_sweepable_balance_flag`` (the CASA balance
-    is strong: money above the floor the bank could still sweep), ``a1_eosb_flag`` (a
-    DCORE end-of-service result in the window), ``a1_income_source`` (who shows AED
-    1,000 or more in the window: ``internal``, ``bureau``, ``both`` or ``none``),
+    Diagnostics, which change nothing: ``a1_sweepable_balance_flag`` (the observation
+    month's CASA balance reaches the strong amount: money the bank could still sweep),
+    ``a1_eosb_flag`` (a DCORE end-of-service result in the window), ``a1_income_source``
+    (who shows AED 1,000 or more in the window: ``internal``, ``bureau``, ``both`` or
+    ``none``),
     ``a1_salary_stopped`` (internal salary in the prior window, none in the window).
     """
     # join order follows the node inputs; output is the same (left joins on GRAIN)
@@ -268,7 +275,7 @@ def build_a1_ability(
         F.col("a1_points_total").cast("int"),
         F.col("a1_distress_flag").cast("int"),
         F.col("liquidity_anchor_amt").cast("double"),
-        balance_strong(amt, w).cast("int").alias("a1_sweepable_balance_flag"),
+        _balance_strong_now(amt).cast("int").alias("a1_sweepable_balance_flag"),
         F.col("eosb_flag").cast("int").alias("a1_eosb_flag"),
         _income_source().alias("a1_income_source"),
         _salary_stopped().cast("int").alias("a1_salary_stopped"),

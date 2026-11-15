@@ -1,4 +1,4 @@
-"""Small helpers shared by the primary and feature nodes (CASA, products)."""
+"""Small helpers shared by the primary and feature nodes and the persona axes."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from datetime import date
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 
 def months_back(day: str | date, months: int) -> date:
@@ -36,3 +37,12 @@ def wm_month(week_number: str = "week_number") -> Column:
 def cif_column() -> Column:
     """``cif_id`` as a string (the persona join type)."""
     return F.col("cif_id").cast("string").alias("cif_id")
+
+
+def string_key(df: DataFrame, col: str = "account_id") -> Column:
+    """``col`` as a trimmed string join key. A double or decimal id is cast to ``long``
+    first: cast straight to string it reads ``1.23456789E8`` and matches nothing."""
+    key = F.col(col)
+    if isinstance(df.schema[col].dataType, (T.DoubleType, T.FloatType, T.DecimalType)):
+        key = key.cast("long")
+    return F.trim(key.cast("string"))

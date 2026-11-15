@@ -272,9 +272,9 @@ _DISPOSITIONS = [  # first match wins
 ]
 
 
-# Contacts on the same day: the one later in this order counts as the latest (Q-28: a
-# refusal never outranks another contact of its day).
-_SAME_DAY_ORDER = ("refusal", "dispute", "hung_up", "paid", "ptp", "success")
+# Contacts on the same day: the one later in this order counts as the latest (D-A3-32:
+# promise > payment reported > refusal > dispute > contact > hung up).
+_SAME_DAY_ORDER = ("hung_up", "success", "dispute", "refusal", "paid", "ptp")
 
 
 def _disposition(name: Column) -> Column:
@@ -418,7 +418,7 @@ def build_contact_signals(  # pylint: disable=too-many-arguments,too-many-positi
 
     DCORE events of the account in ``[max(episode start, last 24 months), observation
     date]``. Latest right-party contact: on one day, the latest by ``_SAME_DAY_ORDER``
-    (a refusal ranks below the other contacts: a same-day promise followed it, Q-28).
+    (D-A3-32).
     ``a3_refusal_flag``: it was a refusal, no plan started after it and no cycle / month
     with 100 AED or more paid may have come after it (D-A3-30). Diagnostics (not in the
     state):

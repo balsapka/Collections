@@ -16,7 +16,7 @@ from __future__ import annotations
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from enbd_collections.nodes.utils.frames import require_columns
+from enbd_collections.nodes.utils.frames import require_columns, string_key
 
 
 def build(alerts: DataFrame) -> DataFrame:
@@ -34,7 +34,7 @@ def build(alerts: DataFrame) -> DataFrame:
             & (amount > 0)
         )
         .groupBy(
-            F.col("cif_id").cast("string").alias("cif_id"),
+            string_key(alerts, "cif_id").alias("cif_id"),
             F.to_date("dt_of_return").alias("bounce_date"),
         )
         .agg(F.max(amount).alias("amount"))

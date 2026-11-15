@@ -12,16 +12,21 @@ import sys
 import types
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+SRC = Path(__file__).resolve().parents[1] / "src"
+sys.path.insert(0, str(SRC))
 
 from pyspark.sql import SparkSession  # noqa: E402
 from pyspark.sql import functions as F  # noqa: E402
 
 
 def _stub_dcore() -> None:
+    """Stub the DCORE helpers the A3 sources import; the real ``nodes`` modules stay
+    importable (``nodes.utils.frames``)."""
+
     def module(name: str) -> types.ModuleType:
         mod = sys.modules.get(name) or types.ModuleType(name)
-        mod.__path__ = []
+        real = SRC / name.replace(".", "/")
+        mod.__path__ = [str(real)] if real.is_dir() else []
         sys.modules[name] = mod
         return mod
 
@@ -462,6 +467,10 @@ check(
 # R8: a plan starts on the refusal day -> not. R9: a card payment dated the refusal day ->
 # not (the order within the day is unknown). R5 refuses, then a plan starts -> not. R6 refuses, the month's cash (RL: known only to
 # the month) may have come after -> not. R7 paid before the refusal -> refusal. D1 disputes. H1 hangs up, then 3 ringing days.
+# Same day (D-A3-32: promise > paid > refusal > dispute > contact > hung up, whatever
+# the times): RC refuses, then a plain contact -> refusal. RD refuses, then disputes ->
+# refusal. RP promises, then refuses -> the promise. HC a contact, then hangs up -> the
+# contact. RX refuses, then a contact, and pays 150 that day -> refusal, lifted.
 fu_rows = []
 for a in ("R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9"):
     fu_rows.append((a, "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"))
@@ -471,6 +480,16 @@ fu_rows += [
     ("D1", "2026-07-01 10:00:00", "OC", "SUC", "DISPUTE"),
     ("H1", "2026-07-01 10:00:00", "OC", "SUC", "CUSTOMER HUNG UP"),
     ("P1", "2026-07-01 10:00:00", "OC", "SUC", "PARTIALLY PAID"),
+    ("RC", "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"),
+    ("RC", "2026-07-01 11:00:00", "OC", "SUC", "APPRECIATIONS"),
+    ("RD", "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"),
+    ("RD", "2026-07-01 11:00:00", "OC", "SUC", "DISPUTE"),
+    ("RP", "2026-07-01 10:00:00", "OC", "SUC", "PROMISE TO PAY"),
+    ("RP", "2026-07-01 11:00:00", "OC", "SUC", "REFUSE TO PAY"),
+    ("HC", "2026-07-01 10:00:00", "OC", "SUC", "APPRECIATIONS"),
+    ("HC", "2026-07-01 11:00:00", "OC", "SUC", "CUSTOMER HUNG UP"),
+    ("RX", "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"),
+    ("RX", "2026-07-01 11:00:00", "OC", "SUC", "APPRECIATIONS"),
 ]
 fu_rows += [
     ("H1", f"2026-07-{d:02d} 10:00:00", "OC", "UNS", "RINGING NO REPLY")
@@ -482,6 +501,7 @@ followup = df(
     "result_category string, result_name string",
 ).withColumn("action_ts", F.to_timestamp("action_ts"))
 accts = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "D1", "H1", "P1"]
+accts += ["RC", "RD", "RP", "HC", "RX"]
 agreements = df([(a, a) for a in accts], "account_id string, agreement_id string")
 ep_ct = episode([(a, D(2026, 4, 1), False) for a in accts])
 c_dues = df(
@@ -497,6 +517,7 @@ c_pays = df(
         ("R6", D(2026, 7, 1), D(2026, 7, 31), 150.0),
         ("R7", D(2026, 6, 20), D(2026, 6, 20), 150.0),
         ("R9", D(2026, 7, 1), D(2026, 7, 1), 150.0),
+        ("RX", D(2026, 7, 1), D(2026, 7, 1), 150.0),
     ],
     "account_id string, pay_from date, pay_date date, amount double",
 )
@@ -527,7 +548,25 @@ check(
         "D1": False,
         "H1": False,
         "P1": False,
+        "RC": True,
+        "RD": True,
+        "RP": False,
+        "HC": False,
+        "RX": False,
     },
+)
+check(
+    "same-day latest (D-A3-32)",
+    {
+        a: by_account(ct, "last_rpc_disposition")[a]
+        for a in ("RC", "RD", "RP", "HC", "RX")
+    },
+    {"RC": "refusal", "RD": "refusal", "RP": "ptp", "HC": "success", "RX": "refusal"},
+)
+check(
+    "RX refusal lifted by the same-day payment",
+    by_account(ct, "refusal_followed_by_payment")["RX"],
+    True,
 )
 check("R4 latest", by_account(ct, "last_rpc_disposition")["R4"], "ptp")
 check("P1 latest", by_account(ct, "last_rpc_disposition")["P1"], "paid")

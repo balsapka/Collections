@@ -27,7 +27,11 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DateType
 
 from enbd_collections.nodes.primary.cc_way4.prm_cc import derive_billing_amounts
-from enbd_collections.nodes.utils.frames import history_floor, require_columns
+from enbd_collections.nodes.utils.frames import (
+    history_floor,
+    require_columns,
+    string_key,
+)
 
 BALANCE_TAIL_DAYS = 5  # a card's minimum due is read from the last days of the month
 LOAD_LAG_DAYS = 40  # edp_load_date bound before the first month (load lag)
@@ -58,7 +62,7 @@ def build_card_contracts(client: DataFrame, contract: DataFrame) -> DataFrame:
         "raw_stg_contract",
     )
     cif = client.select(
-        "client_idt", F.trim(F.col("ident_number").cast("string")).alias("cif_id")
+        "client_idt", string_key(client, "ident_number").alias("cif_id")
     ).distinct()
     return (
         contract.join(F.broadcast(cif), "client_idt")
@@ -167,8 +171,8 @@ def build_loan_month_end(
     )
     floor = history_floor(persona_start_date, history_months)
     return loan_portfolio.filter(F.to_date("ss_dt") >= F.lit(floor)).select(
-        F.col("cust_num").cast("string").alias("cif_id"),
-        F.trim(F.col("acct_num").cast("string")).alias("account_id"),
+        string_key(loan_portfolio, "cust_num").alias("cif_id"),
+        string_key(loan_portfolio, "acct_num").alias("account_id"),
         F.last_day(F.to_date("ss_dt")).alias("month_end"),
         F.col("ra_delq_bkt").cast("int").alias("delinquency_bucket"),
         F.col("ra_ovd_days").cast("double").alias("overdue_days"),

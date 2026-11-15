@@ -712,6 +712,15 @@ a3_case(
         (dt.datetime(2024, 2, 1, 10), RTP, "OC", "SUC"),
     ),
 )
+a3_case(
+    "refusal and a plain contact later the same day: the refusal counts (D-A3-32)"
+    " and demotes Moderate to Low",
+    pays=PAID_2025 + monthly(100.0, D(2026, 1, 1), D(2026, 6, 1)),
+    followups=(
+        (JUL1, RTP, "OC", "SUC"),
+        (JUL1.replace(hour=11), "APPRECIATIONS", "OC", "SUC"),
+    ),
+)
 
 
 def _due(case: dict, statement: dt.date) -> float | None:

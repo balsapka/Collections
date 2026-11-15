@@ -19,7 +19,7 @@ from __future__ import annotations
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from enbd_collections.nodes.utils.frames import require_columns
+from enbd_collections.nodes.utils.frames import require_columns, string_key
 
 
 def build(unified: DataFrame) -> DataFrame:
@@ -33,7 +33,7 @@ def build(unified: DataFrame) -> DataFrame:
     return unified.filter(
         F.col("cif_id").isNotNull() & F.col("monthly_salary").isNotNull()
     ).select(
-        F.trim(F.col("cif_id").cast("string")).alias("cif_id"),
+        string_key(unified, "cif_id").alias("cif_id"),
         F.last_day("salary_month_end").alias("month_end"),
         F.col("monthly_salary").cast("double").alias("bureau_salary"),
         "salary_source",

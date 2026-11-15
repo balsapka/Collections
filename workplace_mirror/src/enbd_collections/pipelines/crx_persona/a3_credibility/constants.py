@@ -44,7 +44,7 @@ PRE_DLQ_MONTHS = 12  # the 12 months before the episode (row 82)
 PRE_DLQ_MIN_MONTHS_DUE = 3  # fewer months with a due: No record (row 83)
 CLEAN_SHARE = 0.80  # Clean from (row 84)
 
-# ── Contacts (D-A3-19, -20; Q-28, Q-29, Q-30) ─────────────────────────────────
+# ── Contacts (D-A3-19, -20, -32; Q-29, Q-30) ──────────────────────────────────
 DCORE_MAX_MONTHS = 24  # DCORE events read at most 24 months back (Q-30)
 NO_PICKUP_NAMES = ("NO ANSWER", "LEFT_MSG")  # with _dcore_codes.RINGING
 

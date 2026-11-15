@@ -244,6 +244,14 @@ Measured, not assumed (V2, V3).
   statements; no flat fallback. Dimension C's `billed_amount` stays the ladder value. Code:
   `cc_a3_payment_credibility/nodes.py` (`_balance_dues`).
 
+- **D-A3-32: same-day contacts rank by disposition** (user, 2026-11-15, Q-R-10). When the latest
+  right-party contact day holds several dispositions, the strongest counts as the latest, whatever
+  the times: promise (`ptp`) > payment reported (`paid`) > refusal > dispute > contact (`success`) >
+  hung up (`hung_up`). A refusal therefore outranks a dispute, a plain contact or a hang-up of its
+  day, and a promise or a payment report outranks the refusal. A refusal kept as the latest is still
+  lifted by a payment or a plan of the same day (D-A3-30). Code: `a3_credibility/signals.py`
+  (`_SAME_DAY_ORDER`).
+
 - **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.
 - **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
@@ -259,7 +267,7 @@ Measured, not assumed (V2, V3).
   inclusive at the observation date (Q-22 / Q-27); a censored anchor (A4 cropped the history and the
   episode ran from its first kept month) counts as unknown: windows from the observation lookback,
   Dimension C No record, `pre_dlq_reason = censored` (Q-25); same-day ties on the latest right-party
-  contact: a non-refusal counts as later, then the largest disposition (Q-28); "a payment of 100 AED
+  contact: the order of D-A3-32 (Q-28); "a payment of 100 AED
   after the refusal" = one cycle (CC) / month (RL) with 100 AED or more paid after the refusal day
   (Q-29); DCORE read at most 24 months back, both products, the bundle check reports the refusals the
   cap removes (Q-30); the onset cycle is in neither B nor C (Q-31); the instalments are an A3 source

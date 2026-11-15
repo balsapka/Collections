@@ -214,7 +214,7 @@ case("F2: a mirror 5 days later is not netted",
 case("F2 strong: CASA balance held 2 of 3 >= 3000", casa=[(1, 3500), (2, 3500), (3, 100)],
      money_in="strong", sweepable=1)
 case("F2: balance drop > 50% is not strong", casa=[(1, 3500), (2, 3500), (3, 3500), (4, 9000), (5, 9000), (6, 9000)],
-     money_in=None, sweepable=0)
+     money_in=None, sweepable=1)
 case("F2: a balance below strong is not evidence", active=None, casa=[(2, 1500)], money_in=None,
      state="unknown", reason="dormant_casa")
 case("F3 strong: spend >= 3000 in 2 of 3", active=None,
@@ -304,6 +304,11 @@ case("180+: money in 3 of 6", flows=[(1, "C", "economic", 3000), (3, "C", "econo
 case("180+: bounce in month 5 counts", salary=[(1, 5000), (2, 5000), (3, 5000)], bounces=[(5, 500)],
      state="low", **P180)
 case("180+: overdue buckets give no anchor", buckets=[100, 200, 0, 0, 0, 0, 0, 0], anchor=None, **P180)
+# sweepable flag (family rule §4): the observation month's balance is strong
+case("sweepable: swept this month, strong in the two before",
+     casa=[(1, 100), (2, 3500), (3, 3500)], money_in="strong", sweepable=0)
+case("sweepable: 9000 in the observation month only", casa=[(1, 9000)], money_in=None,
+     sweepable=1)
 
 df = spark.createDataFrame
 # a return of another CIF in the 180+ window's first month: the returns feature starts
