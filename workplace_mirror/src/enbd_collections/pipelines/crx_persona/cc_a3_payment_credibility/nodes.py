@@ -11,7 +11,7 @@ from ..a3_credibility.constants import HISTORY_MONTHS
 # ── CC cycles (D-A3-12, -15) ──────────────────────────────────────────────────
 CYCLE_MAX_DAYS = 62  # a longer "cycle" spans missing statements: dropped
 FLOOR_LOOKBACK_DAYS = 35  # keep the statement just before the history floor
-BUCKET08_BASELINE_MONTHS = 12  # months of positive minimum due averaged (D-A3-12)
+BUCKET08_BASELINE_MONTHS = 12  # months of ladder due averaged (D-A3-12, -31)
 _LADDER = [f"overdue_bucket_0{i}" for i in range(7, 0, -1)] + ["minimum_due"]
 
 
@@ -60,31 +60,34 @@ def _nonzero(col: str) -> Column:
 def _balance_dues(balance: DataFrame) -> DataFrame:
     """``(account_id, cycle_start, billed_amount, due_amount)`` per statement.
 
-    One month's due: the oldest open bucket 07..01, else the minimum due (bucket 08 is
-    Way4's accumulator, not one month). Once only bucket 08 holds money, ``due_amount``
-    is the average positive minimum due of the 12 months before that point (D-A3-12);
-    ``billed_amount`` (Dimension C) has no such fallback.
+    ``billed_amount`` (the ladder value): the oldest open bucket 07..01, else the
+    minimum due. ``due_amount`` (one month's due) is the ladder value while bucket 08
+    (Way4's accumulator, not one month) is empty. On a statement with bucket 08 open it
+    is the baseline: the average ladder value of the 12 months before bucket 08 first
+    held money, or NULL when there is none (D-A3-12, -31). ``billed_amount``
+    (Dimension C) keeps the ladder value.
     """
     billed = F.coalesce(*[F.when(_nonzero(c), F.col(c)) for c in _LADDER])
     rows = balance.select(
         string_key(balance, "contract_id").alias("account_id"),
         F.col("observation_date").cast("date").alias("cycle_start"),
-        "minimum_due",
         billed.alias("billed_amount"),
-        # only the accumulator holds money: no bucket 07..01 and no minimum due open
-        (billed.isNull() & _nonzero("overdue_bucket_08")).alias("_stagnated"),
+        _nonzero("overdue_bucket_08").alias("_accumulating"),
     )
     rows = rows.withColumn(
         "_since",
-        F.min(F.when(F.col("_stagnated"), F.col("cycle_start"))).over(
+        F.min(F.when(F.col("_accumulating"), F.col("cycle_start"))).over(
             Window.partitionBy("account_id")
         ),
     )
     recent = Window.partitionBy("account_id").orderBy(F.col("_month").desc())
     baseline = (
-        rows.where(_nonzero("minimum_due") & (F.col("cycle_start") < F.col("_since")))
+        rows.where(
+            F.col("billed_amount").isNotNull()
+            & (F.col("cycle_start") < F.col("_since"))
+        )
         .groupBy("account_id", F.trunc("cycle_start", "month").alias("_month"))
-        .agg(F.avg("minimum_due").alias("_m"))
+        .agg(F.avg("billed_amount").alias("_m"))
         .withColumn("_r", F.row_number().over(recent))
         .where(F.col("_r") <= BUCKET08_BASELINE_MONTHS)
         .groupBy("account_id")
@@ -94,9 +97,9 @@ def _balance_dues(balance: DataFrame) -> DataFrame:
         "account_id",
         "cycle_start",
         "billed_amount",
-        F.coalesce(
-            "billed_amount", F.when(F.col("_stagnated"), F.col("_baseline"))
-        ).alias("due_amount"),
+        F.when(F.col("_accumulating"), F.col("_baseline"))
+        .otherwise(F.col("billed_amount"))
+        .alias("due_amount"),
     )
 
 

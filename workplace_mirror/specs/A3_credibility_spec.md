@@ -97,12 +97,12 @@ Measured, not assumed (V2, V3).
   least its amount arrive between the promise date and its due date. CC matches Way4 payment
   transactions by date. RL can only match by month (`total_paid` is a monthly total).
 
-- **D-A3-12: CC due once the ladder sits in bucket 08** (user, 2026-11-03). Deep in delinquency Way4
-  accumulates the whole overdue amount in `overdue_bucket_08`, so no bucket holds one month's due.
-  What is reasonable to ask is estimated from before: the average `minimum_due` of the last 12 months
-  with a positive minimum due, before the first statement where only bucket 08 holds money
-  (`resolve_bucket08_fallback_due`, kept). The waterfall's bucket-08 slicing goes with the waterfall
-  method (D-A3-3).
+- **D-A3-12: CC due once the ladder sits in bucket 08** (user, 2026-11-03; rule in D-A3-31). Deep in
+  delinquency Way4 accumulates the whole overdue amount in `overdue_bucket_08`, so no bucket holds one
+  month's due. While bucket 08 is empty, one month's due is the oldest non-zero bucket 07..01, else the
+  minimum due (the ladder value). On a statement with bucket 08 open, what is reasonable to ask is
+  estimated from before: the baseline of D-A3-31. The waterfall's bucket-08 slicing goes with the
+  waterfall method (D-A3-3).
 - **D-A3-13: RL record before delinquency falls back to the last known EMI** (user, 2026-11-03, O81):
   a month without its own EMI snapshot is judged against `monthly_emi_asof`, as Dimension B does.
 - **D-A3-14: RL refusal payment test reads the loan's own cash after the refusal** (user,
@@ -234,6 +234,15 @@ Measured, not assumed (V2, V3).
   cash as well, because the day within the month is not known. A plan that starts on or after the refusal
   day lifts it too: a payment or a plan of the same day may have come out of that conversation
   (user, 2026-11-15).
+
+- **D-A3-31: CC bucket 08 open = the baseline due** (user, 2026-11-15, Q-S6-05). On every statement
+  where `overdue_bucket_08` is non-zero, one month's due is the baseline, whatever buckets 01–07 or the
+  minimum due show; neither a bucket amount nor the minimum due is used on such a statement. Baseline =
+  the ladder value (D-A3-12) over the account's statements before its first statement with bucket 08
+  non-zero: averaged per calendar month, then over the latest 12 months with a ladder value
+  (`BUCKET08_BASELINE_MONTHS`). An account with no such statement has no due (NULL) on its bucket-08
+  statements; no flat fallback. Dimension C's `billed_amount` stays the ladder value. Code:
+  `cc_a3_payment_credibility/nodes.py` (`_balance_dues`).
 
 - **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.

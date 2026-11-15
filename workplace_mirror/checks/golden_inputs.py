@@ -520,7 +520,8 @@ def a3_case(  # pylint: disable=too-many-arguments
     row in July only) / none. ``followups``: (day, result_name[, action_code[,
     category]]). ``plans``: (ptp | settlement, start, cancelled, [(due_date, due, paid,
     status)]). ``due`` / ``min_due``: statement -> amount. ``stagnated_from``: from this
-    statement only bucket 08 holds money (CC) and the EMI is missing (RL)."""
+    statement bucket 08 holds money and buckets 01..07 none (CC; the minimum due is 0
+    unless ``min_due`` sets it) and the EMI is missing (RL)."""
     account = 101 + len(A3_CASES)
     A3_CASES[account] = {
         "what": what,
@@ -617,9 +618,13 @@ a3_case(
     pays=monthly(60.0, D(2025, 1, 1), D(2026, 8, 1)),
 )
 a3_case(
-    "bucket 08 only from May: the due is the average minimum due before it; regular",
+    "bucket 08 open from May with a minimum due of 5000: the due is the average ladder"
+    " due before it; regular",
     pays=((D(2026, 6, 20), 150.0), (D(2026, 7, 20), 150.0)),
-    min_due={s: 100.0 if s.month % 2 else 140.0 for s in STATEMENTS},
+    min_due={
+        s: 5000.0 if s >= D(2026, 5, 5) else 100.0 if s.month % 2 else 140.0
+        for s in STATEMENTS
+    },
     stagnated_from=D(2026, 5, 5),
 )
 a3_case(
@@ -807,12 +812,12 @@ def _cc_raw_rows(account: int, case: dict) -> tuple[list, list, list]:
                 "BS_PMT_CYCLE_DUE=3",
             )
         )
-        min_due = 0.0 if due is None else case["min_due"].get(s, 100.0)
+        min_due = case["min_due"].get(s, 0.0 if due is None else 100.0)
         groups = {1: min_due, 2: 500.0, 3: due or 5000.0}
         if due is not None and due != 100.0:
             groups[13] = due  # OVD_03: the oldest open bucket
         if due is None:
-            groups[18] = 5000.0  # OVD_08 only
+            groups[18] = 5000.0  # OVD_08 open, buckets 01..07 empty
         balance += [(float(account), s, s, g, -v) for g, v in groups.items()]
     for day, amount in case["pays"]:
         txn.append(

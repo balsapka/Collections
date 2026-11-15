@@ -41,7 +41,7 @@ Q-S6-05 [A3 · cc_a3_payment_credibility/nodes.py:21-66 `_balance_dues`] (M, amb
 Now: `_LADDER` is buckets 07..01 **and `minimum_due`**. `_stagnated` = none of them non-zero and bucket 08 non-zero. A statement with only bucket 08 plus a non-zero `minimum_due` takes `due_amount = minimum_due`. Deep in delinquency that may be the whole accumulated overdue amount, so a Dimension B cycle can only qualify by paying all of it. | Spec: D-A3-12 "once the ladder sits in bucket 08 … no bucket holds one month's due … before the first statement where **only bucket 08 holds money**". Whether `minimum_due` counts as "holding money" is not said.
 Options: (a) keep (minimum_due is a slot of the ladder). (b) treat "only 08" as buckets 01–07 empty, whatever the minimum due (fallback = the 12-month baseline).
 Recommendation: data check first (Sonnet aggregate, cc_60_180 and cc_180_plus, latest month): statements with buckets 01–07 = 0 and bucket 08 > 0, split by `minimum_due` = 0 / > 0, and the ratio `minimum_due / overdue_bucket_08`. If `minimum_due ≈ bucket 08` on most of them, ask the user (b). | Impact: CC Dimension B at 180+ (Regular / qualifying cycles); none if Way4 zeroes the minimum due in that state.
-Answer:
+Answer: (decided) bucket 08 non-zero switches to the baseline, the minimum due is never used from then on; baseline = average ladder due of the 12 months before bucket 08 first held money; no statement before it = no due; ships in bundle 25 as its own check step (user, 2026-11-15)
 ```
 
 ```
@@ -182,7 +182,7 @@ Answer:
 Q-R-06 [cc_raw_extract · Q-S3-1] `cc_raw_extract` reads raw Way4 tables inside a persona pipeline (the known exception to "no raw_ / stg_ inputs").
 Options: (a) keep the exception in bundle 25; (b) later: primary-layer `prm_cc_*` tables bounded by parameters, scoped in the CC A3 wrapper as RL does.
 Recommendation: (a) now, (b) as its own bundle (D-A3-18 already lists it as a later option).
-Answer:
+Answer: (a) keep the exception in bundle 25; moving the raw Way4 reads to the CC primaries is a to-do for a later code-improvement bundle (user, 2026-11-15).
 ```
 
 ```
@@ -240,7 +240,7 @@ Q-S6-18 [A3 · a3_credibility/signals.py:100-125 `build_commitment_signals`] (L,
 Now: `_concluded = promise_cutoff <= observation_date`. A card promise on 08-10, paid in full on 08-12, has its cutoff at the 09-05 statement. At obs 08-31 it is not concluded, so it adds neither kept nor broken, though it is settled and its outcome is known. | Decision: D-A3-25 "concluded once the deadline is on or before the observation date" (unchanged). D-U1-1 now lets payment end an event early, but says nothing about when it counts.
 Options: (a) keep (an event counts after its deadline). (b) also concluded when the payments after the event day up to the observation date reach the amount (kept at once). That needs a paid-by-obs sum per row and event, not the cutoff sum.
 Recommendation: ask the user with the promise-points work; (a) for bundle 25. | Impact: the latest month's kept counts on CC 61–180 and the 30-day options (cutoff after the month end). None on month_end books. Check: events with `promise_cutoff > obs` and payments by obs ≥ amount, per model_id.
-Answer:
+Answer: (a) keep: an event counts once its deadline has passed (user, 2026-11-15).
 ```
 
 ```

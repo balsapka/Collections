@@ -9,28 +9,28 @@ column cannot show) and what the oracle does not cover.
 
 | Run | Datasets | Seconds |
 |---|---|---|
-| `crx_cc_a1_ability.cc_60_180` | 8 | 46.3 |
-| `crx_cc_a3_payment_credibility.cc_60_180` | 17 | 10.4 |
-| `crx_cc_a2_locatability.cc_60_180` | 6 | 12.7 |
-| `crx_cc_a4_deterioration.cc_60_180` | 3 | 3.1 |
-| `crx_cc_a1_ability.cc_180_plus` | 8 | 8.0 |
-| `crx_cc_a3_payment_credibility.cc_180_plus` | 17 | 9.8 |
-| `crx_cc_a2_locatability.cc_180_plus` | 6 | 4.8 |
-| `crx_cc_a4_deterioration.cc_180_plus` | 3 | 2.1 |
-| `crx_cc_a4_deterioration.cc_60_180_alt` | 3 | 2.3 |
-| `crx_rl_a1_ability.rl_60_180` | 8 | 7.5 |
-| `crx_rl_a3_payment_credibility.rl_60_180` | 12 | 7.3 |
-| `crx_rl_a2_locatability.rl_60_180` | 6 | 4.7 |
-| `crx_rl_a4_deterioration.rl_60_180` | 6 | 3.9 |
-| `crx_rl_a1_ability.rl_180_plus` | 8 | 8.4 |
-| `crx_rl_a3_payment_credibility.rl_180_plus` | 12 | 7.7 |
-| `crx_rl_a2_locatability.rl_180_plus` | 6 | 5.1 |
-| `crx_rl_a4_deterioration.rl_180_plus` | 6 | 3.7 |
-| `crx_rl_a4_deterioration.rl_60_180_alt` | 6 | 4.7 |
-| `crx_cc_a3_payment_credibility.cc_60_180_30_days` | 17 | 9.7 |
-| `crx_rl_a3_payment_credibility.rl_60_180_next_month_end` | 12 | 7.8 |
-| `crx_rl_a3_payment_credibility.rl_60_180_30_days_month_end` | 12 | 7.8 |
-| `product_primary+product_features` | 4 | 1.9 |
+| `crx_cc_a1_ability.cc_60_180` | 8 | 53.2 |
+| `crx_cc_a3_payment_credibility.cc_60_180` | 17 | 12.3 |
+| `crx_cc_a2_locatability.cc_60_180` | 6 | 13.5 |
+| `crx_cc_a4_deterioration.cc_60_180` | 3 | 3.3 |
+| `crx_cc_a1_ability.cc_180_plus` | 8 | 9.2 |
+| `crx_cc_a3_payment_credibility.cc_180_plus` | 17 | 10.5 |
+| `crx_cc_a2_locatability.cc_180_plus` | 6 | 5.6 |
+| `crx_cc_a4_deterioration.cc_180_plus` | 3 | 2.3 |
+| `crx_cc_a4_deterioration.cc_60_180_alt` | 3 | 2.4 |
+| `crx_rl_a1_ability.rl_60_180` | 8 | 8.3 |
+| `crx_rl_a3_payment_credibility.rl_60_180` | 12 | 9.1 |
+| `crx_rl_a2_locatability.rl_60_180` | 6 | 11.4 |
+| `crx_rl_a4_deterioration.rl_60_180` | 6 | 6.6 |
+| `crx_rl_a1_ability.rl_180_plus` | 8 | 13.9 |
+| `crx_rl_a3_payment_credibility.rl_180_plus` | 12 | 10.5 |
+| `crx_rl_a2_locatability.rl_180_plus` | 6 | 6.2 |
+| `crx_rl_a4_deterioration.rl_180_plus` | 6 | 5.3 |
+| `crx_rl_a4_deterioration.rl_60_180_alt` | 6 | 6.1 |
+| `crx_cc_a3_payment_credibility.cc_60_180_30_days` | 17 | 12.6 |
+| `crx_rl_a3_payment_credibility.rl_60_180_next_month_end` | 12 | 9.0 |
+| `crx_rl_a3_payment_credibility.rl_60_180_30_days_month_end` | 12 | 8.9 |
+| `product_primary+product_features` | 4 | 2.1 |
 | `bureau_salary_bounces` | 2 | 0.7 |
 
 ## a1_ability
@@ -127,7 +127,7 @@ column cannot show) and what the oracle does not cover.
 - reached: `a3_promise_events` — next-statement fallback: no statement after the promise (cutoff = day + 31)
 - reached: `a3_promise_events` — event outside the 12-month window (not counted)
 - reached: `a3_payment_credibility` — refusal demotes a rung (points >= 2, Low or Moderate)
-- reached: `a3_payment_cycles` — bucket-08 due: due from the minimum-due baseline
+- **not reached**: `a3_payment_cycles` — bucket-08 due: due from the minimum-due baseline
 - reached: `a3_dlq_cycles` — RL EMI missing: the last known EMI carries
 - reached: `transactions` — post-block fee row flagged
 - reached: `billing` — latest cycle has no next statement

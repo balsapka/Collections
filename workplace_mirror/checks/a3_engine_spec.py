@@ -594,6 +594,59 @@ check(
     [("ptp:1", "2026-07-20"), ("settlement:5", "2026-06-10")],
 )
 
+# ── 7b. CC one month's due: the ladder, the bucket-08 baseline (D-A3-12, -31) ──
+from enbd_collections.pipelines.crx_persona.cc_a3_payment_credibility.nodes import (  # noqa: E402
+    _balance_dues,
+)
+
+
+def stmt(acct, day, min_due=0.0, **buckets):
+    """A balance row; ``buckets`` as ``b01=..`` .. ``b08=..``, the rest 0."""
+    return (
+        acct,
+        day,
+        min_due,
+        *[float(buckets.get(f"b0{i}", 0.0)) for i in range(1, 9)],
+    )
+
+
+month = [D(2025 + (m - 1) // 12, (m - 1) % 12 + 1, 15) for m in range(1, 19)]
+dues_rows = [
+    stmt("B7", D(2026, 7, 15), 50.0, b07=300.0, b03=100.0),
+    # baseline: 2025-01/02 fall outside the latest 12 months with a ladder value
+    stmt("M", month[0], b01=10000.0),
+    stmt("M", month[1], b01=10000.0),
+    *[stmt("M", month[i], 30.0, b01=200.0) for i in range(2, 13)],
+    stmt("M", month[13], 80.0),  # minimum due only
+    stmt("M", month[14]),  # no ladder value: not a baseline month
+    stmt("M", month[15], 900.0, b07=700.0, b08=5000.0),
+    stmt("M", month[16], 900.0, b08=5000.0),
+    stmt("M", month[17], 60.0, b02=400.0),  # bucket 08 empty again
+    stmt("Z", D(2026, 7, 15), 50.0, b08=1000.0),
+    stmt("Y", D(2026, 6, 15)),
+    stmt("Y", D(2026, 7, 15), 50.0, b08=1000.0),
+]
+dues = {
+    (r["account_id"], str(r["cycle_start"])): (r["billed_amount"], r["due_amount"])
+    for r in _balance_dues(
+        df(
+            dues_rows,
+            "contract_id string, observation_date date, minimum_due double, "
+            + ", ".join(f"overdue_bucket_0{i} double" for i in range(1, 9)),
+        )
+    ).collect()
+}
+base = (11 * 200.0 + 80.0) / 12
+check("due: oldest open bucket 07", dues[("B7", "2026-07-15")], (300.0, 300.0))
+check("due: bucket 08 + 07 = baseline", dues[("M", "2026-04-15")], (700.0, base))
+check(
+    "due: bucket 08 + minimum due = baseline", dues[("M", "2026-05-15")], (900.0, base)
+)
+check("due: bucket 08 empty again = ladder", dues[("M", "2026-06-15")], (400.0, 400.0))
+check("due: minimum due month in baseline", dues[("M", "2026-02-15")], (80.0, 80.0))
+check("due: no statement before bucket 08", dues[("Z", "2026-07-15")], (50.0, None))
+check("due: no ladder value before bucket 08", dues[("Y", "2026-07-15")], (50.0, None))
+
 # ── 8. Kedro: both product pipelines end to end ──────────────────
 from kedro.io import DataCatalog, MemoryDataset  # noqa: E402
 from kedro.runner import SequentialRunner  # noqa: E402
