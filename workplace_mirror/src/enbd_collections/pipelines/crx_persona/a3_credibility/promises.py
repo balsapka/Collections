@@ -83,7 +83,8 @@ def _promise_rows(
 def _with_terms(days: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
     """``days`` (``account_id``, ``event_date``) + ``promise_cutoff`` (``CUTOFFS``) and
     ``promise_amount``: the latest due on or before the day (cycles without a due amount
-    skipped), at least ``PROMISE_MIN_AED``. One pass over the account's cycles."""
+    skipped), at least ``PROMISE_MIN_AED`` (D-A3-29). One pass over the account's
+    cycles."""
     day = F.col("event_date")
     known_due = F.col("due_amount").isNotNull() & (F.col("cycle_start") <= day)
     cycles = (
@@ -120,9 +121,10 @@ def _after(day: Column) -> Column:
 
 def _with_payments(days: DataFrame, payments: DataFrame) -> DataFrame:
     """``days`` + three sums from one pass over the payments up to the day's
-    ``promise_cutoff``: ``_paid_before`` (dated before the day) and ``_paid_by`` (not
-    after it, ``_after``), which an event starting that day never counts, and
-    ``promise_paid_amount`` (after the day; NULL: none), which it does."""
+    ``promise_cutoff``: ``_paid_before`` (dated before the day), ``_paid_not_after``
+    (not after it, ``_after``) and ``promise_paid_amount`` (after the day; NULL: none).
+    Only a payment after the promise can keep it, so an event starting that day counts
+    the last and never the money in ``_paid_not_after``."""
     day = F.col("event_date")
     pays = payments.select(
         F.col("account_id").alias("_p_account"),
@@ -144,7 +146,7 @@ def _with_payments(days: DataFrame, payments: DataFrame) -> DataFrame:
         .groupBy(*days.columns)
         .agg(
             total(F.col("pay_date") < day).alias("_paid_before"),
-            total(~_after(day)).alias("_paid_by"),
+            total(~_after(day)).alias("_paid_not_after"),
             F.sum(F.when(_after(day), F.col("_amount"))).alias("promise_paid_amount"),
         )
     )
@@ -172,7 +174,7 @@ def _event_step(live: Column, day: Column) -> Column:
         start,
         keep("cutoff", "promise_cutoff"),
         keep("amount", "promise_amount"),
-        keep("paid_at_start", "_paid_by"),
+        keep("paid_at_start", "_paid_not_after"),
     )
 
 
@@ -191,7 +193,7 @@ def _with_event_start(days: DataFrame) -> DataFrame:
     """``account_id``, ``_DAY_TERMS`` and ``event_start``, the event each promise day
     belongs to (``_event_step`` over the account's days in date order)."""
     ordered = F.array_sort(
-        F.collect_list(F.struct(*_DAY_TERMS, "_paid_before", "_paid_by"))
+        F.collect_list(F.struct(*_DAY_TERMS, "_paid_before", "_paid_not_after"))
     )
     return (
         days.groupBy("account_id")
@@ -236,9 +238,11 @@ def _events(promises: DataFrame, days: DataFrame) -> DataFrame:
 
 
 def _judged(events: DataFrame) -> DataFrame:
-    """``EVENTS``: ``promise_outcome`` paid when the payments reach the promised amount,
-    partial from ``PROMISE_MIN_AED``, else none."""
-    paid = F.coalesce("promise_paid_amount", F.lit(0.0))
+    """``EVENTS``: ``promise_outcome`` paid when the payments reach the promised amount
+    (to the cent, as in ``_event_step``), partial from ``PROMISE_MIN_AED``, else none.
+    ``promise_paid_amount`` runs to the event's deadline, so after an event that ended
+    early it overlaps the next event's: never sum it across events."""
+    paid = F.round(F.coalesce("promise_paid_amount", F.lit(0.0)), 2)
     outcome = (
         F.when(paid >= F.col("promise_amount"), "paid")
         .when(paid >= PROMISE_MIN_AED, "partial")

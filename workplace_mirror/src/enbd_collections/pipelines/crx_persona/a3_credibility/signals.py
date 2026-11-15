@@ -289,9 +289,9 @@ def _paid_after_refusal(
     refusals: DataFrame, payments: DataFrame, dues: DataFrame
 ) -> DataFrame:
     """Rows with a cycle (CC) / month (RL) holding 100 AED or more paid on or after
-    the refusal day, up to the observation date (Q-29). A payment that may have come
-    after the refusal lifts it: one dated the refusal day, and on RL the refusal
-    month's cash (known only to the month)."""
+    the refusal day, up to the observation date (Q-29, D-A3-30). A payment that may
+    have come after the refusal lifts it: one dated the refusal day, and on RL the
+    refusal month's cash (known only to the month)."""
     accounts = F.broadcast(refusals.select("account_id").distinct())
     cycles = dues.select("account_id", "cycle_start", "cycle_end").join(
         accounts, on="account_id", how="left_semi"

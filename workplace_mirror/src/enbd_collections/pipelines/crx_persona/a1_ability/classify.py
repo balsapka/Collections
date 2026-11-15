@@ -26,10 +26,8 @@ from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard, state_label
 # Thresholds (family rule §2; income: spec S2–S12): starting values, not tuned on PROD.
 # Keyed by window length W (3 months at 60–180, 6 at 180+, S10).
 MIN_MONTHS = {3: 2, 6: 3}  # months of the window a flow / balance must be strong
-STABLE_INCOME_FLOORS = {
-    3: 2,
-    6: 3,
-}  # S12: the window's salary is this many strong amounts
+# S12: stable income = the window's salary reaches this many strong amounts
+STABLE_INCOME_FLOORS = {3: 2, 6: 3}
 # Income, money in, money out, the balance and assets are strong from one amount:
 # max(floor, mult x anchor) (family rule §2).
 STRONG_FLOOR = 3000.0  # AED
