@@ -1,6 +1,6 @@
 # crx_persona A3 credibility + A1 ability: council review and refactor plan (run 2)
 
-Status: **U0 approved 2026-11-14; round 1 running.**
+Status: **signed off by R-O 2026-11-15 (two rounds, exceptions E1-E4); see FINAL_REPORT.md. Waiting on the user (U-final) before bundle 25 is built.**
 
 Run 1 (all axes, signed off 2026-11-06, shipped as bundles 15 and 16) is on branch
 `refactor/persona_review`; its plan is kept here as `run1/PLAN.md` (with its decisions, questions and final report). Since then A3 was built as an
