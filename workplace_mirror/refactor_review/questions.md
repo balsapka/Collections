@@ -106,7 +106,7 @@ Q-S6-12 [A3 · a3_credibility/sources.py:123, 130-131 `build_instalments`] (L, l
 Now: `is_cancelled` and the cancelled instalment statuses are read as loaded. A plan cancelled after an observation date is missing from that observation's events and from the refusal "followed by a plan" test. | Spec: D-A3-25 "every non-cancelled PTP and settlement plan"; D-A3-2 point in time. Neither says "as of when".
 Options: (a) accept (the latest month, which PROD scores, is right). (b) as-of cancellation, if DCORE keeps a cancel date.
 Recommendation: (a), one spec line; note it for back-tests on earlier months. | Impact: history rows only.
-Answer:
+Answer: (a) accept: cancellation is the status as loaded; right for the latest month, a caveat for back-tests on earlier months (user, 2026-11-15).
 ```
 
 ```
@@ -114,7 +114,7 @@ Q-S6-13 [A1 · nodes/features/bureau/feat_cif_bureau_salary_monthly.py:25-40; a1
 Now: a pull loaded 2026-09 gives rows for 2025-09..2026-08, which a 2026-03 observation already reads. | Spec: family rule §1 "every signal comes from W or the observation-month snapshot" (window, not knowledge time); the source description itself says the pull is inferred back.
 Options: (a) accept and say so (~1% of 61–180 CIFs, `bulk_pull_results.md`). (b) cap each row at its load date (needs a load stamp on the unified table: DE ask).
 Recommendation: (a) now; add the load stamp to the DE asks for when pulls repeat. | Impact: history rows of ~1% of CIFs (bulk) plus salary_credit rows (0.0–0.6%). Matters for outcome validation, not for latest-month scoring.
-Answer:
+Answer: (b) cap each bureau salary row at its load date, so an observation reads only rows already loaded by then; not coded yet (user, 2026-11-15).
 ```
 
 ```
@@ -122,7 +122,7 @@ Q-S6-14 [A1 · nodes/features/products/feat_cif_cross_product.py:136-139 `_cards
 Now: every contract named as a parent is dropped as "replaced". If Way4 uses `parent_contract_idt` for card contracts under their account contract, account contracts with cards are dropped and card-level contracts stay. F4 could then count the scored account's own card contracts (≠ `account_id`) as "another card", or miss the CIF's other accounts. | Spec: family rule §2 F4 "the customer's other cards, not supplementaries of the same contract".
 Options: (a) keep (B24 found products "as expected"; bundle 21's logic). (b) Sonnet aggregate: share of `prm_card_contracts` parents that are account-level contracts, and of `prm_card_month_end` rows whose contract has a parent.
 Recommendation: (b), one aggregate before GRR reads F4 card results. | Impact: F4 card branch (`xp_current`, `xp_instalment_max`) on CC and RL.
-Answer:
+Answer: (b) one aggregate from the workplace before GRR reads the F4 card results (user, 2026-11-15).
 ```
 
 ```
@@ -130,7 +130,7 @@ Q-S6-15 [A1 · cc_a1_ability/nodes.py:38, rl_a1_ability/nodes.py:29, a1_ability/
 Now: A1 anchors and the cross-product feature use plain `cast("string")` on `contract_id` / `account_id` / `product_account_id` / `cust_num`. A3 uses `_common.string_key`, which casts doubles to long and trims. The bureau salary `cif_id` is trimmed, the bounces `cif_id` is not, and Way4 `ident_number` is trimmed. | Expected: run 1 Q-21 (b) "one key helper on every axis" (accepted 2026-11-05).
 Options: (a) keep. (b) `string_key` everywhere in A1 (a refactor proposal for S1/S3; the oracle proves no value changes with today's types).
 Recommendation: (b), with the golden check; flag any source whose type would change a value. | Impact: none with today's types; guards a double / padded source.
-Answer:
+Answer: (b) `_common.string_key` on every A1 key (user, 2026-11-15). Applied at the persona-pipeline sites (CC / RL anchors, `a1_ability/signals.py`); the `nodes/` sites (bureau bounces and salary, `prm_products.py`) wait on the user: the helper would have to move to `nodes/utils`.
 ```
 
 ```
@@ -138,7 +138,7 @@ Q-S6-16 [A3 · _dcore_codes.py:285-300 `PROMISE_EVENT`; a3_credibility/signals.p
 Now: a refusal followed by `EOSB_PTP_DOCUMENTS` stays a refusal, though D-A3-25 counts it as a promise event (not a plan, so the `planned` test misses it too). | Spec: D-A3-20 "no PTP / settlement … followed it"; the `_dcore_codes` comment says both names are near-empty.
 Options: (a) keep (near-empty). (b) add `EOSB_PTP_DOCUMENTS` to the `ptp` disposition.
 Recommendation: (a). | Impact: near zero.
-Answer:
+Answer: (a) keep (near-empty) (user, 2026-11-15).
 ```
 
 ## B. Refactor decisions that are the user's (held, not applied)

@@ -207,6 +207,8 @@ Measured, not assumed (V2, V3).
   (user, 2026-11-14; replaces the 2026-11-13 wording, the 7-day follow-up chaining and D-A3-25's
   7-day plan matching; ships in bundle 25). Promises are one stream: non-cancelled DCORE plans
   (dated at their start) and follow-up promises (dated at the call day).
+  Cancellation is the plan's status as loaded: a plan cancelled after an observation date is absent
+  from that earlier observation; the latest month is unaffected.
   - An event starts with the first promise. Its deadline (D-A3-28) and its promised amount are
     those of that day.
   - Every promise made while the event is alive belongs to it, however many days apart. A promise

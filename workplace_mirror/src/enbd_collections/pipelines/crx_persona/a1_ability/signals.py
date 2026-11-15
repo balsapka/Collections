@@ -49,6 +49,7 @@ from .._common import (
     left_join_all,
     require_columns,
     scoped,
+    string_key,
     window_agg,
     window_months,
 )
@@ -70,7 +71,7 @@ BUREAU_CARRY_MONTHS = 1
 def _cifs(obs_base: DataFrame) -> DataFrame:
     """Observation rows with a CIF, ``cif_id`` as string (the features' type)."""
     return obs_base.filter(F.col("cif_id").isNotNull()).withColumn(
-        "cif_id", F.col("cif_id").cast("string")
+        "cif_id", string_key(obs_base, "cif_id")
     )
 
 
@@ -312,7 +313,7 @@ def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> Dat
         products.select(
             cif_column(),
             F.col("month_end").alias("observation_date"),
-            F.col("product_account_id").cast("string").alias("_acct"),
+            string_key(products, "product_account_id").alias("_acct"),
             "product_type",
             F.col("balance_aed").cast("double").alias("_bal"),
             "is_current",
@@ -321,9 +322,9 @@ def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> Dat
         obs,
         "cif_id",
     )
+    joined = obs.join(mine, on=["cif_id", "observation_date"])
     rows = (
-        obs.join(mine, on=["cif_id", "observation_date"])
-        .filter(F.col("_acct") != F.col("account_id").cast("string"))
+        joined.filter(F.col("_acct") != string_key(joined))
         .groupBy(*GRAIN)
         .agg(
             F.sum(F.when(asset, F.col("_bal"))).alias("xp_assets_aed"),

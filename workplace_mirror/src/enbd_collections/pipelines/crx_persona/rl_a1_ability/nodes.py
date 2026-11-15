@@ -6,7 +6,7 @@ Everything else (evidence, levels, points, state) is the shared ``a1_ability`` e
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, pit_latest, require_columns
+from .._common import GRAIN, pit_latest, require_columns, string_key
 from ..a1_ability.signals import persona_floor
 
 # int_loan_master is a month-end snapshot; none in the observation month: no anchor.
@@ -27,7 +27,7 @@ def build_rl_liquidity_anchor(
     )
     since = persona_floor(crx_persona, _LOAN_MAX_AGE_M)
     src = int_loan_master.filter(F.col("observation_date") >= F.lit(since)).select(
-        F.col("account_id").cast("string").alias("account_id"),
+        string_key(int_loan_master).alias("account_id"),
         F.col("observation_date").cast("date").alias("snapshot_date"),
         F.col("installment_due_amount").cast("double").alias("emi"),
     )
