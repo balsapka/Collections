@@ -1,6 +1,6 @@
 # Synthesized Features: GRR deck, content pack
 
-Source of truth for moving the deck into the bank template. It covers 32 slides, in order: every word, number and speaker note as it stands in v97 (2026-11-13). Copy the text exactly. Change layout and styling only, never wording or numbers.
+Source of truth for moving the deck into the bank template. It covers 33 slides (with 10b), in order: every word, number and speaker note as it stands in v98 (2026-11-15). Copy the text exactly. Change layout and styling only, never wording or numbers.
 
 ## Visual conventions
 
@@ -379,42 +379,40 @@ Equation tiles:
 
 Underneath:
 - **393**: occur among card accounts in August
-- **222**: have enough accounts (10+) to judge
+- **171**: hold fewer than 10 accounts each
 - Box: A **persona** is one combination of states. Each UC1 signal multiplies the count again, and many personas hold only a handful of accounts.
 
 Footer: Cards 61–180 · August 2026 · credibility High / Moderate / Low; ability includes Unknown
 
 Notes:
-> Part 2 starts by putting the axes together. A persona is one combination of states: one of six deterioration states, one of nine locatability cells, one of three credibility bands and one of four ability bands. That is 648 possible personas before anything from UC1. The transcript signals, such as stated intent, a hardship reason or a dispute, come on top, and each one multiplies the count again. Many of these combinations do occur: 393 among card accounts in August, of which 222 have ten or more accounts; on loans 323 occur and only 111 have ten or more. Many hold just a handful of accounts. Nobody can write and run a separate strategy for hundreds of personas. The good news is on the next slide: the customers most likely to pay sit in a few dozen of them.
+> Part 2 starts by putting the axes together. A persona is one combination of states: one of six deterioration states, one of nine locatability cells, one of three credibility bands and one of four ability bands. That is 648 possible personas before anything from UC1. The transcript signals, such as stated intent, a hardship reason or a dispute, come on top, and each one multiplies the count again. Many of these combinations do occur: 393 among card accounts in August, of which 171 hold fewer than ten accounts each; on loans 323 occur and 212 hold fewer than ten. Many hold just a handful of accounts. Nobody can write and run a separate strategy for hundreds of personas. The good news is on the next slide: size and value sit in different personas, and a select set brings in several times its share of the money.
 
 ## 14 · Where the value sits
 
-Layout: a dark stat box with one line underneath on the left; on the right a horizontal bar chart of six example personas, with a dashed red line for the card average. Persona text in one regular weight, no highlighted state.
+Layout: on the left (about 60%), three rows of paired horizontal bars on one common scale (0–40%): a grey bar for share of card balance and a blue bar for share of money collected, with recovery as a large number at the right of each row; a small line under the rows. On the right, a light grey panel with three short facts, each with a blue rule on its left.
 
 - Section label: Where the value sits
-- Headline: **A few dozen personas bring in over half the money**
+- Headline: **The balance sits where little is paid; reachable customers who keep promises bring in over three times their share**
 
-Left:
-- Dark box: **54%** of the money collected came from one fifth of card accounts, picked in advance by their persona · small: tested on months and accounts not used to rank them
-- Text: The examples on the right collect three to four times the card average.
+Chart label: Share of card balance vs share of money collected (legend: balance grey, money blue)
 
-Chart label: Examples · AED collected per account in 3 months (bar length = AED; paid % beside it)
+| Row | Share of balance | Share of money | Recovered |
+|---|---|---|---|
+| The 10 largest personas | 40% | 10% | 0.8% |
+| Reachable and keep their promises · High or Moderate credibility, any family | 11% | 37% | 10.6% |
+| High credibility or High ability | 5% | 17% | 10.6% |
 
-| Persona | AED | Paid |
-|---|---|---|
-| Curing now · in country · reachable / moderate credibility · low ability | 2,603 | 72% |
-| Stopped suddenly · in country · reachable / moderate credibility · unknown ability | 2,373 | 37% |
-| Stopped suddenly · in country · reachable / moderate credibility · low ability | 1,962 | 42% |
-| Curing now · location unknown · reachable / moderate credibility · moderate ability | 1,892 | 60% |
-| Curing now · in country · reachable / moderate credibility · moderate ability | 1,794 | 65% |
-| Curing now · location unknown · reachable / moderate credibility · unknown ability | 1,713 | 69% |
+Line under the rows: Card average recovery: 3.1% · the second and third groups overlap · in the second group, a third of the money comes from customers who are not curing now
 
-Dashed line: card average: AED 639
+Right panel, title: **High credibility or High ability: rare, and they pay**
+- **55%** make a payment within three months, against 17% of other customers.
+- They recover more within each family that has enough of them: **+2.5 to +3.8 points**.
+- Same persona, different ability: Cured before · in country · reachable · low credibility recovers **8.2%** with High ability and 5.1% with Low.
 
-Footer: Cards 61–180 · May 2026 accounts, payments June–August
+Footer: Cards 61–180 · accounts January–May 2026, payments to August 2026 · nearly 9 in 10 personas stayed on the same side of the card average in May as in January–April
 
 Notes:
-> The good news is that the value is concentrated. If we rank card accounts by their persona, one fifth of them brought in 54 percent of all the money collected over the next three months, and that was tested on months and accounts the ranking had not seen. That fifth sits in a few dozen personas, mostly customers curing now or cured before who show some credibility or ability. On the right are examples among the larger personas, by how much each collected per account in three months: from about 1,700 to 2,600 dirhams, against a card average of about 640, about three to four times the average. Customers curing now with moderate credibility paid most often, 60 to 72 percent of them. Personas with High credibility or High ability tend to pay well too, but High is rare, 2.5 percent and 1.6 percent of card accounts, so each of those personas holds only a handful of accounts and the figures for them are less reliable. Loans show the same pattern on a smaller book.
+> The previous slide said there are hundreds of personas. This slide says we don't need to treat them alike. In the first row, the ten largest personas hold 40 percent of the card balance but bring in only 10 percent of the money; they recover less than one percent in three months. The second row is the opposite: customers we can reach and who have kept promises, High or Moderate credibility, in any family. They hold 11 percent of the balance and bring in 37 percent of the money, more than three times their share. About a third of that money comes from customers who are not curing now, and they still recover more than twice the average. The third row cuts across the book: customers with High credibility or High ability. They are rare, but more than half of them pay, against 17 percent of everyone else, and that holds inside each family. The ranking is stable: nearly nine in ten personas stayed on the same side of the average in May as in January to April. These are payments under today's handling. Loans point the same way, on a thinner book.
 
 ## 15 · The deliverable
 
