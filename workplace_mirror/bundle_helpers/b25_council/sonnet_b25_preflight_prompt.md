@@ -80,6 +80,10 @@ Related dataset names: `crx_cc_spell_table`, `crx_rl_spell_table`, `crx_rl_a4_sp
 (imports and entries), catalog entries (every file in `conf/`, every model_id variant), parameters, tests,
 notebooks, checks. Also list who reads `raw_stg_limit`. We do not delete anything in this task.
 
+Unread CASA features. In the mirror nothing reads the datasets `feat_cif_casa_activity_monthly` and
+`feat_cif_ext_card_payment_monthly`. List every reader in the workplace (node inputs in any pipeline,
+catalog entries, notebooks, tests), or say "0 readers" for each. Add them to table (b).
+
 Task 2: A3 catalog listing
 We want to persist two new datasets per product, `crx_<p>_a3_dues` and `crx_<p>_a3_payments` (`<p>` = `cc`,
 `rl`). Our apply tool can silently drop a workplace-only block that sits next to an edited line, so we
