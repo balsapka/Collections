@@ -219,16 +219,19 @@ Measured, not assumed (V2, V3).
   - `event_kind`: matched (the event holds plans and follow-up promises), table_only,
     followup_only. `event_name` is the first follow-up promise's, `plan_id` the first plan's.
   - The promised amount is the latest known due on or before the event day: a cycle without a due
-    amount is a data error and is skipped; 100 AED only when no due exists (user, 2026-11-14).
+    amount is a data error and is skipped. It is never below 100 AED: a smaller due, or no due at
+    all, counts as 100 (user, 2026-11-14 and 2026-11-15).
   - Next-statement deadline: the first statement after the event day, at most 31 days after it (a
-    later one means statements are missing from the history).
+    later one means statements are missing from the history); `NEXT_STATEMENT_MAX_DAYS`, user 2026-11-15).
   - Code: `a3_credibility/promises.py` (`_event_step`, a per-account fold over the promise days in
     date order, `F.aggregate`, no Python UDF).
 
 - **D-A3-30: a refusal is counted only when it is certain that nothing was paid after it** (user,
   2026-11-14; refines D-A3-14 and D-A3-22). A payment of 100 AED or more that may have come after the
   refusal lifts it: on cards one dated on or after the refusal day; on loans the refusal month's
-  cash as well, because the day within the month is not known.
+  cash as well, because the day within the month is not known. A plan that starts on or after the refusal
+  day lifts it too: a payment or a plan of the same day may have come out of that conversation
+  (user, 2026-11-15).
 
 - **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.

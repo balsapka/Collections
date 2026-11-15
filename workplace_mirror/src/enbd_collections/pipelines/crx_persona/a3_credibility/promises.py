@@ -7,9 +7,9 @@ from pyspark.sql import functions as F
 from .. import _dcore_codes as codes
 from .._common import dcore_account_events, require_columns
 from .constants import (
+    NEXT_STATEMENT_MAX_DAYS,
     PROMISE_DAYS,
     PROMISE_MIN_AED,
-    STATEMENT_FALLBACK_D,
     promise_deadline,
 )
 from .sources import DUES, INSTALMENTS, PAYMENTS
@@ -32,9 +32,9 @@ _DAY_TERMS = ("event_date", *_TERMS)
 
 
 def _next_statement(day: Column, next_cycle_end: Column) -> Column:
-    """The first cycle end after ``day``, at most ``STATEMENT_FALLBACK_D`` days after
+    """The first cycle end after ``day``, at most ``NEXT_STATEMENT_MAX_DAYS`` days after
     it (no statement on record by then: that day)."""
-    fallback = F.date_add(day, STATEMENT_FALLBACK_D)
+    fallback = F.date_add(day, NEXT_STATEMENT_MAX_DAYS)
     return F.least(F.coalesce(next_cycle_end, fallback), fallback)
 
 

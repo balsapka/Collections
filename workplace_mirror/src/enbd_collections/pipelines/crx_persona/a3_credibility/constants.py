@@ -18,7 +18,9 @@ PROMISE_DEADLINE = {
     SEG_60_180: {"cc": "next_statement", "rl": "month_end"},
     SEG_180_PLUS: {"cc": "month_end", "rl": "month_end"},
 }
-STATEMENT_FALLBACK_D = 31  # no statement after the promise day yet: 31 days
+# next-statement deadline: at most 31 days after the promise (no statement on record by
+# then: statements are missing from the history) (D-A3-29)
+NEXT_STATEMENT_MAX_DAYS = 31
 PROMISE_DAYS = 30  # the "30_days" options: 30 days after the promise
 
 

@@ -459,10 +459,11 @@ check(
 # agreement = account id. R1 refuses on 07-01, nothing after -> refusal. R2 refuses, then
 # two 60 AED payments in two cycles -> still refusal (no cycle with 100). R3 refuses, then
 # 150 in one cycle -> not. R4 refuses and promises the same day -> latest is the promise.
-# R5 refuses, then a plan starts -> not. R6 refuses, the month's cash (RL: known only to
+# R8: a plan starts on the refusal day -> not. R9: a card payment dated the refusal day ->
+# not (the order within the day is unknown). R5 refuses, then a plan starts -> not. R6 refuses, the month's cash (RL: known only to
 # the month) may have come after -> not. R7 paid before the refusal -> refusal. D1 disputes. H1 hangs up, then 3 ringing days.
 fu_rows = []
-for a in ("R1", "R2", "R3", "R5", "R6", "R7"):
+for a in ("R1", "R2", "R3", "R5", "R6", "R7", "R8", "R9"):
     fu_rows.append((a, "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"))
 fu_rows += [
     ("R4", "2026-07-01 10:00:00", "OC", "SUC", "REFUSE TO PAY"),
@@ -480,7 +481,7 @@ followup = df(
     "agreement_id string, action_ts string, action_code string, "
     "result_category string, result_name string",
 ).withColumn("action_ts", F.to_timestamp("action_ts"))
-accts = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "D1", "H1", "P1"]
+accts = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "D1", "H1", "P1"]
 agreements = df([(a, a) for a in accts], "account_id string, agreement_id string")
 ep_ct = episode([(a, D(2026, 4, 1), False) for a in accts])
 c_dues = df(
@@ -495,11 +496,15 @@ c_pays = df(
         ("R3", D(2026, 7, 10), D(2026, 7, 10), 150.0),
         ("R6", D(2026, 7, 1), D(2026, 7, 31), 150.0),
         ("R7", D(2026, 6, 20), D(2026, 6, 20), 150.0),
+        ("R9", D(2026, 7, 1), D(2026, 7, 1), 150.0),
     ],
     "account_id string, pay_from date, pay_date date, amount double",
 )
 c_inst = df(
-    [("R5", "ptp:9", "ptp", D(2026, 7, 15), D(2026, 7, 30), 100.0, None)],
+    [
+        ("R5", "ptp:9", "ptp", D(2026, 7, 15), D(2026, 7, 30), 100.0, None),
+        ("R8", "ptp:10", "ptp", D(2026, 7, 1), D(2026, 7, 30), 100.0, None),
+    ],
     "account_id string, plan_id string, plan_type string, plan_start date, "
     "due_date date, due_amount double, payment_amount double",
 )
@@ -517,6 +522,8 @@ check(
         "R5": False,
         "R6": False,
         "R7": True,
+        "R8": False,
+        "R9": False,
         "D1": False,
         "H1": False,
         "P1": False,

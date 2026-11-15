@@ -222,7 +222,7 @@ Q-R-11 [A3 promise deadline · promises.py `_cutoff`, applied with the new event
 Now: the deadline is the first statement after the promise day; when the next statement on record is more than 31 days later (statements missing from the history), the deadline is day + 31. Before, such an event waited for whatever statement came next, which under the new rule kept an old promise alive for months.
 Options: (a) keep the cap; (b) no cap.
 Recommendation: (a).
-Answer:
+Answer: (a) keep the cap (user, 2026-11-15).
 ```
 
 ```
@@ -230,7 +230,7 @@ Q-R-12 [A3 refusal · signals.py `_paid_after_refusal`, applied with D-A3-30] On
 Now: "penalise only when certain" is applied to both products: loans by month, cards by day. A card payment on the same day as the refusal may have come before or after the call.
 Options: (a) keep (same-day payment lifts); (b) cards need a payment on a later day.
 Recommendation: (a), the same principle as on loans.
-Answer:
+Answer: (a) a same-day payment lifts; a same-day plan too (user, 2026-11-15).
 ```
 
 ## C. From the check of the newly coded rules (S6, round 2)
@@ -250,7 +250,7 @@ Q-S6-19 [A3 · a3_credibility/promises.py:107-109 `_with_terms`] (L, ambiguity: 
 Now: `promise_amount = greatest(coalesce(_due, 0), 100)`, so a known due of 60 becomes 100. | Decision: D-U1-6 / D-A3-29 "100 AED only when no due exists (rare)". D-A3-25's older text says "at least 100 AED".
 Options: (a) keep the floor on every due (D-A3-25) and change D-A3-29's wording. (b) floor only a missing due.
 Recommendation: (a). A promise below 100 AED would be "paid" by a payment that is not even a "partial" (which needs 100 AED), and the partial / none split would no longer line up with the amount. Fix the spec sentence. | Impact: dues below 100 AED (small residual buckets on cards; RL EMIs almost never). Check: events with `_due < 100`.
-Answer:
+Answer: (a) keep the 100 AED minimum; spec corrected (user, 2026-11-15).
 ```
 
 ```
@@ -258,7 +258,7 @@ Q-S6-20 [A3 · a3_credibility/signals.py:391-404 `_plan_after_refusal`] (L, cons
 Now: payments use `pay_date >= last_rpc_date` (D-A3-30, D-B-2). Plans use `plan_start > last_rpc_date`. A same-day follow-up promise already lifts it through `_SAME_DAY_ORDER`, so only a plan with no follow-up record on that day is left out. | Decision: D-A3-30 "counted only when it is certain"; D-B-2 (2) applies "order unknown" to payments only.
 Options: (a) keep. (b) `>=` for plans too, under the same "penalise only when certain" reading.
 Recommendation: put it to the user together with D-B-2 (2), which is open anyway; (b) if they confirm D-B-2 (2). | Impact: refusal rows with a DCORE plan starting on the refusal day and no same-day promise call; likely very few.
-Answer:
+Answer: (a) a plan on the refusal day lifts it (user, 2026-11-15).
 ```
 
 ```

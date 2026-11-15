@@ -389,13 +389,14 @@ def _contact_summary(events: DataFrame) -> DataFrame:
 
 
 def _plan_after_refusal(refusals: DataFrame, instalments: DataFrame) -> DataFrame:
-    """Rows whose plan started after the refusal day, by the observation date."""
+    """Rows whose plan started on or after the refusal day, by the observation date
+    (D-A3-30: a plan of the same day may have followed the refusal)."""
     return (
         refusals.join(
             instalments.select("account_id", "plan_start").distinct(), on="account_id"
         )
         .filter(
-            (F.col("plan_start") > F.col("last_rpc_date"))
+            (F.col("plan_start") >= F.col("last_rpc_date"))
             & (F.col("plan_start") <= F.col("observation_date"))
         )
         .select(*GRAIN)
