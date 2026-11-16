@@ -28,7 +28,7 @@ The signals that ship next to the four persona states (rows 6–9 of the bank's 
 | # | Column | Type | Example | Meaning |
 |---:|---|---|---|---|
 | 56 | `SF_1_months_before_delinquency` | numeric | `18` | Months of payment history we can see before the current delinquency began (earlier delinquencies included). Short = early-life default; long = seasoned customer. Card history starts in Jan 2024, so cards top out at about 34; 0 = the delinquency began before our history does |
-| 57 | `SF_1_prior_delinquency_count` | numeric | `1` | Earlier delinquencies on this account in the visible history, after it had come back to current. Not counted: 1–2 month slips that never went past 30 DPD |
+| 57 | `SF_1_prior_delinquency_count` | numeric | `1` | Earlier delinquencies on this account in our history, each one ended by the account becoming fully up to date again. One counts if it reached 31+ DPD at any point, or stayed overdue (1–30 DPD) for 3+ months; shorter slips that never went past 30 DPD are not counted. How deep it went beyond that is not shown: an earlier delinquency that reached 31–60 DPD and one that reached 180+ count the same. 0 = first delinquency we can see |
 | 58 | `SF_1_months_paid_in_delinquency` | numeric | `2` | Months since this delinquency began in which the account did not get worse, i.e. the customer paid about a month's due or more. 0 = never paid enough to stop the roll (small partial payments may still have come in). Months at the top bucket (cards 211+, loans 181+) are not counted |
 | 59 | `SF_1_months_since_61_dpd` | numeric | `5` | Months since the account first reached 61+ DPD in this delinquency (0 = this month). If the delinquency began before our history starts, it counts from the first month we can see |
 
