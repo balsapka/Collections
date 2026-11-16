@@ -54,7 +54,7 @@ The signals that ship next to the four persona states (rows 6–9 of the bank's 
 | 70 | `SF_3_promises_judged_count` | numeric | `4` | Promises and plans of the last 12 months whose deadline has passed; repeats before the deadline count once (deadline: cards 61–180 next statement, else month end) |
 | 71 | `SF_3_promises_kept_count` | numeric | `3` | Of those, the monthly due (min AED 100) paid by the deadline |
 | 72 | `SF_3_promises_partly_paid_count` | numeric | `1` | Of those, AED 100+ paid but less than the monthly due |
-| 73 | `SF_3_promises_broken_count` | numeric | `0` | Of those, under AED 100 paid |
+| 73 | `SF_3_promises_broken_count` | numeric | `0` | Of those, not paid |
 | 74 | `SF_3_last_3_promises_not_kept_flag` | numeric | `0` | 1 = none of the last 3 judged promises was kept |
 | 75 | `SF_3_full_due_paid_months` | numeric | `1` | Months in the period, since falling behind, with the full monthly due (min AED 100) paid |
 | 76 | `SF_3_payment_while_overdue_level` | string | `some` | regular (full due paid in 2 months of the period, 3 at 180+) / some (AED 100+ paid in a month of the period; at 180+, of the last 12 months) / none |
