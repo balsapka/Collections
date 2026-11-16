@@ -1,10 +1,10 @@
-# UC2 persona signals: rows 56–84, revised for review
+# UC2 persona signals: rows 56–83, revised for review
 
 This draft applies the review in `uc2_schema_review.md` and sits beside
 `uc2_signals_output_schema.md` (unchanged). The user accepted the review's recommendation for every
 open question (C1–C9, 2026-11-16); they are listed under "Decided" at the end. Then cut to what our models compute: anything a collector already sees in DCORE (DPD bucket,
 amounts owed, calls and their outcomes, live promises, payments, skip trace, end-of-service notes)
-is left out (user, 2026-11-16). 29 columns: 5 SF_1, 7 SF_2, 8 SF_3, 9 SF_4.
+is left out (user, 2026-11-16). 28 columns: 5 SF_1, 7 SF_2, 7 SF_3, 9 SF_4.
 
 ## Header note (goes above row 56)
 
@@ -44,22 +44,21 @@ field id	field	type	Example value	Desc
 66	SF_2_last_travel_date	YYYY-MM-DD	2026-10-20	latest travel purchase (airline, travel agency, cruise) on any of the customer's cards. A sign of a possible trip, not proof the customer left. Blank if none
 67	SF_2_recent_travel_purchase_flag	numeric	1	1 = a travel purchase in the period. An early warning of a possible departure, raised before the location state changes to Skip
 68	SF_3_main_reason	string	promises	which evidence lifted payment credibility most: promises / payments_while_overdue / record_before_delinquency, or refusal (the latest contact was a refusal to pay, which lowers the state one level, no further than Low). Blank = no positive evidence (state Low or Unknown)
-69	SF_3_delinquency_start_date	YYYY-MM-DD	2026-06-01	first day of the month the account first fell overdue (1+ DPD) in its current delinquency. Blank = no delinquency history available (credibility Unknown). If our history starts mid-delinquency, the true start is earlier
-70	SF_3_promise_level	string	kept	promises to pay and payment plans made in the observation month and the 11 before, judged once their deadline has passed. Deadline: cards at 61–180 DPD = next statement; loans and everything at 180+ = end of the month the promise was made. kept = 2+ judged and 80%+ paid in full / broken = the last 3 all not paid in full, or 2+ judged and under 40% paid / partly_kept = at least one paid in full otherwise / thin = none paid in full, or no promises
-71	SF_3_promises_judged_count	numeric	4	promises made in the observation month and the 11 before whose deadline has passed (see SF_3_promise_level)
-72	SF_3_promises_kept_count	numeric	3	of those, promises paid in full by their deadline. Partial payments do not count
-73	SF_3_payment_while_overdue_level	string	some	payments since the account fell behind. regular = the full monthly due (at least AED 100) paid in 2 of the last 3 months (3 of the last 6 at 180+) / some = a month with AED 100+ paid in the last 3 months (12 at 180+) / none = neither
-74	SF_3_record_before_delinquency_level	string	clean	payment record in the 12 months before this delinquency. clean = 80%+ of the statements / instalments in that year paid in full / not_clean = below that / no_record = fewer than 3 bills in that year, or the start of the delinquency is not visible
-75	SF_3_refusal_flag	numeric	0	1 = the customer's latest contact was a refusal to pay, and no plan or payment of AED 100+ has come since (a payment on the same day lifts it). Lowers payment credibility one level
-76	SF_4_main_reason	string	income	which evidence lifted ability most: income / money_in / spending / other_products, or distress (a returned cheque, rejected direct debit or bureau bounce in the period, which lowers the state one level). Blank = no strong evidence (state Low or Unknown)
-77	SF_4_income_level	string	stable	salary over the period, from our records or the credit bureau, whichever is larger each month. stable = the total reaches 2 × the strong amount (3 × at 180+) and is no more than 25% below the period before / weak = some month with AED 1,000+ salary / none = no salary seen
-78	SF_4_money_in_level	string	strong	money other than salary coming into the customer's current / savings accounts with us, or held there. strong = the strong amount in 2 of the period's 3 months (3 of 6 at 180+), either as inflow or as balance held (balance not halved against the period before) / some = a month with AED 1,000+ in / none = less. Blank = no account activity data in the period
-79	SF_4_spending_level	string	some	money the customer spends or moves out of their accounts with us by choice: card and account spending, transfers to their own accounts at other banks. strong / some / none on the same amounts as SF_4_money_in_level. Blank = no account activity data in the period
-80	SF_4_other_products_level	string	none	other products the customer holds with us at the observation month end. strong = deposits / investments of at least the strong amount, or another loan / card that is up to date with an instalment of at least the larger of AED 1,000 and the amount due / some = any other up-to-date loan / card, or any deposit / investment / none = neither
-81	SF_4_distress_flag	numeric	0	1 = a returned cheque, a rejected direct debit, or a bounce reported by the credit bureau in the period. Lowers ability one level
-82	SF_4_income_source	string	internal	where salary of AED 1,000+ was seen in the period: internal (credited to an account with us) / bureau (reported by the credit bureau) / both / none
-83	SF_4_salary_stopped_flag	numeric	0	1 = salary credited to an account with us in the period before and none in the period. Possible job loss. Bureau salary is not considered
-84	SF_4_unknown_reason	string	no_account_activity_12m	why ability is Unknown. no_account_activity_12m = no current / savings account with movement or a positive balance with us in the last 12 months / inactive_account = such an account exists but had no counted transaction in the period. Blank when ability is not Unknown
+69	SF_3_promise_level	string	kept	promises to pay and payment plans made in the observation month and the 11 before, judged once their deadline has passed. Deadline: cards at 61–180 DPD = next statement; loans and everything at 180+ = end of the month the promise was made. kept = 2+ judged and 80%+ paid in full / broken = the last 3 all not paid in full, or 2+ judged and under 40% paid / partly_kept = at least one paid in full otherwise / thin = none paid in full, or no promises
+70	SF_3_promises_judged_count	numeric	4	promises made in the observation month and the 11 before whose deadline has passed (see SF_3_promise_level)
+71	SF_3_promises_kept_count	numeric	3	of those, promises paid in full by their deadline. Partial payments do not count
+72	SF_3_payment_while_overdue_level	string	some	payments since the account fell behind. regular = the full monthly due (at least AED 100) paid in 2 of the last 3 months (3 of the last 6 at 180+) / some = a month with AED 100+ paid in the last 3 months (12 at 180+) / none = neither
+73	SF_3_record_before_delinquency_level	string	clean	payment record in the 12 months before this delinquency. clean = 80%+ of the statements / instalments in that year paid in full / not_clean = below that / no_record = fewer than 3 bills in that year, or the start of the delinquency is not visible
+74	SF_3_refusal_flag	numeric	0	1 = the customer's latest contact was a refusal to pay, and no plan or payment of AED 100+ has come since (a payment on the same day lifts it). Lowers payment credibility one level
+75	SF_4_main_reason	string	income	which evidence lifted ability most: income / money_in / spending / other_products, or distress (a returned cheque, rejected direct debit or bureau bounce in the period, which lowers the state one level). Blank = no strong evidence (state Low or Unknown)
+76	SF_4_income_level	string	stable	salary over the period, from our records or the credit bureau, whichever is larger each month. stable = the total reaches 2 × the strong amount (3 × at 180+) and is no more than 25% below the period before / weak = some month with AED 1,000+ salary / none = no salary seen
+77	SF_4_money_in_level	string	strong	money other than salary coming into the customer's current / savings accounts with us, or held there. strong = the strong amount in 2 of the period's 3 months (3 of 6 at 180+), either as inflow or as balance held (balance not halved against the period before) / some = a month with AED 1,000+ in / none = less. Blank = no account activity data in the period
+78	SF_4_spending_level	string	some	money the customer spends or moves out of their accounts with us by choice: card and account spending, transfers to their own accounts at other banks. strong / some / none on the same amounts as SF_4_money_in_level. Blank = no account activity data in the period
+79	SF_4_other_products_level	string	none	other products the customer holds with us at the observation month end. strong = deposits / investments of at least the strong amount, or another loan / card that is up to date with an instalment of at least the larger of AED 1,000 and the amount due / some = any other up-to-date loan / card, or any deposit / investment / none = neither
+80	SF_4_distress_flag	numeric	0	1 = a returned cheque, a rejected direct debit, or a bounce reported by the credit bureau in the period. Lowers ability one level
+81	SF_4_income_source	string	internal	where salary of AED 1,000+ was seen in the period: internal (credited to an account with us) / bureau (reported by the credit bureau) / both / none
+82	SF_4_salary_stopped_flag	numeric	0	1 = salary credited to an account with us in the period before and none in the period. Possible job loss. Bureau salary is not considered
+83	SF_4_unknown_reason	string	no_account_activity_12m	why ability is Unknown. no_account_activity_12m = no current / savings account with movement or a positive balance with us in the last 12 months / inactive_account = such an account exists but had no counted transaction in the period. Blank when ability is not Unknown
 ```
 
 ## Changes against `uc2_signals_output_schema.md`
@@ -82,7 +81,7 @@ field id	field	type	Example value	Desc
 | 71 | `SF_2_attempt_days_in_window` | **dropped** | DCORE call log | cut |
 | 72 | `SF_2_last_skip_trace_date` | **dropped** | DCORE result | cut |
 | 73 | `SF_3_reason` | `SF_3_main_reason` | new values; blank meaning corrected | C2, C3, C5 |
-| 74 | `SF_3_episode_start` | `SF_3_delinquency_start_date` | example and Desc were wrong | C2 |
+| 74 | `SF_3_episode_start` | **dropped** | DCORE shows the delinquency date | cut |
 | 75–77 | `SF_3_commitments_*` | `SF_3_promise_level`, `SF_3_promises_judged_count`, `SF_3_promises_kept_count` | deadline rule and window spelled out | C2 |
 | 78 | `SF_3_dlq_payment_level` | `SF_3_payment_while_overdue_level` | 180+ rule and "some" window were wrong / missing | C2 |
 | 79 | `SF_3_pre_dlq_payment_level` | `SF_3_record_before_delinquency_level` | no_record cases | C2 |
@@ -100,7 +99,7 @@ field id	field	type	Example value	Desc
 | 94 | `SF_4_unknown_reason` | same | values `no_account_activity_12m` / `inactive_account`; Desc was wrong | C3 |
 | 95 | `SF_4_amount_due_now` | **dropped** | amount owed is in DCORE; the header note says how thresholds use it | cut |
 
-New ids: 56–60 SF_1, 61–67 SF_2, 68–75 SF_3, 76–84 SF_4.
+New ids: 56–60 SF_1, 61–67 SF_2, 68–74 SF_3, 75–83 SF_4.
 
 ## Code column → output field (for the persona master)
 
@@ -117,7 +116,6 @@ New ids: 56–60 SF_1, 61–67 SF_2, 68–75 SF_3, 76–84 SF_4.
 | `last_travel_date` | `SF_2_last_travel_date` | — |
 | `last_travel_date` | `SF_2_recent_travel_purchase_flag` | 1 if ≥ first day of the month 2 (5 at 180+) months before the observation month |
 | `a3_reason` | `SF_3_main_reason` | commitments → promises, dlq_payments → payments_while_overdue, pre_dlq_record → record_before_delinquency; blank when SF_3 = Unknown |
-| `episode_start` | `SF_3_delinquency_start_date` | — |
 | `a3_commitments_level`, `commitments_concluded`, `commitments_kept` | `SF_3_promise_level`, `SF_3_promises_judged_count`, `SF_3_promises_kept_count` | — |
 | `a3_dlq_payment_level` | `SF_3_payment_while_overdue_level` | — |
 | `a3_pre_dlq_payment_level` | `SF_3_record_before_delinquency_level` | — |
@@ -144,9 +142,10 @@ New ids: 56–60 SF_1, 61–67 SF_2, 68–75 SF_3, 76–84 SF_4.
 - C9: `SF_1_months_before_delinquency` kept, with the visible-history Desc.
 - SF_3 cut (user, 2026-11-16): no columns that repeat DCORE. Dropped: last customer contact date
   and outcome, the no-answer flag, and the proposed open-promise and last-payment columns. Kept: the
-  engine's own signals (main reason, delinquency start, promise level with the judged / kept
+  engine's own signals (main reason, promise level with the judged / kept
   counts, payment while overdue, record before delinquency, refusal flag after the payment / plan
   lift).
 - Same cut on every axis (user, 2026-11-16: amounts owed etc. are in DCORE): dropped `dpd_bucket`,
   the SF_2 call columns (last connected call, last attempt, attempt days, skip trace),
   `SF_4_end_of_service_flag` and `SF_4_amount_due_aed`.
+- `SF_3_delinquency_start_date` dropped too (user, 2026-11-16: DCORE shows it).
