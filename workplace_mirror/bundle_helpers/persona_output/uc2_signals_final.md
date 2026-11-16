@@ -1,4 +1,4 @@
-# UC2 persona signals: final columns (rows 56–82)
+# UC2 persona signals: final columns (rows 56–87)
 
 The signals that ship next to the four persona states (rows 6–9 of the bank's output table), one row per customer, account and observation date. Only what our models compute: anything the collection system (DCORE) already shows is left out. Source of truth: `uc2_signals_output_schema_v2.md` (same content in the bank's tab format, with the change list and the mapping to the code columns). Decisions: user, 2026-11-16.
 
@@ -27,47 +27,73 @@ The signals that ship next to the four persona states (rows 6–9 of the bank's 
 
 | # | Column | Type | Example | Meaning |
 |---:|---|---|---|---|
-| 56 | `SF_1_months_before_delinquency` | numeric | `18` | Months of payment history we can see before the current delinquency began (earlier delinquencies included). Short = early-life default; long = seasoned customer. Card history starts in Jan 2024, so cards top out at about 34; 0 = the delinquency began before our history does |
-| 57 | `SF_1_prior_delinquency_count` | numeric | `1` | Earlier delinquencies on this account in our history, each one ended by the account becoming fully up to date again. One counts if it reached 31+ DPD at any point, or stayed overdue (1–30 DPD) for 3+ months; shorter slips that never went past 30 DPD are not counted. How deep it went beyond that is not shown: an earlier delinquency that reached 31–60 DPD and one that reached 180+ count the same. 0 = first delinquency we can see |
-| 58 | `SF_1_months_paid_in_delinquency` | numeric | `2` | Months since this delinquency began in which the account did not get worse, i.e. the customer paid about a month's due or more. 0 = never paid enough to stop the roll (small partial payments may still have come in). Months at the top bucket (cards 211+, loans 181+) are not counted |
-| 59 | `SF_1_months_since_61_dpd` | numeric | `5` | Months since the account first reached 61+ DPD in this delinquency (0 = this month). If the delinquency began before our history starts, it counts from the first month we can see |
+| 56 | `SF_1_months_before_delinquency` | numeric | `18` | Months of our history before this delinquency began. 0 = it began before our history (cards: from Jan 2024) |
+| 57 | `SF_1_prior_delinquency_count` | numeric | `1` | Earlier delinquencies that ended with the account up to date. Counted if 31+ DPD or 3+ months overdue; depth not shown |
+| 58 | `SF_1_months_paid_in_delinquency` | numeric | `2` | Months in this delinquency in which the account did not get worse (about a month's due or more paid) |
+| 59 | `SF_1_months_since_61_dpd` | numeric | `5` | Months since the account first reached 61+ DPD in this delinquency |
 
-## SF_2 Locatability: where the customer is
-
-| # | Column | Type | Example | Meaning |
-|---:|---|---|---|---|
-| 60 | `SF_2_location_reason` | string | `uae_recent` | Why the location part of SF_2 is what it is. abroad_latest: the most recent evidence (any age) puts the customer abroad. travelled_then_quiet: a travel purchase, at most 3 months of UAE evidence after it, and none in the last month. uae_recent: UAE evidence in the period. uae_too_old: UAE evidence exists but is older than the period. no_evidence: none at all |
-| 61 | `SF_2_last_uae_date` | YYYY-MM-DD | `2026-11-12` | Latest date we have evidence the customer was in the UAE: a login from the UAE, or a card used in person there (shop terminal or ATM), on any of their accounts. Blank if none |
-| 62 | `SF_2_last_uae_source` | string | `login` | What that evidence was: login / debit_card / credit_card (card used in person). Blank if none |
-| 63 | `SF_2_last_foreign_date` | YYYY-MM-DD | `2026-03-04` | Latest date we have evidence the customer was abroad, on any of their accounts. Blank if none |
-| 64 | `SF_2_last_foreign_source` | string | `credit_card` | What that evidence was: login / debit_card / credit_card (card used in person abroad) / collector_note (a collector recorded that the customer left the country). Blank if none |
-| 65 | `SF_2_last_travel_date` | YYYY-MM-DD | `2026-10-20` | Latest travel purchase (airline, travel agency, cruise) on any of the customer's cards. A sign of a possible trip, not proof the customer left. Blank if none |
-| 66 | `SF_2_recent_travel_purchase_flag` | numeric | `1` | 1 = a travel purchase in the period. An early warning of a possible departure, raised before the location state changes to Skip |
-
-## SF_3 Payment credibility: how far the customer's word and payments can be trusted
+## SF_2 Locatability: where the customer is and whether we reach them
 
 | # | Column | Type | Example | Meaning |
 |---:|---|---|---|---|
-| 67 | `SF_3_main_reason` | string | `promises` | Which evidence lifted payment credibility most: promises / payments_while_overdue / record_before_delinquency, or refusal (the latest contact was a refusal to pay, which lowers the state one level, no further than Low). Blank = no positive evidence (state Low or Unknown) |
-| 68 | `SF_3_promise_level` | string | `kept` | Promises to pay and payment plans made in the observation month and the 11 before, judged once their deadline has passed. Deadline: cards at 61–180 DPD = next statement; loans and everything at 180+ = end of the month the promise was made. kept = 2+ judged and 80%+ paid in full / broken = the last 3 all not paid in full, or 2+ judged and under 40% paid / partly_kept = at least one paid in full otherwise / thin = none paid in full, or no promises |
-| 69 | `SF_3_promises_judged_count` | numeric | `4` | Promises made in the observation month and the 11 before whose deadline has passed (see SF_3_promise_level) |
-| 70 | `SF_3_promises_kept_count` | numeric | `3` | Of those, promises paid in full by their deadline. Partial payments do not count |
-| 71 | `SF_3_payment_while_overdue_level` | string | `some` | Payments since the account fell behind. regular = the full monthly due (at least AED 100) paid in 2 of the last 3 months (3 of the last 6 at 180+) / some = a month with AED 100+ paid in the last 3 months (12 at 180+) / none = neither |
-| 72 | `SF_3_record_before_delinquency_level` | string | `clean` | Payment record in the 12 months before this delinquency. clean = 80%+ of the statements / instalments in that year paid in full / not_clean = below that / no_record = fewer than 3 bills in that year, or the start of the delinquency is not visible |
-| 73 | `SF_3_refusal_flag` | numeric | `0` | 1 = the customer's latest contact was a refusal to pay, and no plan or payment of AED 100+ has come since (a payment on the same day lifts it). Lowers payment credibility one level |
+| 60 | `SF_2_location_reason` | string | `uae_recent` | abroad_latest (latest evidence is abroad) / travelled_then_quiet (travel purchase, UAE evidence at most 3 months after it, none in the last month) / uae_recent (UAE evidence in the period) / uae_too_old / no_evidence |
+| 61 | `SF_2_reachability_reason` | string | `call_connected` | call_connected (a call got through in the period) / calls_failing (last 3 call days, 6 at 180+, all failed in the period, none connected since) / no_recent_connection (calls, none connected in the period) / no_calls |
+| 62 | `SF_2_last_uae_date` | YYYY-MM-DD | `2026-11-12` | Latest evidence of being in the UAE: a UAE login or a card used in person there. Blank = none |
+| 63 | `SF_2_last_uae_source` | string | `login` | login / debit_card / credit_card |
+| 64 | `SF_2_last_foreign_date` | YYYY-MM-DD | `2026-03-04` | Latest evidence of being abroad. Blank = none |
+| 65 | `SF_2_last_foreign_source` | string | `credit_card` | login / debit_card / credit_card / collector_note (departure noted by a collector) |
+| 66 | `SF_2_last_travel_date` | YYYY-MM-DD | `2026-10-20` | Latest travel purchase (airline, travel agency, cruise). Blank = none |
+| 67 | `SF_2_recent_travel_purchase_flag` | numeric | `1` | 1 = travel purchase in the period (early warning of a departure) |
+
+## SF_3 Payment credibility: promises and payments
+
+| # | Column | Type | Example | Meaning |
+|---:|---|---|---|---|
+| 68 | `SF_3_main_reason` | string | `promises` | What set the state most: promises / payments_while_overdue / record_before_delinquency / refusal. Blank = no positive evidence |
+| 69 | `SF_3_promise_level` | string | `kept` | kept / partly_kept / broken / thin, from the promise counts below |
+| 70 | `SF_3_promises_judged_count` | numeric | `4` | Promises to pay and plans of the last 12 months whose deadline has passed (cards 61–180: next statement; otherwise end of the promise month) |
+| 71 | `SF_3_promises_kept_count` | numeric | `3` | Of those, paid in full by the deadline |
+| 72 | `SF_3_promises_partly_paid_count` | numeric | `1` | Of those, AED 100+ paid but not in full |
+| 73 | `SF_3_promises_broken_count` | numeric | `0` | Of those, under AED 100 paid |
+| 74 | `SF_3_last_3_promises_not_kept_flag` | numeric | `0` | 1 = the last 3 judged promises were all not paid in full |
+| 75 | `SF_3_full_due_paid_months` | numeric | `1` | Months in the period, since falling behind, with the full monthly due (min AED 100) paid |
+| 76 | `SF_3_payment_while_overdue_level` | string | `some` | regular (full due paid in 2 months of the period, 3 at 180+) / some (AED 100+ paid in a month of the last 3 months, 12 at 180+) / none |
+| 77 | `SF_3_record_before_delinquency_level` | string | `clean` | clean (80%+ of bills paid in full in the 12 months before this delinquency) / not_clean / no_record (under 3 bills, or start not visible) |
+| 78 | `SF_3_refusal_flag` | numeric | `0` | 1 = latest contact was a refusal, with no plan or AED 100+ payment since |
 
 ## SF_4 Ability: income, money and other products
 
 | # | Column | Type | Example | Meaning |
 |---:|---|---|---|---|
-| 74 | `SF_4_main_reason` | string | `income` | Which evidence lifted ability most: income / money_in / spending / other_products, or distress (a returned cheque, rejected direct debit or bureau bounce in the period, which lowers the state one level). Blank = no strong evidence (state Low or Unknown) |
-| 75 | `SF_4_income_level` | string | `stable` | Salary over the period, from our records or the credit bureau, whichever is larger each month. stable = the total reaches 2 × the strong amount (3 × at 180+) and is no more than 25% below the period before / weak = some month with AED 1,000+ salary / none = no salary seen |
-| 76 | `SF_4_money_in_level` | string | `strong` | Money other than salary coming into the customer's current / savings accounts with us, or held there. strong = the strong amount in 2 of the period's 3 months (3 of 6 at 180+), either as inflow or as balance held (balance not halved against the period before) / some = a month with AED 1,000+ in / none = less. Blank = no account activity data in the period |
-| 77 | `SF_4_spending_level` | string | `some` | Money the customer spends or moves out of their accounts with us by choice: card and account spending, transfers to their own accounts at other banks. strong / some / none on the same amounts as SF_4_money_in_level. Blank = no account activity data in the period |
-| 78 | `SF_4_other_products_level` | string | `none` | Other products the customer holds with us at the observation month end. strong = deposits / investments of at least the strong amount, or another loan / card that is up to date with an instalment of at least the larger of AED 1,000 and the amount due / some = any other up-to-date loan / card, or any deposit / investment / none = neither |
-| 79 | `SF_4_distress_flag` | numeric | `0` | 1 = a returned cheque, a rejected direct debit, or a bounce reported by the credit bureau in the period. Lowers ability one level |
-| 80 | `SF_4_income_source` | string | `internal` | Where salary of AED 1,000+ was seen in the period: internal (credited to an account with us) / bureau (reported by the credit bureau) / both / none |
-| 81 | `SF_4_salary_stopped_flag` | numeric | `0` | 1 = salary credited to an account with us in the period before and none in the period. Possible job loss. Bureau salary is not considered |
-| 82 | `SF_4_unknown_reason` | string | `no_account_activity_12m` | Why ability is Unknown. no_account_activity_12m = no current / savings account with movement or a positive balance with us in the last 12 months / inactive_account = such an account exists but had no counted transaction in the period. Blank when ability is not Unknown |
+| 79 | `SF_4_main_reason` | string | `income` | What set the state most: income / money_in / spending / other_products / distress. Blank = nothing strong |
+| 80 | `SF_4_income_level` | string | `stable` | stable (period salary ≥ 2 × the strong amount, 3 × at 180+, and ≤ 25% below the period before) / weak (a month with AED 1,000+) / none |
+| 81 | `SF_4_money_in_level` | string | `strong` | Non-salary money into or held in accounts with us: strong (the strong amount in 2 of 3 months, 3 of 6 at 180+) / some (a month with AED 1,000+) / none. Blank = no data |
+| 82 | `SF_4_spending_level` | string | `some` | Money spent or moved out by choice, same scale as money in. Blank = no data |
+| 83 | `SF_4_other_products_level` | string | `none` | strong (deposits / investments ≥ the strong amount, or an up-to-date loan / card with instalment ≥ max(AED 1,000, amount due)) / some (any such product) / none |
+| 84 | `SF_4_distress_flag` | numeric | `0` | 1 = returned cheque, rejected direct debit or bureau bounce in the period |
+| 85 | `SF_4_income_source` | string | `internal` | Where salary of AED 1,000+ was seen in the period: internal / bureau / both / none |
+| 86 | `SF_4_salary_stopped_flag` | numeric | `0` | 1 = salary with us in the period before, none in the period |
+| 87 | `SF_4_unknown_reason` | string | `no_account_activity_12m` | no_account_activity_12m / inactive_account (account with us, no transaction in the period). Blank unless Ability is Unknown |
 
-27 columns: 4 SF_1, 7 SF_2, 7 SF_3, 9 SF_4.
+## Deriving the states
+
+- **SF_1** is not derivable from these columns: the journey tree reads about eight history
+  features (`docs/deterioration_states/METHODOLOGY.md`).
+- **SF_2:** Deceased overrides everything (shown in SF_2 itself). Otherwise location × reachability.
+  Location: abroad_latest or travelled_then_quiet = Skip, uae_recent = In Country, else Unknown.
+  Reachability: call_connected = Reachable, calls_failing = Non-Reachable, else Unknown.
+- **SF_3:** Unknown when the account has no delinquency history in our data. Otherwise points:
+  - promise level: kept 2, partly_kept 1, broken −1, thin 0;
+  - payment while overdue: regular 2, some 1, none 0;
+  - record before delinquency: clean 1, else 0.
+
+  High from 4, Moderate from 2, else Low. `SF_3_refusal_flag` = 1 moves the state one level down
+  (not below Low). Promise level from the counts: broken if the last-3 flag is 1, or 2+ judged and
+  under 40% kept; kept if 2+ judged and 80%+ kept; partly_kept if 1+ kept; else thin. Partly paid
+  counts as not kept.
+- **SF_4:** stable income or a strong family = 2 points each. High from 4, Moderate from 2, else
+  Low; `SF_4_distress_flag` = 1 moves it one level down (not below Low). Unknown when
+  `SF_4_unknown_reason` is filled: every level none or blank, no distress, no account activity in
+  the period.
+
+32 columns: 4 SF_1, 8 SF_2, 11 SF_3, 9 SF_4.
