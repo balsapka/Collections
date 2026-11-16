@@ -1,6 +1,6 @@
 # UC2 persona signals: rows to append to `output_schema.md`
 
-Rows 56–94 continue the bank's output schema (rows 1–55: keys, persona, collection action, the four
+Rows 56–95 continue the bank's output schema (rows 1–55: keys, persona, collection action, the four
 synthetic features SF_1–SF_4, UC1 transcript signals). One row per (`cif_id`, `account_id`,
 `observation_date`). Examples are illustrative. Every signal is prefixed with the synthetic feature it belongs to
 (`SF_1_` … `SF_4_`, as rows 6–9); the internal axis prefixes (`a1_` = SF_4 Ability, `a3_` = SF_3
@@ -31,36 +31,37 @@ field id	field	type	Example value	Desc
 66	SF_2_last_foreign_source	string	credit_card	source of that evidence: login / debit_card / credit_card / dcore (collector departure note)
 67	SF_2_last_travel_date	YYYY-MM-DD	2026-10-20	latest travel purchase (airline, travel agency, cruise; debit or credit card, any channel)
 68	SF_2_travel_purchase_recent_flag	numeric	1	1 = a travel purchase in the last 3 months (6 at 180+), whether or not it has moved location to Skip yet. An early-warning signal for possible departure
-69	SF_2_last_attempt_date	YYYY-MM-DD	2026-11-25	SF_2 reachability: latest collector call attempt (DCORE)
-70	SF_2_attempt_days_in_window	numeric	6	distinct days with a call attempt in the window (3 months at 61–180, 6 at 180+)
-71	SF_2_last_skip_trace_date	YYYY-MM-DD	2026-09-10	latest skip-trace / under-tracing result in DCORE; blank if never
-72	SF_3_reason	string	commitments	what decided the state: commitments / dlq_payments / pre_dlq_record / refusal (refusal lowered it one level); blank = no evidence (Low on 0 points)
-73	SF_3_episode_start	YYYY-MM-DD	2026-06-30	start of the current collections episode (all credibility windows are read inside it)
-74	SF_3_commitments_level	string	kept	promises to pay in the last 12 months: kept (80%+ of 2 or more concluded promises kept) / broken (under 40%, or the last 3 all broken) / partly_kept (at least one kept otherwise) / thin (none kept, or no promises)
-75	SF_3_commitments_concluded	numeric	4	promises whose deadline has passed in the last 12 months
-76	SF_3_commitments_kept	numeric	3	of those, promises kept in full
-77	SF_3_dlq_payment_level	string	some	payments while delinquent: regular (the monthly due paid in full in 2 of the last 3 cycles; 3 at 180+) / some (any payment of AED 100 or more) / none
-78	SF_3_pre_dlq_payment_level	string	clean	record in the 12 months before the episode: clean (80%+ of bills paid as billed) / not_clean / no_record
-79	SF_3_last_rpc_date	YYYY-MM-DD	2026-11-02	latest right-party contact (DCORE)
-80	SF_3_last_rpc_disposition	string	ptp	outcome of that contact: ptp / paid (payment reported) / refusal / dispute / hung_up / success
-81	SF_3_refusal_flag	numeric	0	1 = explicit refusal to pay, not lifted by a later payment or plan
-82	SF_3_dispute_flag	numeric	0	1 = the latest contact was a dispute (DCORE disposition; UC1 rows 20–25 give the transcript view)
-83	SF_3_no_pickup_after_contact	numeric	1	1 = has stopped answering since the last right-party contact
-84	SF_4_reason	string	income	the strongest family behind the state: income / money_in / money_out / cross_product, or distress (lowered one level)
-85	SF_4_income_level	string	stable	salary in the window: stable (reaches max(AED 3,000, 2 × amount due), not falling) / weak / none
-86	SF_4_money_in_level	string	strong	money coming in or held in CASA: strong / some / none
-87	SF_4_money_out_level	string	some	money the customer chooses to spend or move to own accounts elsewhere: strong / some / none
-88	SF_4_cross_product_level	string	none	other products with us (deposits / investments, current credit products): strong / some / none
-89	SF_4_distress_flag	numeric	0	1 = returned cheque, direct-debit reject or bureau bounce in the window
-90	SF_4_income_source	string	internal	who sees an income of AED 1,000+ in the window: internal / bureau / both / none
-91	SF_4_salary_stopped_flag	numeric	0	1 = salary credited with us in the previous window, none in the current one (possible job loss)
-92	SF_4_eosb_flag	numeric	0	1 = DCORE end-of-service result in the window (gratuity payout may be due)
-93	SF_4_unknown_reason	string	no_casa	why Ability is Unknown: no_casa (no current / savings account with us) / dormant_casa; blank otherwise
-94	SF_4_amount_due_now	numeric	2000	amount the customer must find now (cards: oldest overdue bucket; loans: one instalment), AED; blank at cards 180+
+69	SF_2_last_contact_date	YYYY-MM-DD	2026-11-02	reachability: latest call that got through (an inbound call, a successful outbound call, or a right-party result), all DCORE history. Decides the state: within the window (3 months at 61–180, 6 at 180+) = Reachable; Non-Reachable = the last 3 call days (6 at 180+) all failed and no contact since
+70	SF_2_last_attempt_date	YYYY-MM-DD	2026-11-25	latest collector call attempt (DCORE)
+71	SF_2_attempt_days_in_window	numeric	6	distinct days with a call attempt in the window (3 months at 61–180, 6 at 180+)
+72	SF_2_last_skip_trace_date	YYYY-MM-DD	2026-09-10	latest skip-trace / under-tracing result in DCORE; blank if never
+73	SF_3_reason	string	commitments	what decided the state: commitments / dlq_payments / pre_dlq_record / refusal (refusal lowered it one level); blank = no evidence (Low on 0 points)
+74	SF_3_episode_start	YYYY-MM-DD	2026-06-30	start of the current collections episode (all credibility windows are read inside it)
+75	SF_3_commitments_level	string	kept	promises to pay in the last 12 months: kept (80%+ of 2 or more concluded promises kept) / broken (under 40%, or the last 3 all broken) / partly_kept (at least one kept otherwise) / thin (none kept, or no promises)
+76	SF_3_commitments_concluded	numeric	4	promises whose deadline has passed in the last 12 months
+77	SF_3_commitments_kept	numeric	3	of those, promises kept in full
+78	SF_3_dlq_payment_level	string	some	payments while delinquent: regular (the monthly due paid in full in 2 of the last 3 cycles; 3 at 180+) / some (any payment of AED 100 or more) / none
+79	SF_3_pre_dlq_payment_level	string	clean	record in the 12 months before the episode: clean (80%+ of bills paid as billed) / not_clean / no_record
+80	SF_3_last_rpc_date	YYYY-MM-DD	2026-11-02	latest right-party contact (DCORE)
+81	SF_3_last_rpc_disposition	string	ptp	outcome of that contact: ptp / paid (payment reported) / refusal / dispute / hung_up / success
+82	SF_3_refusal_flag	numeric	0	1 = explicit refusal to pay, not lifted by a later payment or plan
+83	SF_3_dispute_flag	numeric	0	1 = the latest contact was a dispute (DCORE disposition; UC1 rows 20–25 give the transcript view)
+84	SF_3_no_pickup_after_contact	numeric	1	1 = has stopped answering since the last right-party contact
+85	SF_4_reason	string	income	the strongest family behind the state: income / money_in / money_out / cross_product, or distress (lowered one level)
+86	SF_4_income_level	string	stable	salary in the window: stable (reaches max(AED 3,000, 2 × amount due), not falling) / weak / none
+87	SF_4_money_in_level	string	strong	money coming in or held in CASA: strong / some / none
+88	SF_4_money_out_level	string	some	money the customer chooses to spend or move to own accounts elsewhere: strong / some / none
+89	SF_4_cross_product_level	string	none	other products with us (deposits / investments, current credit products): strong / some / none
+90	SF_4_distress_flag	numeric	0	1 = returned cheque, direct-debit reject or bureau bounce in the window
+91	SF_4_income_source	string	internal	who sees an income of AED 1,000+ in the window: internal / bureau / both / none
+92	SF_4_salary_stopped_flag	numeric	0	1 = salary credited with us in the previous window, none in the current one (possible job loss)
+93	SF_4_eosb_flag	numeric	0	1 = DCORE end-of-service result in the window (gratuity payout may be due)
+94	SF_4_unknown_reason	string	no_casa	why Ability is Unknown: no_casa (no current / savings account with us) / dormant_casa; blank otherwise
+95	SF_4_amount_due_now	numeric	2000	amount the customer must find now (cards: oldest overdue bucket; loans: one instalment), AED; blank at cards 180+
 ```
 
-39 columns: the DPD range, 5 SF_1, 10 SF_2, 12 SF_3, 11 SF_4. With the four states and the keys, the UC2 part of
-the table is 43 columns. The deck's "50+ signals" refers to what the engines compute, not to this
+40 columns: the DPD range, 5 SF_1, 11 SF_2, 12 SF_3, 11 SF_4. With the four states and the keys, the UC2 part of
+the table is 44 columns. The deck's "50+ signals" refers to what the engines compute, not to this
 table, and it holds: the four axis tables carry about 95 signal columns (A1 17, A2 17, A3 42,
 A4 ~20).
 
@@ -77,6 +78,7 @@ Added:
 - `SF_2_location_reason`: replaces `location_rule` (L1–L4 codes) and `location_unknown_reason`.
 - `dpd_bucket` (reference DPD range) and, as SF_1 had no rows in the draft, five journey facts from the A4 engine.
 - `SF_3_last_rpc_disposition`, `SF_3_no_pickup_after_contact`, `SF_3_dispute_flag`.
+- The draft's name clash (`last_contact_date` in A2, `last_rpc_date` in A3) is gone with the SF prefixes: both ship, as `SF_2_last_contact_date` and `SF_3_last_rpc_date`.
 
 Dropped, with the reason:
 
@@ -93,7 +95,6 @@ Dropped, with the reason:
 | `refusal_followed_by_plan`, `refusal_followed_by_payment`, `a3_hung_up_last`, `contact_dates_n`, `no_pickup_days_n` | Inputs to the refusal / no-pickup flags, or already in `SF_3_last_rpc_disposition` |
 | `a1_sweepable_balance_flag` | Diagnostic: measures the sweep, not ability (GRR: CASA balances are swept against the overdue) |
 | `deceased_flag`, `deceased_source` | SF_2 = Deceased already; which system said so is an audit question |
-| `last_contact_date` (A2; the name clash) | See open point 1 |
 | A4 engine fields (`runup_len`, `last6_in_band`, `chg_6m`, `gap_prior_peak3`, `n_blips`, glitch / gap counters, `history_cropped`) | Tree mechanics and data-quality counters |
 
 ## Code column → output field
@@ -113,6 +114,7 @@ Dropped, with the reason:
 | `last_foreign_source` | `SF_2_last_foreign_source` |
 | `last_travel_date` | `SF_2_last_travel_date` |
 | `last_travel_date` within W | `SF_2_travel_purchase_recent_flag` |
+| `last_contact_date` | `SF_2_last_contact_date` |
 | `last_attempt_date` | `SF_2_last_attempt_date` |
 | `attempt_days_in_window` | `SF_2_attempt_days_in_window` |
 | `last_skip_trace_date` | `SF_2_last_skip_trace_date` |
@@ -146,10 +148,7 @@ Dropped, with the reason:
   location / reachability columns (user, 2026-11-16).
 - `dpd_bucket` (no SF prefix: context, not a signal of one feature) is added as the reference DPD
   range in days of our data; DCORE keeps the live one (user, 2026-11-16).
-
-## Open point (your call)
-
-1. **One contact date or two.** Both read the DCORE follow-up of the account, but differently:
+- **Both contact dates ship** (user, 2026-11-16: the A2 date decides the reachability state). They read the DCORE follow-up of the account, but differently:
 
    | | A2 `last_contact_date` (decides reachability) | A3 `last_rpc_date` (+ `last_rpc_disposition`) |
    |---|---|---|
@@ -162,6 +161,4 @@ Dropped, with the reason:
    So the dates usually agree. A2 is later when the last call got through without a right-party
    result (an inbound call, or a successful outbound call with a neutral result name). A3 is later
    when a promise or payment was logged as a note without a call. A2 has a date and A3 is blank
-   when the last contact predates the episode. Proposed: ship only the A3 pair (date + outcome).
-   Alternative: also ship the A2 date as `SF_2_last_answered_date`, so a Non-Reachable row shows
-   when a call last got through.
+   when the last contact predates the episode.
