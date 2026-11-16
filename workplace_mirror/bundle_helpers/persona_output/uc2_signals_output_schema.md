@@ -18,7 +18,7 @@ the schema stay in the axis tables. Those are persisted and available on request
 
 ```
 field id	field	type	Example value	Desc
-56	SF_1_dpd_bucket	string	91-120	reference DPD bucket at the observation date, from the billing / loan history the features were built on: 61-90 / 91-120 / 121-150 / 151-180 / 181-210 / 211+ (cards) / 180+ (loans). DCORE holds the live bucket; the two can differ by the days since the observation date
+56	dpd_bucket	string	91-120	reference DPD range at the observation date, in days (same values for cards and loans), from the billing / loan history the features were built on: 61-90 / 91-120 / 121-150 / 151-180 / 181-210 / 211+ (cards; loans 180+). DCORE holds the live bucket; the two can differ by the days since the observation date
 57	SF_1_months_before_spell	numeric	18	months of clean history on book before the current delinquency spell started (short = early-life default, long = seasoned customer)
 58	SF_1_prior_episodes	numeric	1	earlier delinquency spells on this account (1–2 month blips not counted)
 59	SF_1_spell_pay_months	numeric	2	months in the current spell in which the customer paid something (0 = has not paid since falling behind)
@@ -59,7 +59,7 @@ field id	field	type	Example value	Desc
 94	SF_4_amount_due_now	numeric	2000	amount the customer must find now (cards: oldest overdue bucket; loans: one instalment), AED; blank at cards 180+
 ```
 
-39 signal columns: 6 SF_1, 10 SF_2, 12 SF_3, 11 SF_4. With the four states and the keys, the UC2 part of
+39 columns: the DPD range, 5 SF_1, 10 SF_2, 12 SF_3, 11 SF_4. With the four states and the keys, the UC2 part of
 the table is 43 columns. The deck's "50+ signals" refers to what the engines compute, not to this
 table, and it holds: the four axis tables carry about 95 signal columns (A1 17, A2 17, A3 42,
 A4 ~20).
@@ -75,7 +75,7 @@ Added:
   flag fires on the purchase itself, before the travel rule (no UAE evidence for a month afterwards)
   moves the customer to Skip, so GRR can act before the customer leaves.
 - `SF_2_location_reason`: replaces `location_rule` (L1–L4 codes) and `location_unknown_reason`.
-- SF_1 had no rows in the draft: the reference DPD bucket and five journey facts from the A4 engine.
+- `dpd_bucket` (reference DPD range) and, as SF_1 had no rows in the draft, five journey facts from the A4 engine.
 - `SF_3_last_rpc_disposition`, `SF_3_no_pickup_after_contact`, `SF_3_dispute_flag`.
 
 Dropped, with the reason:
@@ -103,7 +103,7 @@ Dropped, with the reason:
 | `months_before_spell` | `SF_1_months_before_spell` |
 | `n_prior_episodes` | `SF_1_prior_episodes` |
 | `spell_pay_events` | `SF_1_spell_pay_months` |
-| `current_bucket` (CC native k, RL native k + 1 → DPD range) | `SF_1_dpd_bucket` |
+| `current_bucket` (product bucket number → DPD range in days) | `dpd_bucket` |
 | `months_since_4` | `SF_1_months_since_61_dpd` |
 | `restructure_blind_spot_flag` | `SF_1_restructured_flag` |
 | `location_rule` + `location_unknown_reason` | `SF_2_location_reason` |
@@ -144,13 +144,24 @@ Dropped, with the reason:
 
 - SF_2 ships as one combined value (e.g. "In Country – Reachable", 9 values + Deceased); no separate
   location / reachability columns (user, 2026-11-16).
-- `SF_1_dpd_bucket` is added as the reference bucket of our data; DCORE keeps the live one (user,
-  2026-11-16).
+- `dpd_bucket` (no SF prefix: context, not a signal of one feature) is added as the reference DPD
+  range in days of our data; DCORE keeps the live one (user, 2026-11-16).
 
 ## Open point (your call)
 
-1. **One contact date or two.** A2's `last_contact_date` = any answered call (inbound, or an
-   outbound call in the success category). This date decides reachability. A3's `last_rpc_date` = a
-   confirmed right-party contact, and it comes with its outcome. Proposed: ship only the A3 pair.
-   Alternative: also ship the A2 date as `SF_2_last_answered_date`, so a Non-Reachable row can show
-   when the phone was last answered.
+1. **One contact date or two.** Both read the DCORE follow-up of the account, but differently:
+
+   | | A2 `last_contact_date` (decides reachability) | A3 `last_rpc_date` (+ `last_rpc_disposition`) |
+   |---|---|---|
+   | Question | Did a call get through? | When did we last speak to the customer, and what was the outcome? |
+   | Entries read | Calls only (outbound, callback, inbound); administrative notes never count | Any entry, administrative notes included (e.g. RETAIN PTP, payment reports logged without a call) |
+   | Counts as contact | Any inbound call (whatever the result), an outbound call in the success category, or a right-party result name | A result name that says the holder was reached: right-party list, promise, payment reported, refusal, dispute, hung up |
+   | Window | All DCORE history up to the observation date | The current episode, at most 24 months back |
+   | Outcome | None | ptp / paid / refusal / dispute / hung_up / success |
+
+   So the dates usually agree. A2 is later when the last call got through without a right-party
+   result (an inbound call, or a successful outbound call with a neutral result name). A3 is later
+   when a promise or payment was logged as a note without a call. A2 has a date and A3 is blank
+   when the last contact predates the episode. Proposed: ship only the A3 pair (date + outcome).
+   Alternative: also ship the A2 date as `SF_2_last_answered_date`, so a Non-Reachable row shows
+   when a call last got through.
