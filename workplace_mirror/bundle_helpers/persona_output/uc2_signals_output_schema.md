@@ -23,7 +23,7 @@ field id	field	type	Example value	Desc
 58	SF_1_prior_episodes	numeric	1	earlier delinquency spells on this account (1–2 month blips not counted)
 59	SF_1_spell_pay_months	numeric	2	months in the current spell in which the customer paid something (0 = has not paid since falling behind)
 60	SF_1_months_since_61_dpd	numeric	5	months since the account first reached 61–90 DPD in this spell
-61	SF_1_restructured_flag	numeric	0	1 = restructured account; the journey before the restructure is not visible, so the state is less certain
+61	SF_1_history_gap_flag	numeric	0	1 = the start of the delinquency journey is not visible, so the state is less certain. Loans: a restructured loan whose original loans could not be linked (a linked loan carries the original loans' months and is 0). Cards: the first billing month on record is already 61+ DPD (likely reopened mid-delinquency)
 62	SF_2_location_reason	string	uae_in_window	SF_2 location: why. foreign_after_uae (latest evidence is abroad) / travelled_no_uae_since (travel purchase, no UAE evidence since) / uae_in_window / no_evidence / uae_before_window (all evidence too old)
 63	SF_2_last_uae_date	YYYY-MM-DD	2026-11-12	latest evidence the customer was in the UAE
 64	SF_2_last_uae_source	string	login	source of that evidence: login / debit_card / credit_card (in-person use only)
@@ -106,7 +106,7 @@ Dropped, with the reason:
 | `spell_pay_events` | `SF_1_spell_pay_months` |
 | `current_bucket` (product bucket number → DPD range in days) | `dpd_bucket` |
 | `months_since_4` | `SF_1_months_since_61_dpd` |
-| `restructure_blind_spot_flag` | `SF_1_restructured_flag` |
+| `restructure_blind_spot_flag` | `SF_1_history_gap_flag` |
 | `location_rule` + `location_unknown_reason` | `SF_2_location_reason` |
 | `last_uae_date` | `SF_2_last_uae_date` |
 | `last_uae_source` | `SF_2_last_uae_source` |
