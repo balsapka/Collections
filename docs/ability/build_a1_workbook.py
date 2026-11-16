@@ -25,13 +25,14 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 # --- rules (reference implementation, 61–180 DPD window unless ``w`` is given) --------------
 WINDOW = {"61–180 DPD": 3, "180+ DPD": 6}  # months, the scoring month included
-MIN_MONTHS = {3: 2, 6: 3}  # months of the window a flow or balance must reach its floor
-STABLE_FLOORS = {3: 2, 6: 3}  # the window's salary covers this many monthly floors
-INCOME_FLOOR, INCOME_ANCHOR, INCOME_MAX_FALL = 3000, 2, 0.25
+MIN_MONTHS = {3: 2, 6: 3}  # months of the window a flow or balance must be strong
+STABLE_AMOUNTS = {3: 2, 6: 3}  # the window's salary reaches this many strong amounts
+# income, money in, money out, the balance and assets are strong from one amount
+STRONG_FLOOR, STRONG_ANCHOR = 3000, 2
+INCOME_MAX_FALL, BALANCE_MAX_FALL = 0.25, 0.50
 MIN_SALARY = 1000  # smallest monthly salary that counts as evidence
-FLOW_FLOOR, MONEY_IN_SOME, MONEY_OUT_SOME = 1000, 1000, 500
-BALANCE_FLOOR, BALANCE_MAX_FALL = 3000, 0.50
-ASSET_FLOOR, ASSET_ANCHOR, INSTALMENT_FLOOR = 10000, 3, 1000
+FLOW_SOME = 1000  # money in or out in any month: Some
+INSTALMENT_FLOOR, INSTALMENT_ANCHOR = 1000, 1  # another credit product's instalment
 W = 3
 
 
@@ -49,6 +50,11 @@ def _holding(months: list, max_fall: float, missing_is_zero: bool, w: int) -> bo
     return True if not prior or recent is None else recent >= prior * (1 - max_fall)
 
 
+def strong_amount(anchor: float) -> float:
+    """The amount a family is strong from: max(AED 3,000, 2 × anchor)."""
+    return max(STRONG_FLOOR, STRONG_ANCHOR * anchor)
+
+
 def salary_months(internal: list, bureau: list) -> list:
     """Salary per month, oldest first: the larger of the internal and the bureau figure, a
     bureau figure counting in its own month and the next unless that month has its own."""
@@ -59,31 +65,29 @@ def salary_months(internal: list, bureau: list) -> list:
 
 def income(internal: list, bureau: list, anchor: float = 0, w: int = W) -> str:
     months = salary_months(internal, bureau)
-    floor = max(INCOME_FLOOR, INCOME_ANCHOR * anchor)
     has_internal = any((m or 0) >= MIN_SALARY for m in internal[-2 * w :])
     total = sum(m or 0 for m in months[-w:])
-    if total >= STABLE_FLOORS[w] * floor and _holding(months, INCOME_MAX_FALL, has_internal, w):
+    enough = total >= STABLE_AMOUNTS[w] * strong_amount(anchor)
+    if enough and _holding(months, INCOME_MAX_FALL, has_internal, w):
         return "stable"
     return "weak" if any((m or 0) >= MIN_SALARY for m in months[-w:]) else "none"
 
 
-def flow(months: list, some_floor: float, anchor: float = 0, w: int = W) -> str:
+def flow(months: list, anchor: float = 0, w: int = W) -> str:
     """Money in or money out over the window, oldest first."""
-    floor = max(FLOW_FLOOR, anchor)
-    if sum((m or 0) >= floor for m in months[-w:]) >= MIN_MONTHS[w]:
+    if sum((m or 0) >= strong_amount(anchor) for m in months[-w:]) >= MIN_MONTHS[w]:
         return "strong"
-    return "some" if any((m or 0) >= some_floor for m in months[-w:]) else "none"
+    return "some" if any((m or 0) >= FLOW_SOME for m in months[-w:]) else "none"
 
 
 def balance_held(months: list, anchor: float = 0, w: int = W) -> bool:
-    floor = max(BALANCE_FLOOR, anchor)
-    enough = sum((m or 0) >= floor for m in months[-w:]) >= MIN_MONTHS[w]
+    enough = sum((m or 0) >= strong_amount(anchor) for m in months[-w:]) >= MIN_MONTHS[w]
     return enough and _holding(months, BALANCE_MAX_FALL, False, w)
 
 
 def other_products(assets: float, current: bool, instalment: float, anchor: float = 0) -> str:
-    if assets >= max(ASSET_FLOOR, ASSET_ANCHOR * anchor) or (
-        current and instalment >= max(INSTALMENT_FLOOR, anchor)
+    if assets >= strong_amount(anchor) or (
+        current and instalment >= max(INSTALMENT_FLOOR, INSTALMENT_ANCHOR * anchor)
     ):
         return "strong"
     return "some" if current or assets > 0 else "none"
@@ -265,7 +269,8 @@ def overview(wb: Workbook) -> None:
         ("Distress", "A returned cheque or direct debit takes the state one level down."),
         ("Principle", "Customer level: every signal covers all the customer's accounts with us. "
                       "Only the months up to the scoring date are read, nothing from before the "
-                      "delinquency. Thresholds scale with what the customer must pay now."),
+                      "delinquency. One strong amount for every family, max(AED 3,000, 2 × "
+                  "what the customer must pay now)."),
         ("Unknown", "We cannot see the customer's money: absence of data, not evidence of no "
                     "ability."),
     ]:  # fmt: skip
@@ -327,8 +332,10 @@ TERMS = [
                "The prior window is the same number of months before that."),
     ("Anchor", "What the customer must pay now. Cards at 61–180 DPD: the amount in the oldest "
                "overdue bucket (up to 151–180 DPD) on the scoring month's statement. Loans: one "
-               "monthly instalment. Cards at 180+ DPD, or when missing: no anchor, the flat "
-               "floors apply."),
+               "monthly instalment, at 61–180 and at 180+ DPD. Cards at 180+ DPD, or when "
+               "missing: no anchor, the flat amounts apply."),
+    ("Strong amount", "max(AED 3,000, 2 × anchor): the one amount income, money in, money out, "
+                      "the balance and assets are strong from (AED 3,000 without an anchor)."),
     ("Current and savings accounts", "The customer's accounts of the bank's 49 current and "
                                      "savings account types. Term deposits and loan accounts "
                                      "are not among them."),
@@ -359,20 +366,19 @@ PARAMETERS = [  # (parameter, value, why)
      "Same as the other axes; activity is thinner at 180+."),
     ("Months needed", "2 of the 3 months, 3 of the 6 at 180+ (money in, money out, balance).",
      "Most months, not one."),
-    ("Income: monthly floor", "max(AED 3,000, 2 × anchor).",
-     "A salary that leaves room for the amount due."),
-    ("Income: Stable", "Window salary of 2 monthly floors (3 at 180+), not more than 25% below "
+    ("Strong amount", "max(AED 3,000, 2 × anchor), for income, money in, money out, the "
+                      "balance and assets.",
+     "One amount for every family, leaving room for what is due."),
+    ("Income: Stable", "Window salary of 2 strong amounts (3 at 180+), not more than 25% below "
                        "the prior window.",
      "The total, not the months: an employer may pay early. A falling salary is not stable."),
     ("Income: smallest salary", "AED 1,000 in a month.", "Below it is not evidence of income."),
     ("Bureau salary: carried", "1 month.", "Bureau figures arrive on a change, not monthly."),
-    ("Money in / out: Strong", "max(AED 1,000, 1 × anchor) a month.",
-     "Covers what is due."),
-    ("Money in / out: Some", "AED 1,000 in / AED 500 out in any month.",
-     "The account is in use."),
-    ("Balance held", "Average balance of max(AED 3,000, 1 × anchor) a month, not more than 50% "
-                     "below the prior window.", "Money that stays, not money passing through."),
-    ("Other products: assets", "max(AED 10,000, 3 × anchor).", "A real cushion."),
+    ("Money in / out: Strong", "The strong amount a month.", "Covers what is due."),
+    ("Money in / out: Some", "AED 1,000 in any month (in or out).", "The account is in use."),
+    ("Balance held", "Average balance of the strong amount a month, not more than 50% below the "
+                     "prior window.", "Money that stays, not money passing through."),
+    ("Other products: assets", "The strong amount.", "A cushion beyond what is due."),
     ("Other products: credit", "Current, with an instalment or minimum due of max(AED 1,000, "
                                "1 × anchor).", "The customer is paying another product on time."),
     ("Netting", "Opposite movement of the same amount (±1%) within 3 days.",
@@ -385,8 +391,8 @@ OTHER_COLUMNS = [
     ("Reason", "The distress, or else the first strong family."),
     ("Why Unknown", "No account: no movement and no positive balance on a current or savings "
                     "account in 12 months. Dormant account: otherwise."),
-    ("Money held", "The balance rule of F2 holds at the scoring date: a delinquent customer "
-                   "holding money above the floor."),
+    ("Money held", "The average balance of the scoring month reaches the strong amount: a "
+                   "delinquent customer holding money above it now."),
     ("Salary source", "Who shows a salary of AED 1,000 or more in the window: internal, bureau, "
                       "both or none."),
     ("Salary stopped", "Internal salary in the prior window, none in the window."),
@@ -421,25 +427,26 @@ def logic(wb: Workbook) -> None:
     s.section("Terms", gap=0)
     table(TERMS)
     flow_("F1 Income", [
-        ("The salary received in the window is at least 2 monthly floors (3 at 180+), the floor "
-         "being max(AED 3,000, 2 × anchor); and it is not more than 25% below the prior window. "
+        ("The salary received in the window is at least 2 strong amounts (3 at 180+), the strong "
+         "amount being max(AED 3,000, 2 × anchor); and it is not more than 25% below the prior "
+         "window. "
          "The fall compares the window totals. When neither window has an internal salary, it "
          "compares the average of the months that have a figure.", "stable"),
         ("A salary of AED 1,000 or more in any month of the window.", "weak"),
         ("Otherwise.", "none"),
     ])  # fmt: skip
     flow_("F2 Money in or held", [
-        ("Money in of max(AED 1,000, 1 × anchor) or more in 2 of the 3 months (3 of the 6 at "
+        ("Money in of max(AED 3,000, 2 × anchor) or more in 2 of the 3 months (3 of the 6 at "
          "180+). Or balance held: an average balance on the current and savings accounts of "
-         "max(AED 3,000, 1 × anchor) or more in as many months, with the window average not "
+         "max(AED 3,000, 2 × anchor) or more in as many months, with the window average not "
          "more than 50% below the prior window's.", "strong"),
         ("Money in of AED 1,000 or more in any month of the window.", "some"),
         ("Otherwise. A balance below the rule above is not evidence.", "none"),
     ])  # fmt: skip
     flow_("F3 Money out", [
-        ("Money out of max(AED 1,000, 1 × anchor) or more in 2 of the 3 months (3 of the 6 at "
+        ("Money out of max(AED 3,000, 2 × anchor) or more in 2 of the 3 months (3 of the 6 at "
          "180+).", "strong"),
-        ("Money out of AED 500 or more in any month of the window.", "some"),
+        ("Money out of AED 1,000 or more in any month of the window.", "some"),
         ("Otherwise.", "none"),
     ])  # fmt: skip
     s.section("F2 and F3: which movements on the current and savings accounts count")
@@ -451,7 +458,7 @@ def logic(wb: Workbook) -> None:
     s.note("A movement mirrored by an opposite movement of the same amount (±1%) within 3 days, "
            "on any of the customer's accounts, is dropped together with its mirror.")  # fmt: skip
     flow_("F4 Other products (at the end of the scoring month, the scored account left out)", [
-        ("Deposits, investments and wealth assets of max(AED 10,000, 3 × anchor) or more. Or "
+        ("Deposits, investments and wealth assets of max(AED 3,000, 2 × anchor) or more. Or "
          "another card or loan with us that is current, with an instalment or minimum due of "
          "max(AED 1,000, 1 × anchor) or more.", "strong"),
         ("Any other card or loan with us that is current, or any such asset above 0.", "some"),
@@ -498,27 +505,28 @@ INCOME_EXAMPLES = [  # (level, internal, bureau, anchor, why)
     ("weak", [8000, 8000, 8000, 8000, N, N], [N] * 6, 0,
      "Salary stopped: the window total is far below the prior window."),
     ("weak", [5000] * 6, [N] * 6, 4000,
-     "Anchor 4,000: floor 8,000 a month, 16,000 needed, 15,000 received."),
-    ("weak", [N, N, N, N, 2500, N], [N] * 6, 0, "Some salary, under two floors of 3,000."),
+     "Anchor 4,000: strong amount 8,000, 16,000 needed, 15,000 received."),
+    ("weak", [N, N, N, N, 2500, N], [N] * 6, 0, "Some salary, under two strong amounts of 3,000."),
     ("none", [N] * 6, [N] * 6, 0, "No salary of 1,000 or more."),
 ]  # fmt: skip
 MONEY_IN_EXAMPLES = [  # (level, money in per month of the window, anchor, why)
-    ("strong", [2000, 0, 1500], 0, "1,000 or more in 2 of the 3 months."),
-    ("some", [0, 5000, 300], 0, "Only one month of 1,000 or more."),
-    ("some", [2000, 2600, 1500], 2500, "Anchor 2,500: one month reaches it."),
-    ("none", [200, 0, 400], 0, "Movement, never 1,000 in a month."),
+    ("strong", [4000, 0, 3500], 0, "3,000 or more in 2 of the 3 months."),
+    ("some", [0, 5000, 300], 0, "Only one month of 3,000 or more."),
+    ("some", [2000, 1500, 2500], 0, "1,000 or more every month, never 3,000."),
+    ("some", [4000, 5500, 4500], 2500, "Anchor 2,500: strong from 5,000; one month reaches it."),
+    ("none", [200, 0, 900], 0, "Movement, never 1,000 in a month."),
 ]  # fmt: skip
 BALANCE_EXAMPLES = [  # (held, average balance per month, why)
     (True, [4000, 4000, 4000, 3500, 500, 3200], "3,000 or more in 2 of the 3 months; holding."),
     (False, [20000, 20000, 20000, 3500, 3200, 3100],
-     "Above the floor, but more than 50% below the prior window: draining."),
-    (False, [N, N, N, 5000, 0, 0], "Above the floor in one month only."),
+     "Above the strong amount, but more than 50% below the prior window: draining."),
+    (False, [N, N, N, 5000, 0, 0], "Above the strong amount in one month only."),
 ]  # fmt: skip
 PRODUCT_EXAMPLES = [  # (level, assets, another credit product current, its instalment, why)
-    ("strong", 25000, False, 0, "Term deposit of 25,000."),
+    ("strong", 5000, False, 0, "Term deposit of 5,000: above 3,000."),
     ("strong", 0, True, 1200, "Another card kept current, minimum due 1,200."),
     ("some", 0, True, 600, "Another loan kept current, instalment under 1,000."),
-    ("some", 2000, False, 0, "A small investment."),
+    ("some", 2000, False, 0, "A small investment, under 3,000."),
     ("none", 0, False, 0, "No other product, or none that is current."),
 ]  # fmt: skip
 STATE_EXAMPLES = [  # (state, F1, F2, F3, F4, distress, counted movement, why)
@@ -569,15 +577,16 @@ def examples(wb: Workbook) -> None:
         rows.append((want, LABEL[want], salary_months(internal, bureau), text))
     grid("Level", rows)
     s.note("Each cell is the salary of the month: the larger of the internal and the bureau "
-           "figure, a bureau figure carried one month.")  # fmt: skip
+           "figure, a bureau figure carried one month. Strong amount 3,000 unless an anchor is "
+           "given.")  # fmt: skip
 
     s.section("F2 Money in")
     rows = []
     for want, cells, anchor, text in MONEY_IN_EXAMPLES:
-        _check(flow([N] * W + cells, MONEY_IN_SOME, anchor), want, text)
+        _check(flow([N] * W + cells, anchor), want, text)
         rows.append((want, LABEL[want], [N] * W + cells, text))
     grid("Level", rows)
-    s.note("Money out reads the same way, with AED 500 in any month for Some.")
+    s.note("Money out reads the same way.")
 
     s.section("F2 Balance held: average balance of each month")
     rows = []
@@ -651,6 +660,12 @@ DETAIL = [  # (section, [(label, tone key)], {segment: counts in row order})
      {0: [4656, 6527], 1: [235821, 35594], 2: [430, 1203], 3: [36853, 10456]}),
 ]  # fmt: skip
 ENTRY = {"color": "0000FF", "fill": INPUT_FILL}
+EARLIER_RULES = (
+    "These numbers come from runs under the earlier amounts: money in and money out strong from "
+    "max(AED 1,000, 1 × anchor), money out Some from AED 500, balance held from max(AED 3,000, "
+    "1 × anchor), assets from max(AED 10,000, 3 × anchor). Income, the instalment rule, distress "
+    "and the state map are unchanged. They are replaced when the current rules have run."
+)
 
 
 def _pair(s: Sheet, col: int, count, base: str) -> None:
@@ -697,6 +712,7 @@ def results(wb: Workbook) -> None:
     _state_table(s, VARIANTS, ACCOUNTS, STATE_COUNTS)
     s.r += 1
     s.note("Aggregates only.")
+    s.note(EARLIER_RULES)
     s.ws.freeze_panes = "B6"
 
 
@@ -722,6 +738,7 @@ def detail(wb: Workbook) -> None:
     s.note("None includes customers with no current or savings account. Why Unknown is from "
            "the run before the latest bureau salary source, when Unknown was 147 (cards 61–180), "
            "335 (cards 180+), 11 and 33 (loans) accounts higher.")  # fmt: skip
+    s.note(EARLIER_RULES)
     s.ws.freeze_panes = "B6"
 
 
@@ -799,6 +816,7 @@ def validation(wb: Workbook) -> None:
     s.note("Every state cures and pays more, and rolls less, than the one below it. On loans "
            "High has 124 account-months, so its gap to Moderate is not significant. 180+ has "
            "no outcome test.")  # fmt: skip
+    s.note(EARLIER_RULES)
     s.ws.freeze_panes = "A4"
 
 
