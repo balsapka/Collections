@@ -218,6 +218,7 @@ If a task turns out to be bigger than one session, split it, record the split in
 | `snippets/` | Generated PROD snippets — modules with `main(catalog)`, run in a Kedro notebook |
 | `results/` | PROD run outputs (JSON), pushed from PROD and pulled into UAT |
 | `reference/feature_specs.md` | When implementing — formula-level label/spell/A4/A2 specs |
+| `reference/uc1_data_kb.md` | When a task names UC1 — what the call-transcript signal data is (store, tables, signal dictionary, formats, sample caveats). Proposal for its use: `results/uc1_integration_proposal.md` |
 | `reference/roadmap.md` | Only for orientation on why a task exists / what comes later |
 | `RESULTS.md` | Every session — append results, read before re-running anything |
 | `../problem_statement.md` | Human-facing companion. Not an instruction source; update its evidence lines when a diagnostic closes. |
