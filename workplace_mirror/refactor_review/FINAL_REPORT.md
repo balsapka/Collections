@@ -97,8 +97,8 @@ outputs are the reference; all four model_ids.
   (that prompt is not sent; it is the spec for the block); rl_180_plus B-window months with EMI = 0 /
   NULL / > 0; rows whose latest-contact disposition changes under the new same-day order; old vs new
   `a1_sweepable_balance_flag` crosstab.
-- **Before the build:** the three answers are in (2026-11-15); still needed: the UAT preflight answer
-  (the workplace A3 catalog listing, so persisted dues / payments go in only if it is back, else the
-  next A3 bundle; the workplace grep for removed and moved symbols); rebase onto the workplace-equivalent
+- **Before the build:** the three answers are in (2026-11-15); the UAT preflight is back (2026-11-17,
+  `bundle_helpers/b25_council/preflight_review.md`): no production caller breaks, three workplace tests
+  need Sonnet's update, persisted dues / payments go in as 4 catalog entries; rebase onto the workplace-equivalent
   head and re-run every gate; `--exclude _dcore_codes.py`; no registry edit.
 - **Not in bundle 25:** the dead-package deletion (S7 group A), the CASA handoff prompt, S2-12.
