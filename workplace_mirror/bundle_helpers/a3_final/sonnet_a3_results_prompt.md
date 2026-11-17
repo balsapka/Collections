@@ -1,0 +1,94 @@
+# A3: results for the model document (prompt for the UAT Sonnet)
+
+When to send: after bundle 25's step 8, once the A3 pipelines have been re-run in PROD for all four
+model_ids (cc_60_180, cc_180_plus, rl_60_180, rl_180_plus). The user runs the snippet in PROD per
+model_id and pastes `summary_a3_results.md` back to Claude. Claude then fills the yellow cells of the
+A3 model document (`docs/credibility/build_a3_workbook.py` → `a3_credibility_reference.xlsx`) on
+these sheets: Results, Results detail, Results trend, Results 180+ vintage and Validation.
+Sensitivity keeps its back-tests.
+
+````text
+Goal
+Produce every table of the A3 payment credibility model document's results sheets from the
+persisted A3 output after bundle 25 (rules D-A3-28..33: promise events, refusal lifted by a later
+plan or payment, card due at bucket 08, same-day contact order, points Kept 3 / Partly kept 2 /
+Broken 1 / Promised 1 / No promise 0). All four model_ids. Aggregates only; no pipeline change.
+
+Decided, to follow
+- Source: the persisted crx_<p>_a3_payment_credibility (p = cc / rl), loaded from the catalog. Do
+  not re-run or re-implement the engine. First check it is bundle 25's output: commitments_n is a
+  column, and a3_commitments_level takes values in kept / partly_kept / broken / promised /
+  no_promise. If not, stop and say so.
+- Scored rows = a3_unknown_reason is null. "Accounts in scope" = every row of the month; every
+  other count is over scored rows. The document shows three states (High / Moderate / Low); report
+  the Unknown count once per model_id as a check, not as a state.
+- Months: Results, detail and vintage use persona_end_date's month. Trend uses every month the
+  output holds. Validation pools the month ends that leave 3 full months of outcome after them.
+- Splits (the definitions the persona code already uses; say which column you took):
+  - RL product: rl_spine.loan_type → Personal Loans / Personal Cash Loans / Auto (anything else
+    as is, listed separately).
+  - DPD band at the observation date: 61–90 / 91–120 / 121–150 / 151–180 at 61–180;
+    181–360 / 361–720 / 720+ at 180+. Cards at 180+: from the charge-off age where the spine has
+    no DPD.
+  - 180+ vintage: early-stage = charged off less than 24 months ago, late-stage = 24 or more
+    (CC chargeoff_age_months; RL feat_loan_chargeoff_segment).
+- Outcomes, per (account, observation date), over the 3 months after the observation date, from
+  the A3 dues and payments (the persisted crx_<p>_a3_dues / crx_<p>_a3_payments if the catalog has
+  them; else run the A3 source nodes on catalog loads, unchanged):
+  - paid_due = payments in the 3 months reach max(one month's due at the observation date,
+    100 AED);
+  - paid_any = payments in the 3 months reach 100 AED.
+- Other axes, persona_end_date's month, from their persisted outputs: A1 ability state; A2
+  reachability (Reachable / Non-Reachable / Unknown) and location (In Country / Skip / Unknown);
+  A4 family.
+
+Tables (per model_id; counts unless a % is asked; cells under 10 as "<10")
+T1 Results. Accounts in scope, High, Moderate, Low. CC: one row. RL: one row per product and a
+   total.
+T2 Results detail (scored rows):
+   - scored accounts;
+   - A levels: kept, partly_kept, broken, promised, no_promise;
+   - B levels: regular, some, none;
+   - C levels: clean, not_clean, no_record split by pre_dlq_reason (too few months due vs
+     censored = delinquent since before the history we hold);
+   - a3_points_total 0..6 (any other value: list it, it is a defect);
+   - refusal flag; refusals that lower the state (the state is below the one its points give);
+     refusals lifted (refusal_followed_by_plan or refusal_followed_by_payment); dispute; no pickup
+     after contact; hung up.
+T3 State by DPD band: High / Moderate / Low counts per band.
+T4 Trend: High / Moderate / Low counts per month end, labelled "Jan 2026" style.
+T5 180+ vintage (180+ only): accounts in scope, High / Moderate / Low per vintage.
+T6 Validation (pooled outcome months; give the months):
+   - per state: n, paid_due %, paid_any %;
+   - paid_due % by state within each group: DPD band; RL product (RL); vintage (180+);
+   - AUC of the state on paid_due: overall, within each DPD band, and of a3_points_total;
+   - paid_due % by a3_points_total 0..6, with n;
+   - stability, accounts present in consecutive months, pooled: same state %, up %, down %, High
+     staying High %, Moderate staying Moderate %;
+   - Cramér's V of the A3 state with A1, A2 reachability, A2 location and the A4 family (latest
+     month).
+T7 Checks: Unknown count; rows whose a3_points_total differs from the points of their three levels
+   (Kept 3 / Partly kept 2 / Broken 1 / Promised 1 / No promise 0; Regular 2 / Some 1; Clean 1)
+   and rows whose state differs from the points and refusal rule (High from 4, Moderate from 2,
+   one level down for a refusal): both expected 0.
+
+Rules
+catalog.load only; model_id = catalog.load("params:model_id"), in every output file name;
+aggregates only, no account / agreement / CIF ids. A part that fails records its error and the
+rest still runs. Performance: literal date filters right after catalog.load; one pass per table
+group over a localCheckpoint of the joined frame; broadcast the small tables; no row-level
+collect; for the AUCs at 180+ aggregate to (score, outcome) counts first. Work in a new tracked
+folder tmp_validation/a3_results/ and commit only that.
+
+Deliverables
+1. Snippet + README_a3_results.md, pushed from UAT.
+2. The user runs it in PROD per model_id and commits results_a3_<model_id>.md.
+3. Back in UAT: summary_a3_results.md, which the user pastes back to Claude.
+   - All four model_ids together, one markdown table per T-table with a model_id column, in the
+     row order above, numbers only (no prose inside tables).
+   - Under 300 lines.
+   - End with five lines: does High > Moderate > Low hold on paid_due in every group; how the
+     state mix compares with the earlier back-test (cards 61–180 High / Moderate / Low 11.8 /
+     32.9 / 55.3%); where A3 overlaps the other axes most; the T7 checks; anything that looks
+     wrong.
+````

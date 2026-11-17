@@ -28,16 +28,16 @@ S61, S180 = "61–180 DPD", "180+ DPD"
 CARD, LOAN = "Card", "Loan"
 HIGH_FROM, MODERATE_FROM = 4, 2
 POINTS = {
-    "kept": 2, "partly": 1, "thin": 0, "broken": -1,
+    "kept": 3, "partly": 2, "broken": 1, "promised": 1, "no_promise": 0,
     "regular": 2, "some": 1, "none": 0,
     "clean": 1, "not_clean": 0, "no_record": 0,
 }  # fmt: skip
-A_LEVELS = ["kept", "partly", "thin", "broken"]
+A_LEVELS = ["kept", "partly", "broken", "promised", "no_promise"]
 B_LEVELS = ["regular", "some", "none"]
 C_LEVELS = ["clean", "not_clean", "no_record"]
 MIN_AED = 100  # smallest payment that counts as a payment
 MIN_CONCLUDED, KEPT_RATE, BROKEN_RATE, BROKEN_STREAK = 2, 0.80, 0.40, 3
-NOTE_RUN_DAYS = 7  # notes at most this far apart are one promise; a plan absorbs a note this near
+NEXT_STATEMENT_MAX_DAYS = 31  # a card deadline is never later than this after the promise
 WINDOW = {S61: 3, S180: 6}  # months of payments in delinquency
 REGULAR_FROM = {S61: 2, S180: 3}  # months with a qualifying payment
 SOME_WINDOW = {S61: 3, S180: 12}
@@ -48,7 +48,8 @@ AS_BILLED, MISSED, NO_DUE = "✓", "✗", "·"  # one month before the delinquen
 
 
 def promises(history: str) -> str:
-    """Level A from the promises of the last 12 months, oldest first (pending ones ignored)."""
+    """Level A from the promise events of the last 12 months, oldest first (pending ones
+    count only for Promised)."""
     done = [p == KEPT for p in history if p != PENDING]
     n, kept = len(done), sum(done)
     if (n >= BROKEN_STREAK and not any(done[-BROKEN_STREAK:])) or (
@@ -57,7 +58,9 @@ def promises(history: str) -> str:
         return "broken"
     if n >= MIN_CONCLUDED and kept / n >= KEPT_RATE:
         return "kept"
-    return "partly" if kept else "thin"
+    if kept:
+        return "partly"
+    return "promised" if history else "no_promise"
 
 
 def payments(months: str, seg: str) -> str:
@@ -84,6 +87,11 @@ def state(a: str, b: str, c: str, refusal: bool = False) -> str:
     return "moderate" if pts >= MODERATE_FROM and not refusal else "low"
 
 
+def state_of_points(pts: int) -> str:
+    """The state of a points total without a refusal."""
+    return "high" if pts >= HIGH_FROM else "moderate" if pts >= MODERATE_FROM else "low"
+
+
 def month_end(day: dt.date) -> dt.date:
     return (day.replace(day=1) + dt.timedelta(days=32)).replace(day=1) - dt.timedelta(days=1)
 
@@ -91,30 +99,36 @@ def month_end(day: dt.date) -> dt.date:
 def deadline(product: str, seg: str, day: dt.date, statement: dt.date | None = None) -> dt.date:
     """The last day a payment still counts for a promise made on ``day``."""
     if product == CARD and seg == S61:
-        return statement or day + dt.timedelta(days=31)
+        cap = day + dt.timedelta(days=NEXT_STATEMENT_MAX_DAYS)
+        return min(statement, cap) if statement else cap
     return month_end(day)
 
 
-def outcome(product, seg, day, due, pays, statement=None) -> str:
-    """One promise judged by the payments ``[(date, amount)]`` that followed it."""
+def _paid(product, day, end, pays) -> float:
+    """Payments after the event day up to ``end``; loans: the event month's cash counts."""
     start = day.replace(day=1) - dt.timedelta(days=1) if product == LOAN else day
-    end = deadline(product, seg, day, statement)
-    paid = sum(amount for d, amount in pays if start < d <= end)
+    return sum(amount for d, amount in pays if start < d <= end)
+
+
+def outcome(product, seg, day, due, pays, statement=None) -> str:
+    """One event judged by the payments ``[(date, amount)]`` that followed its first day."""
+    paid = _paid(product, day, deadline(product, seg, day, statement), pays)
     return "paid" if paid >= max(due, MIN_AED) else "partial" if paid >= MIN_AED else "unpaid"
 
 
-def promise_days(notes: list[dt.date], plans: list[dt.date], cutoff) -> list[dt.date]:
-    """The promises (dated) that collector notes and plans amount to."""
-    runs, prev = [], None
-    for d in sorted(notes):
-        if not runs or (d - prev).days > NOTE_RUN_DAYS or d > cutoff(runs[-1]):
-            runs.append(d)
-        prev = d
-    for plan in sorted(plans):
-        near = [r for r in runs if abs((r - plan).days) <= NOTE_RUN_DAYS]
-        if near:
-            runs.remove(min(near, key=lambda r: abs((r - plan).days)))
-    return sorted([*plans, *runs])
+def events(product, promise_days, due, pays, statement=None) -> list[dt.date]:
+    """The event start days (61–180) that a stream of promise days amounts to: an event is
+    alive until its deadline passes or the payments since its day reach the amount to pay;
+    every promise meanwhile belongs to it."""
+    starts: list[dt.date] = []
+    for day in sorted(promise_days):
+        if starts:
+            start = starts[-1]
+            paid = _paid(product, start, day - dt.timedelta(days=1), pays)
+            if day <= deadline(product, S61, start, statement) and paid < max(due, MIN_AED):
+                continue
+        starts.append(day)
+    return starts
 
 
 # --- design system --------------------------------------------------------------------------
@@ -128,14 +142,15 @@ TONE = {  # (fill, text)
 }
 KEY_TONE = {
     "high": "good", "moderate": "mid", "low": "bad",
-    "kept": "good", "partly": "mid", "thin": "unknown", "broken": "bad",
+    "kept": "good", "partly": "good", "broken": "mid", "promised": "mid", "no_promise": "unknown",
     "regular": "good", "some": "mid", "none": "bad",
     "clean": "good", "not_clean": "bad", "no_record": "unknown",
     "paid": "good", "partial": "bad", "unpaid": "bad", "refusal": "bad",
 }  # fmt: skip
 LABEL = {
     "high": "High", "moderate": "Moderate", "low": "Low",
-    "kept": "Kept", "partly": "Partly kept", "thin": "Thin", "broken": "Broken",
+    "kept": "Kept", "partly": "Partly kept", "broken": "Broken", "promised": "Promised",
+    "no_promise": "No promise",
     "regular": "Regular", "some": "Some", "none": "None",
     "clean": "Clean", "not_clean": "Not clean", "no_record": "No record",
     "paid": "Kept", "partial": "Not kept (partial)", "unpaid": "Not kept", "refusal": "Refusal",
@@ -265,7 +280,7 @@ class Sheet:
 
 # --- overview -------------------------------------------------------------------------------
 def overview(wb: Workbook) -> None:
-    s = Sheet(wb.active, [24, 24, 24, 24, 24])
+    s = Sheet(wb.active, [24, 19, 19, 19, 19, 19])
     s.ws.title = "Overview"
     s.title(
         "A3 Payment Credibility",
@@ -275,8 +290,9 @@ def overview(wb: Workbook) -> None:
     for k, v in [
         ("Scope", "Credit cards and retail loans (Personal Loans, Personal Cash Loans, Auto) at "
                   "61–180 DPD and 180+ DPD, scored at each month end."),
-        ("A. Promises", "Does the customer do what they commit to? Promises of the last 12 "
-                        "months, each judged by the payments that followed it."),
+        ("A. Promises", "Does the customer commit, and keep to it? Promises of the last 12 "
+                        "months, each judged by the payments that followed it. Any promise "
+                        "counts: customers who promise pay more than those who never do."),
         ("B. Payments", "Is money coming in now? Payments in the recent months of the current "
                         "delinquency."),
         ("C. Record", "Did they pay as billed before? The 12 months before the delinquency "
@@ -288,32 +304,31 @@ def overview(wb: Workbook) -> None:
         ("Read with", "Ability: no payment can mean inability, not unwillingness."),
     ]:  # fmt: skip
         s.text(1, k, bold=True, color=NAVY, border=False)
-        s.text(2, v, span=4, border=False)
-        s.fit([(v, s.width(2, 5))], floor=18)
+        s.text(2, v, span=5, border=False)
+        s.fit([(v, s.width(2, 6))], floor=18)
         s.r += 1
     s.section("States")
-    s.header(["State", "Rule", "Meaning"], [1, 2, 2])
+    s.header(["State", "Rule", "Meaning"], [1, 2, 3])
     for st, rule, meaning in [
         ("high", "4 points or more, no refusal.",
-         "Keeps promises and money is coming in."),
+         "Has promised and money is coming in."),
         ("moderate", "2 or 3 points, no refusal. Or 4 or more with a refusal.",
          "Some evidence to rely on, not yet consistent; or a strong record with a fresh refusal."),
         ("low", "Fewer than 2 points. Or fewer than 4 with a refusal.",
-         "Little or nothing positive on record, or it is outweighed by broken promises or a "
-         "refusal."),
+         "Little or nothing positive on record, or it is outweighed by a refusal."),
     ]:  # fmt: skip
         s.chip(1, st)
         s.text(2, rule, span=2, align=MID)
-        s.text(4, meaning, span=2, align=MID)
-        s.fit([(rule, s.width(2, 3)), (meaning, s.width(4, 5))])
+        s.text(4, meaning, span=3, align=MID)
+        s.fit([(rule, s.width(2, 3)), (meaning, s.width(4, 6))])
         s.r += 1
     s.section("Dimensions and points")
-    s.header(["Dimension", "Levels", "", "", ""])
-    s.ws.merge_cells(start_row=s.r - 1, start_column=2, end_row=s.r - 1, end_column=5)
+    s.header(["Dimension", "Levels", "", "", "", ""])
+    s.ws.merge_cells(start_row=s.r - 1, start_column=2, end_row=s.r - 1, end_column=6)
     for name, levels in [("A. Promises kept", A_LEVELS), ("B. Payments in delinquency", B_LEVELS),
                          ("C. Record before delinquency", C_LEVELS)]:  # fmt: skip
         s.text(1, name, bold=True, align=MID)
-        for col in range(2, 6):
+        for col in range(2, 7):
             lev = levels[col - 2] if col - 2 < len(levels) else None
             s.chip(col, lev, _points(lev), align=CENTER) if lev else s.text(col, None)
         s.ws.row_dimensions[s.r].height = 30
@@ -334,10 +349,10 @@ TERMS = [
                     "it. It starts on the first day of its first month."),
     ("Month", "Card: a statement cycle, from one statement to the next. Loan: a calendar month."),
     ("One month's due", "Card: the oldest unpaid monthly amount on the statement, or the minimum "
-                        "due when nothing is overdue. Once the whole overdue amount is "
-                        "accumulated at 210+ DPD: the average minimum due of the last 12 months "
-                        "that had one. Loan: the monthly instalment, the last known one when the "
-                        "month has none."),
+                        "due when nothing is overdue. On a statement where the 210+ DPD bucket "
+                        "holds money: the average of that amount over the latest 12 months before "
+                        "the bucket first held money (none: no due). Loan: the monthly "
+                        "instalment, the last known one when the month has none."),
     ("Qualifying payment", "The payments of a month reach one month's due and at least 100 AED."),
     ("Paid as billed", "The payments of a month reach the amount due, before the next statement "
                        "(loans: within the month). Paying the minimum counts, whatever its size."),
@@ -348,31 +363,36 @@ PROMISE_RULES = [
                 "cancelled, or a collector note of a promise: promise to pay (full, partial or "
                 "scheduled), digital collect subscribed, will pay at salary. Not a promise: a "
                 "soft or re-affirmed promise, a payment the customer reports."),
-    ("One promise", "Every plan is one promise, dated at its start. A collector note is the "
-                    "same promise as the note before it when it comes at most 7 days later and "
-                    "not after that promise's deadline; otherwise it is a new promise, dated at "
-                    "its first note. A plan absorbs the nearest note-promise within 7 days."),
+    ("Event", "Plans (dated at their start) and collector notes (dated at the call) are one "
+              "stream. An event starts with a promise and stays alive until its deadline passes "
+              "or the payments since its first day reach the amount to pay; every promise "
+              "meanwhile belongs to it, also one on the deadline day. The next promise starts a "
+              "new event. Loans: cash is known by month, so all promises of a month are one "
+              "event."),
     ("Window", "Promises dated in the 12 months up to the scoring date, earlier delinquencies "
                "included."),
-    ("Deadline", "Fixed, whatever date was promised. Cards at 61–180 DPD: the next statement "
-                 "after the promise day (31 days when there is none yet). Loans, and every "
-                 "account at 180+ DPD: the last day of the month of the promise. A payment on "
-                 "the deadline day counts."),
-    ("Kept", "The payments after the promise day, up to the deadline, reach one month's due as "
-             "of the promise day (at least 100 AED). Less is not kept, a partial payment "
-             "included. Loans: the payments of the promise month count in full."),
-    ("Concluded", "The deadline is on or before the scoring date. Pending promises are not "
-                  "counted."),
+    ("Deadline", "Set by the event's first day, whatever date was promised. Cards at 61–180 "
+                 "DPD: the next statement, at most 31 days later. Loans, and every account at "
+                 "180+ DPD: the last day of that month. A payment on the deadline day counts."),
+    ("Amount to pay", "One month's due on the event's first day, at least 100 AED."),
+    ("Kept", "The payments after the event's first day, up to the deadline, reach the amount to "
+             "pay. Less is not kept, a partial payment included. Loans: the payments of the "
+             "event month count in full."),
+    ("Concluded", "The deadline is on or before the scoring date, also for an event paid "
+                  "early. Pending events count only for Promised."),
 ]  # fmt: skip
 PARAMETERS = [  # (parameter, value, why)
     ("Promises: window", "12 months, earlier delinquencies included.",
      "Trust is a track record."),
-    ("Promises: deadline", "Cards at 61–180: next statement. Loans and 180+: end of the promise "
-                           "month.", "Set by GRR; one rule whatever date was promised."),
+    ("Promises: deadline", "Cards at 61–180: next statement (at most 31 days). Loans and "
+                           "180+: end of the promise month.",
+     "Set by GRR; one rule whatever date was promised."),
     ("Promises: amount to pay", "One month's due, at least 100 AED.",
      "What a customer can be asked for in a month; a token payment keeps no promise."),
-    ("Promises: notes joined", "At most 7 days apart and within the deadline.",
-     "Repeated notes on one promise; a note after the deadline is a new promise."),
+    ("Promises: one event", "Alive until the deadline or until paid.",
+     "Repeated promises on one debt are one commitment."),
+    ("Promises: points", "Kept 3, Partly kept 2, Broken 1, Promised 1, No promise 0.",
+     "Promising is engagement even when missed; keeping it is stronger."),
     ("Promises: concluded needed", "2, for Kept and for Broken by share.",
      "One promise is not a pattern."),
     ("Promises: Kept / Broken", "Kept from 80% kept. Broken under 40% kept, or the last 3 all "
@@ -390,9 +410,11 @@ PARAMETERS = [  # (parameter, value, why)
     ("Record: Clean", "Paid as billed in 80% of the months with an amount due.",
      "Allows an occasional miss."),
     ("State: High / Moderate", "High from 4 points, Moderate from 2.",
-     "Payment rates step up at 2 points; High cannot be reached without a kept promise."),
+     "Payment rates step up at 2 points; High needs a promise and payments."),
     ("Refusal: look-back", "The current delinquency, at most 24 months.",
      "A refusal belongs to this delinquency."),
+    ("Refusal: lifted", "A plan, or 100 AED paid, on or after the refusal day (loans: in the "
+                        "refusal month or later).", "Counted only when nothing followed it."),
 ]  # fmt: skip
 OTHER_COLUMNS = [
     ("Dispute", "The latest conversation was a dispute of the debt. Contesting is not refusing."),
@@ -400,7 +422,7 @@ OTHER_COLUMNS = [
                                 "that rang out, went unanswered or left a message, with no dead "
                                 "line in between."),
     ("Hung up", "The customer hung up on the latest conversation."),
-    ("Inputs", "Every count behind the state: promises concluded, kept and partial, months with "
+    ("Inputs", "Every count behind the state: promise events, concluded, kept and partial, months with "
                "a qualifying payment, months due and paid as billed, the levels and the points."),
 ]  # fmt: skip
 
@@ -437,7 +459,8 @@ def logic(wb: Workbook) -> None:
          "fewer than 40% of them kept.", "broken"),
         ("At least 2 concluded and 80% or more of them kept.", "kept"),
         ("At least one kept.", "partly"),
-        ("Otherwise: no concluded promise, or a single one, not kept.", "thin"),
+        ("Any other event in the 12 months: none concluded yet, or one not kept.", "promised"),
+        ("Otherwise: no promise in the 12 months.", "no_promise"),
     ])  # fmt: skip
     flow("B. Payments in delinquency: level", [
         ("A qualifying payment in 2 or more of the last 3 months (3 or more of the last 6 at "
@@ -454,8 +477,10 @@ def logic(wb: Workbook) -> None:
     ])  # fmt: skip
     flow("Refusal", [
         ("The latest conversation in the current delinquency (at most 24 months back) ended in "
-         "a refusal (refuse to pay, rewrite not agreed), and since then no plan has started and no month has 100 AED or more paid. "
-         "On the same day, any other conversation counts as later than the refusal.", "refusal"),
+         "a refusal (refuse to pay, rewrite not agreed), and no plan started and no 100 AED or "
+         "more was paid on or after its day (loans: in its month or later). Several "
+         "conversations on one day: the strongest is the latest: promise, payment reported, "
+         "refusal, dispute, contact, hung up.", "refusal"),
     ], label=lambda _: "One level down")  # fmt: skip
     flow("State: total points = A + B + C", [
         ("4 points or more, and no refusal.", "high"),
@@ -498,12 +523,13 @@ def state_map(wb: Workbook) -> None:
     for (a, b, c, refusal), want in {
         ("kept", "regular", "no_record", False): "high",
         ("kept", "regular", "no_record", True): "moderate",
-        ("partly", "regular", "clean", False): "high",
-        ("thin", "regular", "clean", False): "moderate",
-        ("thin", "some", "clean", True): "low",
-        ("thin", "none", "clean", False): "low",
-        ("broken", "regular", "clean", False): "moderate",
-        ("broken", "regular", "not_clean", False): "low",
+        ("partly", "regular", "no_record", False): "high",
+        ("no_promise", "regular", "clean", False): "moderate",
+        ("no_promise", "some", "clean", True): "low",
+        ("no_promise", "none", "clean", False): "low",
+        ("promised", "none", "clean", False): "moderate",
+        ("broken", "regular", "clean", False): "high",
+        ("broken", "regular", "not_clean", False): "moderate",
     }.items():
         assert state(a, b, c, refusal) == want, (a, b, c, refusal)
 
@@ -527,30 +553,31 @@ ONE_PROMISE = [  # (outcome, product, segment, promise day, due, payments, next 
     ("paid", CARD, S180, D(2026, 3, 12), 600, [(D(2026, 3, 30), 400), (D(2026, 3, 31), 200)],
      None, "At 180+ the deadline is the month end; payments add up."),
 ]  # fmt: skip
-COUNTING = [  # (promises, product, notes, plans, next statement, why)
-    (1, CARD, [D(2026, 3, 3), D(2026, 3, 6), D(2026, 3, 9)], [], D(2026, 3, 25),
-     "Notes at most 7 days apart are one promise, dated 3 Mar."),
-    (2, CARD, [D(2026, 3, 3), D(2026, 3, 14)], [], D(2026, 3, 25),
-     "11 days apart: two promises."),
-    (2, LOAN, [D(2026, 3, 28), D(2026, 4, 2)], [], None,
-     "5 days apart, but the second note is after the first promise's deadline (31 Mar)."),
-    (1, CARD, [D(2026, 3, 7)], [D(2026, 3, 5)], D(2026, 3, 25),
-     "The plan absorbs the note 2 days later."),
-    (2, CARD, [D(2026, 3, 20)], [D(2026, 3, 5)], D(2026, 3, 25),
-     "The note is 15 days from the plan: a promise of its own."),
+COUNTING = [  # (events, product, promise days, payments, why); due 800, statement 25 Mar
+    (1, CARD, [D(2026, 3, 3), D(2026, 3, 14), D(2026, 3, 20)], [],
+     "Nothing paid: every promise up to the 25 Mar deadline joins the first."),
+    (2, CARD, [D(2026, 3, 3), D(2026, 3, 14)], [(D(2026, 3, 10), 800)],
+     "Paid in full on 10 Mar: the event ends, 14 Mar starts a new one."),
+    (1, CARD, [D(2026, 3, 3), D(2026, 3, 14)], [(D(2026, 3, 10), 300)],
+     "A partial payment does not end the event."),
+    (2, CARD, [D(2026, 3, 20), D(2026, 3, 27)], [],
+     "27 Mar is after the 25 Mar deadline: a new event."),
+    (1, LOAN, [D(2026, 3, 5), D(2026, 3, 28)], [(D(2026, 3, 31), 800)],
+     "Loan cash is known by month: all promises of March are one event."),
 ]  # fmt: skip
+STATEMENT = D(2026, 3, 25)
 A_EXAMPLES = [
     ("kept", "KKKKK", "5 concluded, all kept."),
     ("kept", "KXKKKK", "5 of 6 kept (83%)."),
     ("partly", "KXKK", "3 of 4 kept (75%): under 80%."),
     ("partly", "K", "A single promise, kept: one is not a pattern."),
-    ("partly", "KKXXP", "2 of 4 kept; the pending promise is not counted."),
+    ("partly", "KKXXP", "2 of 4 kept; the pending event is not counted."),
     ("broken", "KKKXXX", "The last 3 were all not kept, whatever came before."),
     ("broken", "XX", "2 concluded, none kept."),
     ("broken", "XXKXX", "1 of 5 kept (20%): under 40%."),
-    ("thin", "X", "A single promise, not kept."),
-    ("thin", "P", "One promise, still pending."),
-    ("thin", "", "No promise in 12 months."),
+    ("promised", "X", "A single event, not kept."),
+    ("promised", "P", "One event, still pending."),
+    ("no_promise", "", "No promise in 12 months."),
 ]  # fmt: skip
 B_EXAMPLES = {
     S61: [
@@ -575,14 +602,14 @@ C_EXAMPLES = [
     ("no_record", "✓✓✓✓✓✓✓✓✓✓✓✓", False, "Delinquent since before the history we hold."),
 ]  # fmt: skip
 STATE_EXAMPLES = [  # (state, A, B, C, refusal, why)
-    ("high", "kept", "regular", "clean", False, "Keeps promises, pays, clean before."),
-    ("high", "partly", "regular", "clean", False, "4 points with a mixed promise record."),
-    ("moderate", "kept", "regular", "no_record", True, "4 points, one level down for a refusal."),
-    ("moderate", "thin", "regular", "clean", False, "Pays without promising: 3 points."),
-    ("moderate", "broken", "regular", "clean", False, "Broken promises cost a point; the payments still count."),
-    ("low", "thin", "none", "clean", False, "A clean past alone is 1 point."),
-    ("low", "thin", "some", "clean", True, "2 points, one level down for a refusal."),
-    ("low", "thin", "none", "no_record", False, "Delinquent with nothing positive on record."),
+    ("high", "kept", "regular", "clean", False, "Keeps promises, pays, clean before: 6 points."),
+    ("high", "broken", "regular", "clean", False, "Promised and pays: a missed promise still counts."),
+    ("moderate", "kept", "regular", "no_record", True, "5 points, one level down for a refusal."),
+    ("moderate", "no_promise", "regular", "clean", False, "Pays without promising: 3 points."),
+    ("moderate", "promised", "none", "clean", False, "Promised, nothing kept yet, clean before."),
+    ("low", "no_promise", "none", "clean", False, "A clean past alone is 1 point."),
+    ("low", "no_promise", "some", "clean", True, "2 points, one level down for a refusal."),
+    ("low", "no_promise", "none", "no_record", False, "Delinquent with nothing positive on record."),
 ]  # fmt: skip
 
 
@@ -630,7 +657,7 @@ def examples(wb: Workbook) -> None:
     def cases(head: list[str], spans: list[int]) -> None:
         s.header([head[0], *head[1:], "Why"], [1, *spans, 1], height=30)
 
-    s.section("A. One promise: kept or not", gap=0)
+    s.section("A. One event: kept or not", gap=0)
     cases(["Outcome", "Account", "Promise → deadline", "Due", "Paid by the deadline"], [3, 4, 2, 3])
     for want, product, seg, day, due, pays, statement, text in ONE_PROMISE:
         _check(outcome(product, seg, day, due, pays, statement), want, text)
@@ -646,15 +673,14 @@ def examples(wb: Workbook) -> None:
         s.ws.row_dimensions[s.r].height = 20
         s.r += 1
 
-    s.section("A. Counting promises (61–180 DPD)")
-    cases(["Promises", "Account", "Collector notes", "Plan"], [2, 6, 4])
-    for want, product, notes, plans, statement, text in COUNTING:
-        got = promise_days(notes, plans, lambda d, p=product, st=statement: deadline(p, S61, d, st))
-        _check(len(got), want, text)
+    s.section("A. Promises into events (61–180 DPD, due 800, cards' statement 25 Mar)")
+    cases(["Events", "Account", "Promises (plans or notes)", "Payments"], [2, 6, 4])
+    for want, product, days, pays, text in COUNTING:
+        _check(len(events(product, days, 800, pays, STATEMENT)), want, text)
         s.text(1, want, bold=True, align=CENTER)
         s.text(2, product, span=2, align=MID)
-        s.text(4, ", ".join(_day(d) for d in notes), span=6, align=MID)
-        s.text(10, ", ".join(_day(d) for d in plans) or "–", span=4, align=MID)
+        s.text(4, ", ".join(_day(d) for d in days), span=6, align=MID)
+        s.text(10, ", ".join(f"{a:,} on {_day(d)}" for d, a in pays) or "–", span=4, align=MID)
         s.text(why, text, align=MID)
         s.ws.row_dimensions[s.r].height = 20
         s.r += 1
@@ -664,7 +690,7 @@ def examples(wb: Workbook) -> None:
     for want, cells, text in A_EXAMPLES:
         _check(promises(cells), want, text)
     grid("Level", [str(k) for k in range(1, GRID + 1)], A_EXAMPLES)
-    s.note("One cell per promise of the last 12 months, oldest first.")
+    s.note("One cell per event of the last 12 months, oldest first.")
 
     months = [("Now" if k == 0 else str(k)) for k in range(1 - GRID, 1)]
     legend_b = [(QUALIFYING, "qualifying payment"), (SMALL, "100 AED or more"), (NOTHING, "nothing")]
@@ -702,7 +728,7 @@ def examples(wb: Workbook) -> None:
 
 
 # --- results --------------------------------------------------------------------------------
-RESULTS_DATE = "31 Aug 2026"
+RESULTS_DATE = "the latest month end of the run"  # set when the results are filled
 PRODUCTS = ["Personal Loans", "Personal Cash Loans", "Auto"]
 VARIANTS = (["CC\n61–180", "CC\n180+"]
             + [f"RL 61–180\n{p}" for p in PRODUCTS] + ["RL 61–180\ntotal"]
@@ -710,74 +736,37 @@ VARIANTS = (["CC\n61–180", "CC\n180+"]
 SEGMENTS = ["CC\n61–180", "CC\n180+", "RL\n61–180", "RL\n180+"]
 VINTAGES = [f"{prod}\n{v}" for prod in ("CC 180+", "RL 180+")
             for v in ("early-stage\ncharge-off", "late-stage\ncharge-off")]  # fmt: skip
-# Production run, month end 31 Aug 2026. Counts where the run kept them, else shares (%).
-ACCOUNTS = [19292, 318663, 1397, 1224, 1364, 3985, 33862, 10306, 11203, 55371]
-STATE_COUNTS = {0: [490, 3750, 15052], 1: [159, 8288, 310216],
-                5: [126, 980, 2879], 9: [120, 2289, 52962]}  # fmt: skip
-STATE_SHARES = {2: [1.1, 18.8, 80.0], 3: [2.5, 24.5, 73.0], 4: [5.8, 30.6, 63.6],
-                6: [0.1, 2.2, 97.7], 7: [0.5, 8.7, 90.8], 8: [0.4, 5.8, 93.8]}  # fmt: skip
-VINTAGE_ACCOUNTS = [61112, 257551, 10050, 45321]
-VINTAGE_SHARES = {0: [0.2, 10.9, 88.9], 1: [0.0, 0.6, 99.4],
-                  2: [0.6, 16.4, 83.0], 3: [0.1, 1.4, 98.5]}  # fmt: skip
-SEGMENT_ACCOUNTS = [19292, 318663, 3985, 55371]
-DETAIL = [  # (section, [(label, tone key)], {segment: values}, values are counts?)
-    ("A. Promises kept", [(_points(k), k) for k in A_LEVELS],
-     {0: [2.3, 13.9, 70.2, 13.6], 1: [0.0, 0.8, 97.9, 1.2],
-      2: [4.8, 12.0, 74.5, 8.6], 3: [0.2, 1.3, 97.7, 0.8]}, False),
-    ("B. Payments in delinquency", [(_points(k), k) for k in B_LEVELS],
-     {0: [7.5, 17.6, 74.9], 1: [0.7, 5.2, 94.1], 2: [10.9, 32.4, 56.7], 3: [1.0, 7.2, 91.8]},
-     False),
+# Production run after the latest model change: filled from the results prompt
+# (bundle_helpers/a3_final/sonnet_a3_results_prompt.md). Empty = not run yet.
+ACCOUNTS: list[int | None] = [None] * len(VARIANTS)
+STATE_COUNTS: dict[int, list[int]] = {}  # variant index -> [High, Moderate, Low]
+VINTAGE_ACCOUNTS: list[int | None] = [None] * len(VINTAGES)
+VINTAGE_COUNTS: dict[int, list[int]] = {}
+SEGMENT_ACCOUNTS: list[int | None] = [None] * len(SEGMENTS)
+POINT_VALUES = range(0, 7)
+DETAIL = [  # (section, [(label, tone key)], {segment index: counts})
+    ("A. Promises kept", [(_points(k), k) for k in A_LEVELS], {}),
+    ("B. Payments in delinquency", [(_points(k), k) for k in B_LEVELS], {}),
     ("C. Record before delinquency",
      [(_points("clean"), "clean"), (_points("not_clean"), "not_clean"),
       ("No record: fewer than 3 months with an amount due", "no_record"),
-      ("No record: delinquent since before the history we hold", "no_record")],
-     {0: [64.5, 20.0, 15.4, 0.0], 1: [10.5, 4.0, 31.1, 54.5],
-      2: [44.3, 44.6, 11.1, 0.0], 3: [19.1, 15.4, 7.4, 58.1]}, False),
+      ("No record: delinquent since before the history we hold", "no_record")], {}),
     ("Points total",
-     [(f"{p} points".replace("-", "−"), "low" if p < 2 else "moderate" if p < 4 else "high")
-      for p in range(-1, 6)],
-     {0: [631, 4873, 9403, 2825, 1066, 416, 78], 1: [817, 274168, 34993, 7191, 1327, 161, 6],
-      2: [80, 1085, 1687, 729, 276, 87, 41], 3: [82, 42228, 10617, 1842, 482, 109, 11]}, True),
+     [(f"{p} points", "low" if p < 2 else "moderate" if p < 4 else "high") for p in POINT_VALUES],
+     {}),
     ("Refusal and other columns",
-     [("Refusal", "bad"), ("Refusal that lowers the state", "bad"), ("Dispute", "unknown"),
-      ("No pickup after contact", "unknown"), ("Hung up", "unknown")],
-     {0: [844, 149, 74, 1344, 443], 1: [6480, 246, 565, 2901, 4569],
-      2: [185, 29, 0, 329, 41], 3: [1007, 35, 58, 403, 615]}, True),
+     [("Refusal", "bad"), ("Refusal that lowers the state", "bad"),
+      ("Refusal lifted by a later plan or payment", "unknown"), ("Dispute", "unknown"),
+      ("No pickup after contact", "unknown"), ("Hung up", "unknown")], {}),
 ]  # fmt: skip
-BANDS = [  # (segment, band, accounts, High %, Moderate %, Low %)
-    ("Credit cards 61–180", "61–90 DPD", 5859, 4.8, 25.4, 69.8),
-    ("Credit cards 61–180", "91–120 DPD", 5260, 2.3, 19.2, 78.5),
-    ("Credit cards 61–180", "121–150 DPD", 4401, 1.4, 16.8, 81.8),
-    ("Credit cards 61–180", "151–180 DPD", 3772, 0.7, 13.7, 85.7),
-    ("Retail loans 61–180", "61–90 DPD", 1401, 5.7, 30.7, 63.6),
-    ("Retail loans 61–180", "91–120 DPD", 1106, 2.4, 26.9, 70.7),
-    ("Retail loans 61–180", "121–150 DPD", 971, 1.8, 18.0, 80.2),
-    ("Retail loans 61–180", "151–180 DPD", 507, 0.6, 15.2, 84.2),
-    ("Credit cards 180+", "181–360 DPD", 16823, 0.3, 19.3, 80.5),
-    ("Credit cards 180+", "361–720 DPD", 29712, 0.3, 9.2, 90.5),
-    ("Credit cards 180+", "720+ DPD", 272128, 0.0, 0.8, 99.1),
-    ("Retail loans 180+", "181–360 DPD", 3926, 1.8, 33.0, 65.2),
-    ("Retail loans 180+", "361–720 DPD", 4848, 0.4, 10.2, 89.4),
-    ("Retail loans 180+", "720+ DPD", 46597, 0.1, 1.1, 98.9),
-]  # fmt: skip
-TREND = {  # month end 2026: (High, Moderate, Low)
-    "Credit cards 61–180": {
-        "Jan": (608, 3392, 10664), "Feb": (615, 3299, 10662), "Mar": (607, 3241, 10607),
-        "Apr": (581, 3206, 10884), "May": (598, 3335, 11957), "Jun": (544, 3556, 12882),
-        "Jul": (518, 3728, 14151), "Aug": (490, 3750, 15052)},
-    "Retail loans 61–180": {
-        "Jan": (106, 656, 1562), "Feb": (100, 588, 1525), "Mar": (102, 604, 1512),
-        "Apr": (105, 736, 1820), "May": (95, 769, 2232), "Jun": (94, 860, 2560),
-        "Jul": (102, 877, 2749), "Aug": (126, 980, 2879)},
-    "Credit cards 180+": {
-        "Jan": (118, 7483, 297656), "Feb": (119, 7695, 299040), "Mar": (128, 7948, 300666),
-        "Apr": (145, 8007, 302557), "May": (146, 8057, 304423), "Jun": (164, 8161, 306502),
-        "Jul": (160, 8241, 308337), "Aug": (159, 8288, 310216)},
-    "Retail loans 180+": {
-        "Jan": (105, 1927, 50625), "Feb": (105, 1950, 50827), "Mar": (103, 1927, 51240),
-        "Apr": (113, 1895, 51607), "May": (128, 1976, 51902), "Jun": (111, 2157, 52115),
-        "Jul": (115, 2207, 52497), "Aug": (120, 2289, 52962)},
-}  # fmt: skip
+BAND_ROWS = [("Credit cards 61–180", b) for b in ("61–90", "91–120", "121–150", "151–180")] + [
+    ("Retail loans 61–180", b) for b in ("61–90", "91–120", "121–150", "151–180")] + [
+    (seg, b) for seg in ("Credit cards 180+", "Retail loans 180+")
+    for b in ("181–360", "361–720", "720+")]  # fmt: skip
+BANDS: dict[tuple[str, str], tuple[int, int, int]] = {}  # (segment, band) -> (H, M, L) counts
+TREND_SEGMENTS = ["Credit cards 61–180", "Retail loans 61–180", "Credit cards 180+",
+                  "Retail loans 180+"]  # fmt: skip
+TREND: dict[str, dict[str, tuple[int, int, int]]] = {}  # segment -> {"Jan 2026": (H, M, L)}
 ENTRY = {"color": "0000FF", "fill": INPUT_FILL}
 
 
@@ -827,9 +816,9 @@ def results(wb: Workbook) -> None:
     s.title("Results", f"Accounts per state and model variant, {RESULTS_DATE} (production run). "
                        "Pale yellow = from the run; other shares and totals are calculated.")  # fmt: skip
     s.section("Credibility state", gap=0)
-    _state_table(s, VARIANTS, ACCOUNTS, STATE_COUNTS, STATE_SHARES)
+    _state_table(s, VARIANTS, ACCOUNTS, STATE_COUNTS, {})
     s.r += 1
-    s.note("Loans by product: the run kept shares, not counts. Aggregates only.")  # fmt: skip
+    s.note("Aggregates only. Blank = not filled from the run yet.")  # fmt: skip
     s.ws.freeze_panes = "B6"
 
 
@@ -844,39 +833,37 @@ def detail(wb: Workbook) -> None:
         s.text(2 + 2 * b, n, fmt="#,##0", **ENTRY)
         s.text(3 + 2 * b, None)
     s.r += 1
-    for title, labels, data, counted in DETAIL:
+    for title, labels, data in DETAIL:
         s.section(title)
         for i, (label, tone) in enumerate(labels):
             s.chip(1, tone, label)
             for b in range(len(SEGMENTS)):
                 L = get_column_letter(2 + 2 * b)
-                v = data[b][i]
-                _pair(s, 2 + 2 * b, count=v if counted else None, share=None if counted else v,
-                      base=f"{L}${base}")  # fmt: skip
+                _pair(s, 2 + 2 * b, count=data[b][i] if b in data else None, base=f"{L}${base}")
             s.r += 1
     s.section("State by DPD band")
-    s.header(["", "Accounts", "", "High", "", "Moderate", "", "Low", ""])
-    for c in (2, 4, 6, 8):
-        s.ws.merge_cells(start_row=s.r - 1, start_column=c, end_row=s.r - 1, end_column=c + 1)
-    for seg, band, n, *shares in BANDS:
-        s.text(1, f"{seg} · {band}")
-        s.text(2, n, span=2, fmt="#,##0", **ENTRY)
-        for col, v in zip((4, 6, 8), shares):
-            s.text(col, v / 100, span=2, fmt="0.0%", **ENTRY)
+    s.header(["", "Accounts", "", "High", "share", "Moderate", "share", "Low", "share"])
+    s.ws.merge_cells(start_row=s.r - 1, start_column=2, end_row=s.r - 1, end_column=3)
+    for seg, band in BAND_ROWS:
+        s.text(1, f"{seg} · {band} DPD")
+        s.text(2, f"=D{s.r}+F{s.r}+H{s.r}", span=2, bold=True, fmt="#,##0")
+        counts = BANDS.get((seg, band), (None, None, None))
+        for col, n in zip((4, 6, 8), counts):
+            _pair(s, col, count=n, base=f"$B{s.r}")
         s.r += 1
     s.r += 1
-    s.note("Levels: the run kept shares, not counts. Most refusals do not change the state: the "
-           "account is already Low. Cards at 180+: the DPD band is taken from the charge-off "
-           "age.")  # fmt: skip
+    s.note("Shares are of all accounts in the segment; DPD band shares of the band. Cards at "
+           "180+: the DPD band is taken from the charge-off age.")  # fmt: skip
     s.ws.freeze_panes = "B6"
 
 
 def trend(wb: Workbook) -> None:
     states = STATES
     s = Sheet(wb.create_sheet("Results trend"), [10, 10] + [10, 7] * len(states))
-    s.title("Results trend", "Accounts per state by month, Jan–Aug 2026 (month ends). Shares are "
-                             "of the month's accounts.")  # fmt: skip
-    for i, (title, months) in enumerate(TREND.items()):
+    s.title("Results trend", "Accounts per state at every month end of the run. Shares are of "
+                             "the month's accounts.")  # fmt: skip
+    for i, title in enumerate(TREND_SEGMENTS):
+        months = TREND.get(title, {})
         s.section(title, gap=0 if i == 0 else 1)
         s.text(1, "Month", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
         s.text(2, "Accounts", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
@@ -885,15 +872,12 @@ def trend(wb: Workbook) -> None:
         s.ws.row_dimensions[s.r].height = 20
         s.r += 1
         for month, counts in months.items():
-            s.text(1, f"{month} 2026", bold=True)
+            s.text(1, month, bold=True)
             s.text(2, "=" + "+".join(f"{get_column_letter(3 + 2 * j)}{s.r}" for j in range(3)),
                    bold=True, fmt="#,##0")  # fmt: skip
             for j, n in enumerate(counts):
                 _pair(s, 3 + 2 * j, count=n, base=f"$B{s.r}")
             s.r += 1
-    s.r += 1
-    s.note("At 61–180 the books grew through the year and the new accounts are mostly Low. "
-           "180+ is flat.")  # fmt: skip
     s.ws.freeze_panes = "A4"
 
 
@@ -903,76 +887,41 @@ def vintage(wb: Workbook) -> None:
             "Early-stage charge-off = charged off less than 2 years ago; late-stage = 2 years or "
             f"more; {RESULTS_DATE}. Shares are within each vintage.")  # fmt: skip
     s.section("Credibility state", gap=0)
-    _state_table(s, VINTAGES, VINTAGE_ACCOUNTS, {}, VINTAGE_SHARES)
+    _state_table(s, VINTAGES, VINTAGE_ACCOUNTS, VINTAGE_COUNTS, {})
     s.ws.freeze_panes = "B6"
 
 
 # --- validation -----------------------------------------------------------------------------
 BOOKS = ["Cards 61–180", "Loans 61–180", "Cards 180+", "Loans 180+"]
-# Month ends Jan–May 2026 pooled, outcomes over the next 3 months (% of accounts).
-OUTCOMES = [  # book, accounts H / M / L, paid a due H, M, L, any payment H, M, L
-    ("Cards 61–180", "3,009 / 16,473 / 54,774", (65.4, 37.6, 10.9), (67.0, 40.1, 12.0)),
-    ("Loans 61–180", "508 / 3,353 / 8,651", (69.3, 54.0, 24.3), (74.2, 63.2, 32.7)),
-    ("Cards 180+", "656 / 39,190 / 1,504,342", (51.8, 30.7, 1.5), (53.5, 35.4, 2.0)),
-    ("Loans 180+", "554 / 9,675 / 256,201", (67.1, 31.6, 1.3), (70.2, 37.5, 1.9)),
-]
-BY_GROUP = [  # book, split, group, paid a due H, M, L
-    ("Cards 61–180", "DPD", "61–90", 64.6, 42.1, 18.9),
-    ("Cards 61–180", "DPD", "91–120", 71.3, 41.8, 12.0),
-    ("Cards 61–180", "DPD", "121–150", 63.2, 35.2, 8.0),
-    ("Cards 61–180", "DPD", "151–180", 50.6, 18.4, 2.9),
-    ("Loans 61–180", "Product", "Personal Loans", 75.2, 42.5, 15.2),
-    ("Loans 61–180", "Product", "Personal Cash Loans", 71.0, 53.5, 22.3),
-    ("Loans 61–180", "Product", "Auto", 65.1, 62.0, 42.2),
-    ("Loans 61–180", "DPD", "61–90", 72.2, 60.0, 35.2),
-    ("Loans 61–180", "DPD", "91–120", 68.2, 54.5, 23.1),
-    ("Loans 61–180", "DPD", "121–150", 62.5, 44.0, 15.5),
-    ("Loans 61–180", "DPD", "151–180", 68.2, 36.1, 15.0),
-    ("Cards 180+", "Vintage", "Early-stage charge-off", 50.6, 21.6, 4.0),
-    ("Cards 180+", "Vintage", "Late-stage charge-off", 69.8, 64.6, 1.0),
-    ("Loans 180+", "Product", "Personal Loans", 75.2, 38.7, 0.9),
-    ("Loans 180+", "Product", "Personal Cash Loans", 60.6, 31.7, 2.8),
-    ("Loans 180+", "Product", "Auto", 68.8, 23.1, 1.4),
-    ("Loans 180+", "Vintage", "Early-stage charge-off", 61.4, 22.7, 4.4),
-    ("Loans 180+", "Vintage", "Late-stage charge-off", 76.3, 53.8, 0.7),
-]
-AUC = [  # book, state: all accounts, state within DPD band, points total
-    ("Cards 61–180", "0.70", "61–90 0.67 · 91–120 0.71 · 121–150 0.71 · 151–180 0.72", "0.70"),
-    ("Loans 61–180", "0.65", "61–90 0.63 · 91–120 0.67 · 121–150 0.66 · 151–180 0.61", "0.70"),
-    ("Cards 180+", "0.67", "181–360 0.58 · 361–720 0.68 · 720+ 0.65", "0.82"),
-    ("Loans 180+", "0.74", "181–360 0.68 · 361–720 0.71 · 720+ 0.71", "0.86"),
-]
-POINTS_PAID = [  # points total, paid a due % per book, state without a refusal
-    ("−1", 15.6, 28.4, 8.6, 8.0, "low"),
-    ("0", 9.8, 18.4, 0.7, 0.5, "low"),
-    ("1", 11.1, 28.2, 9.5, 4.5, "low"),
-    ("2", 30.3, 47.6, 27.7, 24.5, "moderate"),
-    ("3", 50.3, 66.0, 42.8, 54.9, "moderate"),
-    ("4", 64.5, 65.2, 49.5, 66.6, "high"),
-    ("5", 66.7, 87.9, 55.2, 73.0, "high"),
-]
-STABILITY = [  # book, same state next month, up, down, High stays, Moderate stays (%)
-    ("Cards 61–180", 90.2, 4.3, 5.6, 77.8, 75.3),
-    ("Loans 61–180", 88.2, 5.3, 6.6, 72.0, 75.9),
-    ("Cards 180+", 99.5, 0.2, 0.3, 78.8, 89.3),
-    ("Loans 180+", 99.3, 0.3, 0.3, 81.7, 91.0),
-]
-OVERLAP = [  # book, Cramér's V with ability, reachability, location, deterioration
-    ("Cards 61–180", 0.11, 0.19, 0.14, 0.41),
-    ("Loans 61–180", 0.06, 0.16, 0.15, 0.36),
-    ("Cards 180+", 0.14, 0.19, 0.17, 0.22),
-    ("Loans 180+", 0.22, 0.24, 0.18, 0.20),
-]
+# Pooled month ends with 3 months of outcome after them, from the results prompt. None = not run.
+OUTCOME_MONTHS = ""  # e.g. "January to July 2026"
+OUTCOMES = {b: None for b in BOOKS}  # book -> (n H, n M, n L, paid a due H, M, L, any H, M, L)
+GROUPS = [(b, "DPD", g) for b in ("Cards 61–180", "Loans 61–180")
+          for g in ("61–90", "91–120", "121–150", "151–180")] + [
+    ("Loans 61–180", "Product", p) for p in PRODUCTS] + [
+    (b, "DPD", g) for b in ("Cards 180+", "Loans 180+") for g in ("181–360", "361–720", "720+")] + [
+    ("Loans 180+", "Product", p) for p in PRODUCTS] + [
+    (b, "Vintage", v) for b in ("Cards 180+", "Loans 180+")
+    for v in ("Early-stage charge-off", "Late-stage charge-off")]  # fmt: skip
+BY_GROUP: dict[tuple[str, str, str], tuple[float, float, float]] = {}  # paid a due H, M, L
+AUC: dict[str, tuple[str, str, str]] = {}  # book -> (state, state within DPD band, points)
+POINTS_PAID: dict[int, tuple] = {}  # points -> paid a due % per book (BOOKS order)
+STABILITY: dict[str, tuple] = {}  # book -> same, up, down, High stays, Moderate stays (%)
+OVERLAP: dict[str, tuple] = {}  # book -> Cramér's V with ability, reachability, location, A4
 HML = {2: "good", 3: "mid", 4: "bad"}
 
 
-def _pc(x: float) -> str:
-    return f"{x:.1f}%"
+def _pc(x: float | None) -> str | None:
+    return None if x is None else f"{x:.1f}%"
+
+
+def _blank(n: int) -> tuple:
+    return (None,) * n
 
 
 def validation(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Validation"), [20, 22, 15, 15, 15, 15, 15, 15])
-    s.title("Validation", "What each state goes on to do: month ends January to May 2026, "
+    s.title("Validation", f"What each state goes on to do: month ends {OUTCOME_MONTHS or '…'}, "
                           "outcomes over the following 3 months. Paid a due = payments reach one "
                           "month's due; any payment = 100 AED or more.")  # fmt: skip
     s.section("Outcome by state", gap=0)
@@ -981,74 +930,68 @@ def validation(wb: Workbook) -> None:
     s.text(6, "Any payment", span=3, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
     s.r += 1
     s.header(["Book", "Accounts\nH / M / L"] + ["High", "Moderate", "Low"] * 2, height=30)
-    for book, n, paid, anyp in OUTCOMES:
-        s.row([book, n, *map(_pc, paid + anyp)], align=MID,
+    for book, v in OUTCOMES.items():
+        v = v or _blank(9)
+        n = None if v[0] is None else " / ".join(f"{x:,}" for x in v[:3])
+        s.row([book, n, *map(_pc, v[3:])], align=MID,
               tones={2: "good", 3: "mid", 4: "bad", 5: "good", 6: "mid", 7: "bad"})  # fmt: skip
-    s.note("High pays most and Low least in every book, month and group. Cure and roll do not "
-           "separate the states: cards leave billing at charge-off, loans cure alike in every "
-           "state.")  # fmt: skip
 
     s.section("Paid a due by group")
     s.header(["Book", "Group", "High", "Moderate", "Low"], [1, 1, 1, 1, 1])
-    for book, split, group, *vals in BY_GROUP:
-        s.row([book, f"{split}: {group}", *map(_pc, vals)], align=MID, tones=HML)
+    for key in GROUPS:
+        book, split, group = key
+        s.row([book, f"{split}: {group}", *map(_pc, BY_GROUP.get(key, _blank(3)))], align=MID,
+              tones=HML)  # fmt: skip
 
     s.section("Ranking power (AUC on paid a due; 0.5 = chance)")
     s.header(["Book", "State", "State within DPD band", "", "", "", "Points total", ""])
     for c1, c2 in ((3, 6), (7, 8)):
         s.ws.merge_cells(start_row=s.r - 1, start_column=c1, end_row=s.r - 1, end_column=c2)
-    for row in AUC:
-        s.row(list(row), [1, 1, 4, 2], align=MID)
-    s.note("The state ranks customers inside every DPD band. At 180+, where almost all accounts "
-           "are Low, the points total ranks far better than the three states.")  # fmt: skip
+    for book in BOOKS:
+        s.row([book, *AUC.get(book, _blank(3))], [1, 1, 4, 2], align=MID)
 
     s.section("Paid a due by points total")
     s.header(["Points", "State (no refusal)", *BOOKS])
-    for pts, *vals, st in POINTS_PAID:
+    for pts in POINT_VALUES:
         s.text(1, pts, bold=True, align=CENTER)
-        s.chip(2, st)
-        for col, v in enumerate(vals, 3):
+        s.chip(2, state_of_points(pts))
+        for col, v in enumerate(POINTS_PAID.get(pts, _blank(len(BOOKS))), 3):
             s.text(col, _pc(v), align=MID)
         s.r += 1
-    s.note("The step comes at 2 points in every book, where Moderate starts. −1 (Broken) pays "
-           "more than 0: see 'Sensitivity'.")  # fmt: skip
 
     s.section("Stability, one month to the next")
     s.header(["Book", "Same state", "Up", "Down", "High stays", "Moderate stays"])
-    for book, *vals in STABILITY:
-        s.row([book, *map(_pc, vals)], align=MID)
+    for book in BOOKS:
+        s.row([book, *map(_pc, STABILITY.get(book, _blank(5)))], align=MID)
 
     s.section("Overlap with the other axes (Cramér's V; 0 = unrelated, 1 = the same axis)")
     s.header(["Book", "Ability", "Reachability", "Location", "Deterioration"])
-    for book, *vals in OVERLAP:
-        s.row([book, *(f"{v:.2f}" for v in vals)], align=MID)
-    s.note("Highest with deterioration at 61–180: payments drive the DPD path.")
+    for book in BOOKS:
+        vals = OVERLAP.get(book, _blank(4))
+        s.row([book, *(None if v is None else f"{v:.2f}" for v in vals)], align=MID)
     s.ws.freeze_panes = "A4"
 
 
 # --- sensitivity ----------------------------------------------------------------------------
-# Month end 31 Aug 2026 state mix (%) and state AUC on paid a due (month ends Mar–May 2026).
-DEADLINES = [  # book, [(deadline, High, Moderate, Low, AUC)]
-    ("Cards 61–180", [("Next statement (model)", 2.5, 19.4, 78.0, 0.692),
-                      ("30 days", 4.0, 22.7, 73.3, 0.714)]),
-    ("Loans 61–180", [("End of the promise month (model)", 3.2, 24.6, 72.2, 0.643),
-                      ("30 days, to that month's end", 4.9, 27.9, 67.2, 0.666)]),
-    ("Cards 180+", [("End of the promise month (model)", 0.0, 2.6, 97.3, 0.665),
-                    ("30 days", 0.1, 2.9, 97.0, 0.690)]),
-    ("Loans 180+", [("End of the promise month (model)", 0.2, 4.1, 95.6, 0.736),
-                    ("30 days, to that month's end", 0.3, 4.3, 95.4, 0.746)]),
-]  # fmt: skip
-PROMISE_PAID = [  # book, paid a due %: Kept, Partly, Broken, Thin: one not kept, Thin: none
+# Back-tests on month ends March–May 2026 (outcome: paid a due in the next 3 months), run on
+# the promise counting before the event rule; they chose the points and the deadline.
+POINT_SCHEMES = [  # book, state AUC earlier / model points, mix H / M / L earlier, model (61–180)
+    ("Cards 61–180", 0.692, 0.751, (4.0, 21.7, 74.3), (11.8, 32.9, 55.3)),
+    ("Loans 61–180", 0.643, 0.688, (3.8, 26.4, 69.8), (11.0, 33.7, 55.3)),
+    ("Cards 180+", 0.665, 0.748, None, None),
+    ("Loans 180+", 0.736, 0.783, None, None),
+]
+DEADLINES = [  # book, state AUC with the model points: model deadline, 30 days
+    ("Cards 61–180", "Next statement", 0.751, 0.756),
+    ("Loans 61–180", "End of the promise month", 0.688, 0.692),
+    ("Cards 180+", "End of the promise month", 0.748, 0.748),
+    ("Loans 180+", "End of the promise month", 0.783, 0.783),
+]
+PROMISE_PAID = [  # book, paid a due %: Kept, Partly, Broken, Promised (one not kept), No promise
     ("Cards 61–180", 38.4, 32.9, 28.5, 24.0, 8.2),
     ("Loans 61–180", 58.0, 53.9, 47.9, 42.9, 25.3),
     ("Cards 180+", 21.1, 30.5, 17.6, 21.0, 1.3),
     ("Loans 180+", 36.6, 43.5, 19.8, 20.4, 1.6),
-]
-BROKEN_POINTS = [  # book, state AUC with Broken at −1 (model), 0, +1; accounts moving up at +1 (%)
-    ("Cards 61–180", 0.692, 0.722, 0.737, 11.7),
-    ("Loans 61–180", 0.643, 0.655, 0.673, 7.6),
-    ("Cards 180+", 0.665, 0.680, 0.697, 0.8),
-    ("Loans 180+", 0.736, 0.742, 0.756, 0.6),
 ]
 NO_EVIDENCE = [  # book, share of accounts, paid a due %: no evidence, rest of Low, Moderate
     ("Cards 61–180", 12.2, 3.9, 12.4, 35.2),
@@ -1058,35 +1001,41 @@ NO_EVIDENCE = [  # book, share of accounts, paid a due %: no evidence, rest of L
 ]
 
 
+def _mix(m) -> str:
+    return "–" if m is None else " / ".join(f"{x:.1f}" for x in m)
+
+
 def sensitivity(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Sensitivity"), [20, 26, 16, 16, 16, 16, 16])
-    s.title("Sensitivity", "How the states react to the two promise parameters, and who sits in "
-                           "Low with no evidence. Outcomes: paid a due in the following 3 months, "
-                           "month ends March to May 2026.")  # fmt: skip
-    s.section("Promise deadline", gap=0)
-    s.header(["Book", "Deadline", "High", "Moderate", "Low", "State AUC"])
-    for book, rows in DEADLINES:
-        for name, hi, mo, lo, auc in rows:
-            s.row([book, name, _pc(hi), _pc(mo), _pc(lo), f"{auc:.3f}"], align=MID, tones=HML)
-    s.note(f"State mix at {RESULTS_DATE}. A 30-day deadline counts more promises as kept and "
-           "ranks customers a little better in every book.")  # fmt: skip
-
-    s.section("Paid a due by promise level")
-    s.header(["Book", *(LABEL[k] for k in ("kept", "partly", "broken")),
-              "Thin: one,\nnot kept", "Thin: no\npromise"], [2, 1, 1, 1, 1, 1],
-             height=30)  # fmt: skip
+    s.title("Sensitivity", "Why the promise points and the deadline are what they are. Back-tests "
+                           "on month ends March to May 2026, outcome: paid a due in the following "
+                           "3 months.")  # fmt: skip
+    s.section("Paid a due by promise level", gap=0)
+    s.header(["Book", *(LABEL[k] for k in ("kept", "partly", "broken", "promised", "no_promise"))],
+             [2, 1, 1, 1, 1, 1])  # fmt: skip
     for book, *vals in PROMISE_PAID:
         s.row([book, *map(_pc, vals)], [2, 1, 1, 1, 1, 1], align=MID)
-    s.note("Customers who never promised pay least. A Broken record pays like a single promise "
-           "not kept, and more than no promise.")  # fmt: skip
+    s.note("Customers who never promised pay least by far. A broken record pays like a single "
+           "promise not kept: what separates is promising at all, so every promise earns a "
+           "point and keeping it earns more.")  # fmt: skip
 
-    s.section("Points for Broken")
-    s.header(["Book", "State AUC:\n−1 (model)", "State AUC:\n0", "State AUC:\n+1",
-              "Low → Moderate\nat +1"], [2, 1, 1, 1, 1], height=30)  # fmt: skip
-    for book, a, b, c, moved in BROKEN_POINTS:
-        s.row([book, f"{a:.3f}", f"{b:.3f}", f"{c:.3f}", _pc(moved)], [2, 1, 1, 1, 1], align=MID)
-    s.note("Scoring Broken higher ranks customers better in every book; the accounts it moves "
-           "to Moderate pay like Moderate at 61–180.")  # fmt: skip
+    s.section("Promise points")
+    s.header(["Book", "State AUC:\nKept 2 / Partly 1 / Broken −1", "State AUC:\nmodel points",
+              "High / Moderate / Low %:\nearlier", "High / Moderate / Low %:\nmodel points"],
+             [2, 1, 1, 1, 1], height=44)  # fmt: skip
+    for book, a, b, m0, m1 in POINT_SCHEMES:
+        s.row([book, f"{a:.3f}", f"{b:.3f}", _mix(m0), _mix(m1)], [2, 1, 1, 1, 1], align=MID)
+    s.note("The model points rank customers better in every book; at 61–180 also in every "
+           "month, DPD band and loan product. High and Moderate then hold 78% of the money "
+           "collected from cards at 61–180, against 53%.")  # fmt: skip
+
+    s.section("Promise deadline (model points)")
+    s.header(["Book", "Model deadline", "State AUC:\nmodel deadline", "State AUC:\n30 days"],
+             [2, 1, 1, 1], height=30)  # fmt: skip
+    for book, name, a, b in DEADLINES:
+        s.row([book, name, f"{a:.3f}", f"{b:.3f}"], [2, 1, 1, 1], align=MID)
+    s.note("With the model points the deadline barely matters (at most 0.005), so GRR's rule "
+           "stays.")  # fmt: skip
 
     s.section("Low with no evidence in any dimension")
     s.header(["Book", "Share of accounts", "Paid a due:\nno evidence",
@@ -1094,9 +1043,7 @@ def sensitivity(wb: Workbook) -> None:
              height=30)  # fmt: skip
     for book, *vals in NO_EVIDENCE:
         s.row([book, *map(_pc, vals)], [2, 1, 1, 1, 1], align=MID)
-    s.note("No promise, no payment and no record: they pay least, so they are Low. At 61–180 "
-           "mostly accounts that defaulted within months of opening; at 180+ accounts charged "
-           "off long ago.")  # fmt: skip
+    s.note("No promise, no payment and no record: they pay least, so they are Low.")  # fmt: skip
     s.ws.freeze_panes = "A4"
 
 
