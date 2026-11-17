@@ -109,6 +109,8 @@ from enbd_collections.pipelines.crx_persona import (
 from enbd_collections.pipelines.crx_persona import (
     rl_a3_payment_credibility as crx_rl_a3_payment_credibility,
 )
+from enbd_collections.pipelines.crx_persona import cc_uc1_stated as crx_cc_uc1_stated
+from enbd_collections.pipelines.crx_persona import rl_uc1_stated as crx_rl_uc1_stated
 from enbd_collections.pipelines import digital_login as dl
 from enbd_collections.pipelines.location import pipeline as location_features
 from enbd_collections.pipelines import genesys
@@ -244,6 +246,8 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
+        "crx_cc_uc1_stated": crx_cc_uc1_stated.create_pipeline(),
+        "crx_rl_uc1_stated": crx_rl_uc1_stated.create_pipeline(),
         "crx_cc_a3_payment_credibility": (
             crx_cc_a3_payment_credibility.create_pipeline()
         ),
