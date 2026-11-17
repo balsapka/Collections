@@ -1,36 +1,42 @@
-"""RL-A4 — DPD-journey deterioration state for retail loans (thin wrappers on _dpd_journey).
+"""RL A4 — deterioration state for retail loans (wrappers on ``_dpd_journey``).
 
 Node 1 build_rl_full_history_linked  crx_rl_full_history + int_loan_master
                                      + int_loan_restructure_link
-                                     -> crx_rl_full_history_linked, crx_rl_restructure_chains
+                                     -> crx_rl_full_history_linked,
+                                        crx_rl_restructure_chains
 Node 2 build_rl_dpd_sequences        crx_rl_full_history + feature_retail_loans
                                      -> crx_rl_dpd_sequences
 Node 3 build_rl_linked_dpd_sequences crx_rl_full_history_linked + chains
-                                     + feature_retail_loans -> crx_rl_dpd_sequences_linked
-Node 4 build_rl_a4_deterioration     both sequences + chains -> crx_rl_a4_deterioration
+                                     + feature_retail_loans
+                                     -> crx_rl_dpd_sequences_linked
+Node 4 build_rl_a4_deterioration     both sequences + chains
+                                     -> crx_rl_a4_deterioration
+Run: ``kedro run --pipeline=crx_rl_a4_deterioration`` (needs crx_rl_full_history).
 
-RL buckets: 0 = 0 DPD, 1 = 1-30, 2 = 31-60, ..., 6 = 151-180, 7 = 180+ (cap). The engine maps
-them onto the CC scale (+1), so every rule and threshold is shared with CC. The 60-180
-segment is RL 3-6, the 180+ segment is RL 7. RL history is trusted in full (no floor).
+RL buckets: 0 = 0 DPD, 1 = 1-30, 2 = 31-60, ..., 6 = 151-180, 7 = 180+ (cap). The
+engine maps them onto the CC scale (+1), so every rule and threshold is shared with CC.
+The 60-180 segment is RL 3-6, the 180+ segment is RL 7. RL history is trusted in full
+(no floor).
 
 A restructure closes the old account and opens a new one. A matched new account gets the
 original loans' months in front of its own, from the month both the restructure flag and
 the closure have happened; before that month it keeps its own history, so nothing leaks
-from the future. A loan is restructured if feature_retail_loans.has_restructured_loan_flag
-says so; one with no original loan's months stays a blind spot.
+from the future (conformance D6). A loan is restructured if
+feature_retail_loans.has_restructured_loan_flag says so (D2); one with no original
+loan's months stays a blind spot.
 """
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from .._common import require_columns
+from .._common import require_columns, string_key
 from .._dpd_journey import (
     RL,
-    _log_state_stats,
     build_deterioration,
     build_dpd_sequences,
     journey_params,
+    log_state_stats,
 )
 from .chains import Edge, resolve_chains
 
@@ -60,8 +66,8 @@ def _edges(link: DataFrame) -> list[Edge]:
     rows = (
         link.filter(F.col(_LINK_ORIGINAL).isNotNull())
         .select(
-            F.trim(F.col(_LINK_ACCOUNT).cast("string")).alias("account"),
-            F.trim(F.col(_LINK_ORIGINAL).cast("string")).alias("original"),
+            string_key(link, _LINK_ACCOUNT).alias("account"),
+            string_key(link, _LINK_ORIGINAL).alias("original"),
             F.greatest(
                 F.col("restr_flagged_date").cast("date"),
                 F.col("orig_close_date").cast("date"),
@@ -74,6 +80,44 @@ def _edges(link: DataFrame) -> list[Edge]:
     return [Edge(*r) for r in rows]
 
 
+def _original_loan_months(
+    own: DataFrame, int_loan_master: DataFrame, chains: list, members: list
+) -> tuple[DataFrame, DataFrame]:
+    """Restructure chains: the originals' months to put in front of each account's own.
+
+    Returns (account_id, month_end_date, dlq_bucket) rows, and the chains table with
+    chain_months_added. Only chains of accounts in `own` are kept. Closed months are
+    dropped (their zero DPD would fake a cure), the worst bucket wins per month, and
+    the account's own row stays where months overlap.
+    """
+    in_history = F.broadcast(own.select("account_id").distinct())
+    spark = own.sparkSession
+    chain_df = spark.createDataFrame([tuple(r) for r in chains], _CHAIN_SCHEMA)
+    member_df = spark.createDataFrame([tuple(r) for r in members], _MEMBER_SCHEMA)
+    chain_df = chain_df.join(in_history, on="account_id", how="leftsemi")
+    member_df = member_df.join(in_history, on="account_id", how="leftsemi")
+    original = (
+        int_loan_master.select(
+            string_key(int_loan_master).alias("original_id"),
+            F.last_day(F.col("observation_date").cast("date")).alias("month_end_date"),
+            F.col("dpd_bucket").cast("int").alias("dlq_bucket"),
+            F.upper(F.col("account_status")).alias("_status"),
+        )
+        .join(F.broadcast(member_df), on="original_id")
+        .filter(F.coalesce(F.col("_status"), F.lit("")) != "CLOSED")
+        .groupBy("account_id", "month_end_date")
+        .agg(F.max("dlq_bucket").alias("dlq_bucket"))
+        .join(own, on=["account_id", "month_end_date"], how="left_anti")
+    )
+    added = original.groupBy("account_id").agg(
+        F.count(F.lit(1)).cast("int").alias("chain_months_added")
+    )
+    chain_out = chain_df.join(added, on="account_id", how="left").withColumn(
+        "chain_months_added", F.coalesce("chain_months_added", F.lit(0))
+    )
+    return original, chain_out
+
+
 def build_rl_full_history_linked(
     crx_rl_full_history: DataFrame,
     int_loan_master: DataFrame,
@@ -81,9 +125,6 @@ def build_rl_full_history_linked(
 ) -> tuple[DataFrame, DataFrame]:
     """Every spine account's history, with each matched restructured account's original
     loans re-keyed in front of its own months.
-
-    Original rows: closed months dropped (their zero DPD would fake a cure), the worst
-    bucket per month across originals, the account's own row kept where months overlap.
 
     Returns:
         crx_rl_full_history_linked: account_id, month_end_date, dlq_bucket.
@@ -104,52 +145,21 @@ def build_rl_full_history_linked(
     )
     require_columns(
         int_loan_master,
-        (
-            "account_id",
-            "observation_date",
-            "dpd_bucket",
-            "account_status",
-        ),
+        ("account_id", "observation_date", "dpd_bucket", "account_status"),
         "int_loan_master",
     )
     own = crx_rl_full_history.select(
-        "account_id",
-        F.last_day("month_end_date").alias("month_end_date"),
-        "dlq_bucket",
+        "account_id", F.last_day("month_end_date").alias("month_end_date"), "dlq_bucket"
     )
-    accounts = [r[0] for r in own.select("account_id").distinct().collect()]
-    chains, members = resolve_chains(_edges(int_loan_restructure_link), accounts)
-    spark = crx_rl_full_history.sparkSession
-    chain_df = spark.createDataFrame([tuple(c) for c in chains], _CHAIN_SCHEMA)
-    member_df = spark.createDataFrame([tuple(m) for m in members], _MEMBER_SCHEMA)
-
-    original = (
-        int_loan_master.select(
-            F.trim(F.col("account_id").cast("string")).alias("original_id"),
-            F.last_day(F.col("observation_date").cast("date")).alias("month_end_date"),
-            F.col("dpd_bucket").cast("int").alias("dlq_bucket"),
-            F.upper(F.col("account_status")).alias("_status"),
-        )
-        .join(F.broadcast(member_df), on="original_id")
-        .filter(F.coalesce(F.col("_status"), F.lit("")) != "CLOSED")
-        .groupBy("account_id", "month_end_date")
-        .agg(F.max("dlq_bucket").alias("dlq_bucket"))
-        .join(own, on=["account_id", "month_end_date"], how="left_anti")
-    )
-    added = original.groupBy("account_id").agg(
-        F.count(F.lit(1)).cast("int").alias("chain_months_added")
-    )
-    chain_out = chain_df.join(added, on="account_id", how="left").withColumn(
-        "chain_months_added", F.coalesce("chain_months_added", F.lit(0))
-    )
+    edges = _edges(int_loan_restructure_link)
+    chains, members = resolve_chains(edges, {e.account for e in edges})
+    original, chain_out = _original_loan_months(own, int_loan_master, chains, members)
     return own.unionByName(original), chain_out
 
 
 def _history(full_history: DataFrame) -> DataFrame:
     return full_history.select(
-        "account_id",
-        F.col("month_end_date").alias("obs_date"),
-        "dlq_bucket",
+        "account_id", F.col("month_end_date").alias("obs_date"), "dlq_bucket"
     )
 
 
@@ -161,7 +171,7 @@ def _restructured(feature_retail_loans: DataFrame) -> DataFrame:
         "feature_retail_loans",
     )
     return feature_retail_loans.groupBy(
-        F.trim(F.col("account_id").cast("string")).alias("account_id")
+        string_key(feature_retail_loans).alias("account_id")
     ).agg(
         F.max(F.col("has_restructured_loan_flag").cast("int")).alias(
             "restructure_blind_spot_flag"
@@ -177,6 +187,11 @@ def build_rl_dpd_sequences(
 ) -> DataFrame:
     """One row per RL account: gap-filled monthly bucket array + audit columns +
     restructure_blind_spot_flag (the loan is restructured)."""
+    require_columns(
+        crx_rl_full_history,
+        ("account_id", "month_end_date", "dlq_bucket"),
+        "crx_rl_full_history",
+    )
     return build_dpd_sequences(
         _history(crx_rl_full_history),
         RL,
@@ -194,6 +209,11 @@ def build_rl_linked_dpd_sequences(
 ) -> DataFrame:
     """As build_rl_dpd_sequences on the linked history: an account with the original
     loans' months in front of its own is no longer a blind spot."""
+    require_columns(
+        crx_rl_full_history_linked,
+        ("account_id", "month_end_date", "dlq_bucket"),
+        "crx_rl_full_history_linked",
+    )
     stitched = crx_rl_restructure_chains.filter(F.col("chain_months_added") > 0).select(
         "account_id"
     )
@@ -217,16 +237,17 @@ def build_rl_a4_deterioration(  # pylint: disable=too-many-arguments,too-many-po
 ) -> DataFrame:
     """One deterioration state per (account, rl_spine observation_date) row: this row's
     billing history truncated to its own date, classified by the same engine as
-    build_rl_dpd_sequences. rl_spine is already model_id/DLQ-band scoped by construction
-    (R20) -- no separate segment filter needed here.
+    build_rl_dpd_sequences. rl_spine is already scoped to the model_id's DLQ band, so no
+    segment filter is applied here.
 
     A row before its chain's ``chain_known_date`` reads the account's own history, every
     other row the linked one. Adds the ``chain_*`` columns of crx_rl_restructure_chains
     and chain_stitched_flag (1 if this row's history has the original loans' months)."""
+    require_columns(rl_spine, ("account_id", "observation_date"), "rl_spine")
     params = journey_params(crx_persona, RL, model_id)
     chains = F.broadcast(crx_rl_restructure_chains)
     spine = rl_spine.select(
-        F.trim(F.col("account_id").cast("string")).alias("account_id"),
+        string_key(rl_spine).alias("account_id"),
         F.col("observation_date").cast("date").alias("observation_date"),
     ).join(chains.select("account_id", "chain_known_date"), on="account_id", how="left")
     before_chain = F.coalesce(
@@ -256,5 +277,5 @@ def build_rl_a4_deterioration(  # pylint: disable=too-many-arguments,too-many-po
             F.lit(False),
         ).cast("int"),
     )
-    _log_state_stats(out, params.end_date, RL, params)
+    log_state_stats(out, params.end_date, RL, params)
     return out

@@ -1,4 +1,4 @@
-"""RL-A3-1 A3 Payment Credibility axis for Retail Loans."""
+"""RL A3 payment credibility on the shared ``a3_credibility`` engine."""
 
 from .pipeline import create_pipeline
 

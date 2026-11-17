@@ -1,9 +1,10 @@
 """Bureau salary and bounce inputs of the persona axes (per model_id).
 
-    prm_bureau_alert_enriched ─┬─► feat_cif_bureau_salary_monthly
-                               └─► feat_cif_bureau_bounces_monthly
+    feat_bureau_salary_unified ──► feat_cif_bureau_salary_monthly
+    prm_bureau_alert_enriched ───► feat_cif_bureau_bounces_monthly
 
-Needs ``bureau_staging`` and ``bureau_primary`` (the alerts) first.
+Needs the DE's ``feat_bureau_salary_unified`` (read-only here) and ``bureau_staging`` +
+``bureau_primary`` (the alerts) first.
 
     kedro run --pipeline=bureau_salary_bounces
 """
@@ -18,21 +19,22 @@ from enbd_collections.nodes.features.bureau import (
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
     """The two monthly bureau features."""
+    tags = ["bureau", "features"]
     return Pipeline(
         [
             node(
                 func=feat_cif_bureau_salary_monthly.build,
-                inputs={"alerts": "prm_bureau_alert_enriched"},
+                inputs={"unified": "feat_bureau_salary_unified"},
                 outputs="feat_cif_bureau_salary_monthly",
                 name="build_feat_cif_bureau_salary_monthly",
-                tags=["bureau", "features"],
+                tags=tags,
             ),
             node(
                 func=feat_cif_bureau_bounces_monthly.build,
                 inputs={"alerts": "prm_bureau_alert_enriched"},
                 outputs="feat_cif_bureau_bounces_monthly",
                 name="build_feat_cif_bureau_bounces_monthly",
-                tags=["bureau", "features"],
+                tags=tags,
             ),
         ]
     )

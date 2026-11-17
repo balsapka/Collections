@@ -2,7 +2,8 @@
 the amount in the oldest overdue bucket (``nodes.py``).
 
 Needs, for the model_id (cc_60_180 / cc_180_plus): ``crx_cc_obs_base``,
-``casa_primary``, ``casa_features``, ``bureau_salary_bounces`` and ``location_features``.
+``casa_primary``, ``casa_features``, ``product_features``, ``bureau_salary_bounces`` and
+``location_features``.
 
     kedro run --pipeline=crx_cc_a1_ability
 """

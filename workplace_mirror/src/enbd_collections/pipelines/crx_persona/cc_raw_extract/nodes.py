@@ -1,49 +1,17 @@
-"""T04c — CRX CC Raw Extract nodes.
+"""CC raw extract nodes: Way4 extracts scoped to each account's window.
 
-# pylint: disable=too-many-locals
-# Rationale: build functions, each with per-account window scoping and schema
-# derivations. Logic is self-contained within each function.
+    build_cc_transactions : transaction history with the ``prm_cc`` derivations (A3
+                            payments).
+    build_cc_balance      : minimum_due / overdue buckets / total_due (A3 dues).
+    build_cc_billing      : billing-cycle header (billing_date, due_date,
+                            next_billing_date) (A3 cycles).
+    build_cc_limits       : credit-limit snapshots pivoted by type_code, on its own
+                            spell-table window (no persona reader at present).
 
-Five build functions:
-
-    build_cc_acct_windows : shared per-account [acct_start, acct_end] window,
-                            forward edge anchored to cc_spine — computed once
-                            here instead of independently inside each of the
-                            three consumers below (same cc_spine/
-                            crx_cc_spell_table groupBy was previously
-                            recomputed 3x per pipeline run).
-    build_cc_transactions : window-scoped transaction history with enriched schema
-                            (replaces _load_t0_scoped_transactions + prm_cc
-                            derivations; consumed by T04b, T05, T06, A3 Dimension B/C)
-    build_cc_limits       : T0-scoped credit-limit snapshots pivoted by type_code
-                            (replaces prm_limit; consumed by T05)
-    build_cc_balance      : window-scoped minimum_due/stmt_balance/total_due billing
-                            history (replaces _load_t0_scoped_balance; consumed by
-                            T04b, A3 Dimension B/C)
-    build_cc_billing      : window-scoped billing-cycle header (billing_date, due_date,
-                            next_billing_date, dlq_level_m) — new, consumed by A3
-                            Dimension B/C.
-
-build_cc_transactions, build_cc_balance and build_cc_billing all consume
-build_cc_acct_windows' output (crx_cc_acct_windows):
-    acct_start = add_months(trunc(min(t0), 'month'), -12)
-    acct_end   = max(cc_spine.observation_date) for that account, falling back to
-                 trunc(max(t0), 'month') when the account has no cc_spine rows.
-computed over non-censored spells in crx_cc_spell_table; spine accounts without one
-get acct_start = max(params:cc_a3_history_floor_date, min spine obs - 12 months) so A3
-has payment cycles for them too (see build_cc_acct_windows). The forward edge is anchored
-to cc_spine (not t0) so post-T0 observation dates are retained — needed for A3
-Dimension B ("payments in delinquency"), which looks at the window after onset.
-This can only add rows relative to the old trunc(max(t0),'month') bound, since
-cc_spine.observation_date is always >= t0 for an active account — pre-T0 rows and
-values are unaffected.
-
-build_cc_limits keeps the original T0-anchored (no post-T0) window — it is not
-needed past onset by any current consumer, so it computes its own window inline
-rather than consuming crx_cc_acct_windows.
-
-Quality filter (transactions + limits): primary_entry_idt != 0, org == 100.
-Type cast: contract_idt (double → long) at the DDI raw boundary.
+The first three read ``crx_cc_acct_windows`` (``build_cc_acct_windows`` in
+``cc_a3_payment_credibility.nodes``) and prune raw partitions with
+``_window_utils.prune_by_edp_load_date``. ``contract_idt`` is cast double -> long at the
+raw boundary; transactions keep primary_entry_idt != 0 and org == 100.
 """
 
 from pyspark.sql import DataFrame, Window
@@ -58,81 +26,18 @@ from enbd_collections.nodes.utils.config import (
     POST_BLOCK_X_SENTINEL_DATE,
     TXN_CATEGORIES,
 )
+from enbd_collections.pipelines.crx_persona._common import require_columns
 from enbd_collections.pipelines.crx_persona.cc_raw_extract._window_utils import (
     prune_by_edp_load_date,
     scope_to_acct_window,
 )
 
 
-def build_cc_acct_windows(
-    crx_cc_spell_table: DataFrame,
-    cc_spine: DataFrame,
-    history_floor_date: str = None,
-) -> DataFrame:
-    """Shared per-account [acct_start, acct_end] window, forward edge anchored to cc_spine.
-
-    Accounts with a non-censored spell (unchanged from the original T0-only window):
-    acct_start = add_months(trunc(min(t0), 'month'), -12).
-    acct_end   = max(cc_spine.observation_date) for the account; falls back to
-    trunc(max(t0), 'month') when the account has no cc_spine rows, so the window
-    never shrinks relative to the pre-widening behaviour.
-
-    Spine-only accounts (no non-censored spell: first billing row already delinquent,
-    ~60% of the 180+ stock) also get a window, so A3 Dimension B has payment cycles for
-    them. acct_start = add_months(trunc(min(cc_spine.observation_date), 'month'), -12),
-    never earlier than history_floor_date (params:cc_a3_history_floor_date) when set;
-    acct_end = max(cc_spine.observation_date). These windows lie inside the raw-scan
-    bound set by the spell accounts, and the other consumers of the extract
-    (payment_trajectory, utilisation, departure_signature) reach it only through
-    non-censored spells, so the added accounts do not change their results.
-
-    Persisted once and consumed by build_cc_transactions, build_cc_balance and
-    build_cc_billing — avoids recomputing the same crx_cc_spell_table/cc_spine
-    aggregation three times per pipeline run.
-
-    Args:
-        crx_cc_spell_table: Required cols: account_id, t0, t0_censored_flag.
-        cc_spine: Required cols: contract_id, observation_date.
-        history_floor_date: ISO date or None. Lower bound for spine-only accounts.
-
-    Returns:
-        DataFrame with columns (account_id, acct_start, acct_end).
-    """
-    spell_windows = (
-        crx_cc_spell_table.filter(F.col("t0_censored_flag") == 0)
-        .groupBy("account_id")
-        .agg(
-            F.add_months(F.trunc(F.min("t0"), "month"), -12).alias("_spell_start"),
-            F.trunc(F.max("t0"), "month").alias("_acct_end_fallback"),
-        )
-    )
-
-    spine_windows = cc_spine.groupBy(F.col("contract_id").alias("account_id")).agg(
-        F.add_months(F.trunc(F.min("observation_date"), "month"), -12).alias(
-            "_spine_start"
-        ),
-        F.max("observation_date").alias("_spine_max_obs"),
-    )
-
-    spine_only_start = F.col("_spine_start")
-    if history_floor_date:
-        spine_only_start = F.greatest(
-            F.lit(str(history_floor_date)).cast(DateType()), spine_only_start
-        )
-
-    return (
-        spell_windows.join(spine_windows, on="account_id", how="full_outer")
-        .withColumn("acct_start", F.coalesce(F.col("_spell_start"), spine_only_start))
-        .withColumn(
-            "acct_end",
-            F.coalesce(F.col("_spine_max_obs"), F.col("_acct_end_fallback")),
-        )
-        .select("account_id", "acct_start", "acct_end")
-    )
-
-
 def _as_contract_windows(acct_windows: DataFrame) -> DataFrame:
     """crx_cc_acct_windows, keyed as contract_idt to join against raw DDI tables."""
+    require_columns(
+        acct_windows, ["account_id", "acct_start", "acct_end"], "crx_cc_acct_windows"
+    )
     return acct_windows.select(
         F.col("account_id").alias("contract_idt"), "acct_start", "acct_end"
     )
@@ -142,62 +47,49 @@ def build_cc_transactions(
     raw_transaction: DataFrame,
     crx_cc_acct_windows: DataFrame,
 ) -> DataFrame:
-    """Extract window-scoped CC transaction history with enriched schema.
+    """CC transactions in each account's window, with ``txn_category`` (``prm_cc``'s
+    ``TXN_CATEGORIES`` by ``txn_code``; NULL for an unrecognised code),
+    ``is_international`` (``DOMESTIC=N`` in ``add_info``) and ``is_post_block_x_fee``
+    (the Block-W fee-accrual artefacts, as in ``stg_transaction.build()``, which A3 must
+    not read as payments).
 
-    Scope: per-account window from crx_cc_acct_windows (build_cc_acct_windows) —
-    see module docstring for why the forward edge is cc_spine-anchored rather
-    than T0-anchored.
-    Partition pruning: raw_transaction is filtered on edp_load_date — the actual
-    Hive partition column — to the global [min(acct_start), max(acct_end)] bound
-    (computed from crx_cc_acct_windows) widened by +/-EDP_LOAD_DATE_BUFFER_MONTHS
-    (12 months — the project's shared feature-lookback constant, reused here as
-    the pruning buffer), *before* the per-account join. The buffer absorbs the
-    load-date lag between when a transaction happens (banking_date) and when it
-    lands in its edp_load_date partition. Unlike stg_transaction.build() (whose
-    spine, data_spine_contracts_way4, already bakes the lookback into
-    observation_date, so it needs no extra buffer), cc_spine has no backward
-    lookback at all — crx_cc_acct_windows builds that bound itself, so this
-    buffer is still needed here. This lets Spark/Hive skip partitions outside
-    the bound instead of scanning the full table. The subsequent per-account
-    filter (on banking_date vs. acct_start/acct_end) still narrows further — the
-    global bound is only a superset of each account's own window.
-    Quality filters: primary_entry_idt != 0, org == 100 (same as stg_transaction.build()).
-    Replicates prm_cc.build_transaction() derivation logic for txn_category and
-    is_international, and stg_transaction.build()'s is_post_block_x_fee sentinel-fee
-    derivation (Block-W fee-accrual artifacts that must not be mistaken for real
-    post-delinquency payment activity).
+    Returns::
 
-    Args:
-        raw_transaction:     Raw Way4 transaction table (DDI-backed). Long history.
-                             Required cols: primary_entry_idt, org, contract_idt,
-                             banking_date, edp_load_date, settl_amount, direction,
-                             txn_code, txn_description, add_info, trans_mcc,
-                             trans_date, card_idt, service_class.
-        crx_cc_acct_windows: T04c — build_cc_acct_windows output.
-                             Required cols: account_id, acct_start, acct_end.
-
-    Returns:
-        DataFrame with schema::
-
-            contract_id (long), observation_date (date), direction (int),
-            txn_amount_aed (double), txn_description (string),
-            merchant_category_code (int), is_international (int),
-            txn_category (string), is_post_block_x_fee (int)
+        contract_id (long), observation_date (date, banking date), direction (int),
+        txn_amount_aed (double), txn_description (string),
+        merchant_category_code (int), is_international (int),
+        txn_category (string), is_post_block_x_fee (int)
     """
+    require_columns(
+        raw_transaction,
+        [
+            "primary_entry_idt",
+            "org",
+            "contract_idt",
+            "banking_date",
+            "edp_load_date",
+            "settl_amount",
+            "direction",
+            "txn_code",
+            "txn_description",
+            "add_info",
+            "trans_mcc",
+            "trans_date",
+            "card_idt",
+            "service_class",
+        ],
+        "raw_transaction",
+    )
     acct_windows = _as_contract_windows(crx_cc_acct_windows)
 
     df = (
-        # Partition prune on edp_load_date before the join (see docstring).
         prune_by_edp_load_date(raw_transaction, crx_cc_acct_windows)
-        # Base quality filters (same as stg_transaction.build())
-        .filter(F.col("primary_entry_idt") != 0).filter(F.col("org") == 100)
+        .filter(F.col("primary_entry_idt") != 0)
+        .filter(F.col("org") == 100)
     )
-    # Scope + date filter via inner join on per-account windows (also casts
-    # raw double contract_idt key to long before the join).
     df = scope_to_acct_window(df, acct_windows, "banking_date")
 
-    # Derive txn_category from txn_code (replicates prm_cc.build_transaction logic).
-    # Default NULL — unrecognized codes excluded rather than mislabelled.
+    # NULL for unrecognised codes: excluded rather than mislabelled.
     category_expr = F.lit(None).cast("string")
     for cat_name, codes in TXN_CATEGORIES.items():
         category_expr = F.when(
@@ -205,8 +97,6 @@ def build_cc_transactions(
         ).otherwise(category_expr)
     df = df.withColumn("txn_category", category_expr)
 
-    # Derive is_international from DOMESTIC flag in add_info JSON
-    # (replicates prm_cc.build_transaction logic).
     # DOMESTIC=N → international (1); DOMESTIC=Y or absent → domestic (0).
     df = df.withColumn(
         "is_international",
@@ -215,9 +105,8 @@ def build_cc_transactions(
         ).otherwise(0),
     )
 
-    # Derive is_post_block_x_fee (replicates stg_transaction.build()'s sentinel-fee
-    # derivation) — system-generated fee-accrual events posted after collector
-    # Block W, flagged so A3 Dimension B/C never count them as a real payment.
+    # System-generated fee accruals posted after collector Block W carry a sentinel
+    # trans_date; flagged so A3 Dimension B/C never count them as a payment.
     sentinel = F.lit(POST_BLOCK_X_SENTINEL_DATE).cast(DateType())
     df = df.withColumn(
         "is_post_block_x_fee",
@@ -249,29 +138,16 @@ def build_cc_limits(
     raw_stg_limit: DataFrame,
     crx_cc_spell_table: DataFrame,
 ) -> DataFrame:
-    """Extract T0-anchored CC credit-limit snapshots, pivoted by type_code.
+    """CC credit-limit snapshots (``FIN_LIMIT`` and ``AVAILABLE`` pivoted by type_code)
+    in the window [min(t0) − 12 months, max(t0)] of each account's non-censored spells;
+    it does not read ``crx_cc_acct_windows``, whose forward edge is the observation
+    base.
 
-    Scope: per-account window [min(T0) − 12m, max(T0)] from non-censored spells.
-    Pivot logic replicates stg_limit.build() but uses type_code FIN_LIMIT and
-    AVAILABLE only (ADD_LIMIT excluded; not needed for util_ratio computation).
+    Returns::
 
-    Deliberately does NOT consume crx_cc_acct_windows — that window's forward
-    edge is cc_spine-anchored (extends past T0), which this function does not
-    need (see module docstring).
-
-    Args:
-        raw_stg_limit:       Raw Way4 limit table (DDI-backed).
-                             Required cols: contract_idt, banking_date,
-                             type_code, amount.
-        crx_cc_spell_table:  T03 output. Used for per-account T0 window.
-
-    Returns:
-        DataFrame with schema::
-
-            contract_id (long), observation_date (date),
-            credit_limit (double), available_limit (double)
+        contract_id (long), observation_date (date),
+        credit_limit (double), available_limit (double)
     """
-    # Excludes both censored subtypes — see build_cc_transactions Step 0 comment.
     spell = crx_cc_spell_table.filter(F.col("t0_censored_flag") == 0)
 
     acct_windows = (
@@ -287,19 +163,11 @@ def build_cc_limits(
         )
     )
 
-    # Scope + date filter via inner join on per-account windows (also casts
-    # raw double contract_idt key to long before the join). This T0-only
-    # acct_windows is the one built just above, NOT crx_cc_acct_windows —
-    # see module/function docstring for why this window is deliberately kept
-    # separate.
     scoped = scope_to_acct_window(raw_stg_limit, acct_windows, "banking_date")
 
     pivoted = (
-        scoped
-        # Only limit types needed for util_ratio: FIN_LIMIT (credit_limit) + AVAILABLE
-        .filter(F.col("type_code").isin("FIN_LIMIT", "AVAILABLE"))
-        # Pivot — max() is deterministic when multiple rows exist for same key
-        # (highest approved limit wins; highest available = least alarming)
+        scoped.filter(F.col("type_code").isin("FIN_LIMIT", "AVAILABLE"))
+        # max(): the highest limit and the highest available amount win on a tie
         .groupBy("contract_idt", "banking_date")
         .pivot("type_code", ["FIN_LIMIT", "AVAILABLE"])
         .agg(F.max("amount"))
@@ -320,62 +188,26 @@ def build_cc_balance(
     raw_stg_account_group: DataFrame,
     crx_cc_acct_windows: DataFrame,
 ) -> DataFrame:
-    """Extract window-scoped minimum_due/stmt_balance/total_due/overdue-bucket history.
+    """CC balance history in each account's window: the billing amounts and overdue
+    buckets of ``prm_cc.derive_billing_amounts`` / ``derive_overdue_buckets`` per
+    banking date (Way4 stores credit balances as negative; both flip the sign).
 
-    Scope: per-account window from crx_cc_acct_windows (build_cc_acct_windows) —
-    see module docstring for the cc_spine-anchored forward edge.
+    Returns::
 
-    Reuses prm_cc.derive_billing_amounts() and prm_cc.derive_overdue_buckets() —
-    the authoritative, production-verified derivations — rather than hand-rolling
-    the pivots here, per the standing team decision to never reverse-engineer
-    billing amounts from raw stg_balance. raw_stg_balance already carries its own
-    native banking_date column (the daily snapshot grain both derive_* functions
-    group by) distinct from billing_date — scoping/output use banking_date
-    directly rather than aliasing billing_date onto it.
-
-    Way4 stores credit balances as negative; derive_billing_amounts/
-    derive_overdue_buckets flip the sign.
-
-    Partition pruning: raw_stg_balance is filtered on edp_load_date — the actual
-    Hive partition column — to the global [min(acct_start), max(acct_end)] bound
-    (computed from crx_cc_acct_windows) widened by +/-EDP_LOAD_DATE_BUFFER_MONTHS
-    (12 months — the project's shared feature-lookback constant, reused here as
-    the pruning buffer), *before* the per-account join. The buffer absorbs the
-    load-date lag between when a balance snapshot is taken (banking_date) and
-    when it lands in its edp_load_date partition. cc_spine has no backward
-    lookback at all (unlike data_spine_contracts_way4, which already bakes it
-    into observation_date for the credit_card_way4 staging layer), so this
-    buffer is still needed here. This lets Spark/Hive skip partitions outside
-    the bound instead of scanning the full table. The subsequent per-account
-    filter (on banking_date vs. acct_start/acct_end) still narrows further — the
-    global bound is only a superset of each account's own window.
-
-    Args:
-        raw_stg_balance:       Raw Way4 balance table (DDI-backed).
-                               Required cols: contract_idt, banking_date,
-                               edp_load_date, account_group_id, balance.
-        raw_stg_account_group: Dimension table mapping account_group_id →
-                               type_code / class_code.
-        crx_cc_acct_windows:   T04c — build_cc_acct_windows output.
-                               Required cols: account_id, acct_start, acct_end.
-
-    Returns:
-        DataFrame with schema::
-
-            contract_id (long), observation_date (date), minimum_due (double),
-            stmt_balance (double), total_due (double),
-            overdue_bucket_01 (double) .. overdue_bucket_08 (double)
+        contract_id (long), observation_date (date), minimum_due (double),
+        stmt_balance (double), total_due (double),
+        overdue_bucket_01 (double) .. overdue_bucket_08 (double)
     """
+    require_columns(
+        raw_stg_balance,
+        ["contract_idt", "banking_date", "edp_load_date"],
+        "raw_stg_balance",
+    )
     acct_windows = _as_contract_windows(crx_cc_acct_windows)
 
-    scoped_balance = (
-        # Partition prune on edp_load_date before the join (see docstring).
-        prune_by_edp_load_date(raw_stg_balance, crx_cc_acct_windows).withColumn(
-            "banking_date", F.col("banking_date").cast(DateType())
-        )
-    )
-    # Scope + date filter via inner join on per-account windows (also casts
-    # raw double contract_idt key to long before the join).
+    scoped_balance = prune_by_edp_load_date(
+        raw_stg_balance, crx_cc_acct_windows
+    ).withColumn("banking_date", F.col("banking_date").cast(DateType()))
     scoped_balance = scope_to_acct_window(scoped_balance, acct_windows, "banking_date")
 
     billing_amounts = derive_billing_amounts(scoped_balance, raw_stg_account_group)
@@ -403,61 +235,25 @@ def build_cc_billing(
     raw_stg_billing: DataFrame,
     crx_cc_acct_windows: DataFrame,
 ) -> DataFrame:
-    """Extract window-scoped billing-cycle header: billing_date, due_date,
-    next_billing_date, dlq_level_m.
+    """CC billing-cycle headers in each account's window. ``next_billing_date`` is the
+    next statement of the contract (NULL for its latest cycle). A payment belongs to the
+    cycle ``(billing_date, next_billing_date]``, not ``(billing_date, due_date]``: the
+    due date falls about 5 days before the next statement, and late payments would
+    otherwise be dropped. ``dlq_level_m`` is Way4's per-cycle bucket
+    (``BS_PMT_CYCLE_DUE`` in ``add_info``; NULL when blank).
 
-    Scope: per-account window from crx_cc_acct_windows (build_cc_acct_windows) —
-    see module docstring for the cc_spine-anchored forward edge. This is the
-    primitive A3 Dimension B/C's payment-attribution helper
-    (cc_a3_payment_credibility._signals_common.attribute_payments_to_billing_cycles)
-    is built on.
+    Returns::
 
-    next_billing_date = F.lead(billing_date) per contract. A payment belongs to
-    the cycle (billing_date, due_date) iff billing_date < banking_date <=
-    next_billing_date — NOT billing_date < banking_date <= due_date. due_date is
-    ~billing_date+25d while the next statement cuts ~billing_date+30d, leaving a
-    ~5-6 day dead zone where late payments (common in practice) would otherwise
-    be dropped or misattributed to the wrong cycle — found and fixed in the
-    exploratory notebook (notebooks/data_engineering/crx_persona/
-    cc_account_payment_profiling.ipynb). next_billing_date is NULL for the most
-    recent cycle per contract — treated as open-ended by the attribution helper.
-
-    dlq_level_m is Way4's own per-cycle DLQ bucket (0-9), extracted from the
-    add_info KV field's BS_PMT_CYCLE_DUE= key — the identical extraction
-    nodes/spine/cc_way4/spine_builders.py uses to build cc_spine's
-    dlq_bucket_from_hist, so this is the same ground truth the rest of the
-    business already treats as authoritative, not a reconstruction from
-    crx_cc_balance's overdue buckets. [CONFIRM]: BS_PMT_CYCLE_DUE is
-    sometimes blank/missing in add_info (seen in sample data) — regexp_extract
-    then casts to NULL, same as spine_builders.py's own behavior; no fallback
-    is applied. Consumed by build_a3_payment_cycles for the DPD-bucket-based
-    alternative to Dimension B/C's payment-cycle method (see
-    cc_a3_payment_credibility.constants._DLQ_LEVEL_SATURATED).
-
-    Partition pruning: raw_stg_billing is filtered on edp_load_date to the
-    global [min(acct_start), max(acct_end)] bound (from crx_cc_acct_windows)
-    widened by +/-EDP_LOAD_DATE_BUFFER_MONTHS (12 months), before the
-    per-account join — same rationale as build_cc_transactions/build_cc_balance
-    (cc_spine has no backward lookback of its own).
-
-    Args:
-        raw_stg_billing:       Raw Way4 billing table (DDI-backed).
-                               Required cols: contract_idt, billing_date,
-                               edp_load_date, due_date, add_info.
-        crx_cc_acct_windows:   T04c — build_cc_acct_windows output.
-                               Required cols: account_id, acct_start, acct_end.
-
-    Returns:
-        DataFrame with schema::
-
-            contract_id (long), observation_date (date, = billing_date),
-            due_date (date), next_billing_date (date), dlq_level_m (int, nullable)
+        contract_id (long), observation_date (date, = billing_date),
+        due_date (date), next_billing_date (date), dlq_level_m (int, nullable)
     """
+    require_columns(
+        raw_stg_billing,
+        ["contract_idt", "billing_date", "edp_load_date", "due_date", "add_info"],
+        "raw_stg_billing",
+    )
     acct_windows = _as_contract_windows(crx_cc_acct_windows)
 
-    # Partition prune on edp_load_date before the join (see docstring), then
-    # scope + date filter via inner join on per-account windows (also casts
-    # raw double contract_idt key to long before the join).
     pruned = prune_by_edp_load_date(raw_stg_billing, crx_cc_acct_windows)
     scoped = (
         scope_to_acct_window(pruned, acct_windows, "billing_date")

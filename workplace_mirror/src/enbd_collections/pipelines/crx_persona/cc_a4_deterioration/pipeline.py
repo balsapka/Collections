@@ -1,4 +1,4 @@
-"""Kedro pipeline: T43 — DPD-journey deterioration state for Credit Cards.
+"""Kedro pipeline: CC A4 deterioration state (credit cards).
 
 2-node pipeline:
     Node 1  build_cc_dpd_sequences       -> crx_cc_dpd_sequences
@@ -14,34 +14,35 @@ from kedro.pipeline import Pipeline, node
 
 from .nodes import build_cc_a4_deterioration, build_cc_dpd_sequences
 
+TAGS = ["crx_persona", "crx", "a4", "deterioration", "persona_axis"]
+
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """2-node pipeline: build per-account DPD sequences, then classify deterioration state."""
+    """Build per-account DPD sequences, then classify the deterioration state."""
     return Pipeline(
         [
             node(
                 func=build_cc_dpd_sequences,
-                inputs=[
-                    "crx_cc_full_history",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
+                inputs={
+                    "crx_cc_full_history": "crx_cc_full_history",
+                    "crx_persona": "params:crx_persona",
+                    "model_id": "params:model_id",
+                },
                 outputs="crx_cc_dpd_sequences",
                 name="build_crx_cc_dpd_sequences",
-                tags=["crx", "cc", "cc_a4_deterioration"],
+                tags=TAGS,
             ),
             node(
                 func=build_cc_a4_deterioration,
-                inputs=[
-                    "crx_cc_dpd_sequences",
-                    "cc_spine",
-                    "params:crx_persona",
-                    "params:model_id",
-                ],
+                inputs={
+                    "crx_cc_dpd_sequences": "crx_cc_dpd_sequences",
+                    "cc_spine": "cc_spine",
+                    "crx_persona": "params:crx_persona",
+                    "model_id": "params:model_id",
+                },
                 outputs="crx_cc_a4_deterioration",
                 name="build_crx_cc_a4_deterioration",
-                tags=["crx", "cc", "cc_a4_deterioration"],
+                tags=TAGS,
             ),
         ],
-        tags=["crx_persona"],
     )

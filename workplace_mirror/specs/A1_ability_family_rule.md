@@ -21,8 +21,8 @@ against the flow dictionary, the check's outcome block.
   snapshot.
 - **Anchor**, which is what the customer must find now:
   - CC 60–180: the oldest non-zero overdue bucket on the observation-month snapshot;
-  - RL: one EMI;
-  - 180+ or missing: flat floors only.
+  - RL: one EMI, at 61–180 and at 180+ (a restructuring changes the EMI; user, 2026-11-14);
+  - CC 180+, or a missing anchor: flat floors only.
 - **CIF level.** All customer signals cover every account of the `cif_id`.
 - **Income (F1).** Computed exactly as today's `income_level` (S12, S14).
 - **The bureau salary source is swappable** (user, 2026-11-10). **Next source:** the DE's
@@ -70,7 +70,7 @@ against the flow dictionary, the check's outcome block.
   - **Built in bundle 24** (`bundles/24_a1_product_primaries_bureau_swap.md`, 2026-11-12): the feature node
     reads `feat_bureau_salary_unified`; the carry stays, the RL loan salary is dropped.
   - **Two alert-specific pieces stay in `a1_ability/signals.py` until then:**
-    - the **one-month carry** (S14, `_with_next_month`) **stays** after the swap, until bureau salary
+    - the **one-month carry** (S14, `_with_carry`) **stays** after the swap, until bureau salary
       sourcing is fixed (user, 2026-11-11, replacing the 2026-11-10 plan): the unified series is
       event-like, and dropping the carry would cut Stable by 0.8–3.6pp;
     - **fill until change — tested 2026-11-12** (`bundle_helpers/a1_final/bureau_fill_whatif_results.md`,
@@ -89,7 +89,7 @@ against the flow dictionary, the check's outcome block.
       `salaryaccountclosed` alerts the DE drops (no amount); precedence hides only 2–8%. **Decided (user,
       2026-11-12): keep the one-month carry for now.** Ready option, not forgotten: a carry of up to 3
       months (ages 1–3, ended by a newer row or a 0) is what the data support; switching is one constant in
-      `signals.py` (`_with_next_month`) plus the spec cases. 4–6 months only after the DE maps every closed
+      `signals.py` (`BUREAU_CARRY_MONTHS`, read by `_with_carry`) plus the spec cases. 4–6 months only after the DE maps every closed
       alert to 0; never beyond 6. **Closure rule (user,
       2026-11-12):** the bureau mixes added / closed, so `salaryaccountclosed` and
       `salaryaccountisadded/closed` are decided by their amount: 0 or NULL = a stop (0) for both; > 0 =
@@ -97,7 +97,7 @@ against the flow dictionary, the check's outcome block.
       for `salaryaccountclosed`. Added / changed alerts are unchanged. DE ask
       (`bundle_helpers/a1_final/de_bureau_asks.md`): apply this in `int_bureau_alert_salary_monthly` and
       add `is_closure` (true only on positive `salaryaccountclosed` rows) to the unified table; then our
-      feature passes it through and `_with_next_month` skips the carry for those rows (a later A1 bundle,
+      feature passes it through and `_with_carry` skips the carry for those rows (a later A1 bundle,
       once the column is in PROD);
     - **RL `feature_retail_loans`** (`_loan_bureau_salary`) is dropped with the swap: its salary is
       the loan application's, not a monthly series (user, 2026-11-11). The swap also drops the RL
@@ -109,6 +109,13 @@ against the flow dictionary, the check's outcome block.
 
 ## 2. Families
 
+**One strong amount for every family** (user, 2026-11-14, for simplicity): income, money in, money out,
+the balance and assets are strong from max(AED 3,000, 2 × anchor) (`STRONG_FLOOR`,
+`STRONG_ANCHOR_MULT`). Before, flows used max(1,000, 1 ×), the balance max(3,000, 1 ×) and assets
+max(10,000, 3 ×). "Some" for money in and money out is AED 1,000 in any month (`FLOW_SOME`; money out
+was 500). Only the other credit product's instalment keeps max(AED 1,000, 1 × anchor). Ships in bundle
+25 as its own check step (rows moved, payment and cure per level).
+
 Each family is **strong**, **some** or **none** (NULL = no data). Only strong scores, with 2 points.
 "Some" scores 0 but still counts as evidence: it makes a row Low rather than Unknown.
 
@@ -116,16 +123,16 @@ Each family is **strong**, **some** or **none** (NULL = no data). Only strong sc
 |---|---|---|
 | **F1 Income** | today's `income_level` = stable | weak |
 | **F2 Money in or held** | either inflow or balance (below) is strong | inflow some |
-| **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 1,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 500 |
-| **F4 Cross-product** | deposits / investments / WM assets (AUM; kept, user 2026-11-10) ≥ max(AED 10,000, 3 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
+| **F3 Money out** | chosen spend + transfers out to the customer's own accounts at other banks (§3) ≥ max(AED 3,000, 2 × anchor) in ≥ `MIN_MONTHS` months of W | any month ≥ AED 1,000 |
+| **F4 Cross-product** | deposits / investments / WM assets (AUM; kept, user 2026-11-10) ≥ max(AED 3,000, 2 × anchor) at the observation month end; **or** another credit product with us (incl. the customer's other cards, not supplementaries of the same contract) current at the observation month with instalment / minimum due ≥ max(AED 1,000, 1 × anchor) | any other product current, or any holding > 0 |
 
 ### F2 Money in or held
 
-- **Inflow strong:** credits in the counted classes (§3) ≥ max(AED 1,000, 1 × anchor) in
+- **Inflow strong:** credits in the counted classes (§3) ≥ max(AED 3,000, 2 × anchor) in
   ≥ `MIN_MONTHS` months of W. Salary-flagged credits are left out, since salary is F1.
 - **Inflow some:** any month of W with ≥ AED 1,000 of counted credits.
 - **Balance strong:** the CASA average balance (`feat_cif_casa_balance_monthly`, WM's 49 CASA scheme
-  codes, CIF level) ≥ max(AED 3,000, 1 × anchor) in ≥ `MIN_MONTHS` months of W, and the window
+  codes, CIF level) ≥ max(AED 3,000, 2 × anchor) in ≥ `MIN_MONTHS` months of W, and the window
   average is no more than 50% below the prior window's. This is today's liquidity "adequate"
   condition on balances (`F_CASA`, `K_CASA`, `D_CASA`).
 - **Balance below strong does nothing.** It scores no points and is not evidence. A small balance
@@ -183,7 +190,7 @@ from the round-3 flow dictionary: `tran_dc` × `tran_type` × `reason_for_exclud
 | High | 2 or more strong families (4+ points) |
 | Moderate | exactly 1 strong family |
 | Low | no strong family, but some evidence (any "some", F1 weak, or F4 some) |
-| Unknown | no evidence in any family |
+| Unknown | no evidence in any family and no counted CASA leg in the window (S11) |
 
 - **Distress** lowers the state one rung (High → Moderate → Low). Low stays Low.
 - **Reason column:** the strongest family, or `distress` when the demotion fired. Unknown keeps

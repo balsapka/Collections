@@ -378,6 +378,48 @@ Still the old copy: `cc_raw_extract/pipeline.py` (the current one wires `build_c
   667, settlement 5,840; G2 / paid = 69.0% / 34.7%, V1c's +5 d rates). The 2-cycle outcome rows do not
   sum to 100 (e.g. CC PTP G1 93.2%), as printed. Handoff 45 (A1 other schemes) is the A1 session's.
 
+## Handoffs 70–73 (A1 session): bundle 21 step-4 files after the casa perf prompts (2026-11-12)
+
+Typed by the workplace Sonnet from photos; copied to the stage branch `refactor/a1_family`.
+- `nodes/features/products/feat_cif_cross_product.py` (359 editor lines, complete).
+- `nodes/features/casa/feat_cif_casa.py` (628): **lines 438–487 not photographed** (body of
+  `_TRANSACTION_COLUMNS`, `_LABEL_KEYS`, `_LABEL_COLUMNS`, `_flag`, `_usable_key`, the start of
+  `_flow_labels` at 461). Marked `# <<NOT PHOTOGRAPHED: line N>>`; ruff F821 on those names until
+  the photo arrives. Line 19 / 81 `yyyyMM0W` read as zero. **Filled by handoff 74** (lines 434–491;
+  overlaps agree): file complete.
+- `pipelines/casa/features.py` (101; docstring lines 3–7 kept from the mirror, arrows unreadable),
+  `pipelines/products/features.py` (41), `catalog_casa.yml` (288, now incl. the `casa_windows*`
+  outputs; `rl_` vs `r1_` on lines 144/154/198/208 read as `rl_`), `catalog_bureau.yml` (35, adds
+  `feat_bureau_salary_unified`).
+- `pipeline_registry.py`: only lines 1–53 and 131–179 photographed. Added the four `casa_windows*`
+  imports and entries; comment rules kept from the mirror. The workplace has one more line in
+  54–130 than the mirror. **Handoff 74** filled 51–162: the extra line is `from enbd_collections.pipelines
+  import genesys` (line 112); lines 1–179 now match. Lines 180+ still unphotographed (the genesys entry is
+  presumably there: ruff F401 here until then). `rl_` read for `r1_` in the crx imports.
+
+## Handoff 6 (2026-11-12, IMG_9026–9032): casa_windows pipelines + registry 178–276
+
+- `pipelines/casa/windows.py`, `windows_all_models.py`, `windows_casa_all_models.py`, `windows_casa.py`
+  added verbatim. The docstring diagrams were redrawn in ASCII by the transcriber, so their line count may
+  be off by one (`windows.py` 53 vs 54 editor lines, `windows_casa.py` 58 vs 59); code lines match.
+- They import `feat_cif_windows` and `feat_cif_casa_flow` from `nodes/features/casa/`: neither is in the
+  mirror. One of them must import `_cif` from `feat_cif_casa` (bundle 24's first apply failed on it; the
+  pipeline files do not). **Photograph both node modules.**
+- `pipeline_registry.py` 178–276: the `genesys` entry added (F401 gone); the bundle 23 A3 check entries
+  are not in the workplace (bundle 23 not applied yet, user 2026-11-12), removed here too; bundle 23 adds
+  them back when applied (tested: 24 then 23 gives the head's registry and catalog). Lines 1–177 match handoff 74; separator
+  lengths kept from the mirror.
+
+## Handoff 7 (2026-11-12, IMG_9033–9041): the casa_windows node modules
+
+- `nodes/features/casa/feat_cif_casa_flow.py` (editor lines 1–160; the photos stop there, the last
+  function returns at 159, so the file is probably complete) and `feat_cif_windows.py` (1–303) added
+  verbatim. `py_compile` and ruff F/E9 clean.
+- These are the `_cif` importers behind bundle 24's first failed apply: `feat_cif_casa_flow.py:19`
+  (`_cif, _require`) and `feat_cif_windows.py:32` (`_cif, _require, _wm_month`); bundle 24 keeps the
+  aliases, a later bundle repoints both to `nodes/utils/frames.py`.
+- Transcriber: "▯" in docstrings read as `-` (a minus / dash the font did not render).
+
 ## Review findings
 
 Moved to [REVIEW_OBSERVATIONS.md](REVIEW_OBSERVATIONS.md).
@@ -391,3 +433,20 @@ keeps the workplace file's own separators on apply, so this never blocks a bundl
 The same goes for spacing and wrapping inside comments and docstrings (second PROD check,
 2026-10-23): v4 accepts a file whose Python code (AST without docstrings) or YAML content
 equals the photographed base. Only real code differences conflict.
+
+## Handoff 8 (2026-11-13): the DE bureau salary chain after the workplace merge
+
+The workplace merged the DE bureau branch (56 bureau files; note `bundle_helpers/a1_final/de_bureau_merge_summary_20261113.md`).
+Mirrored only what the persona code reads or bundles edit:
+- `conf/base/catalog/catalog_bureau.yml` verbatim (26 lines): the `feat_bureau_salary_unified` entry bundle 24 added
+  is gone; it lives once in the DE's `catalog_outputs.yml` (same path, `<<: *spark_de`), which the mirror does not
+  hold. Excerpt (lines 798–852) in `bundle_helpers/a1_final/workplace_reference.md`.
+- `nodes/features/bureau/feat_bureau_salary_unified.py` (117 lines) and `pipelines/bureau/features.py` (92 lines)
+  added verbatim; they import DE modules the mirror lacks (`scope_extractor`, `feat_bureau_alert`, …).
+  `py_compile` + ruff F/E9 clean. Output: `cif_id`, `salary_month_end`, `monthly_salary`, `salary_source`,
+  `is_closure`: bundle 24's contract (the first four) holds.
+- `pipeline_registry.py` (workplace 285 lines, photographed whole): the only lasting change is the DE's comment +
+  four `<model_id>.bureau` entries, added here. The workplace still has the bundle 24 and bundle 23 check
+  entries (their cleanups are pending); the mirror keeps them out (bundle 24 cleanup mirrored ahead). Separator
+  lengths and the em dash on the "Full pipelines" comment kept from the mirror (transcriber: `-`). Apart from
+  those, the photo and the mirror are identical.

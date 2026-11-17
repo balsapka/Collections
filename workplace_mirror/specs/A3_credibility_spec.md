@@ -97,12 +97,12 @@ Measured, not assumed (V2, V3).
   least its amount arrive between the promise date and its due date. CC matches Way4 payment
   transactions by date. RL can only match by month (`total_paid` is a monthly total).
 
-- **D-A3-12: CC due once the ladder sits in bucket 08** (user, 2026-11-03). Deep in delinquency Way4
-  accumulates the whole overdue amount in `overdue_bucket_08`, so no bucket holds one month's due.
-  What is reasonable to ask is estimated from before: the average `minimum_due` of the last 12 months
-  with a positive minimum due, before the first statement where only bucket 08 holds money
-  (`resolve_bucket08_fallback_due`, kept). The waterfall's bucket-08 slicing goes with the waterfall
-  method (D-A3-3).
+- **D-A3-12: CC due once the ladder sits in bucket 08** (user, 2026-11-03; rule in D-A3-31). Deep in
+  delinquency Way4 accumulates the whole overdue amount in `overdue_bucket_08`, so no bucket holds one
+  month's due. While bucket 08 is empty, one month's due is the oldest non-zero bucket 07..01, else the
+  minimum due (the ladder value). On a statement with bucket 08 open, what is reasonable to ask is
+  estimated from before: the baseline of D-A3-31. The waterfall's bucket-08 slicing goes with the
+  waterfall method (D-A3-3).
 - **D-A3-13: RL record before delinquency falls back to the last known EMI** (user, 2026-11-03, O81):
   a month without its own EMI snapshot is judged against `monthly_emi_asof`, as Dimension B does.
 - **D-A3-14: RL refusal payment test reads the loan's own cash after the refusal** (user,
@@ -124,7 +124,8 @@ Measured, not assumed (V2, V3).
 - **D-A3-18: A3 builds the source outputs it needs itself, for now** (user, 2026-11-03). No refactor of
   the core CC pipelines in this bundle; merging them into the CC primaries / features is a later
   option. The builders still lose their T0 windows (D-A3-1): rescoping them needs the current
-  `cc_raw_extract/nodes.py` (`build_cc_acct_windows`, `build_cc_billing`) at bundle time.
+  `cc_raw_extract/nodes.py` (`build_cc_billing`) and `build_cc_acct_windows` (now in
+  `cc_a3_payment_credibility/nodes.py`) at bundle time.
 
 - **D-A3-19: no contact-based negative in the state** (user, 2026-11-04, from V2). Today's no-response
   rule goes: it fires on 36% CC / 26% RL and is 84% / 78% A2 Non-Reachable (dead-line outcomes), so
@@ -200,17 +201,72 @@ Measured, not assumed (V2, V3).
   61–180 cards by the next statement after the promise day (unchanged); 61–180 loans by the end of
   the promise month (was the end of the next month); 180+ cards and loans by the end of the promise
   month. Paying on the deadline day counts. `PROMISE_DEADLINE` is keyed by segment (from
-  `params:model_id`) and product; the 30-day and next-month-end options stay.
+  `params:model_id`) and product; the 30-day and next-month-end options stay. Final (user,
+  2026-11-17): with the D-A3-33 points the deadline moves state AUC by at most .005 (V1j), so GRR's
+  rule stays and 30 days is not pursued.
 
-- **D-A3-29: a follow-up promise after the event's deadline is a new event** (user, 2026-11-13;
-  ships in bundle 25, sized by V1j Q0). Today `_followup_promises` chains rows less than 8 days
-  after the previous row into one run judged by the first row's deadline, so a follow-up after
-  that deadline (a new promise after a broken one) is never judged, and a chain can span weeks.
-  New rule: a follow-up starts a new event when it is more than 7 days after the previous one
-  **or** after the current event's `promise_cutoff`. Not a running sum any more: each row's own
-  cutoff first, then a per-account fold over the date-ordered rows (`F.aggregate`, no Python UDF).
-  Related, for V1j Q0 to size: at 180+ on cards (month-end deadline) a promise made on the last
-  day of the month has an empty payment window (loans unaffected: cash is dated at month end).
+- **D-A3-29: a promise event is alive until its deadline passes or the promised amount is paid**
+  (user, 2026-11-14; replaces the 2026-11-13 wording, the 7-day follow-up chaining and D-A3-25's
+  7-day plan matching; ships in bundle 25). Promises are one stream: non-cancelled DCORE plans
+  (dated at their start) and follow-up promises (dated at the call day).
+  Cancellation is the plan's status as loaded: a plan cancelled after an observation date is absent
+  from that earlier observation; the latest month is unaffected.
+  - An event starts with the first promise. Its deadline (D-A3-28) and its promised amount are
+    those of that day.
+  - Every promise made while the event is alive belongs to it, however many days apart. A promise
+    on the deadline day still belongs to it.
+  - The event ends when the deadline passes, or when the payments made since the event day and
+    before a later promise reach the promised amount. A partial payment does not end it. The first
+    promise after the end starts a new event, which counts only the payments after its own day.
+  - Loans: cash is known only to the month (dated at the month end), so an event never ends
+    mid-month; all promises of a month are one event.
+  - `event_kind`: matched (the event holds plans and follow-up promises), table_only,
+    followup_only. `event_name` is the first follow-up promise's, `plan_id` the first plan's.
+  - The promised amount is the latest known due on or before the event day: a cycle without a due
+    amount is a data error and is skipped. It is never below 100 AED: a smaller due, or no due at
+    all, counts as 100 (user, 2026-11-14 and 2026-11-15).
+  - Next-statement deadline: the first statement after the event day, at most 31 days after it (a
+    later one means statements are missing from the history); `NEXT_STATEMENT_MAX_DAYS`, user 2026-11-15).
+  - Code: `a3_credibility/promises.py` (`_event_step`, a per-account fold over the promise days in
+    date order, `F.aggregate`, no Python UDF).
+
+- **D-A3-30: a refusal is counted only when it is certain that nothing was paid after it** (user,
+  2026-11-14; refines D-A3-14 and D-A3-22). A payment of 100 AED or more that may have come after the
+  refusal lifts it: on cards one dated on or after the refusal day; on loans the refusal month's
+  cash as well, because the day within the month is not known. A plan that starts on or after the refusal
+  day lifts it too: a payment or a plan of the same day may have come out of that conversation
+  (user, 2026-11-15).
+
+- **D-A3-31: CC bucket 08 open = the baseline due** (user, 2026-11-15, Q-S6-05). On every statement
+  where `overdue_bucket_08` is non-zero, one month's due is the baseline, whatever buckets 01–07 or the
+  minimum due show; neither a bucket amount nor the minimum due is used on such a statement. Baseline =
+  the ladder value (D-A3-12) over the account's statements before its first statement with bucket 08
+  non-zero: averaged per calendar month, then over the latest 12 months with a ladder value
+  (`BUCKET08_BASELINE_MONTHS`). An account with no such statement has no due (NULL) on its bucket-08
+  statements; no flat fallback. Dimension C's `billed_amount` stays the ladder value. Code:
+  `cc_a3_payment_credibility/nodes.py` (`_balance_dues`).
+
+- **D-A3-32: same-day contacts rank by disposition** (user, 2026-11-15, Q-R-10). When the latest
+  right-party contact day holds several dispositions, the strongest counts as the latest, whatever
+  the times: promise (`ptp`) > payment reported (`paid`) > refusal > dispute > contact (`success`) >
+  hung up (`hung_up`). A refusal therefore outranks a dispute, a plain contact or a hang-up of its
+  day, and a promise or a payment report outranks the refusal. A refusal kept as the latest is still
+  lifted by a payment or a plan of the same day (D-A3-30). Code: `a3_credibility/signals.py`
+  (`_SAME_DAY_ORDER`).
+
+- **D-A3-33: promise points Kept 3 / Partly kept 2 / Broken 1 / Promised 1 / No promise 0** (V1j scheme P5,
+  `bundle_helpers/a3_final/v1j_review.md`; accepted by GRR, user 2026-11-17; ships in bundle 25).
+  Making a promise is evidence of engagement even when it was missed: Broken customers pay more than
+  equally reachable customers who never promised, and keeping it is stronger still. So Dimension A
+  gains a level: **promised** = at least one promise event in the 12-month window, none kept and not
+  Broken (none concluded yet, or concluded and nothing kept); the old **thin** is renamed **no_promise**
+  (never promised in the window) and stays the silent level. The ladder (Broken, Kept, Partly kept) and the thresholds
+  (Moderate from 2, High from 4, D-A3-24) are unchanged; `commitments_n` (events in the window) is
+  carried. Same scheme for all four model_ids; no contact points (they would re-count A2's
+  reachability). V1j on today's events: state AUC +.059 cc / +.045 rl at 61–180, +.083 / +.047 at
+  180+, High > Moderate > Low in every slice; bundle 25's check re-reads the gain on the new events.
+  Code: `a3_credibility/constants.py` (`COMMITMENT_POINTS`), `signals.py`
+  (`build_commitment_signals`).
 
 - **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.
@@ -227,13 +283,14 @@ Measured, not assumed (V2, V3).
   inclusive at the observation date (Q-22 / Q-27); a censored anchor (A4 cropped the history and the
   episode ran from its first kept month) counts as unknown: windows from the observation lookback,
   Dimension C No record, `pre_dlq_reason = censored` (Q-25); same-day ties on the latest right-party
-  contact: a non-refusal counts as later, then the largest disposition (Q-28); "a payment of 100 AED
+  contact: the order of D-A3-32 (Q-28); "a payment of 100 AED
   after the refusal" = one cycle (CC) / month (RL) with 100 AED or more paid after the refusal day
   (Q-29); DCORE read at most 24 months back, both products, the bundle check reports the refusals the
   cap removes (Q-30); the onset cycle is in neither B nor C (Q-31); the instalments are an A3 source
   node (Q-32 (a), until the DE adds a DCORE primary).
-- **D-A3-23: Broken scores −1 and is not a strong negative; refusal is the only one** (proposal
-  2026-11-05, in bundle 17). The weight (today's override / 0 / −1 / −2) is reported by the bundle
+- **D-A3-23: Broken is not a strong negative; refusal is the only one** (its −1 weight is replaced
+  by D-A3-33) (proposal
+  2026-11-05, in bundle 17). The weight then (override / 0 / −1 / −2) is reported by the bundle
   check's `A3 BROKEN` block; V1e part 2 (outcome) can still confirm it.
 
 ## Bundle 17 (built 2026-11-06)

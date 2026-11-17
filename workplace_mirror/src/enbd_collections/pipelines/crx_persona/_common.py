@@ -8,35 +8,61 @@ up customer-level sources by ``cif_id``. The helpers here encode the conventions
   ends) and the months before it;
 * point-in-time lookups read before the observation date and can be bounded in age
   (``pit_latest``), window aggregates read the last N months (``window_agg``);
-* source partition floors follow from the earliest observation month
-  (``lookback_floor``);
+* source partition floors follow from ``crx_persona.persona_start_date``, the first
+  observation month (``nodes.utils.frames.history_floor``);
 * each axis logs its state distribution for the latest observation month only
-  (``log_latest_month``).
+  (``log_latest_month``);
+* DCORE events are read per scored account, through its agreements
+  (``dcore_account_events``); each axis applies its own date window.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import date
-from typing import Sequence
+from collections.abc import Sequence
 
 from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
-from ._dpd_journey.constants import MODEL_ID_SEGMENT
+# Re-exported: the axes import the key helper from here.
+# pylint: disable-next=unused-import
+from enbd_collections.nodes.utils.frames import string_key  # noqa: F401
 
 LOG = logging.getLogger(__name__)
 
 GRAIN = ("account_id", "observation_date")
 
+# The two segments; every per-segment setting in crx_persona is keyed by them.
+SEG_60_180, SEG_180_PLUS = "60_180", "180_plus"
+
+# The DPD segment each model_id scores; every segment-dependent rule keys on it.
+MODEL_ID_SEGMENT = {
+    "cc_60_180": SEG_60_180,
+    "cc_180_plus": SEG_180_PLUS,
+    "rl_60_180": SEG_60_180,
+    "rl_180_plus": SEG_180_PLUS,
+}
+
 # Months every axis looks back, the observation month included; the dry 180+ buckets
 # look further.
-WINDOW_MONTHS = {"60_180": 3, "180_plus": 6}
+WINDOW_MONTHS = {SEG_60_180: 3, SEG_180_PLUS: 6}
+# Failed call days in a row that make a customer gone dark: A2 Non-Reachable (D-A2-20),
+# A3's no-pickup diagnostic (D-A3-19).
+GONE_DARK_DAYS = {SEG_60_180: 3, SEG_180_PLUS: 6}
+
+
+def segment(model_id: str) -> str:
+    """``model_id``'s DPD segment: ``60_180`` or ``180_plus``."""
+    if model_id not in MODEL_ID_SEGMENT:
+        raise ValueError(
+            f"model_id must be one of {sorted(MODEL_ID_SEGMENT)}, got {model_id!r}"
+        )
+    return MODEL_ID_SEGMENT[model_id]
 
 
 def window_months(model_id: str) -> int:
     """The lookback window of ``model_id``'s segment, in calendar months."""
-    return WINDOW_MONTHS[MODEL_ID_SEGMENT[model_id]]
+    return WINDOW_MONTHS[segment(model_id)]
 
 
 def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
@@ -46,14 +72,18 @@ def require_columns(df: DataFrame, columns: Sequence[str], source: str) -> None:
         raise ValueError(f"{source} is missing required columns {missing}")
 
 
-def parse_yyyymmdd(col: str) -> Column:
-    """``20260531`` (int or string) -> date."""
-    return F.to_date(F.col(col).cast("string"), "yyyyMMdd")
-
-
-def _window_start(anchor: Column, months: int) -> Column:
-    """First day of the last ``months`` calendar months, the anchor's month included."""
+def window_start(months: int, anchor: Column | None = None) -> Column:
+    """First day of the last ``months`` calendar months, the month of ``anchor``
+    (default ``observation_date``) included."""
+    anchor = F.col("observation_date") if anchor is None else anchor
     return F.add_months(F.trunc(anchor, "month"), 1 - months)
+
+
+def scoped(src: DataFrame, base: DataFrame, key: str) -> DataFrame:
+    """``src`` rows whose ``key`` occurs in ``base``. Sources span the whole bank, the
+    base one model's customers: the broadcast semi-join drops the rest before the
+    shuffle of the join that follows."""
+    return src.join(F.broadcast(base.select(key).distinct()), on=key, how="left_semi")
 
 
 def pit_latest(  # pylint: disable=too-many-arguments
@@ -63,36 +93,35 @@ def pit_latest(  # pylint: disable=too-many-arguments
     date_col: str,
     value_cols: Sequence[str],
     key: str = "cif_id",
-    anchor: Column | None = None,
     max_age_months: int | None = None,
     inclusive: bool = False,
 ) -> DataFrame:
-    """Latest ``src`` row dated before each base row's anchor, per ``GRAIN``.
+    """Latest ``src`` row dated before each base row's observation date, per ``GRAIN``.
 
-    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. The anchor
-    defaults to ``observation_date``; ``inclusive`` also accepts rows dated on it (same-
-    day snapshots). ``max_age_months`` keeps only rows in the anchor's last N calendar
-    months (1 = its own month), so a stale record never stands in for a current one.
-    Ties on the date are broken by the values (descending), so reruns agree. Returns
-    ``GRAIN + value_cols`` for base rows with a match only.
+    ``src`` must carry ``key``, ``date_col`` (a date) and ``value_cols``. ``inclusive``
+    also accepts rows dated on it (same-day snapshots). ``max_age_months`` keeps only
+    rows in the last N calendar months of the observation date (1 = its own month), so a
+    stale record never stands in for a current one.
+    Ties on the date are broken by the values (largest first, NULL last), so reruns
+    agree. Returns ``GRAIN + value_cols`` for base rows with a match only.
     """
-    anchor = F.col("observation_date") if anchor is None else anchor
-    before = (
-        F.col("_d") <= F.col("_anchor") if inclusive else F.col("_d") < F.col("_anchor")
-    )
-    cond = before
+    row_date, obs_date = F.col("_d"), F.col("observation_date")
+    cond = row_date <= obs_date if inclusive else row_date < obs_date
     if max_age_months is not None:
-        cond = cond & (F.col("_d") >= _window_start(F.col("_anchor"), max_age_months))
-    order = [F.col("_d").desc(), *[F.col(c).desc_nulls_last() for c in value_cols]]
+        cond = cond & (row_date >= window_start(max_age_months))
+    latest = F.max(F.struct("_d", *value_cols))
     return (
-        base.select(*GRAIN, key, anchor.alias("_anchor"))
-        .join(src.select(key, F.col(date_col).alias("_d"), *value_cols), on=key)
-        .filter(cond)
-        .withColumn(
-            "_rn", F.row_number().over(Window.partitionBy(*GRAIN).orderBy(*order))
+        base.select(*GRAIN, key)
+        .join(
+            scoped(
+                src.select(key, F.col(date_col).alias("_d"), *value_cols), base, key
+            ),
+            on=key,
         )
-        .filter(F.col("_rn") == 1)
-        .select(*GRAIN, *value_cols)
+        .filter(cond)
+        .groupBy(*GRAIN)
+        .agg(latest.alias("_latest"))
+        .select(*GRAIN, *[F.col("_latest")[c].alias(c) for c in value_cols])
     )
 
 
@@ -104,29 +133,27 @@ def window_agg(  # pylint: disable=too-many-arguments
     aggs: Sequence[Column],
     months: int,
     key: str = "cif_id",
+    start: str | None = None,
 ) -> DataFrame:
     """Aggregate ``src`` rows dated in the last ``months`` calendar months — the
     observation month and the ``months - 1`` before it, up to the observation date.
 
-    ``src`` holds ``key``, ``date_col`` and the columns ``aggs`` read.
-    Returns ``GRAIN + aggs`` for base rows with at least one row in the window.
+    ``src`` holds ``key``, ``date_col`` and the columns ``aggs`` read. ``start`` names a
+    base date column that bounds each row's window from below as well (A3, D-A3-2:
+    the episode start); ``aggs`` may read it. Returns ``GRAIN + aggs`` for base rows
+    with at least one row in the window.
     """
     obs = F.col("observation_date")
+    lower = window_start(months)
+    if start is not None:
+        lower = F.greatest(lower, F.col(start))
     return (
-        base.select(*GRAIN, key)
-        .join(src, on=key)
-        .filter(
-            (F.col(date_col) >= _window_start(obs, months)) & (F.col(date_col) <= obs)
-        )
+        base.select(*GRAIN, key, *([start] if start is not None else []))
+        .join(scoped(src, base, key), on=key)
+        .filter((F.col(date_col) >= lower) & (F.col(date_col) <= obs))
         .groupBy(*GRAIN)
         .agg(*aggs)
     )
-
-
-def lookback_floor(base: DataFrame, months: int) -> str:
-    """ISO start of the earliest observation's ``months``-month window (partition floor)."""
-    first: date = base.agg(_window_start(F.min("observation_date"), months)).first()[0]
-    return first.isoformat()
 
 
 def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
@@ -137,19 +164,30 @@ def left_join_all(base: DataFrame, parts: Sequence[DataFrame]) -> DataFrame:
     return result
 
 
-def log_latest_month(df: DataFrame, col: str, name: str, persona_end_date: str) -> None:
+def log_latest_month(
+    df: DataFrame,
+    col: str,
+    name: str,
+    persona_end_date: str,
+    *,
+    latest_per_account: bool = False,
+) -> None:
     """Log the ``col`` distribution of the latest observation month — the month of
     ``persona_end_date`` (one aggregate job; the month filter pushes down). A logging
-    failure is a warning, never a failed run."""
+    failure is a warning, never a failed run. ``latest_per_account`` counts each
+    account's latest row of that month once (cc_spine has billing dates, so a card can
+    have two rows in a month; drop the option when cc_spine is month-end)."""
     month = F.trunc(F.lit(str(persona_end_date)), "month")
     try:
-        rows = (
-            df.filter(F.trunc("observation_date", "month") == month)
-            .groupBy(col)
-            .count()
-            .orderBy(col)
-            .collect()
-        )
+        latest = df.filter(F.trunc("observation_date", "month") == month)
+        if latest_per_account:
+            newest_first = Window.partitionBy("account_id").orderBy(
+                F.col("observation_date").desc()
+            )
+            latest = latest.withColumn("_rn", F.row_number().over(newest_first)).filter(
+                F.col("_rn") == 1
+            )
+        rows = latest.groupBy(col).count().orderBy(col).collect()
     except Exception as exc:  # pylint: disable=broad-except
         LOG.warning("%s: %s distribution not logged: %s", name, col, exc)
         return
@@ -195,10 +233,12 @@ def _obs_base(spine: DataFrame, id_col: str, crx_persona: dict) -> DataFrame:
 
 
 def build_cc_obs_base(cc_spine: DataFrame, crx_persona: dict) -> DataFrame:
-    """The CC observation base at month ends. Until ``cc_spine`` itself is month-end, each
-    billing-date row moves to its month end; an account's rows in one month become one
-    (the largest ``cif_id`` if they disagree). Remove the shift once the spine is month-end.
+    """The CC observation base at month ends. While ``cc_spine`` is dated at billing
+    dates, each row moves to its month end and an account's rows in one month become
+    one (the largest ``cif_id`` if they disagree); on a month-end spine this changes
+    nothing.
     """
+    require_columns(cc_spine, ["contract_id", "observation_date", "cif_id"], "cc_spine")
     month_end = cc_spine.select(
         "contract_id",
         F.last_day(F.col("observation_date").cast("date")).alias("observation_date"),
@@ -212,4 +252,40 @@ def build_cc_obs_base(cc_spine: DataFrame, crx_persona: dict) -> DataFrame:
 
 def build_rl_obs_base(rl_spine: DataFrame, crx_persona: dict) -> DataFrame:
     """The RL observation base (``rl_spine`` is already month-end)."""
+    require_columns(rl_spine, ["account_id", "observation_date", "cif_id"], "rl_spine")
     return _obs_base(rl_spine, "account_id", crx_persona)
+
+
+# ── DCORE ─────────────────────────────────────────────────────────────────────
+
+
+def dcore_account_events(
+    obs_base: DataFrame, followup: DataFrame, agreements: DataFrame
+) -> DataFrame:
+    """DCORE events on the agreements of the base's accounts: ``account_id``,
+    ``day``, ``action_code``, ``category``, ``name`` (upper-cased, trimmed, '' when
+    missing). Shared by A2 (D-A2-8: all history, one agreement per account) and A3
+    (D-A3-7: account level). Not dated by the observation: the caller joins its rows
+    and window."""
+    require_columns(
+        followup,
+        ["agreement_id", "action_ts", "action_code", "result_category", "result_name"],
+        "dcore_prm_followup_outcomes",
+    )
+    require_columns(
+        agreements, ["account_id", "agreement_id"], "prm_dcore_account_agreements"
+    )
+    scope = scoped(
+        agreements.select("account_id", "agreement_id"), obs_base, "account_id"
+    )
+
+    def text(col: str) -> Column:
+        return F.coalesce(F.upper(F.trim(col)), F.lit(""))
+
+    return followup.select(
+        F.col("agreement_id").cast("string").alias("agreement_id"),
+        F.to_date("action_ts").alias("day"),
+        text("action_code").alias("action_code"),
+        text("result_category").alias("category"),
+        text("result_name").alias("name"),
+    ).join(F.broadcast(scope), on="agreement_id")

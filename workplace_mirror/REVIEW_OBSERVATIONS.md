@@ -1027,3 +1027,37 @@ earliest non-censored spell's t0, or before the first spine date. Under D-A3-1 /
 cover 12 months (plus one cycle) before the latest spell start, through the last observation date,
 floored at `cc_a3_history_floor_date`. That anchor comes from A4 and can be years back at 180+.
 `build_cc_limits` keeps its own T0 window, but no A3 node reads it (only the T0-only packages do).
+
+### O90 — `product_features` reads raw Way4 tables in a feature node (M)
+
+`feat_cif_cross_product.build` (`nodes/features/products/feat_cif_cross_product.py:291-358`,
+`pipelines/products/features.py`) takes `raw_stg_client / contract / billing / balance /
+account_group` next to `wm_fea_*` and `feat_product_holding`: raw and feature inputs in one node,
+against "no raw sources in persona" and one layer per node (DESIGN_REVIEW §7). It re-derives the
+card level (`BS_PMT_CYCLE_DUE` from `add_info`) and the minimum due (`derive_billing_amounts`)
+that the cc_way4 primary layer already builds. Fix later: read `prm_` card tables (billing level,
+balance / minimum due per contract) or add a primary node `prm_cif_card_products_monthly`. Output
+unchanged by the move; not blocking (bundle 21 check passed).
+
+### O91 — `casa_windows*` read `feat_cif_bureau_salary_monthly`, whose source bundle 24 changes (L)
+
+`pipelines/casa/windows.py:3-8`, `windows_casa.py:3-8`: both salary-window nodes read
+`feat_cif_bureau_salary_monthly`; the docstring says "from prm_bureau_alert_enriched only". After bundle
+24 it holds the DE's unified bureau salary (plus a `salary_source` column), so these tables change at
+their next run and the docstrings are stale. `windows_all_models.py` / `windows_casa_all_models.py` loop
+over a hardcoded `feat_cif_windows.MODEL_IDS` (deliberate: they union the four models). `feat_cif_windows._external_series` repeats A1's one-month carry with its own
+`_BUREAU_CARRY_MONTHS = 1` (`feat_cif_windows.py:42`, 88-109): it works on the new contract (reads only
+`cif_id`, `month_end`, `bureau_salary`), but a carry change in A1 (3 months, the closure rule) will not
+reach it; and `_data_end` takes the latest bureau month, which the unified table runs to 2026-11 (partial).
+Fix with the import repoint (handoff 7): docstrings, one carry rule shared with A1.
+
+
+### O92 — the DE's unified salary now flags closure months; A1's carry ignores the flag (M)
+
+`nodes/features/bureau/feat_bureau_salary_unified.py:51-57, 63`: the DE output carries `is_closure` (true when the
+winning row is a `salaryaccountclosed` alert with a positive amount) and says such a month "counts in its own month;
+forward filling downstream must not carry it into the next month" (the closure rule the user asked the DE for,
+2026-11-12). `feat_cif_bureau_salary_monthly.build` does not select `is_closure`, and A1's `_with_next_month`
+(`a1_ability/signals.py:93`) carries every positive month one month on, closure months included; the same holds for
+`feat_cif_windows._external_series` (O91). Fix in the next A1 bundle: pass `is_closure` through the contract and
+stop the carry on it (with the 3-month carry option, if taken).

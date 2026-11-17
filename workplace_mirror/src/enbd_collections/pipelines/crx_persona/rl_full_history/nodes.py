@@ -1,34 +1,29 @@
-"""RL full monthly history (amended). Same output contract as before.
+"""RL full monthly history: ``int_loan_master`` scoped to the run's ``rl_spine``.
 
-Changes vs the current node (see REVIEW_SPARK.md, findings F4-F6):
-  * the spine key is cast to string SAFELY: a double/decimal account_id is cast to long
-    first (double -> string gives "1.23456789E8" and silently zeroes the leftsemi join —
-    the exact trap the CC node documents);
-  * the spine keys are broadcast: ~31k keys are tiny, and without the hint Spark may shuffle
-    the whole int_loan_master (all RL accounts x all months) for a sort-merge join;
-  * _log_stats is opt-in (params dpd_journey.log_stats): it runs extra jobs over the whole
-    output, and without a persist the node is computed twice.
+Output ``crx_rl_full_history`` at grain (account_id, month_end_date). Run:
+``kedro run --pipeline=crx_rl_full_history`` (needs the spine of the model_id).
+
+* the spine key is cast to string safely: a double/decimal account_id goes through
+  long first (double -> string gives "1.23456789E8" and silently empties the left-semi
+  join);
+* the spine keys are broadcast: they are tiny, and without the hint Spark may shuffle
+  the whole int_loan_master (all RL accounts x all months);
+* the stats log is opt-in (params dpd_journey.log_stats): it runs extra jobs over the
+  whole output.
 """
 
 import logging
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql import types as T
+
+from .._common import require_columns, string_key
 
 LOG = logging.getLogger(__name__)
 
 
-def _string_key(df: DataFrame, col: str = "account_id"):
-    dtype = df.schema[col].dataType
-    c = F.col(col)
-    if isinstance(dtype, (T.DoubleType, T.FloatType, T.DecimalType)):
-        c = c.cast("long")
-    return F.trim(c.cast("string"))
-
-
 def build_rl_full_history(
-    rl_spine: DataFrame, int_loan_master: DataFrame, crx_persona: dict | None = None
+    rl_spine: DataFrame, int_loan_master: DataFrame, crx_persona: dict
 ) -> DataFrame:
     """Full monthly history of the run's RL spine.
 
@@ -37,15 +32,30 @@ def build_rl_full_history(
         int_loan_master: monthly snapshots for all RL accounts. Columns: account_id (string),
             observation_date (date), dpd_bucket (int: 0 = 0 DPD, 1 = 1-30, ..., 7 = 180+),
             emi_coverage_ratio, outstanding_balance, is_restructured, loan_type.
-        crx_persona: optional params dict (only dpd_journey.log_stats is read).
+        crx_persona: params dict (only dpd_journey.log_stats is read).
 
     Returns:
         DataFrame at grain (account_id, month_end_date): account_id string, month_end_date
         date, dlq_bucket int, emi_coverage_ratio double, outstanding_balance double,
         restructure_flag int, loan_type string, computed_at timestamp.
     """
-    # -- Step 1 (R20): scope to the spine (broadcast: the spine is model-sized) ----------
-    spine_keys = rl_spine.select(_string_key(rl_spine).alias("account_id")).distinct()
+    require_columns(rl_spine, ["account_id"], "rl_spine")
+    require_columns(
+        int_loan_master,
+        [
+            "account_id",
+            "cif_id",
+            "observation_date",
+            "dpd_bucket",
+            "emi_coverage_ratio",
+            "outstanding_balance",
+            "is_restructured",
+            "loan_type",
+        ],
+        "int_loan_master",
+    )
+    # -- Step 1: scope to the spine (broadcast: the spine is model-sized) ----------
+    spine_keys = rl_spine.select(string_key(rl_spine).alias("account_id")).distinct()
     df = int_loan_master.join(F.broadcast(spine_keys), on="account_id", how="leftsemi")
 
     # -- Step 2: select + alias + cast to the output schema ----------------------------
@@ -62,7 +72,7 @@ def build_rl_full_history(
     )
 
     # -- Step 3 (opt-in): one aggregate job — rows, date range, null rates, spine match ---
-    if ((crx_persona or {}).get("dpd_journey") or {}).get("log_stats"):
+    if (crx_persona.get("dpd_journey") or {}).get("log_stats"):
         result = result.persist()
         _log_stats(result, spine_keys)
     return result

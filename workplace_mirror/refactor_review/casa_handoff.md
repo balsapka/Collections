@@ -1,0 +1,3 @@
+# CASA handoff: items for the workplace Sonnet (tier A, `nodes/features/casa/`)
+
+1. Q-S6-04 (user, 2026-11-15, option b): `_net_mirrored` in `src/enbd_collections/nodes/features/casa/feat_cif_casa.py` nets only a counted leg against a non-counted, non-salary leg, so round trips between two counted legs keep both. First confirm that the workplace `_net_mirrored` matches the mirror's (lines 438–487 were never photographed and the workplace rewrote the netting). Then also net pairs of opposite counted legs, at least `own_out_external` ↔ `own_in_external`, and `chosen_spend` ↔ `cash_in` (an ATM withdrawal re-deposited as cash), within 0–3 days, same amount ±1%. Count how many CIF-months and how many A1 states the change moves.

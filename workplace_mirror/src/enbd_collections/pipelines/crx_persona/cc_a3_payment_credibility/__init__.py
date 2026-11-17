@@ -1,4 +1,4 @@
-"""T27 – A3 Payment Credibility axis v1 (4-state, DCORE PTP-based)."""
+"""CC A3 payment credibility on the shared ``a3_credibility`` engine."""
 
 from .pipeline import create_pipeline
 

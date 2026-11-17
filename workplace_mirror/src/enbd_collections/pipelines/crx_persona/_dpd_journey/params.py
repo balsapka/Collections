@@ -4,18 +4,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .constants import BucketScheme, MODEL_ID_SEGMENT
+from .._common import SEG_180_PLUS
+from .._common import segment as model_segment
+from .constants import BucketScheme
 
 # Read from params:crx_persona -> dpd_journey (all optional). persona_end_date is required.
 PARAM_DEFAULTS = {
     # CC only, TEMPORARY: billing history before this date has known data-quality issues.
     # Set to null once the source is fixed. RL history is trusted in full.
     "cc_history_floor_date": "2024-01-01",
-    # Independently overridable for the 180_plus segment (T43 2026-10-20 PROD run: the
-    # shared floor left 99.07% of the gt2y chargeoff-age vintage "unknown" — their journey
-    # start is almost always before the floor by construction). Defaults to the same value
-    # as cc_history_floor_date so today's output is unchanged; override to relax/remove the
-    # floor for 180_plus once the pre-2024 data-quality tradeoff is decided.
+    # Overridable for the 180_plus segment alone: the journey of most long charged-off
+    # accounts starts before the shared floor, which leaves them "unknown". Defaults to
+    # cc_history_floor_date; override to relax or remove the floor for 180_plus
+    # (conformance D5).
     "cc_history_floor_date_180_plus": "2024-01-01",
     "rl_history_floor_date": None,
     "on_unresolvable_gap": "truncate",  # "truncate" (keep months after the gap) or "drop"
@@ -45,26 +46,21 @@ def journey_params(
     crx_persona: dict, scheme: BucketScheme, model_id: str
 ) -> JourneyParams:
     """Resolve PARAM_DEFAULTS + crx_persona["dpd_journey"] overrides into a JourneyParams.
-    segment is derived from model_id (MODEL_ID_SEGMENT) — not an overridable param."""
+    segment is derived from model_id (_common.segment) — not an overridable param."""
     given = crx_persona.get("dpd_journey") or {}
     unknown = sorted(set(given) - set(PARAM_DEFAULTS))
-    # a stale key (e.g. the removed det_option, or a removed segment override) must not
-    # be silently ignored
+    # a stale key must not be silently ignored
     if unknown:
         raise ValueError(
             f"dpd_journey: unknown parameter(s) {unknown}; allowed {sorted(PARAM_DEFAULTS)}"
         )
     p = {**PARAM_DEFAULTS, **given}
-    if model_id not in MODEL_ID_SEGMENT:
-        raise ValueError(
-            f"model_id must be one of {sorted(MODEL_ID_SEGMENT)}, got {model_id!r}"
-        )
-    segment = MODEL_ID_SEGMENT[model_id]
+    segment = model_segment(model_id)
     if p["on_unresolvable_gap"] not in ("truncate", "drop"):
         raise ValueError("dpd_journey.on_unresolvable_gap must be 'truncate' or 'drop'")
     floor_key = (
         "cc_history_floor_date_180_plus"
-        if scheme.name == "cc" and segment == "180_plus"
+        if scheme.name == "cc" and segment == SEG_180_PLUS
         else f"{scheme.name}_history_floor_date"
     )
     return JourneyParams(

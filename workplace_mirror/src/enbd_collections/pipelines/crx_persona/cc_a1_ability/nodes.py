@@ -6,13 +6,19 @@ Everything else (evidence, levels, points, state) is the shared ``a1_ability`` e
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from .._common import GRAIN, pit_latest, require_columns
-from .._dpd_journey import MODEL_ID_SEGMENT
+from .._common import (
+    GRAIN,
+    SEG_60_180,
+    pit_latest,
+    require_columns,
+    segment,
+    string_key,
+)
 
 # OVD_k holds the amount k cycles overdue (DPD bucket k+1): OVD_01 1-30 … OVD_06
 # 151-180 DPD. OVD_07 (181-210) and the catch-all OVD_08 (211+) never anchor.
 _OVERDUE_BUCKETS = [f"overdue_bucket_{i:02d}" for i in range(1, 7)]
-# No balance snapshot in the observation month means the card stopped reporting; no anchor.
+# No balance snapshot in the observation month: the card stopped reporting, no anchor.
 _BALANCE_MAX_AGE_M = 1
 
 
@@ -20,13 +26,13 @@ def build_cc_liquidity_anchor(
     obs_base: DataFrame, prm_balance: DataFrame, model_id: str
 ) -> DataFrame:
     """Amount in the oldest non-empty overdue bucket on the latest balance snapshot at
-    or before the observation date — what the customer must pay to stop the roll.
+    or before the observation date — what the customer must pay to stop the roll (S1).
 
     Only for the 60-180 segments: at 180+ the buckets no longer track what is due, so
     the anchor is NULL and A1 uses its flat floors. Also NULL (flat floors) when the
     snapshot is missing or stale, or every bucket is empty.
     """
-    if MODEL_ID_SEGMENT[model_id] != "60_180":
+    if segment(model_id) != SEG_60_180:
         return obs_base.select(
             *GRAIN, F.lit(None).cast("double").alias("liquidity_anchor_amt")
         )
@@ -36,7 +42,7 @@ def build_cc_liquidity_anchor(
         "prm_balance",
     )
     src = prm_balance.select(
-        F.col("contract_id").cast("string").alias("account_id"),
+        string_key(prm_balance, "contract_id").alias("account_id"),
         F.col("observation_date").cast("date").alias("snapshot_date"),
         *[F.col(c).cast("double") for c in _OVERDUE_BUCKETS],
     )

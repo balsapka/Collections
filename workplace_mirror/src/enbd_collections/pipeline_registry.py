@@ -33,6 +33,12 @@ from enbd_collections.pipelines.bureau import salary_bounces as bureau_salary_bo
 
 from enbd_collections.pipelines.casa import primary as casa_prm
 from enbd_collections.pipelines.casa import features as casa_feat
+from enbd_collections.pipelines.casa import windows as casa_win
+from enbd_collections.pipelines.casa import windows_all_models as casa_win_all
+from enbd_collections.pipelines.casa import windows_casa as casa_win_casa
+from enbd_collections.pipelines.casa import windows_casa_all_models as casa_win_casa_all
+from enbd_collections.pipelines.products import features as products_feat
+from enbd_collections.pipelines.products import primary as products_prm
 
 from enbd_collections.pipelines.retail_loans import staging as retail_loans_stg
 from enbd_collections.pipelines.retail_loans import primary as retail_loans_prm
@@ -74,15 +80,6 @@ from enbd_collections.pipelines.crx_persona import (
     cc_raw_extract as crx_cc_raw_extract,
 )
 from enbd_collections.pipelines.crx_persona import (
-    cc_payment_trajectory as crx_cc_payment_trajectory,
-)
-from enbd_collections.pipelines.crx_persona import (
-    cc_utilisation as crx_cc_utilisation,
-)
-from enbd_collections.pipelines.crx_persona import (
-    cc_departure_signature as crx_cc_departure,
-)
-from enbd_collections.pipelines.crx_persona import (
     cc_a4_deterioration as crx_cc_a4_deterioration,
 )
 from enbd_collections.pipelines.crx_persona import (
@@ -92,6 +89,7 @@ from enbd_collections.pipelines.crx_persona import (
     cc_a1_ability as crx_cc_a1_ability,
 )
 from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
+
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
 )
@@ -110,11 +108,9 @@ from enbd_collections.pipelines.crx_persona import (
 from enbd_collections.pipelines.crx_persona import (
     rl_a3_payment_credibility as crx_rl_a3_payment_credibility,
 )
-from enbd_collections.pipelines.crx_persona import (
-    rl_departure_signature as crx_rl_departure_signature,
-)
 from enbd_collections.pipelines import digital_login as dl
 from enbd_collections.pipelines.location import pipeline as location_features
+from enbd_collections.pipelines import genesys
 
 
 def register_pipelines() -> dict[str, Pipeline]:
@@ -165,6 +161,12 @@ def register_pipelines() -> dict[str, Pipeline]:
         # -- CASA (domain) ---------------------------------------------------
         "casa_primary": casa_prm.create_pipeline(),
         "casa_features": casa_feat.create_pipeline(),
+        "casa_windows": casa_win.create_pipeline(),
+        "casa_windows_all_models": casa_win_all.create_pipeline(),
+        "casa_windows_casa": casa_win_casa.create_pipeline(),
+        "casa_windows_casa_all_models": casa_win_casa_all.create_pipeline(),
+        "product_primary": products_prm.create_pipeline(),
+        "product_features": products_feat.create_pipeline(),
         # -- Retail Loans (domain) -----------------------------------------
         "retail_loans": retail_loans.create_pipeline(),
         "retail_loans_staging": retail_loans_stg.create_pipeline(),
@@ -205,12 +207,15 @@ def register_pipelines() -> dict[str, Pipeline]:
         "cc_60_180.target": cc_way4_target.create_pipeline(),
         "cc_60_180.features": cc_way4_feat.create_pipeline(),
         "cc_60_180.rl_scope": retail_loans.create_cc_scoped_pipeline(),
+        # Bureau scoped to this model's spine CIFs (model_id set by ModelConfigHook)
+        "cc_60_180.bureau": bureau.create_pipeline(),
         # Sub-pipelines for incremental cc_180_plus runs
         "cc_180_plus.spine": cc_way4_spine.create_180_plus_pipeline(),
         "cc_180_plus.staging": cc_way4_stg.create_pipeline(),
         "cc_180_plus.target": cc_way4_target.create_recovery_pipeline(),
         "cc_180_plus.features": cc_way4_feat.create_pipeline(),
         "cc_180_plus.rl_scope": retail_loans.create_cc_scoped_pipeline(),
+        "cc_180_plus.bureau": bureau.create_pipeline(),
         # Sub-pipelines for incremental rl_60_180 / rl_180_plus runs
         "rl_60_180.spine": retail_loans_spine.create_pipeline(),
         "rl_60_180.staging": retail_loans_stg.create_pipeline(),
@@ -219,6 +224,7 @@ def register_pipelines() -> dict[str, Pipeline]:
         "rl_60_180.primary": retail_loans_prm.create_pipeline(),
         "rl_60_180.intermediate": retail_loans_int.create_pipeline(),
         "rl_60_180.cc_scope": cc_way4.create_rl_scoped_pipeline(),
+        "rl_60_180.bureau": bureau.create_pipeline(),
         "rl_180_plus.spine": retail_loans_spine.create_180_plus_pipeline(),
         "rl_180_plus.staging": retail_loans_stg.create_pipeline(),
         "rl_180_plus.target": retail_loans_target.create_recovery_pipeline(),
@@ -226,31 +232,34 @@ def register_pipelines() -> dict[str, Pipeline]:
         "rl_180_plus.primary": retail_loans_prm.create_pipeline(),
         "rl_180_plus.intermediate": retail_loans_int.create_pipeline(),
         "rl_180_plus.cc_scope": cc_way4.create_rl_scoped_pipeline(),
+        "rl_180_plus.bureau": bureau.create_pipeline(),
         # -- CRX Persona (experimental, additive) ---------------------------
         # Revert: remove this entry + the import above + rm -r crx_persona/
         "crx_cc_spell_table": crx_cc_spell.create_pipeline(),
         "crx_cc_full_history": crx_cc_full_history.create_pipeline(),
         "crx_cc_raw_extract": crx_cc_raw_extract.create_pipeline(),
-        "crx_cc_payment_trajectory": crx_cc_payment_trajectory.create_pipeline(),
-        "crx_cc_utilisation_features": crx_cc_utilisation.create_pipeline(),
-        "crx_cc_departure_signature": crx_cc_departure.create_pipeline(),
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
         "crx_cc_a2_locatability": crx_cc_a2_locatability.create_pipeline(),
         "crx_cc_a1_ability": crx_cc_a1_ability.create_pipeline(),
         "crx_cc_obs_base": crx_obs_base.create_cc_pipeline(),
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
-        "crx_cc_a3_payment_credibility": crx_cc_a3_payment_credibility.create_pipeline(),
+        "crx_cc_a3_payment_credibility": (
+            crx_cc_a3_payment_credibility.create_pipeline()
+        ),
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
         "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
         "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
-        "crx_rl_departure_signature": crx_rl_departure_signature.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),
-        "crx_rl_a3_payment_credibility": crx_rl_a3_payment_credibility.create_pipeline(),
+        "crx_rl_a3_payment_credibility": (
+            crx_rl_a3_payment_credibility.create_pipeline()
+        ),
         # -- Digital login (OMB) --------------------------------------------
         "digital_login": dl.create_pipeline(),
         "location_features": location_features.create_pipeline(),
+        # -- Genesys / PCA interactions ----------------------------------------
+        "genesys": genesys.create_pipeline(),
         # -- Default ---------------------------------------------------------
         "__default__": cc_way4.create_pipeline(),
         "rerun": model_input.create_features_pipeline()
