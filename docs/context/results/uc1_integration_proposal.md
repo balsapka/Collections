@@ -93,8 +93,8 @@ against 2% `no_payment`, `SAMPLE`), so the level alone says little. `ASSUMPTION`
 
 `uc1_transcripts_n` (= `transcript_count`), `uc1_last_transcript_date`.
 
-`fraudulent_customer` is passed through as their field, not condensed (0 transcript rows in the
-sample).
+`fraudulent_customer` is left out (user, 2026-11-17): detected in 0 transcript rows in the sample.
+Add it as a pass-through if UC1 starts detecting it.
 
 ## 4. How it fits the persona framework
 
