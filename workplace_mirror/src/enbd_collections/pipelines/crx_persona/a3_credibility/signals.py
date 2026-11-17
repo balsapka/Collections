@@ -98,7 +98,7 @@ def _commitment_counts(base: DataFrame, events: DataFrame, lower: Column) -> Dat
 
 
 def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame:
-    """Dimension A: kept / partly kept / broken / promised / thin (D-A3-9, -26, -33).
+    """Dimension A: kept / partly kept / broken / promised / no promise (D-A3-9, -26, -33).
 
     Promise events (``build_promise_events``) dated in the last 12 months up to the
     observation date, earlier delinquency episodes included (trustworthiness, not this
@@ -106,7 +106,7 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
     An event is kept when paid; partial counts as not kept. Broken: the last 3 concluded
     all not kept (a broken event ranks first on a shared day), or at least 2 concluded
     and under 40% kept. Kept: at least 2 concluded and 80% kept. Partly kept: any
-    kept event. Promised: any other event in the window. Else thin (never promised).
+    kept event. Promised: any other event in the window. Else no_promise.
     """
     require_columns(episode, EPISODE, "A3 episode")
     require_columns(events, EVENTS, "A3 promise events")
@@ -124,7 +124,7 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
         .when((done >= MIN_CONCLUDED) & (rate >= KEPT_RATE), "kept")
         .when(ok >= 1, "partly_kept")
         .when(F.col("commitments_n") >= 1, "promised")
-        .otherwise("thin")
+        .otherwise("no_promise")
     )
     counts = [
         "commitments_n",

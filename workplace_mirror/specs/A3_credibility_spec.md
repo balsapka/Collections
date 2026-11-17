@@ -254,13 +254,13 @@ Measured, not assumed (V2, V3).
   lifted by a payment or a plan of the same day (D-A3-30). Code: `a3_credibility/signals.py`
   (`_SAME_DAY_ORDER`).
 
-- **D-A3-33: promise points Kept 3 / Partly kept 2 / Broken 1 / Promised 1 / Thin 0** (V1j scheme P5,
+- **D-A3-33: promise points Kept 3 / Partly kept 2 / Broken 1 / Promised 1 / No promise 0** (V1j scheme P5,
   `bundle_helpers/a3_final/v1j_review.md`; accepted by GRR, user 2026-11-17; ships in bundle 25).
   Making a promise is evidence of engagement even when it was missed: Broken customers pay more than
   equally reachable customers who never promised, and keeping it is stronger still. So Dimension A
   gains a level: **promised** = at least one promise event in the 12-month window, none kept and not
-  Broken (none concluded yet, or concluded and nothing kept); **thin** now means never promised in the
-  window and stays the silent level. The ladder (Broken, Kept, Partly kept) and the thresholds
+  Broken (none concluded yet, or concluded and nothing kept); the old **thin** is renamed **no_promise**
+  (never promised in the window) and stays the silent level. The ladder (Broken, Kept, Partly kept) and the thresholds
   (Moderate from 2, High from 4, D-A3-24) are unchanged; `commitments_n` (events in the window) is
   carried. Same scheme for all four model_ids; no contact points (they would re-count A2's
   reachability). V1j on today's events: state AUC +.059 cc / +.045 rl at 61–180, +.083 / +.047 at

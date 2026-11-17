@@ -104,7 +104,7 @@ def by_account(frame, col):
 
 # ── 1. The map: Scorecard against the reference rule (90 cells) ───────────────
 # D-A3-33
-LEVELS_A = {"kept": 3, "partly_kept": 2, "promised": 1, "thin": 0, "broken": 1}
+LEVELS_A = {"kept": 3, "partly_kept": 2, "promised": 1, "no_promise": 0, "broken": 1}
 LEVELS_B = {"regular": 2, "some": 1, "none": 0}
 LEVELS_C = {"clean": 1, "not_clean": 0, "no_record": 0}
 
@@ -147,7 +147,7 @@ for r in SCORECARD.score(cells).collect():
 # 200 on 05-10, after the 05-05 statement -> none (GRR), paid within 30 days; promised. K: two
 # promises, each paid by its statement -> kept. M: promises 06-05 and 06-14 and a plan
 # on 06-10 are one event (alive to the 07-05 statement, nothing paid) -> promised
-# (D-A3-33). T0: no promise in the window -> thin.
+# (D-A3-33). T0: no promise in the window -> no_promise.
 # Bk: three promises never paid -> broken (streak).
 # N (D-A3-29): promises 07-02, 07-07, 07-09: 07-07 is after the 07-05 statement, the
 # deadline of the 07-02 event, so it starts a new event that 07-09 joins; with a month-end
@@ -346,14 +346,14 @@ check(
     },
 )
 check(
-    "T0 never promised -> thin, 0 events",
+    "T0 never promised -> no_promise, 0 events",
     [
         (r["a3_commitments_level"], r["commitments_n"])
         for r in build_commitment_signals(
             episode([("T0", D(2026, 4, 1), False)]), ev
         ).collect()
     ],
-    [("thin", 0)],
+    [("no_promise", 0)],
 )
 check("M events", by_account(sig, "commitments_n")["M"], 1)
 sig30 = build_commitment_signals(ep, events_for(deadline="30_days"))

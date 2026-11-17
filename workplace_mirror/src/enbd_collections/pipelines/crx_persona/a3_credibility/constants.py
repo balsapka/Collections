@@ -71,7 +71,9 @@ HIGH_FROM, MODERATE_FROM = 4, 2  # D-A3-24
 SCORECARD = Scorecard(
     prefix="a3",
     dimensions=(
-        Dimension("commitments", "a3_commitments_level", COMMITMENT_POINTS, ("thin",)),
+        Dimension(
+            "commitments", "a3_commitments_level", COMMITMENT_POINTS, ("no_promise",)
+        ),
         # no silent level: no payment while delinquent is evidence (0 points), so an
         # episode row is never Unknown (D-A3-27)
         Dimension("dlq_payments", "a3_dlq_payment_level", DLQ_PAYMENT_POINTS, ()),

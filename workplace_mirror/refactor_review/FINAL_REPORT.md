@@ -87,8 +87,8 @@ outputs are the reference; all four model_ids.
   refusal > dispute > contact > hung up (Q-R-10); `a1_sweepable_balance_flag` = the observation month's
   CASA balance at or above max(3,000, 2 × anchor), diagnostic only (Q-S6-06).
 - **D-A3-33 promise points (GRR accepted, user 2026-11-17):** Kept 3 / Partly kept 2 / Broken 1 /
-  Promised 1 / Thin 0. The "A3 state moves split by cause" block gets a points step (old points →
-  new points on the new events), the promise-level mix (Kept / Partly / Broken / Promised / Thin) and
+  Promised 1 / No promise 0 (`thin` renamed `no_promise`). The "A3 state moves split by cause" block gets a points step (old points →
+  new points on the new events), the promise-level mix (Kept / Partly / Broken / Promised / No promise) and
   paid_due per level and state, so V1j's gain is re-read on the bundle 25 events. Deadline stays GRR's.
 - **Data checks folded into the bundle check (one PROD run, no separate prompts):** F1 / F2 / F3 strong
   crosstab (8 cells) with payment and cure rates per cell (cc/rl 60_180); CC accounts with bucket 08
