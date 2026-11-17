@@ -55,14 +55,15 @@ HISTORY_MONTHS = (
     max(PRE_DLQ_MONTHS, COMMITMENT_MONTHS, *ANY_PAYMENT_MONTHS.values()) + 1
 )
 
-# ── State (D-A3-16, -19, -20, -22, -24) ───────────────────────────────────────
+# ── State (D-A3-16, -19, -20, -22, -24, -33) ───────────────────────────────────────
 DISPLAY_NAMES = {
     "high": "payment_credibility_high",
     "moderate": "payment_credibility_moderate",
     "low": "payment_credibility_low",
     "unknown": "payment_credibility_unknown",
 }
-COMMITMENT_POINTS = {"kept": 2, "partly_kept": 1, "broken": -1}
+# a promise counts even when broken; never promising scores 0 (D-A3-33)
+COMMITMENT_POINTS = {"kept": 3, "partly_kept": 2, "broken": 1, "promised": 1}
 DLQ_PAYMENT_POINTS = {"regular": 2, "some": 1}
 PRE_DLQ_POINTS = {"clean": 1}
 HIGH_FROM, MODERATE_FROM = 4, 2  # D-A3-24

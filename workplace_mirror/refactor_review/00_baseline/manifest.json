@@ -1207,7 +1207,7 @@
  },
  "crx_cc_a3_payment_credibility.cc_180_plus": {
   "crx_cc_a3_commitment_signals": {
-   "hash": "5917ea090bd32718c14a78c96a7fac8d3f625b84241404f8291e63a35f3256b6",
+   "hash": "2a8f94b5e108e8e48c0e235acf8edc26a5dba729de53237e8ff33deac5dabb83",
    "rows": 32,
    "schema": [
     [
@@ -1221,6 +1221,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -1365,7 +1369,7 @@
    ]
   },
   "crx_cc_a3_payment_credibility": {
-   "hash": "b03dd05c1862119c6fe247a712f6bfae6a3908bdd897a17aacc252075a11840b",
+   "hash": "5d9cb98c30b6d17c952cfb68d065dbf688419bd42d2da2566879b2b26714c121",
    "rows": 32,
    "schema": [
     [
@@ -1395,6 +1399,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -1911,7 +1919,7 @@
  },
  "crx_cc_a3_payment_credibility.cc_60_180": {
   "crx_cc_a3_commitment_signals": {
-   "hash": "4cfaf8e8ab8d931e2b636c6e3142638d96766a9267411c41b2bf4ac2979dd2b8",
+   "hash": "60df8f408accd96281b8e75cce836518e5cc0544622f6663fb956b6372c67a86",
    "rows": 32,
    "schema": [
     [
@@ -1925,6 +1933,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -2069,7 +2081,7 @@
    ]
   },
   "crx_cc_a3_payment_credibility": {
-   "hash": "3169749fab45551588a91d1498c50f72e4d78b2e31f83b77bf56ba2b6a135386",
+   "hash": "d46469d0849f7cf0a143afd2a8fa66b73f3619c84ec3118dfc1c7a691f43860a",
    "rows": 32,
    "schema": [
     [
@@ -2099,6 +2111,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -2615,7 +2631,7 @@
  },
  "crx_cc_a3_payment_credibility.cc_60_180_30_days": {
   "crx_cc_a3_commitment_signals": {
-   "hash": "b1ca34ee32c67ca4f60165ad643301f2910dc231545facb10764cf121ef87092",
+   "hash": "adab9c1913d117cf3c89e434c30ceea99f17c3e347d9fa10a8c11d3dc36816e2",
    "rows": 32,
    "schema": [
     [
@@ -2629,6 +2645,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -2773,7 +2793,7 @@
    ]
   },
   "crx_cc_a3_payment_credibility": {
-   "hash": "cd704069796719fb99e959118cec9c1c78ea5d28b2582d44d16159e76accbd98",
+   "hash": "a946ee80dda9e9ae7df3361c5c562a1135a51323b3cc4e5fb621d1f24990b9f1",
    "rows": 32,
    "schema": [
     [
@@ -2803,6 +2823,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -5103,7 +5127,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_180_plus": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "5917ea090bd32718c14a78c96a7fac8d3f625b84241404f8291e63a35f3256b6",
+   "hash": "2a8f94b5e108e8e48c0e235acf8edc26a5dba729de53237e8ff33deac5dabb83",
    "rows": 32,
    "schema": [
     [
@@ -5117,6 +5141,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -5291,7 +5319,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "91965dc97111b3c03a96d936dc6c316acc5105282d74c1c28693c18c6c9be8d1",
+   "hash": "32da6623c19cea526356f95874cf456a0cbba049ad33cfafbd01f0e2974eaf1b",
    "rows": 32,
    "schema": [
     [
@@ -5321,6 +5349,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -5641,7 +5673,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_60_180": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "5917ea090bd32718c14a78c96a7fac8d3f625b84241404f8291e63a35f3256b6",
+   "hash": "2a8f94b5e108e8e48c0e235acf8edc26a5dba729de53237e8ff33deac5dabb83",
    "rows": 32,
    "schema": [
     [
@@ -5655,6 +5687,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -5829,7 +5865,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "7bfab4a9ee9535a9f3726ea67d9617ace3015a80dbc9ff07c6dba2b2a01e4f6d",
+   "hash": "71496c36986e7d1e251a41c215c31f5ee8161472d7b49453de617a6d85d1bfca",
    "rows": 32,
    "schema": [
     [
@@ -5859,6 +5895,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -6179,7 +6219,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_60_180_30_days_month_end": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "b1ca34ee32c67ca4f60165ad643301f2910dc231545facb10764cf121ef87092",
+   "hash": "93483c14d505486df12cc4c10f54780fa39b53895717434e31829fc4d9f67a37",
    "rows": 32,
    "schema": [
     [
@@ -6193,6 +6233,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -6367,7 +6411,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "642ddf813be2c7a815fde933cd9f162e33d0c27b181686e924e5edd8d477b5d2",
+   "hash": "b0a5aab6d0dd52273e8bcc7d0533b4b8030ac9384b8861bd9614d9efe4fcac91",
    "rows": 32,
    "schema": [
     [
@@ -6397,6 +6441,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -6717,7 +6765,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_60_180_next_month_end": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "b1ca34ee32c67ca4f60165ad643301f2910dc231545facb10764cf121ef87092",
+   "hash": "93483c14d505486df12cc4c10f54780fa39b53895717434e31829fc4d9f67a37",
    "rows": 32,
    "schema": [
     [
@@ -6731,6 +6779,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",
@@ -6905,7 +6957,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "f382e24221e0fed3be8396676c3b96daca591ad6ec4287e16955201b193c5b93",
+   "hash": "569a3f90cb6d57edd89a7fd8d3dc626dcf070b7d6dcb567af8ef0b8361e1fcb7",
    "rows": 32,
    "schema": [
     [
@@ -6935,6 +6987,10 @@
     [
      "commitments_window_start",
      "date"
+    ],
+    [
+     "commitments_n",
+     "bigint"
     ],
     [
      "commitments_concluded",

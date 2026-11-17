@@ -575,7 +575,7 @@ a3_case(
     followups=((D(2026, 7, 10), PTP),),
 )
 a3_case(
-    "thin: one promise unpaid; a cancelled plan and a cancelled instalment drop out",
+    "promised: one promise unpaid; a cancelled plan and a cancelled instalment drop out",
     followups=((D(2026, 7, 10), PTP),),
     plans=(
         ("ptp", D(2026, 6, 1), 1, [(D(2026, 6, 20), 100.0, None, "B")]),
@@ -597,7 +597,7 @@ a3_case(
     plans=(("ptp", D(2026, 6, 10), 0, [(D(2026, 6, 30), 100.0, None, "B")]),),
 )
 a3_case(
-    "paid after the next statement, within 30 days: none (thin); partly kept at"
+    "paid after the next statement, within 30 days: none (promised); partly kept at"
     " 30 days",
     pays=((D(2026, 5, 10), 200.0),),
     followups=((D(2026, 5, 3), PTP),),

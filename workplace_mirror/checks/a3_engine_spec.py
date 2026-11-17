@@ -102,8 +102,9 @@ def by_account(frame, col):
     return {r["account_id"]: r[col] for r in frame.collect()}
 
 
-# ── 1. The map: Scorecard against the reference rule (72 cells) ───────────────
-LEVELS_A = {"kept": 2, "partly_kept": 1, "thin": 0, "broken": -1}
+# ── 1. The map: Scorecard against the reference rule (90 cells) ───────────────
+# D-A3-33
+LEVELS_A = {"kept": 3, "partly_kept": 2, "promised": 1, "thin": 0, "broken": 1}
 LEVELS_B = {"regular": 2, "some": 1, "none": 0}
 LEVELS_C = {"clean": 1, "not_clean": 0, "no_record": 0}
 
@@ -143,9 +144,10 @@ for r in SCORECARD.score(cells).collect():
 # 150 paid on 07-20 against 300 -> partial; promise 08-20 not concluded (statement 09-05);
 # SOFTPTP is no event; a settlement from 02-01, before the 04-01 episode, is in the window
 # (D-A3-26), unpaid -> 3 concluded, 1 kept -> broken; one from 2025-08-01 is outside. B: promise 05-03, paid
-# 200 on 05-10, after the 05-05 statement -> none (GRR), paid within 30 days. K: two
+# 200 on 05-10, after the 05-05 statement -> none (GRR), paid within 30 days; promised. K: two
 # promises, each paid by its statement -> kept. M: promises 06-05 and 06-14 and a plan
-# on 06-10 are one event (alive to the 07-05 statement, nothing paid) -> thin.
+# on 06-10 are one event (alive to the 07-05 statement, nothing paid) -> promised
+# (D-A3-33). T0: no promise in the window -> thin.
 # Bk: three promises never paid -> broken (streak).
 # N (D-A3-29): promises 07-02, 07-07, 07-09: 07-07 is after the 07-05 statement, the
 # deadline of the 07-02 event, so it starts a new event that 07-09 joins; with a month-end
@@ -333,16 +335,27 @@ check(
     by_account(sig, "a3_commitments_level"),
     {
         "A": "broken",
-        "B": "thin",
+        "B": "promised",
         "K": "kept",
-        "M": "thin",
+        "M": "promised",
         "Bk": "broken",
         "N": "broken",
         "P": "partly_kept",
-        "Q": "thin",
+        "Q": "promised",
         "S": "partly_kept",
     },
 )
+check(
+    "T0 never promised -> thin, 0 events",
+    [
+        (r["a3_commitments_level"], r["commitments_n"])
+        for r in build_commitment_signals(
+            episode([("T0", D(2026, 4, 1), False)]), ev
+        ).collect()
+    ],
+    [("thin", 0)],
+)
+check("M events", by_account(sig, "commitments_n")["M"], 1)
 sig30 = build_commitment_signals(ep, events_for(deadline="30_days"))
 check(
     "B level (30 days)", by_account(sig30, "a3_commitments_level")["B"], "partly_kept"
@@ -599,7 +612,7 @@ check(
     "state K / A",
     (by_account(st, "a3_state")["K"], by_account(st, "a3_state")["A"]),
     ("payment_credibility_moderate", "payment_credibility_low"),
-)  # kept 2 / partly kept 1, no B or C
+)  # kept 3 / broken 1, no B or C (D-A3-33)
 check("deadline column", by_account(st, "a3_promise_deadline")["K"], "next_statement")
 
 # ── 7. Instalments: cancelled plans and instalments drop out ──────────────────

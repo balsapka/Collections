@@ -15,6 +15,7 @@ OUTPUT_COLUMNS = [
     "a3_promise_deadline",
     # Dimension A
     "commitments_window_start",
+    "commitments_n",
     "commitments_concluded",
     "commitments_kept",
     "commitments_partial",
@@ -67,7 +68,7 @@ def build_a3_credibility(  # pylint: disable=too-many-arguments,too-many-positio
     product: str,
     deadline: str | None = None,
 ) -> DataFrame:
-    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24, -27).
+    """``OUTPUT_COLUMNS`` per base row (D-A3-4, -16, -19, -20, -24, -27, -33).
 
     High from 4 points, Moderate from 2, else Low; a refusal takes one rung off.
     Unknown: no episode anchor only (``a3_unknown_reason`` = ``no_episode``); an episode
