@@ -43,7 +43,7 @@ field id	field	type	Example value	Desc
 65	SF_2_last_travel_date	YYYY-MM-DD	2026-10-20	Latest travel purchase (airline, travel agency, cruise). Blank = none
 66	SF_2_recent_travel_purchase_flag	numeric	1	1 = travel purchase in the period (early warning of a departure)
 67	SF_3_main_reason	string	promises	What set the state most: promises / payments_while_overdue / record_before_delinquency / refusal. Blank = no positive evidence
-68	SF_3_promise_level	string	kept	kept / partly_kept / broken / promised (a promise in the last 12 months, none kept, not broken) / thin (no promise in the last 12 months)
+68	SF_3_promise_level	string	kept	kept / partly_kept / broken / promised (a promise in the last 12 months, none kept, not broken) / no_promise (no promise in the last 12 months)
 69	SF_3_promises_judged_count	numeric	4	Promises and plans of the last 12 months whose deadline has passed; repeats before the deadline count once (deadline: cards 61–180 next statement, else month end)
 70	SF_3_promises_kept_count	numeric	3	Of those, the monthly due (min AED 100) paid by the deadline
 71	SF_3_promises_partly_paid_count	numeric	1	Of those, AED 100+ paid but less than the monthly due
@@ -72,14 +72,14 @@ field id	field	type	Example value	Desc
   Location: abroad_latest or travelled_then_quiet = Skip, uae_recent = In Country, else Unknown.
   Reachability: call_connected = Reachable, calls_failing = Non-Reachable, else Unknown.
 - **SF_3:** Unknown when SF_1 was not scored for the row. Otherwise points:
-  - promise level: kept 3, partly_kept 2, broken 1, promised 1, thin 0 (D-A3-33);
+  - promise level: kept 3, partly_kept 2, broken 1, promised 1, no_promise 0 (D-A3-33);
   - payment while overdue: regular 2, some 1, none 0;
   - record before delinquency: clean 1, else 0.
 
   High from 4, Moderate from 2, else Low. `SF_3_refusal_flag` = 1 moves the state one level down
   (not below Low). Promise level from the counts, first match: broken if the last-3 flag is 1, or 2+ judged and
   under 40% kept; kept if 2+ judged and 80%+ kept; partly_kept if 1+ kept; promised if any promise in the last 12 months (judged or
-  not yet); else thin. Partly paid
+  not yet); else no_promise. Partly paid
   counts as not kept.
 - **SF_4:** stable income or a strong family = 2 points each. High from 4, Moderate from 2, else
   Low; `SF_4_distress_flag` = 1 moves it one level down (not below Low). Unknown when
