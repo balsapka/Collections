@@ -262,6 +262,21 @@ crx_cc_a3_payment_credibility:
   save_args:
     mode: overwrite
 
+# the dues and payments the A3 ledger, promise events and contacts read
+crx_cc_a3_dues:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_dues"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_payments:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_a3_payments"
+  save_args:
+    mode: overwrite
+
 # ── RL Foundation (RL-B1) ───────────────────────────────────────────────────
 # Grain: (account_id, month_end_date). Full pre-delinquency monthly history for
 # all RL spine accounts. Source: int_loan_master (month-end snapshots).
@@ -479,5 +494,20 @@ crx_rl_a3_payment_credibility:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_payment_credibility"
+  save_args:
+    mode: overwrite
+
+# the dues and payments the A3 ledger, promise events and contacts read
+crx_rl_a3_dues:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_dues"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_payments:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_payments"
   save_args:
     mode: overwrite

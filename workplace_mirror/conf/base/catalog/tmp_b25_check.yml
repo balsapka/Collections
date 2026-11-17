@@ -1,0 +1,9 @@
+# TEMPORARY (bundle 25): every dataset crx_<p>_b25_check reruns, saved as <name>__b25;
+# this file and the HDFS folder b25_check are removed by the cleanup.
+
+"{name}__b25":
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/{name}"
+  save_args:
+    mode: overwrite
