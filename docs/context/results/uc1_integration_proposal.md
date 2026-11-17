@@ -1,5 +1,9 @@
 # UC1 call-transcript signals in the persona framework: proposed structure
 
+> **Superseded for the built logic by `uc1_stated_block.md`** (bundle 26, 2026-11-17: the
+> as-built mapping, kept / left-out signals and the agenda for integrating the full UC1 delivery).
+> This note predates the timelines handoff; its §10 parked ideas still stand.
+
 Answer to the UC1 ideation brief (`uc1_ideation_prompt.md`), fourth version, 2026-11-16. Directions
 from the user:
 - **A1–A4 and their states are fixed and are not touched.**
