@@ -511,3 +511,55 @@ crx_rl_a3_payments:
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a3_payments"
   save_args:
     mode: overwrite
+
+# ── UC1 stated block (stated ability A5, stated intent A6, dispute / request flags) ──
+# UC1's outputs, read as they are from the shared file store (read only; written by the
+# UC1 team, never by us). No model_id in the path: one store for all model_ids.
+crx_uc1_metadata:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/metadata"
+
+crx_uc1_extracted_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/extracted_signals"
+
+crx_uc1_simple_signal_aggregation:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/simple_signal_aggregation"
+
+crx_uc1_signal_level_conflicts:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/signal_level_conflicts"
+
+# Grain (account_id, observation_date); only the month of persona_end_date is scored.
+crx_cc_uc1_conversation_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_uc1_conversation_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_uc1_stated:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_uc1_stated"
+  save_args:
+    mode: overwrite
+
+crx_rl_uc1_conversation_signals:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_uc1_conversation_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_uc1_stated:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_uc1_stated"
+  save_args:
+    mode: overwrite
