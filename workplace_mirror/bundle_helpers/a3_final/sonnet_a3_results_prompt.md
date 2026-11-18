@@ -81,6 +81,12 @@ T6b Is the Broken level needed? (pooled outcome months, as T6). Broken scores 1 
      else promised (any event), else no_promise; recompute points and state with the T7 rule.
      Report the state AUC on paid_due with and without Broken (overall and per DPD band), the
      share of rows whose state changes, and the from × to state counts.
+T6c Same-day payments (pooled outcome months; events from crx_<p>_a3_promise_events + SOURCE_SUFFIX).
+   A payment dated on the event day never keeps the event (D-A3-29: only payments after the event day
+   count; RL cash is month-end dated and unaffected). Per model_id: events; events judged paid /
+   partial / none; of the none and partial events, how many would be paid if the event day's payments
+   counted too (event-day payments + promise_paid_amount >= promise_amount); and the Dimension A level
+   mix and A3 state mix if they did (count, %), with the paid_due % of the rows that would move.
 T7 Checks: Unknown count; rows whose a3_points_total differs from the points of their three levels
    (Kept 3 / Partly kept 2 / Broken 1 / Promised 1 / No promise 0; Regular 2 / Some 1; Clean 1)
    and rows whose state differs from the points and refusal rule (High from 4, Moderate from 2,
@@ -103,7 +109,7 @@ Deliverables
    - Under 300 lines.
    - End with six lines: does High > Moderate > Low hold on paid_due in every group; does Broken
      with a kept event pay like Partly kept or below it, and does dropping Broken raise or lower
-     the state AUC (T6b); how the
+     the state AUC (T6b), and how many events a same-day payment would keep (T6c); how the
      state mix compares with the earlier back-test (cards 61–180 High / Moderate / Low 11.8 /
      32.9 / 55.3%); where A3 overlaps the other axes most; the T7 checks; anything that looks
      wrong.
