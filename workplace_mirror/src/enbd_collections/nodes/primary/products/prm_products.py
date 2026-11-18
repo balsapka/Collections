@@ -27,7 +27,7 @@ import datetime
 
 from functools import reduce
 
-from pyspark.sql import DataFrame, Window
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType
 
@@ -118,9 +118,13 @@ def build_card_contracts(client: DataFrame, contract: DataFrame) -> DataFrame:
         "edp_effectivestartdate",
         ["cif_id"],
     ).alias("c")
-    start, end = F.lit(datetime.date.min), F.lit(datetime.date.max)
-    overlaps = (F.coalesce("o.valid_from", start) < F.coalesce("c.valid_to", end)) & (
-        F.coalesce("c.valid_from", start) < F.coalesce("o.valid_to", end)
+
+    def before(start: str, end: str) -> Column:
+        """``start`` < ``end``, a NULL bound being open."""
+        return F.col(start).isNull() | F.col(end).isNull() | (F.col(start) < F.col(end))
+
+    overlaps = before("o.valid_from", "c.valid_to") & before(
+        "c.valid_from", "o.valid_to"
     )
     return owner.join(
         cif, (F.col("o.client_idt") == F.col("c.client_idt")) & overlaps
