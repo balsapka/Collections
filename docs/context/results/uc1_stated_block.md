@@ -1,8 +1,8 @@
 # UC1 stated block: how the UC1 signals are condensed (as built, bundle 26)
 
 How bundle 26 (`crx_<p>_uc1_stated`) turns UC1's call-transcript signals into two stated states and
-a few flags, which signals it keeps and leaves out, how it sits beside A1–A4, and what has to be
-thought through when the full UC1 delivery lands. As of 2026-11-17; nothing has run in PROD yet.
+a few flags, which signals it keeps and leaves out, how it sits beside A1–A4, what the first PROD run
+showed (§11) and how the integration with the UC2 states should progress (§12). As of 2026-11-18.
 
 Code: `workplace_mirror/src/enbd_collections/pipelines/crx_persona/uc1_stated/` (`signals.py`,
 `classify.py`), spec test `workplace_mirror/checks/uc1_stated_spec.py`. Data facts:
@@ -58,8 +58,12 @@ row first gets `uc1_evidence`, counting conversations strictly before the observ
 | `no_cif` | no customer id to join on |
 | `no_conversation` | no conversation before the observation date |
 | `not_extracted` | conversations exist, none extracted by UC1 |
-| `legacy_only` | only legacy-format extractions, which UC1's customer table does not read |
-| `extracted` | at least one current-format extracted conversation: the only case with states |
+| `extracted` | at least one extracted conversation: the only case with states |
+
+Legacy-format extractions are not used at all (user, 2026-11-18): a conversation extracted only in
+the legacy format is dropped, as if it did not exist (UC1's customer table reads no level from it).
+Bundle 26 still had a `legacy_only` status (21–82 rows per model_id); the change is coded
+(`cd698c8`) and ships with the next UC1 bundle.
 
 ## 4. Step 2: levels → states
 
@@ -109,7 +113,8 @@ UC1's choice.
 | `plan_structure_mentioned` | mostly fires alongside period or request; little on top |
 | the amounts and dates named | free text; using the values means parsing their output |
 | confidence (high / low) | not in their customer table; rebuilding it from per-call rows = our own conflict rule |
-| agent remarks, legacy extractions | UC1's customer table ignores them; legacy-only shows as `legacy_only` |
+| agent remarks | UC1's customer table ignores them |
+| legacy-format extractions | dropped with their conversations (user, 2026-11-18) |
 | `latest_flags`, `time_weighted_*` | per conversation / never run |
 | UC1's prior-PTP features (`ptp_30d_*`) | promises are A3's, from our own data |
 | `notes` free text | not a signal |
@@ -194,3 +199,95 @@ as an A2 contact) are listed in `uc1_integration_proposal.md` §10.
   across tiers, or that has to be an explicit decision.
 - GRR deck framing applies: the goal is allocation before the collector, and at 180+ finding the
   5–10% with positive signals, where a stated able / pays-in-full could be one of those signals.
+
+## 11. First PROD run (bundle 26, 2026-08-31, all four model_ids)
+
+Summary: `workplace_mirror/bundle_helpers/b26_uc1/b26_run_summary.md`. All checks pass.
+
+| model_id | accounts | extracted | not_extracted | no conversation | A5 stated (able / partly / unable) | A6 stated (full / partly-later / refuses) |
+|---|---|---|---|---|---|---|
+| cc_60_180 | 19,292 | 991 (5.1%) | 25.1% | 69.4% | 690: 18% / 61% / 21% | 772: 25% / 70% / 5% |
+| rl_60_180 | 3,985 | 364 (9.1%) | 18.9% | 71.3% | 239: 14% / 65% / 21% | 290: 26% / 72% / 2% |
+| cc_180_plus | 318,663 | 184 (0.1%) | 0.1% | 99.8% | 98 | 118 |
+| rl_180_plus | 55,371 | 145 (0.3%) | 0.3% | 99.4% | 76 | 85 |
+
+What it says:
+
+- **60–180 only.** About 30% of 60–180 accounts have had a call in the transcript window; at 180+
+  under 1%. UC1 is a 60–180 instrument.
+- **Projected reach after the full run** (if the extracted sample is representative, see below):
+  roughly 30% have a conversation × 70% state capacity ≈ **21% of cc_60_180 accounts with an A5
+  state, ≈ 24% with an A6 state** (rl ≈ 18% / 22%).
+- **The middle dominates.** 61–65% of stated ability is partly_able, 70–72% of stated intent is
+  partly_or_later: what most delinquent customers say. The decision value sits in the tails
+  (able / pays in full, unable / refuses), about 30–40% of stated rows, so after the full run only
+  ≈ 8% of 60–180 accounts would carry a tail stated signal.
+- **`not_stated` is large** (30% of extracted on A5, 22% on A6): the customer talked but said
+  nothing on the topic. Whether that predicts anything is open (validation Part A7).
+- **Every signal is old at the latest month.** Calls in the store end 2026-07-16, so at 2026-08-31
+  the newest signal is 46 days old and most are 2–6 months old (the KB measured 0.2% of rows with a
+  call in the last 30 days, 1.4% in 90, 2.2% in 180).
+- **Reach crosses A2's Non-Reachable** (KB, sample): 42% of rows with a usable call are A2
+  Non-Reachable, because A2 reads DCORE contact outcomes and the transcripts come from Genesys.
+  Either the call predates the failed-call streak (a stale signal), or A2 misses real contacts.
+- **Sampling.** The current extractions were drawn by stratified sampling on the 60–180 population
+  (user, 2026-11-18), so the 60–180 distributions are taken as broadly representative. One caution
+  from the KB: extraction rates differed by prior promise history (7.4% vs 2.3%), repayment
+  behaviour (11.9% vs 4.0%) and call month (July 22%, March–May ~3%), so customers with a promise
+  history may be over-represented; validation Part C measures whether a reweighting changes
+  anything.
+
+## 12. Assessment: how the final personas will turn out, and what to do differently
+
+### 12.1 What the final persona will look like
+
+- **The persona key stays UC2 (A1–A4) for everyone.** UC1 can at best describe about a fifth to a
+  quarter of 60–180 accounts and almost none at 180+. A key that needs UC1 would be empty for most
+  of the book, and at 180+ for nearly all of it.
+- **UC1 becomes an overlay at 60–180**, not a fifth or sixth key axis: per ability and intent pair,
+  stated *confirms* / *contradicts* / *silent* (not stated or no evidence), plus the open-issue
+  flags (dispute, request). Tiers come from UC2. Whether UC1 may move a customer within or across a
+  tier is decided from the validation (B4), and only for the tails.
+- **At 180+ the persona is UC2 only.** Finding the 5–10% with positive signals there stays an
+  observed-data job (A1 / A3 / A4); UC1 is not part of the 180+ design unless the transcript feed
+  starts covering those customers.
+
+Proposed (Claude, for the user to confirm): this drops options 3 and 4 of §10.2 (joint axis, key
+dimension) as the working assumption, and narrows option 2 (fill) to a question for the validation: does a stated level help where A1 or A3
+is Unknown?
+
+### 12.2 What to do differently
+
+1. **Validate at conversation level, point in time, not on the customer table.** UC1's customer
+   table is undated (modal level over all history), so it cannot be backtested. The per-conversation
+   grid plus the call dates can: at month ends 2026-03..07, the level of the latest conversation
+   before the month end, its age, and the payment that followed. That is our validation; it changes
+   neither UC1's rule nor our production block. Prompt:
+   `workplace_mirror/bundle_helpers/uc1/sonnet_uc1_uc2_validation_prompt.md` (Parts A–C).
+2. **Measure decay and hand it over as evidence.** Paid rate by stated level × signal age (B3)
+   shows how fast a statement loses value. That is the input UC1's recency workshop needs; it stays
+   their decision.
+3. **Judge UC1 by what it adds to UC2, not on its own.** The test is whether a stated level
+   separates payers *within* an A1 or A3 state (B2, B4). A signal that only repeats A1 / A3 adds
+   nothing to the persona, however plausible it reads.
+4. **Watch the A2 seam.** If many UC1 conversations come after A2's failed-call streak started
+   (A6), A2 Non-Reachable is overstated and a Genesys conversation should count as contact (parked
+   idea, §10.2). A2 is accepted by GRR, so that would go to the user / GRR as a decision, not into a
+   UC1 bundle.
+5. **Make freshness a production requirement.** The block is only useful if the transcript store and
+   UC1 extraction are refreshed before each scoring month; today the store ends 2026-07-16. Ask
+   (a request, not a change to their work) for the refresh cadence and the full-run date. The
+   25% `not_extracted` share at cc_60_180 is the largest coverage lever.
+6. **Keep the block thin until the validation is back.** No new states or rules in the stated block;
+   the legacy removal is the only pending change and can ride with whatever the validation asks for.
+
+### 12.3 Decision points after the validation
+
+| Result | Then |
+|---|---|
+| B4: stated level adds AUC inside A1 / A3 | define the overlay (confirms / contradicts / silent) and a GRR rule for tails |
+| B4: adds nothing | keep the block as display only (collector context); no tier effect |
+| B3: value drops fast with age | overlay counts only signals younger than the cut-off; tell UC1 |
+| A6: calls after the failed streak | raise the Genesys-as-contact question for A2 with the user / GRR |
+| C: reweighting changes the paid rates | report reweighted numbers until the full run |
+| Fill (A1 / A3 Unknown) adds | candidate rule for A1 Unknown customers, for the user to decide |

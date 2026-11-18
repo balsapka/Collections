@@ -11,7 +11,11 @@ the table profile is model_id-independent; full numbers in `tmp_validation/uc1_p
 **Sample warning (read first).** UC1 extraction has so far run on a **sample only**: 11,920 of the
 147,004 pooled conversations (8.1%), a purposive, UC2-scoped draw. Every count, prevalence and
 coverage figure below is a **sample statistic** and will change on the full run; figures are marked
-*(sample)*. Formats, value sets, rules, keys and grain are structural and carry over.
+*(sample)*. Formats, value sets, rules, keys and grain are structural and carry over. The draw was
+stratified on the 60-180 population, so 60-180 distributions are taken as broadly representative
+until the full run (user, 2026-11-18); §8 lists the extraction-rate differences to check. Legacy-format
+extractions are not used by the persona code (user, 2026-11-18). First PROD run of our stated block:
+`results/uc1_stated_block.md` §11.
 
 ## 1. What UC1 is
 - An LLM reads call transcripts (Genesys) and DCORE agent remarks and emits per-conversation
