@@ -193,7 +193,9 @@ def build_dpd_sequences(
             max_inf,
         )
 
-    hist_udf = F.udf(_udf, _HISTORY_SCHEMA)
+    # non-deterministic: Spark then runs the UDF once per row and never copies its
+    # output into a join condition (ExtractPythonUDFFromJoinCondition, cross join)
+    hist_udf = F.udf(_udf, _HISTORY_SCHEMA).asNondeterministic()
     s = per_acc.withColumn("_h", hist_udf("_rows", "_first_raw", "_global_min"))
 
     out = s.select(
@@ -312,7 +314,7 @@ def build_deterioration(
     schema = _CLASSIFY_SCHEMA
     res = joined.withColumn(
         "_s",
-        F.udf(_udf, schema)(
+        F.udf(_udf, schema).asNondeterministic()(  # once per row, as in Stage 1
             "dlq_buckets",
             "_trunc_len",
             "history_cropped",
