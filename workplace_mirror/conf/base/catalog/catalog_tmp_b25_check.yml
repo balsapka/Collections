@@ -1,0 +1,451 @@
+# TEMPORARY (bundles 25 + 27): every dataset crx_<p>_b25_check reruns, saved as <name>__b25.
+# Explicit entries (the workplace does not resolve dataset patterns). This file and the
+# HDFS folder b25_check are removed by the cleanup.
+
+crx_cc_a1_ability__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a1_ability"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_casa_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a1_casa_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_cross_product_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a1_cross_product_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_distress_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a1_distress_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_eosb_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a1_eosb_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_income_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a1_income_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a1_liquidity_anchor__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a1_liquidity_anchor"
+  save_args:
+    mode: overwrite
+
+crx_cc_a2_dcore_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a2_dcore_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a2_demographics_deceased__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a2_demographics_deceased"
+  save_args:
+    mode: overwrite
+
+crx_cc_a2_locatability__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a2_locatability"
+  save_args:
+    mode: overwrite
+
+crx_cc_a2_location_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a2_location_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a2_way4_deceased__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a2_way4_deceased"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_commitment_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_commitment_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_dlq_payment_signals_single_payment_cycle_count__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_dlq_payment_signals_single_payment_cycle_count"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_dues__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_dues"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_episode__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_episode"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_instalments__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_instalments"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_payment_credibility__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_payment_credibility"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_payment_cycles__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_payment_cycles"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_payments__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_payments"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_pre_dlq_payment_signals_single_payment_cycle_count__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_pre_dlq_payment_signals_single_payment_cycle_count"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_promise_events__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_promise_events"
+  save_args:
+    mode: overwrite
+
+crx_cc_a3_strong_negative_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a3_strong_negative_signals"
+  save_args:
+    mode: overwrite
+
+crx_cc_a4_deterioration__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_a4_deterioration"
+  save_args:
+    mode: overwrite
+
+crx_cc_acct_windows__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_acct_windows"
+  save_args:
+    mode: overwrite
+
+crx_cc_balance__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_balance"
+  save_args:
+    mode: overwrite
+
+crx_cc_billing__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_billing"
+  save_args:
+    mode: overwrite
+
+crx_cc_dpd_sequences__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_dpd_sequences"
+  save_args:
+    mode: overwrite
+
+crx_cc_limits__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_limits"
+  save_args:
+    mode: overwrite
+
+crx_cc_transactions__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_cc_transactions"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_ability__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a1_ability"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_casa_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a1_casa_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_cross_product_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a1_cross_product_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_distress_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a1_distress_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_eosb_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a1_eosb_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_income_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a1_income_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a1_liquidity_anchor__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a1_liquidity_anchor"
+  save_args:
+    mode: overwrite
+
+crx_rl_a2_dcore_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a2_dcore_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a2_demographics_deceased__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a2_demographics_deceased"
+  save_args:
+    mode: overwrite
+
+crx_rl_a2_locatability__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a2_locatability"
+  save_args:
+    mode: overwrite
+
+crx_rl_a2_location_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a2_location_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a2_way4_deceased__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a2_way4_deceased"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_commitment_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_commitment_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_dlq_cycles__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_dlq_cycles"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_dlq_payment_signals_single_payment_cycle_count__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_dlq_payment_signals_single_payment_cycle_count"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_dues__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_dues"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_episode__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_episode"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_instalments__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_instalments"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_payment_credibility__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_payment_credibility"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_payments__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_payments"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_pre_dlq_payment_signals_single_payment_cycle_count__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_pre_dlq_payment_signals_single_payment_cycle_count"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_promise_events__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_promise_events"
+  save_args:
+    mode: overwrite
+
+crx_rl_a3_strong_negative_signals__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a3_strong_negative_signals"
+  save_args:
+    mode: overwrite
+
+crx_rl_a4_deterioration__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_a4_deterioration"
+  save_args:
+    mode: overwrite
+
+crx_rl_dpd_sequences__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_dpd_sequences"
+  save_args:
+    mode: overwrite
+
+crx_rl_dpd_sequences_linked__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_dpd_sequences_linked"
+  save_args:
+    mode: overwrite
+
+crx_rl_full_history_linked__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_full_history_linked"
+  save_args:
+    mode: overwrite
+
+crx_rl_restructure_chains__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/crx_rl_restructure_chains"
+  save_args:
+    mode: overwrite
+
+feat_cif_bureau_bounces_monthly__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/feat_cif_bureau_bounces_monthly"
+  save_args:
+    mode: overwrite
+
+feat_cif_bureau_salary_monthly__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/feat_cif_bureau_salary_monthly"
+  save_args:
+    mode: overwrite
+
+feat_cif_cross_product_monthly__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/feat_cif_cross_product_monthly"
+  save_args:
+    mode: overwrite
+
+prm_card_contracts__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/prm_card_contracts"
+  save_args:
+    mode: overwrite
+
+prm_card_month_end__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/prm_card_month_end"
+  save_args:
+    mode: overwrite
+
+prm_loan_month_end__b25:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b25_check/prm_loan_month_end"
+  save_args:
+    mode: overwrite

@@ -2,8 +2,8 @@
 
 ``crx_<p>_b25_check`` runs the product's pipelines as they ship (CC raw extract, A4, A2,
 A1, A3, plus product primaries / features and the bureau features) with every output
-renamed ``<name>__b25`` (one catalog pattern, ``tmp_b25_check.yml``), so no real output
-is touched; inputs they do not build are the persisted ones. Then it logs, for
+renamed ``<name>__b25`` (explicit entries in ``catalog_tmp_b25_check.yml``), so no real
+output is touched; inputs they do not build are the persisted ones. Then it logs, for
 ``model_id``:
 
 - ``B25 DIFF``: per dataset, rows old / new and rows only on one side (``exceptAll``,
