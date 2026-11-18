@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from functools import reduce
 
-from pyspark.sql import Column, DataFrame
+from pyspark.sql import Column, DataFrame, Window
 from pyspark.sql import functions as F
 
 from enbd_collections.nodes.features.casa.feat_cif_casa import (
@@ -297,7 +297,8 @@ def build_casa_signals(
 
 def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> DataFrame:
     """At the observation month end, the customer's other products with us
-    (``feat_cif_cross_product_monthly``), the scored account itself left out:
+    (``feat_cif_cross_product_monthly``), the scored account and the cards Way4 links
+    to it (``linked_account_id``, either way) left out:
     ``xp_assets_aed`` (deposits + investments + WM), ``xp_instalment_max`` (the largest
     instalment / minimum due of another credit product that is current), ``xp_current``
     (1: another credit product is current) and ``xp_holding`` (1: any asset above 0)."""
@@ -318,13 +319,24 @@ def build_cross_product_signals(obs_base: DataFrame, products: DataFrame) -> Dat
             F.col("balance_aed").cast("double").alias("_bal"),
             "is_current",
             F.col("instalment_aed").cast("double").alias("_inst"),
+            string_key(products, "linked_account_id").alias("_link"),
         ),
         obs,
         "cif_id",
     )
     joined = obs.join(mine, on=["cif_id", "observation_date"])
+    scored = string_key(joined)
+    # the contracts the scored account's own rows link to (its Way4 parents)
+    scored_links = F.collect_set(F.when(F.col("_acct") == scored, F.col("_link"))).over(
+        Window.partitionBy(*GRAIN)
+    )
+    linked = F.coalesce(
+        (F.col("_link") == scored) | F.array_contains("_scored_links", F.col("_acct")),
+        F.lit(False),
+    )
     rows = (
-        joined.filter(F.col("_acct") != string_key(joined))
+        joined.withColumn("_scored_links", scored_links)
+        .filter((F.col("_acct") != scored) & ~linked)
         .groupBy(*GRAIN)
         .agg(
             F.sum(F.when(asset, F.col("_bal"))).alias("xp_assets_aed"),

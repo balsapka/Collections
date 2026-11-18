@@ -1,7 +1,7 @@
 {
  "bureau_salary_bounces": {
   "feat_cif_bureau_bounces_monthly": {
-   "hash": "c21dda1b77c3b3b61b514fc4fdf4f2ff1e79ac64b9ec0155afd22feaad236141",
+   "hash": "9ae0847b6699176af6daa419d0d7c00ad763bfb078cc9a5f5a702444ff16a143",
    "rows": 9,
    "schema": [
     [
@@ -47,8 +47,8 @@
  },
  "crx_cc_a1_ability.cc_180_plus": {
   "crx_cc_a1_ability": {
-   "hash": "1392b73c432794d7f78111bd7cc8aa1c94addd353f1037416d170c6a33f098b6",
-   "rows": 97,
+   "hash": "c7103a5112d69d9e2b892b042b65c187a42cccc01704cbe66e8093c40d0b7977",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -125,8 +125,8 @@
    ]
   },
   "crx_cc_a1_casa_signals": {
-   "hash": "1bb276504fef80115902a1b85632ad45b7143d0c00b317c12c557f27bcc1909c",
-   "rows": 97,
+   "hash": "a64c9091e893b80c8ada57033899c0089365343bde470a6d75de2b463baa345a",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -243,8 +243,8 @@
    ]
   },
   "crx_cc_a1_cross_product_signals": {
-   "hash": "5fd952e654c08128b4b9344769fec920d4fc519211039681bc523f2e99fe5597",
-   "rows": 97,
+   "hash": "df74fe4d7fa454c776bae73b4e00f74e5dcf2793953eb8cab404f5bd91389de5",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -273,8 +273,8 @@
    ]
   },
   "crx_cc_a1_distress_signals": {
-   "hash": "849e16b99b578553508d21e6aa9614794a37c98613d2e73f7128772c0dbfd5e5",
-   "rows": 97,
+   "hash": "48f272938a138cb23b9210ffe03c13f5a14f76c20aa881bf7f8765bc0c845e28",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -303,8 +303,8 @@
    ]
   },
   "crx_cc_a1_eosb_signals": {
-   "hash": "f14299dc688f59af2ad7ccb9e7c862a5ecf16a08e75535fd3de804c7d3cf5c95",
-   "rows": 97,
+   "hash": "2ee64ca877b31b421efd35305f2fdb746b63a413b8ad5e40e682c013fb8dae3d",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -321,8 +321,8 @@
    ]
   },
   "crx_cc_a1_income_signals": {
-   "hash": "7ca5550e6db152b4ec3a4e35133037c6855c7b3d67241566fb1196a8352d9516",
-   "rows": 97,
+   "hash": "4ddd3cb55fdd611df05580cac8b098aed07235b0116b614eb78d9c2ef88734c6",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -395,8 +395,8 @@
    ]
   },
   "crx_cc_a1_liquidity_anchor": {
-   "hash": "6b138323e3f8efce6dc35d12823b47e3cfc4928af461c674556ae0f858bfc518",
-   "rows": 97,
+   "hash": "a1ab66693f72e8b43af5190021120fb306ff6724937811242a56ad5239b4f7d5",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -413,8 +413,8 @@
    ]
   },
   "crx_cc_obs_base": {
-   "hash": "f18ed774545674edc2d26c2fc27155e98d6bdc98589bf1e4273d8503dca3e4d1",
-   "rows": 97,
+   "hash": "02d39e321e1e62df21325469c9a2d66fe07583e8ebbad88002df7e94ffd1bd20",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -433,8 +433,8 @@
  },
  "crx_cc_a1_ability.cc_60_180": {
   "crx_cc_a1_ability": {
-   "hash": "1df4fd0dfe9eafe2b514d121da8e0f7f0d3f35f893f873028fdd20f8433acbe6",
-   "rows": 97,
+   "hash": "d848381ba457736a391c466308eee14b0de4dca0b3001f8ce065d70c243d7c5d",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -511,8 +511,8 @@
    ]
   },
   "crx_cc_a1_casa_signals": {
-   "hash": "e49bcae3e65f9703bdc2fe3bcfaf3c963dc76a835e16047a5130cbd1f0a104c2",
-   "rows": 97,
+   "hash": "9d28e8f0cddf2f5912ade769fb566bb12e9f9cee8db9efe7345d58138c555f9c",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -581,8 +581,8 @@
    ]
   },
   "crx_cc_a1_cross_product_signals": {
-   "hash": "5fd952e654c08128b4b9344769fec920d4fc519211039681bc523f2e99fe5597",
-   "rows": 97,
+   "hash": "df74fe4d7fa454c776bae73b4e00f74e5dcf2793953eb8cab404f5bd91389de5",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -611,8 +611,8 @@
    ]
   },
   "crx_cc_a1_distress_signals": {
-   "hash": "bfd509bceb2aa6de1d283b90bf870b94e1e5ea199b4742c9adfbcbeeed9f1b19",
-   "rows": 97,
+   "hash": "ad2d26273501bd022d0ad68083e5d4ba7c50af2d5733417dd05816813df109ac",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -641,8 +641,8 @@
    ]
   },
   "crx_cc_a1_eosb_signals": {
-   "hash": "f14299dc688f59af2ad7ccb9e7c862a5ecf16a08e75535fd3de804c7d3cf5c95",
-   "rows": 97,
+   "hash": "2ee64ca877b31b421efd35305f2fdb746b63a413b8ad5e40e682c013fb8dae3d",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -659,8 +659,8 @@
    ]
   },
   "crx_cc_a1_income_signals": {
-   "hash": "3f97c486f0590d36eaf3c68c5dc39b84c4995aa3238ad61f88f423b7cbfbcc05",
-   "rows": 97,
+   "hash": "d540208844ca00021402a762c8ff877dd961893c176f980d3bcdc0f568a90bb1",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -709,8 +709,8 @@
    ]
   },
   "crx_cc_a1_liquidity_anchor": {
-   "hash": "2ec40237774d399095e8d6b10b5b7471e71cb3410b4a39b0ca7e09f2b2eb5667",
-   "rows": 93,
+   "hash": "2ec1e6e12b8ca522b61eb748a72e4024a97cd0e0e4a272c42bf9e0492ab1b660",
+   "rows": 96,
    "schema": [
     [
      "account_id",
@@ -727,8 +727,8 @@
    ]
   },
   "crx_cc_obs_base": {
-   "hash": "f18ed774545674edc2d26c2fc27155e98d6bdc98589bf1e4273d8503dca3e4d1",
-   "rows": 97,
+   "hash": "02d39e321e1e62df21325469c9a2d66fe07583e8ebbad88002df7e94ffd1bd20",
+   "rows": 100,
    "schema": [
     [
      "account_id",
@@ -3967,8 +3967,8 @@
  },
  "crx_rl_a1_ability.rl_180_plus": {
   "crx_rl_a1_ability": {
-   "hash": "1826277a0c5ae0e8c1413e0e967ace639e605dff528ece34e18d419b019f61da",
-   "rows": 96,
+   "hash": "0a4f778323089ac579681fb2c5c449603cf2f79707a56ae75cb64a6c72ff70da",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4045,8 +4045,8 @@
    ]
   },
   "crx_rl_a1_casa_signals": {
-   "hash": "ce031ca5a6edc6c69e20040e58a47480fbf6ac166f0423ada8524a74a711b56a",
-   "rows": 96,
+   "hash": "40c50a5f2f0030f7685d686972f1e045dc0bd9aed76c7a7d1219fa4ed69fe7eb",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4163,8 +4163,8 @@
    ]
   },
   "crx_rl_a1_cross_product_signals": {
-   "hash": "e2e129d50238880cd6742ffe803363f135253be2e2d6a827e45f5faa25846952",
-   "rows": 96,
+   "hash": "4b69d6dea83d8c3c81f772f1c6658745fbc8b6831e5cf5bea25dd91c37eba76c",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4193,8 +4193,8 @@
    ]
   },
   "crx_rl_a1_distress_signals": {
-   "hash": "cf7899f020fe88a9d84d86a46aa53a60736f84f9510fcbf4dc8defc728bd658e",
-   "rows": 96,
+   "hash": "688cc10243f4d8bfd8f3668f85b21ff45503e25dcacf09d0e9172267d476787e",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4223,8 +4223,8 @@
    ]
   },
   "crx_rl_a1_eosb_signals": {
-   "hash": "7ae49547f1dc4650db60a6fe2f1db303e939891cde9e6da5be735aa5c77db0e8",
-   "rows": 96,
+   "hash": "3414d3e6ea4f49d703c0c12ac79b55837ad9c83b217828c46bb8c3111ed0b58f",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4241,8 +4241,8 @@
    ]
   },
   "crx_rl_a1_income_signals": {
-   "hash": "b20976919051a9bd41d4b5646afac9e8df6d0d35717fd5a711aebba61ad6a021",
-   "rows": 96,
+   "hash": "c1a150eb87f4385d49b28b2f06805d58f3b39445914851b150d6be7b6a76a661",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4333,8 +4333,8 @@
    ]
   },
   "crx_rl_obs_base": {
-   "hash": "ae00938ae629b59c6377e7b6b6731b8f9d72612aa7826d9ce42d2600c4685ff7",
-   "rows": 96,
+   "hash": "4cfeb1bb6d9fb35607f5f950bebd14f3f02093928d023d43f17fdff47df48c36",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4353,8 +4353,8 @@
  },
  "crx_rl_a1_ability.rl_60_180": {
   "crx_rl_a1_ability": {
-   "hash": "9af5c8c4850b4477f46e485c7f3fb24a89b33816be17630a8379e00b66f3acdf",
-   "rows": 96,
+   "hash": "4cf47d9faa61e183ae813f50f080d9bb56672d5e932c20ffcf4428574537d054",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4431,8 +4431,8 @@
    ]
   },
   "crx_rl_a1_casa_signals": {
-   "hash": "bba5266b752bd1a2ea2da2eb47f1b49f82bfc26e09340b711e70b73d1a438b80",
-   "rows": 96,
+   "hash": "b7d37b2a25cf18fff554cc092ea6ac776119c77b15b23cafa203451a62a66fc7",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4501,8 +4501,8 @@
    ]
   },
   "crx_rl_a1_cross_product_signals": {
-   "hash": "e2e129d50238880cd6742ffe803363f135253be2e2d6a827e45f5faa25846952",
-   "rows": 96,
+   "hash": "4b69d6dea83d8c3c81f772f1c6658745fbc8b6831e5cf5bea25dd91c37eba76c",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4531,8 +4531,8 @@
    ]
   },
   "crx_rl_a1_distress_signals": {
-   "hash": "490c80f832d2b4f5a890523727bd72f2e20785b41369b5bcfcc9eefacdebea19",
-   "rows": 96,
+   "hash": "b21112918ac40a9bde67653dac1a88f05bab9ee741c9f69cd4a83562e0b5b546",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4561,8 +4561,8 @@
    ]
   },
   "crx_rl_a1_eosb_signals": {
-   "hash": "7ae49547f1dc4650db60a6fe2f1db303e939891cde9e6da5be735aa5c77db0e8",
-   "rows": 96,
+   "hash": "3414d3e6ea4f49d703c0c12ac79b55837ad9c83b217828c46bb8c3111ed0b58f",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4579,8 +4579,8 @@
    ]
   },
   "crx_rl_a1_income_signals": {
-   "hash": "bb514f2d9e640e20a41c2c457cfc0f9c35690c567a4652ab85d4cc69fed13c0b",
-   "rows": 96,
+   "hash": "ee7a700f77da55cdf164a82c026bde3693aaab3c7246551a3530648eeadcdedd",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -4647,8 +4647,8 @@
    ]
   },
   "crx_rl_obs_base": {
-   "hash": "ae00938ae629b59c6377e7b6b6731b8f9d72612aa7826d9ce42d2600c4685ff7",
-   "rows": 96,
+   "hash": "4cfeb1bb6d9fb35607f5f950bebd14f3f02093928d023d43f17fdff47df48c36",
+   "rows": 99,
    "schema": [
     [
      "account_id",
@@ -8421,8 +8421,8 @@
  },
  "product_primary+product_features": {
   "feat_cif_cross_product_monthly": {
-   "hash": "8a9a079e411c1db774d48ff6197b6525a4189e477751738569e13e2d7a607f26",
-   "rows": 11,
+   "hash": "c770608c43120627e434e9c1b622c5975ea42b8dc74dfdb88a7ace0f2f83f0a2",
+   "rows": 12,
    "schema": [
     [
      "cif_id",
@@ -8451,6 +8451,10 @@
     [
      "instalment_aed",
      "double"
+    ],
+    [
+     "linked_account_id",
+     "string"
     ]
    ]
   },

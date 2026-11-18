@@ -2,8 +2,8 @@
 ends (the raw Way4 and loan-portfolio reads behind the A1 cross-product feature).
 
 * ``prm_card_contracts`` - one row per ``(cif_id, contract_id)``: every Way4 card
-  contract of a client, with ``parent_contract_id`` (the contract a newer one replaced;
-  NULL for none);
+  contract of a client, with ``parent_contract_id`` (Way4's linked contract, which
+  stays live beside it; NULL for none);
 * ``prm_card_month_end`` - one row per ``(contract_id, month_end)`` with a billing row
   in the month: ``level`` (``BS_PMT_CYCLE_DUE`` of the month's latest billing row; 1 =
   not overdue) and ``minimum_due`` (of the latest balance snapshot in the month's last

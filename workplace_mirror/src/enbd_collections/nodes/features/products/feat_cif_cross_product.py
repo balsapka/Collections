@@ -8,15 +8,17 @@ holds with us at that month end:
 * ``balance_aed`` - the month-end balance (assets; NULL for credit products);
 * ``is_current`` - credit products: 0 DPD at the month end (NULL for assets);
 * ``instalment_aed`` - credit products: the monthly instalment (loans) or minimum due
-  (cards) at the month end (NULL for assets).
+  (cards) at the month end (NULL for assets);
+* ``linked_account_id`` - cards: the contract Way4 links this one to
+  (``parent_contract_idt``; NULL for every other row).
 
 ``product_account_id`` is the account / contract id the persona spines use
 (``account_id``: the Way4 contract id for cards, ``acct_num`` for loans), so the A1
 engine can leave out the scored account itself. The WM asset sources are per customer,
 not per account: their rows carry the fixed ids ``ASSET_IDS`` (never a spine account).
-Supplementary cards post to their contract and never appear as a product of their own; a
-card that a newer card replaced is left out, so the scored card's predecessor is not
-"another card". CASA balances are never a product here (they are A1's money held,
+Supplementary cards post to their contract and never appear as a product of their own.
+Every card contract is kept: a Way4 parent stays live beside its child (Q-S6-14), so the
+link is carried for the A1 engine to leave out the cards linked to the scored account. CASA balances are never a product here (they are A1's money held,
 ``feat_cif_casa_balance_monthly``).
 
 Sources: the primaries ``prm_card_contracts``, ``prm_card_month_end`` and
@@ -49,6 +51,7 @@ COLUMNS = (
     "balance_aed",
     "is_current",
     "instalment_aed",
+    "linked_account_id",
 )
 # Fixed ids of the per-customer asset rows (one row per customer, month and type).
 ASSET_IDS = {"deposit": "ITD", "investment": "INV", "wm": "WM_AUM"}
@@ -92,6 +95,7 @@ def _asset_rows(series: DataFrame, column: str, product_type: str) -> DataFrame:
         F.col(column).alias("balance_aed"),
         _null("int").alias("is_current"),
         _null("double").alias("instalment_aed"),
+        _null("string").alias("linked_account_id"),
     )
 
 
@@ -121,9 +125,9 @@ def _assets(
 
 
 def _cards(card_contracts: DataFrame, card_month_end: DataFrame) -> DataFrame:
-    """``card`` rows: a live contract (not replaced by a newer one) with a billing row
-    in the month; current = billing level at most ``CARD_CURRENT_MAX_LEVEL``; the
-    instalment is the month's minimum due."""
+    """``card`` rows: every contract with a billing row in the month; current = billing
+    level at most ``CARD_CURRENT_MAX_LEVEL``; the instalment is the month's minimum due;
+    ``linked_account_id`` = its parent contract."""
     require_columns(
         card_contracts,
         ["cif_id", "contract_id", "parent_contract_id"],
@@ -134,12 +138,9 @@ def _cards(card_contracts: DataFrame, card_month_end: DataFrame) -> DataFrame:
         ["contract_id", "month_end", "level", "minimum_due"],
         "prm_card_month_end",
     )
-    replaced = card_contracts.select(
-        F.col("parent_contract_id").alias("contract_id")
-    ).distinct()
-    live = card_contracts.join(replaced, "contract_id", "left_anti")
     return card_month_end.join(
-        live.select("cif_id", "contract_id"), "contract_id"
+        card_contracts.select("cif_id", "contract_id", "parent_contract_id"),
+        "contract_id",
     ).select(
         "cif_id",
         "month_end",
@@ -148,6 +149,7 @@ def _cards(card_contracts: DataFrame, card_month_end: DataFrame) -> DataFrame:
         _null("double").alias("balance_aed"),
         (F.col("level") <= CARD_CURRENT_MAX_LEVEL).cast("int").alias("is_current"),
         F.col("minimum_due").alias("instalment_aed"),
+        F.col("parent_contract_id").cast("string").alias("linked_account_id"),
     )
 
 
@@ -180,6 +182,7 @@ def _loans(loan_month_end: DataFrame) -> DataFrame:
         _null("double").alias("balance_aed"),
         current.cast("int").alias("is_current"),
         F.col("instalment_due_aed").alias("instalment_aed"),
+        _null("string").alias("linked_account_id"),
     )
 
 

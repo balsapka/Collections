@@ -190,7 +190,7 @@ def a1_inputs() -> tuple[dict, dict]:
 
     products = ns["products"].unionByName(
         df(
-            [(str(g6), obs, "ITD", "deposit", 20000.0, None, None)],
+            [(str(g6), obs, "ITD", "deposit", 20000.0, None, None, None)],
             ns["products"].schema.simpleString()[7:-1].replace(":", " "),
         )
     )
@@ -1019,7 +1019,7 @@ PRODUCTS_PARAMS = {
 
 @functools.cache
 def product_inputs() -> dict:
-    """Customer 1: card 11 replaced card 10 (left out), card 12 overdue, card 13 with no
+    """Customer 1: card 11 linked to card 10 (both kept), card 12 overdue, card 13 with no
     balance snapshot in the month's last days (minimum due NULL), two billing rows in a
     month (the latest counts), one before the floor, one loaded too early. Customer 2:
     a current loan, an overdue one, a written-off one, a snapshot before the floor, an

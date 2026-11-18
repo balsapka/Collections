@@ -92,7 +92,7 @@ def case(name, *, salary=(), bureau=(), casa=(), flows=(), products=(), bounces=
     """salary: [(k, amount)]; bureau: [(k, amount[, unified salary_source[, day]])]; casa:
     [(k, balance)]; flows: [(k, "C"/"D", LEG kind, amount[, day[, wm label]])] where the
     label is "salary" or "self"; products: [(type, balance, is_current, instalment[,
-    own account])];
+    own account[, linked account ("scored": the scored one)[, account id]]])];
     bounces: [(k, bureau bounced amount on that pull[, k of its return date, None: none])]; active: a CASA leg lane in m2 (None:
     no leg); on_loan: that leg is on the loan account, not a CASA; buckets: overdue_bucket_01..08 on the latest snapshot; eosb: k of a DCORE
     EOSB result."""
@@ -118,9 +118,12 @@ def case(name, *, salary=(), bureau=(), casa=(), flows=(), products=(), bounces=
             label = rest[1]
             rows["lab"].append((cif, tid, m(k, day), "inflow" if dc == "C" else "outflow",
                                 int(label == "salary"), int(label == "self"), 0, 0, 0, 0, 0))
-    for ptype, bal, current, inst, *own in products:
-        pacct = acct if own and own[0] else f"P{i}_{ptype}"
-        rows["prod"].append((str(cif), OBS, pacct, ptype, bal, current, inst))
+    for j, (ptype, bal, current, inst, *extra) in enumerate(products):
+        own = bool(extra) and extra[0]
+        link = extra[1] if len(extra) > 1 else None
+        pacct = acct if own else (extra[2] if len(extra) > 2 else f"P{i}_{ptype}{j}")
+        link = acct if link == "scored" else link
+        rows["prod"].append((str(cif), OBS, pacct, ptype, bal, current, inst, link))
     for k, amt, *ret in bounces:
         back = ret[0] if ret else k  # the return date's month (None: no return date)
         returned = None if back is None else m(back, 3)
@@ -236,6 +239,17 @@ case("F4 some: a current card with a small minimum due", buckets=[100, 2000, 0, 
 case("F4: an overdue loan is not evidence", products=[("loan", None, 0, 5000.0)], cross_product="none")
 case("F4: the scored account itself never counts", products=[("card", None, 1, 5000.0, True)],
      cross_product="none")
+case("F4: a card Way4 links to the scored account never counts",
+     buckets=[100, 2000, 0, 0, 0, 0, 0, 0], products=[("card", None, 1, 5000.0, False, "scored")],
+     cross_product="none")
+case("F4: the card the scored account links to never counts",
+     buckets=[100, 2000, 0, 0, 0, 0, 0, 0],
+     products=[("card", None, 1, 300.0, True, "PX"), ("card", None, 1, 5000.0, False, None, "PX")],
+     cross_product="none")
+case("F4: linked cards not tied to the scored account count",
+     buckets=[100, 2000, 0, 0, 0, 0, 0, 0],
+     products=[("card", None, 1, 5000.0, False, "PY", "PZ"), ("card", None, 1, 300.0, False, None, "PY")],
+     cross_product="strong")
 case("F4: assets must reach 2 x anchor", buckets=[100, 5000, 0, 0, 0, 0, 0, 0],
      products=[("wm", 8000.0, None, None)], cross_product="some")
 # ── Anchor (S1) ──
@@ -345,7 +359,7 @@ legs = fc.build_casa_flow_legs(df(rows["ftr"], ftr_schema), accounts, df(rows["l
                                PERSONA["persona_start_date"], 12)
 flows = fc.build_casa_flows(legs)
 prod_schema = ("cif_id string, month_end date, product_account_id string, product_type string,"
-               " balance_aed double, is_current int, instalment_aed double")
+               " balance_aed double, is_current int, instalment_aed double, linked_account_id string")
 products = df(rows["prod"], prod_schema)
 returns = fc.build_returns(df(rows["ret"] + COVER, ret_schema), accounts)
 bounces = feat_cif_bureau_bounces_monthly.build(df(rows["alert"], alert_schema))
