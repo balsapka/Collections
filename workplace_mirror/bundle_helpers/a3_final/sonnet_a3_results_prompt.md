@@ -1,10 +1,10 @@
 # A3: results for the model document (prompt for the UAT Sonnet)
 
-When to send: now (UAT writes the snippet). PROD runs it after bundle 25's check (step 7) and
-before step 8 and the cleanup, per model_id (cc_60_180, cc_180_plus, rl_60_180, rl_180_plus), on the
-check's `<name>__b25` copies: they are what step 8 will persist, so the Broken decision (T6b) comes
-before the real run and the pipelines run once. If Broken stays, step 8 + cleanup follow and the
-results stand; if it goes, a small A3 bundle comes first and the snippet is re-run (one source switch).
+When to send: now (UAT writes the snippet). PROD runs it twice, per model_id (cc_60_180, cc_180_plus,
+rl_60_180, rl_180_plus). Run 1, the decision run: on the bundle 25 check's `<name>__b25` copies, before step
+8 (T6b decides whether Broken stays; T6c sizes the same-day payment rule adopted 2026-11-18, which the
+copies predate). Then one bundle with the A3 changes, step 8 once, and the cleanup. Run 2: the same
+snippet with SOURCE_SUFFIX = "" on the persisted tables; its summary fills the workbook.
 The user pastes `summary_a3_results.md` back to Claude, who then fills the yellow cells of the A3
 model document (`docs/credibility/build_a3_workbook.py` → `a3_credibility_reference.xlsx`): Results,
 Results detail, Results trend, Results 180+ vintage and Validation. Sensitivity keeps its back-tests.
@@ -82,8 +82,8 @@ T6b Is the Broken level needed? (pooled outcome months, as T6). Broken scores 1 
      Report the state AUC on paid_due with and without Broken (overall and per DPD band), the
      share of rows whose state changes, and the from × to state counts.
 T6c Same-day payments (pooled outcome months; events from crx_<p>_a3_promise_events + SOURCE_SUFFIX).
-   A payment dated on the event day never keeps the event (D-A3-29: only payments after the event day
-   count; RL cash is month-end dated and unaffected). Per model_id: events; events judged paid /
+   In the __b25 copies a payment dated on the event day never keeps the event; from 2026-11-18 it counts
+   (RL cash is month-end dated and unaffected). In run 2 this table should show no change. Per model_id: events; events judged paid /
    partial / none; of the none and partial events, how many would be paid if the event day's payments
    counted too (event-day payments + promise_paid_amount >= promise_amount); and the Dimension A level
    mix and A3 state mix if they did (count, %), with the paid_due % of the rows that would move.
