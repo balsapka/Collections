@@ -18,7 +18,8 @@ engine can leave out the scored account itself. The WM asset sources are per cus
 not per account: their rows carry the fixed ids ``ASSET_IDS`` (never a spine account).
 Supplementary cards post to their contract and never appear as a product of their own.
 Every card contract is kept: a Way4 parent stays live beside its child (Q-S6-14), so the
-link is carried for the A1 engine to leave out the cards linked to the scored account. CASA balances are never a product here (they are A1's money held,
+link is carried for the A1 engine to leave out the cards linked to the scored account.
+CASA balances are never a product here (they are A1's money held,
 ``feat_cif_casa_balance_monthly``).
 
 Sources: the primaries ``prm_card_contracts``, ``prm_card_month_end`` and
