@@ -17,10 +17,11 @@ holds with us at that month end:
 engine can leave out the scored account itself. The WM asset sources are per customer,
 not per account: their rows carry the fixed ids ``ASSET_IDS`` (never a spine account).
 Supplementary cards post to their contract and never appear as a product of their own.
-Every card contract is kept: a Way4 parent stays live beside its child (Q-S6-14), so the
-link is carried for the A1 engine to leave out the cards linked to the scored account.
-CASA balances are never a product here (they are A1's money held,
-``feat_cif_casa_balance_monthly``).
+A card counts for the CIF that held its contract at the month end (point in time,
+``prm_card_contracts``). Every card contract is kept: a Way4 parent stays live beside its
+child (Q-S6-14), so the link is carried for the A1 engine to leave out the cards linked
+to the scored account. CASA balances are never a product here (they are A1's money
+held, ``feat_cif_casa_balance_monthly``).
 
 Sources: the primaries ``prm_card_contracts``, ``prm_card_month_end`` and
 ``prm_loan_month_end`` (pipeline ``product_primary``), and WM's
@@ -126,12 +127,13 @@ def _assets(
 
 
 def _cards(card_contracts: DataFrame, card_month_end: DataFrame) -> DataFrame:
-    """``card`` rows: every contract with a billing row in the month; current = billing
-    level at most ``CARD_CURRENT_MAX_LEVEL``; the instalment is the month's minimum due;
+    """``card`` rows: every contract with a billing row in the month, under the CIF
+    that held it at the month end; current = billing level at most
+    ``CARD_CURRENT_MAX_LEVEL``; the instalment is the month's minimum due;
     ``linked_account_id`` = its parent contract."""
     require_columns(
         card_contracts,
-        ["cif_id", "contract_id", "parent_contract_id"],
+        ["cif_id", "contract_id", "parent_contract_id", "valid_from", "valid_to"],
         "prm_card_contracts",
     )
     require_columns(
@@ -139,18 +141,21 @@ def _cards(card_contracts: DataFrame, card_month_end: DataFrame) -> DataFrame:
         ["contract_id", "month_end", "level", "minimum_due"],
         "prm_card_month_end",
     )
-    return card_month_end.join(
-        card_contracts.select("cif_id", "contract_id", "parent_contract_id"),
-        "contract_id",
-    ).select(
-        "cif_id",
-        "month_end",
-        F.col("contract_id").cast("string").alias("product_account_id"),
-        F.lit("card").alias("product_type"),
-        _null("double").alias("balance_aed"),
-        (F.col("level") <= CARD_CURRENT_MAX_LEVEL).cast("int").alias("is_current"),
-        F.col("minimum_due").alias("instalment_aed"),
-        F.col("parent_contract_id").cast("string").alias("linked_account_id"),
+    month_end, start, end = F.col("month_end"), F.col("valid_from"), F.col("valid_to")
+    held = (start.isNull() | (start <= month_end)) & (end.isNull() | (month_end < end))
+    return (
+        card_month_end.join(card_contracts, "contract_id")
+        .filter(held)
+        .select(
+            "cif_id",
+            "month_end",
+            F.col("contract_id").cast("string").alias("product_account_id"),
+            F.lit("card").alias("product_type"),
+            _null("double").alias("balance_aed"),
+            (F.col("level") <= CARD_CURRENT_MAX_LEVEL).cast("int").alias("is_current"),
+            F.col("minimum_due").alias("instalment_aed"),
+            F.col("parent_contract_id").cast("string").alias("linked_account_id"),
+        )
     )
 
 

@@ -1051,6 +1051,7 @@ def product_inputs() -> dict:
         (2, "L1 ", D(2025, 6, 30), 0, 0.0, 2500.0, None),
         (3, "L4", D(2026, 6, 30), 0, None, 700.0, None),
     ]
+    T0, T1 = dt.datetime(2019, 1, 1), dt.datetime(2021, 5, 1)  # log valid-from days
     wm = [  # (cif, WM week yyyyMM0W, deposits, investments)
         (1, 20260701, 5000.0, 0.0),
         (1, 20260704, 6000.0, 0.0),
@@ -1058,18 +1059,21 @@ def product_inputs() -> dict:
         (1, 20250604, 9999.0, 9999.0),
     ]
     return {
-        "raw_stg_client": df(
-            [(1, " 1"), (2, "2"), (2, "2")], "client_idt long, ident_number string"
+        "raw_stg_client": df(  # change logs: (id, ..., valid from, modified)
+            [(1, " 1", T0, T0), (2, "2", T0, T0), (2, "2", T1, T1)],
+            "client_idt long, ident_number string, edp_effectivestartdate timestamp,"
+            " edp_modifiedts timestamp",
         ),
         "raw_stg_contract": df(
             [
-                (10.0, 1, None),
-                (11.0, 1, 10.0),
-                (12.0, 1, None),
-                (13.0, 1, None),
-                (30.0, 9, None),
+                (10.0, 1, None, T0, T0),
+                (11.0, 1, 10.0, T0, T0),
+                (12.0, 1, None, T0, T0),
+                (13.0, 1, None, T0, T0),
+                (30.0, 9, None, T0, T0),
             ],
-            "contract_idt double, client_idt long, parent_contract_idt double",
+            "contract_idt double, client_idt long, parent_contract_idt double,"
+            " record_date_from timestamp, edp_modifiedts timestamp",
         ),
         "raw_stg_billing": df(
             [

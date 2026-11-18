@@ -8417,6 +8417,14 @@
     [
      "parent_contract_id",
      "bigint"
+    ],
+    [
+     "valid_from",
+     "date"
+    ],
+    [
+     "valid_to",
+     "date"
     ]
    ]
   },
