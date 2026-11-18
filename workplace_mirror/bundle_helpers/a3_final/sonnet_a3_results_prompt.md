@@ -44,8 +44,7 @@ Decided, to follow
     100 AED);
   - paid_any = payments in the 3 months reach 100 AED.
 - Other axes, persona_end_date's month: A1 ability state and A4 family (+ SOURCE_SUFFIX); A2 (persisted)
-  reachability (Reachable / Non-Reachable / Unknown) and location (In Country / Skip / Unknown);
-  A4 family.
+  reachability (Reachable / Non-Reachable / Unknown) and location (In Country / Skip / Unknown).
 
 Tables (per model_id; counts unless a % is asked; cells under 10 as "<10")
 T1 Results. Accounts in scope, High, Moderate, Low. CC: one row. RL: one row per product and a
