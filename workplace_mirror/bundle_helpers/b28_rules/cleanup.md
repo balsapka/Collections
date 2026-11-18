@@ -1,4 +1,4 @@
-Run once, after step 9's blocks are pasted back.
+Run once, after step 8's blocks are pasted back.
 
 - **HDFS first.** The user runs these in PROD; UAT has no data. Resolve the path from the workplace conf and write out `hdfs dfs -rm -r <resolved path>` in full for each of the four model_ids (skip folders that do not exist): `${_project.hdfs_path}/<model_id>/${globals:folders.persona}/b28_check`.
 - **Remove the temporary check** (everything marked TEMPORARY for bundle 28):
