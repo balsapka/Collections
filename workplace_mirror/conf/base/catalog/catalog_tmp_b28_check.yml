@@ -1,0 +1,14 @@
+# TEMPORARY (bundle 28): the A1 / A3 states before step 8; removed by the bundle's cleanup.
+crx_cc_b28_old_states:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b28_check/crx_cc_b28_old_states"
+  save_args:
+    mode: overwrite
+
+crx_rl_b28_old_states:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b28_check/crx_rl_b28_old_states"
+  save_args:
+    mode: overwrite
