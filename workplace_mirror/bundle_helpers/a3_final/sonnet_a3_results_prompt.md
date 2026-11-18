@@ -67,6 +67,16 @@ T6 Validation (pooled outcome months; give the months):
      staying High %, Moderate staying Moderate %;
    - Cramér's V of the A3 state with A1, A2 reachability, A2 location and the A4 family (latest
      month).
+T6b Is the Broken level needed? (pooled outcome months, as T6). Broken scores 1 like Promised, so
+   only Broken rows with commitments_kept >= 1 would move without it.
+   - Split Broken rows by trigger: streak (commitments_last_broken_n >= 3) only, rate (>= 2
+     concluded, kept rate < 40%) only, both; and within each by commitments_kept >= 1 vs 0.
+   - Per cell: n, paid_due %, paid_any %, with Kept, Partly kept and Promised rows beside them
+     for comparison, plus a 95% interval for (Broken with a kept event) minus Partly kept.
+   - Without Broken: level = kept (>= 2 concluded, kept rate >= 80%), else partly_kept (any kept),
+     else promised (any event), else no_promise; recompute points and state with the T7 rule.
+     Report the state AUC on paid_due with and without Broken (overall and per DPD band), the
+     share of rows whose state changes, and the from × to state counts.
 T7 Checks: Unknown count; rows whose a3_points_total differs from the points of their three levels
    (Kept 3 / Partly kept 2 / Broken 1 / Promised 1 / No promise 0; Regular 2 / Some 1; Clean 1)
    and rows whose state differs from the points and refusal rule (High from 4, Moderate from 2,
@@ -87,7 +97,9 @@ Deliverables
    - All four model_ids together, one markdown table per T-table with a model_id column, in the
      row order above, numbers only (no prose inside tables).
    - Under 300 lines.
-   - End with five lines: does High > Moderate > Low hold on paid_due in every group; how the
+   - End with six lines: does High > Moderate > Low hold on paid_due in every group; does Broken
+     with a kept event pay like Partly kept or below it, and does dropping Broken raise or lower
+     the state AUC (T6b); how the
      state mix compares with the earlier back-test (cards 61–180 High / Moderate / Low 11.8 /
      32.9 / 55.3%); where A3 overlaps the other axes most; the T7 checks; anything that looks
      wrong.
