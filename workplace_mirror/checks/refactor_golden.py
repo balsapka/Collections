@@ -312,7 +312,7 @@ STATE_COLUMNS = {
     "a3_payment_credibility": {
         "a3_state": [f"payment_credibility_{s}" for s in ("high", "moderate", "low",
                                                           "unknown")],
-        "a3_commitments_level": ["kept", "partly_kept", "promised", "no_promise", "broken"],
+        "a3_commitments_level": ["kept", "partly_kept", "promised", "no_promise"],
         "a3_dlq_payment_level": ["regular", "some", "none"],
         "a3_pre_dlq_payment_level": ["clean", "not_clean", "no_record"],
         "pre_dlq_reason": ["no_episode", "censored", "NULL"],

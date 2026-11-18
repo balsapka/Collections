@@ -20,7 +20,6 @@ OUTPUT_COLUMNS = [
     "commitments_kept",
     "commitments_partial",
     "commitments_kept_rate",
-    "commitments_last_broken_n",
     "a3_commitments_level",
     # Dimension B
     "dlq_payment_window_start",

@@ -79,7 +79,7 @@ Measured, not assumed (V2, V3).
   reaches the EMI. `on_time_payment_sum_in_cycle` and the TEMPORARY note go.
 
 - **D-A3-9: commitments counted once, from the instalments** (user, 2026-11-03, provisional on V1).
-  Kept / concluded counts and the broken streak come from one rule over the PTP and settlement
+  Kept / concluded counts come from one rule over the PTP and settlement
   instalments: concluded = due on or before the observation date and paid or overdue (pending ones
   do not count), window = `[max(latest spell start, obs − 12 m), obs]` (spec rows 19, 76; O75, O83;
   the window is the last 12 months since D-A3-26).
@@ -269,6 +269,16 @@ Measured, not assumed (V2, V3).
   180+, High > Moderate > Low in every slice; bundle 25's check re-reads the gain on the new events.
   Code: `a3_credibility/constants.py` (`COMMITMENT_POINTS`), `signals.py`
   (`build_commitment_signals`).
+
+- **D-A3-34: no Broken level; Dimension A = Kept 3 / Partly kept 2 / Promised 1 / No promise 0** (user,
+  2026-11-18, results run 1 T6b, `bundle_helpers/a3_final/a3_results_run1_summary.md`; ships in bundle 28).
+  Broken scored 1 like Promised, so only Broken rows with a kept event were affected. At 60–180 those
+  rows pay like Partly kept (cards +0.6 pp [−1.0, +2.3], loans +0.3 pp [−5.1, +5.7]) and dropping
+  Broken raises the state AUC (+.006 cc, +.003 rl); at 180+ the AUC is flat (0.1% of rows move). One
+  scheme for all four model_ids. Rule, first match: Kept = at least 2 concluded and 80% kept; Partly
+  kept = any kept event; Promised = any other event in the window; else No promise. The 40% rate,
+  the streak of 3 and `commitments_last_broken_n` go; D-A3-16's commitment thresholds are now 12
+  months / 2 concluded / 80%.
 
 - **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.

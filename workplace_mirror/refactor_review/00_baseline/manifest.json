@@ -1207,7 +1207,7 @@
  },
  "crx_cc_a3_payment_credibility.cc_180_plus": {
   "crx_cc_a3_commitment_signals": {
-   "hash": "2e6bd14de04c5eb1d686b7b3084ff270a7cf65ed942f1d0c005bb99a9b9fb15c",
+   "hash": "bbbd81427032d91d04fa815a044c1b1a3dc11c69e69d789c47156c284e4e7291",
    "rows": 32,
    "schema": [
     [
@@ -1241,10 +1241,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -1369,7 +1365,7 @@
    ]
   },
   "crx_cc_a3_payment_credibility": {
-   "hash": "10accc5f6e08e13bb9fed27b554d5b58c5d217524616849ca1a9d632be53b648",
+   "hash": "fb2251afe47070a4356cff1e0e854cdeaa14511c7bdac18f5eb960cf9bf4b786",
    "rows": 32,
    "schema": [
     [
@@ -1419,10 +1415,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -1919,7 +1911,7 @@
  },
  "crx_cc_a3_payment_credibility.cc_60_180": {
   "crx_cc_a3_commitment_signals": {
-   "hash": "e4a9485cb0931f8fdae056c6c35ef95e1fb9ce6c16a2c6592d0969404d9ab4a5",
+   "hash": "4fa73ea1d5b0fe6987222b089f3349883ceb6d3388fd54472c8a7c62d8922ef8",
    "rows": 32,
    "schema": [
     [
@@ -1953,10 +1945,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -2081,7 +2069,7 @@
    ]
   },
   "crx_cc_a3_payment_credibility": {
-   "hash": "27042d01b34746fc5f8505e15ad3c56f36f0900370defa6b3574ccfbbc6704fb",
+   "hash": "08f7826c1916414f4f3d4aed217f5f36665bb0cbfe29cf5ae1ff38636bbce5f0",
    "rows": 32,
    "schema": [
     [
@@ -2131,10 +2119,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -2631,7 +2615,7 @@
  },
  "crx_cc_a3_payment_credibility.cc_60_180_30_days": {
   "crx_cc_a3_commitment_signals": {
-   "hash": "c28d8a7a371da7b1e077ba7e5c99c43cdc945f75b9060179263bc5e0b78f8863",
+   "hash": "3fadb8aa8ab436eba7d5769157786176802c6338e88c1828209f1bf8334124fc",
    "rows": 32,
    "schema": [
     [
@@ -2665,10 +2649,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -2793,7 +2773,7 @@
    ]
   },
   "crx_cc_a3_payment_credibility": {
-   "hash": "44620feafcd52db81c1183a9845f9e92ea3e19d934cc1f3ae306ef360e97e875",
+   "hash": "6232e45e96a9fbbb4e917c163cef76d5980d1e92f82a1ce42ec8be64397ca2ad",
    "rows": 32,
    "schema": [
     [
@@ -2843,10 +2823,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -5127,7 +5103,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_180_plus": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "2e6bd14de04c5eb1d686b7b3084ff270a7cf65ed942f1d0c005bb99a9b9fb15c",
+   "hash": "bbbd81427032d91d04fa815a044c1b1a3dc11c69e69d789c47156c284e4e7291",
    "rows": 32,
    "schema": [
     [
@@ -5161,10 +5137,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -5319,7 +5291,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "a0765bf8be21ef0554510931b1a292f1db2354efd96cb523223111bec7bb0252",
+   "hash": "2b4ba6c1d9971f8321a4a6cfd66623371be90effcc0133c46a1beedadd487cc2",
    "rows": 32,
    "schema": [
     [
@@ -5369,10 +5341,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -5673,7 +5641,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_60_180": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "2e6bd14de04c5eb1d686b7b3084ff270a7cf65ed942f1d0c005bb99a9b9fb15c",
+   "hash": "bbbd81427032d91d04fa815a044c1b1a3dc11c69e69d789c47156c284e4e7291",
    "rows": 32,
    "schema": [
     [
@@ -5707,10 +5675,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -5865,7 +5829,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "e6502e71aace6c464e1501b03eab38530d71e2d9c07e990eb6b55de13dd52902",
+   "hash": "f71fe7e06942d028e54c618d6e3f81322b5b64d8af21a9a050032c6c698fda95",
    "rows": 32,
    "schema": [
     [
@@ -5915,10 +5879,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -6219,7 +6179,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_60_180_30_days_month_end": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "07a78c08b8cfcea50dafe847b47b530c5bb69b742a9b8cb4c4912ffec28ea522",
+   "hash": "3d282ee5f583e127b967f8adbcca7d48c71ca6e98ea159c9cec9a0ea7a9de638",
    "rows": 32,
    "schema": [
     [
@@ -6253,10 +6213,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -6411,7 +6367,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "71b77d4ad70985e2d7d193235ac19ecf284f291297fc5ff3cd6e0d4939ec6d17",
+   "hash": "5cd5b5281accb8db68e0c2fced959c5a8de32d2b18f00940427d8ee138ffa495",
    "rows": 32,
    "schema": [
     [
@@ -6461,10 +6417,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -6765,7 +6717,7 @@
  },
  "crx_rl_a3_payment_credibility.rl_60_180_next_month_end": {
   "crx_rl_a3_commitment_signals": {
-   "hash": "07a78c08b8cfcea50dafe847b47b530c5bb69b742a9b8cb4c4912ffec28ea522",
+   "hash": "3d282ee5f583e127b967f8adbcca7d48c71ca6e98ea159c9cec9a0ea7a9de638",
    "rows": 32,
    "schema": [
     [
@@ -6799,10 +6751,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",
@@ -6957,7 +6905,7 @@
    ]
   },
   "crx_rl_a3_payment_credibility": {
-   "hash": "b7ef542b933f97153b8176d5c9d61bd8c6a5a61d56cec8850ffea67fab1955ea",
+   "hash": "d2f5942d2f774df22c77c8d575231b9925cb6c9c37bae84ec8fb0825a3462883",
    "rows": 32,
    "schema": [
     [
@@ -7007,10 +6955,6 @@
     [
      "commitments_kept_rate",
      "double"
-    ],
-    [
-     "commitments_last_broken_n",
-     "int"
     ],
     [
      "a3_commitments_level",

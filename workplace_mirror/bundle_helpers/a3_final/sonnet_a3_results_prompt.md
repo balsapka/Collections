@@ -1,30 +1,29 @@
-# A3: results for the model document (prompt for the UAT Sonnet)
+# A3: results for the model document, run 2 (prompt for the UAT Sonnet)
 
-When to send: now (UAT writes the snippet). PROD runs it twice, per model_id (cc_60_180, cc_180_plus,
-rl_60_180, rl_180_plus). Run 1, the decision run: on the bundle 25 check's `<name>__b25` copies, before step
-8 (T6b decides whether Broken stays; T6c sizes the same-day payment rule adopted 2026-11-18, which the
-copies predate). Then one bundle with the A3 changes, step 8 once, and the cleanup. Run 2: the same
-snippet with SOURCE_SUFFIX = "" on the persisted tables; its summary fills the workbook.
-The user pastes `summary_a3_results.md` back to Claude, who then fills the yellow cells of the A3
-model document (`docs/credibility/build_a3_workbook.py` → `a3_credibility_reference.xlsx`): Results,
-Results detail, Results trend, Results 180+ vintage and Validation. Sensitivity keeps its back-tests.
+When to send: after bundle 28's step 8 (A3 persisted for all four model_ids). Run 1 (the decision run on
+the `__b25` copies) is done: `a3_final/a3_results_run1_summary.md`; it decided D-A3-34 (no Broken level)
+and sized the same-day rule. Run 2 updates the run-1 snippet in `tmp_validation/a3_results/` to the
+persisted tables and the bundle 28 rules; PROD runs it per model_id (cc_60_180, cc_180_plus, rl_60_180,
+rl_180_plus). The user pastes `summary_a3_results.md` back to Claude, who then fills the yellow cells of
+the A3 model document (`docs/credibility/build_a3_workbook.py` → `a3_credibility_reference.xlsx`):
+Results, Results detail, Results trend, Results 180+ vintage and Validation. Sensitivity keeps its
+back-tests.
 
 ````text
 Goal
 Produce every table of the A3 payment credibility model document's results sheets from the
-A3 output of bundle 25 (rules D-A3-28..33: promise events, refusal lifted by a later
-plan or payment, card due at bucket 08, same-day contact order, points Kept 3 / Partly kept 2 /
-Broken 1 / Promised 1 / No promise 0). All four model_ids. Aggregates only; no pipeline change.
+persisted A3 output after bundle 28 (rules D-A3-28..34: promise events, a payment on the promise
+day counts toward it, refusal lifted by a later plan or payment, card due at bucket 08, same-day
+contact order, points Kept 3 / Partly kept 2 / Promised 1 / No promise 0, no Broken level). All four
+model_ids. Aggregates only; no pipeline change. Update the run-1 snippet (tmp_validation/a3_results/)
+rather than writing a new one.
 
 Decided, to follow
-- Source: crx_<p>_a3_payment_credibility__b25 (p = cc / rl), the bundle 25 check's copy (catalog
-  entries in catalog_tmp_b25_check.yml, bundle 27), loaded from the catalog. One constant SOURCE_SUFFIX
-  = "__b25" applies to every dataset the check reran (A3 output, crx_<p>_a3_dues / _a3_payments,
-  A1 and A4 outputs); A2 is not rerun, read it persisted. Setting SOURCE_SUFFIX = "" must switch
-  the whole snippet to the persisted tables (used after step 8 if the rules change). Do not re-run
-  or re-implement the engine. First check it is bundle 25's output: commitments_n is a
-  column, and a3_commitments_level takes values in kept / partly_kept / broken / promised /
-  no_promise. If not, stop and say so.
+- Source: the persisted tables, SOURCE_SUFFIX = "" (crx_<p>_a3_payment_credibility, p = cc / rl,
+  crx_<p>_a3_dues / _a3_payments, A1, A4 and A2 outputs), loaded from the catalog. The b25 check
+  copies are gone. Do not re-run or re-implement the engine. First check it is bundle 28's output:
+  commitments_n is a column, commitments_last_broken_n is not, and a3_commitments_level takes
+  values in kept / partly_kept / promised / no_promise. If not, stop and say so.
 - Scored rows = a3_unknown_reason is null. "Accounts in scope" = every row of the month; every
   other count is over scored rows. The document shows three states (High / Moderate / Low); report
   the Unknown count once per model_id as a check, not as a state.
@@ -51,7 +50,7 @@ T1 Results. Accounts in scope, High, Moderate, Low. CC: one row. RL: one row per
    total.
 T2 Results detail (scored rows):
    - scored accounts;
-   - A levels: kept, partly_kept, broken, promised, no_promise;
+   - A levels: kept, partly_kept, promised, no_promise;
    - B levels: regular, some, none;
    - C levels: clean, not_clean, no_record split by pre_dlq_reason (too few months due vs
      censored = delinquent since before the history we hold);
@@ -71,24 +70,8 @@ T6 Validation (pooled outcome months; give the months):
      staying High %, Moderate staying Moderate %;
    - Cramér's V of the A3 state with A1, A2 reachability, A2 location and the A4 family (latest
      month).
-T6b Is the Broken level needed? (pooled outcome months, as T6). Broken scores 1 like Promised, so
-   only Broken rows with commitments_kept >= 1 would move without it.
-   - Split Broken rows by trigger: streak (commitments_last_broken_n >= 3) only, rate (>= 2
-     concluded, kept rate < 40%) only, both; and within each by commitments_kept >= 1 vs 0.
-   - Per cell: n, paid_due %, paid_any %, with Kept, Partly kept and Promised rows beside them
-     for comparison, plus a 95% interval for (Broken with a kept event) minus Partly kept.
-   - Without Broken: level = kept (>= 2 concluded, kept rate >= 80%), else partly_kept (any kept),
-     else promised (any event), else no_promise; recompute points and state with the T7 rule.
-     Report the state AUC on paid_due with and without Broken (overall and per DPD band), the
-     share of rows whose state changes, and the from × to state counts.
-T6c Same-day payments (pooled outcome months; events from crx_<p>_a3_promise_events + SOURCE_SUFFIX).
-   In the __b25 copies a payment dated on the event day never keeps the event; from 2026-11-18 it counts
-   (RL cash is month-end dated and unaffected). In run 2 this table should show no change. Per model_id: events; events judged paid /
-   partial / none; of the none and partial events, how many would be paid if the event day's payments
-   counted too (event-day payments + promise_paid_amount >= promise_amount); and the Dimension A level
-   mix and A3 state mix if they did (count, %), with the paid_due % of the rows that would move.
 T7 Checks: Unknown count; rows whose a3_points_total differs from the points of their three levels
-   (Kept 3 / Partly kept 2 / Broken 1 / Promised 1 / No promise 0; Regular 2 / Some 1; Clean 1)
+   (Kept 3 / Partly kept 2 / Promised 1 / No promise 0; Regular 2 / Some 1; Clean 1)
    and rows whose state differs from the points and refusal rule (High from 4, Moderate from 2,
    one level down for a refusal): both expected 0.
 
@@ -107,10 +90,9 @@ Deliverables
    - All four model_ids together, one markdown table per T-table with a model_id column, in the
      row order above, numbers only (no prose inside tables).
    - Under 300 lines.
-   - End with six lines: does High > Moderate > Low hold on paid_due in every group; does Broken
-     with a kept event pay like Partly kept or below it, and does dropping Broken raise or lower
-     the state AUC (T6b), and how many events a same-day payment would keep (T6c); how the
-     state mix compares with the earlier back-test (cards 61–180 High / Moderate / Low 11.8 /
+   - End with six lines: does High > Moderate > Low hold on paid_due in every group; the state
+     AUC against run 1 (summary_a3_results run 1: cc_60_180 0.763, cc_180_plus 0.724, rl_60_180
+     0.698, rl_180_plus 0.790); how the state mix compares with the earlier back-test (cards 61–180 High / Moderate / Low 11.8 /
      32.9 / 55.3%); where A3 overlaps the other axes most; the T7 checks; anything that looks
      wrong.
 ````

@@ -28,15 +28,15 @@ S61, S180 = "61–180 DPD", "180+ DPD"
 CARD, LOAN = "Card", "Loan"
 HIGH_FROM, MODERATE_FROM = 4, 2
 POINTS = {
-    "kept": 3, "partly": 2, "broken": 1, "promised": 1, "no_promise": 0,
+    "kept": 3, "partly": 2, "promised": 1, "no_promise": 0,
     "regular": 2, "some": 1, "none": 0,
     "clean": 1, "not_clean": 0, "no_record": 0,
 }  # fmt: skip
-A_LEVELS = ["kept", "partly", "broken", "promised", "no_promise"]
+A_LEVELS = ["kept", "partly", "promised", "no_promise"]
 B_LEVELS = ["regular", "some", "none"]
 C_LEVELS = ["clean", "not_clean", "no_record"]
 MIN_AED = 100  # smallest payment that counts as a payment
-MIN_CONCLUDED, KEPT_RATE, BROKEN_RATE, BROKEN_STREAK = 2, 0.80, 0.40, 3
+MIN_CONCLUDED, KEPT_RATE = 2, 0.80
 NEXT_STATEMENT_MAX_DAYS = 31  # a card deadline is never later than this after the promise
 WINDOW = {S61: 3, S180: 6}  # months of payments in delinquency
 REGULAR_FROM = {S61: 2, S180: 3}  # months with a qualifying payment
@@ -52,10 +52,6 @@ def promises(history: str) -> str:
     count only for Promised)."""
     done = [p == KEPT for p in history if p != PENDING]
     n, kept = len(done), sum(done)
-    if (n >= BROKEN_STREAK and not any(done[-BROKEN_STREAK:])) or (
-        n >= MIN_CONCLUDED and kept / n < BROKEN_RATE
-    ):
-        return "broken"
     if n >= MIN_CONCLUDED and kept / n >= KEPT_RATE:
         return "kept"
     if kept:
@@ -142,7 +138,7 @@ TONE = {  # (fill, text)
 }
 KEY_TONE = {
     "high": "good", "moderate": "mid", "low": "bad",
-    "kept": "good", "partly": "good", "broken": "mid", "promised": "mid", "no_promise": "unknown",
+    "kept": "good", "partly": "good", "promised": "mid", "no_promise": "unknown",
     "regular": "good", "some": "mid", "none": "bad",
     "clean": "good", "not_clean": "bad", "no_record": "unknown",
     "paid": "good", "partial": "bad", "unpaid": "bad", "refusal": "bad",
@@ -391,13 +387,12 @@ PARAMETERS = [  # (parameter, value, why)
      "What a customer can be asked for in a month; a token payment keeps no promise."),
     ("Promises: one event", "Alive until the deadline or until paid.",
      "Repeated promises on one debt are one commitment."),
-    ("Promises: points", "Kept 3, Partly kept 2, Broken 1, Promised 1, No promise 0.",
+    ("Promises: points", "Kept 3, Partly kept 2, Promised 1, No promise 0.",
      "Promising is engagement even when missed; keeping it is stronger."),
-    ("Promises: concluded needed", "2, for Kept and for Broken by share.",
+    ("Promises: concluded needed", "2, for Kept.",
      "One promise is not a pattern."),
-    ("Promises: Kept / Broken", "Kept from 80% kept. Broken under 40% kept, or the last 3 all "
-                                "not kept.", "A clear record either way; in between is Partly "
-                                             "kept."),
+    ("Promises: Kept", "From 80% kept.", "A clear record; any kept promise short of it is "
+                                         "Partly kept."),
     ("Payments: window", "3 months at 61–180 DPD, 6 at 180+ (scoring month included).",
      "Same as the other axes; activity is thinner at 180+."),
     ("Payments: Regular", "A qualifying payment in 2 of the 3 months, 3 of the 6 at 180+.",
@@ -455,11 +450,9 @@ def logic(wb: Workbook) -> None:
     s.section("A. Promises kept: counting and judging a promise")
     table(PROMISE_RULES)
     flow("A. Promises kept: level", [
-        ("The last 3 concluded promises were all not kept, or at least 2 are concluded and "
-         "fewer than 40% of them kept.", "broken"),
         ("At least 2 concluded and 80% or more of them kept.", "kept"),
         ("At least one kept.", "partly"),
-        ("Any other event in the 12 months: none concluded yet, or one not kept.", "promised"),
+        ("Any other event in the 12 months: none concluded yet, or none kept.", "promised"),
         ("Otherwise: no promise in the 12 months.", "no_promise"),
     ])  # fmt: skip
     flow("B. Payments in delinquency: level", [
@@ -528,8 +521,8 @@ def state_map(wb: Workbook) -> None:
         ("no_promise", "some", "clean", True): "low",
         ("no_promise", "none", "clean", False): "low",
         ("promised", "none", "clean", False): "moderate",
-        ("broken", "regular", "clean", False): "high",
-        ("broken", "regular", "not_clean", False): "moderate",
+        ("promised", "regular", "clean", False): "high",
+        ("promised", "regular", "not_clean", False): "moderate",
     }.items():
         assert state(a, b, c, refusal) == want, (a, b, c, refusal)
 
@@ -574,10 +567,9 @@ A_EXAMPLES = [
     ("partly", "KXKK", "3 of 4 kept (75%): under 80%."),
     ("partly", "K", "A single promise, kept: one is not a pattern."),
     ("partly", "KKXXP", "2 of 4 kept; the pending event is not counted."),
-    ("broken", "KKKXXX", "The last 3 were all not kept, whatever came before."),
-    ("broken", "XX", "2 concluded, none kept."),
-    ("broken", "XXKXX", "1 of 5 kept (20%): under 40%."),
+    ("partly", "XXKXX", "1 of 5 kept: any kept promise counts."),
     ("promised", "X", "A single event, not kept."),
+    ("promised", "XX", "2 concluded, none kept."),
     ("promised", "P", "One event, still pending."),
     ("no_promise", "", "No promise in 12 months."),
 ]  # fmt: skip
@@ -605,7 +597,7 @@ C_EXAMPLES = [
 ]  # fmt: skip
 STATE_EXAMPLES = [  # (state, A, B, C, refusal, why)
     ("high", "kept", "regular", "clean", False, "Keeps promises, pays, clean before: 6 points."),
-    ("high", "broken", "regular", "clean", False, "Promised and pays: a missed promise still counts."),
+    ("high", "promised", "regular", "clean", False, "Promised and pays: a missed promise still counts."),
     ("moderate", "kept", "regular", "no_record", True, "5 points, one level down for a refusal."),
     ("moderate", "no_promise", "regular", "clean", False, "Pays without promising: 3 points."),
     ("moderate", "promised", "none", "clean", False, "Promised, nothing kept yet, clean before."),
@@ -1018,7 +1010,9 @@ def sensitivity(wb: Workbook) -> None:
         s.row([book, *map(_pc, vals)], [2, 1, 1, 1, 1, 1], align=MID)
     s.note("Customers who never promised pay least by far. A broken record pays like a single "
            "promise not kept: what separates is promising at all, so every promise earns a "
-           "point and keeping it earns more.")  # fmt: skip
+           "point and keeping it earns more. Broken is no longer a level (2026-11-18): Broken "
+           "accounts with a kept promise pay like Partly kept at 61–180, and dropping it ranks "
+           "no worse in any book.")  # fmt: skip
 
     s.section("Promise points")
     s.header(["Book", "State AUC:\nKept 2 / Partly 1 / Broken −1", "State AUC:\nmodel points",

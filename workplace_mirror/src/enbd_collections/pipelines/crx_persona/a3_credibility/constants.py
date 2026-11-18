@@ -8,8 +8,6 @@ from ..scoring_engine import DEMOTE, Dimension, Override, Scorecard
 COMMITMENT_MONTHS = 12  # promise events in the last 12 months of this episode (row 19)
 MIN_CONCLUDED = 2  # concluded promises before a rate counts (row 74)
 KEPT_RATE = 0.80  # Kept from (row 75)
-BROKEN_RATE = 0.40  # Broken below (row 76)
-BROKEN_STREAK = 3  # Broken when the last 3 concluded were all broken (row 77)
 # The deadline a promise is judged by, whatever date was promised (D-A3-28): at 60-180 a
 # card promise by the next statement after the promise day, however close; a loan
 # promise, and every promise at 180+, by the end of the promise month. The options and
@@ -62,8 +60,8 @@ DISPLAY_NAMES = {
     "low": "payment_credibility_low",
     "unknown": "payment_credibility_unknown",
 }
-# a promise counts even when broken; never promising scores 0 (D-A3-33)
-COMMITMENT_POINTS = {"kept": 3, "partly_kept": 2, "broken": 1, "promised": 1}
+# a promise counts even when not kept; never promising scores 0 (D-A3-33, -34)
+COMMITMENT_POINTS = {"kept": 3, "partly_kept": 2, "promised": 1}
 DLQ_PAYMENT_POINTS = {"regular": 2, "some": 1}
 PRE_DLQ_POINTS = {"clean": 1}
 HIGH_FROM, MODERATE_FROM = 4, 2  # D-A3-24

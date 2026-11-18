@@ -24,8 +24,6 @@ from .._common import (
 )
 from .constants import (
     ANY_PAYMENT_MONTHS,
-    BROKEN_RATE,
-    BROKEN_STREAK,
     CLEAN_SHARE,
     COMMITMENT_MONTHS,
     DCORE_MAX_MONTHS,
@@ -60,29 +58,13 @@ def _base(episode: DataFrame) -> DataFrame:
 
 def _commitment_counts(base: DataFrame, events: DataFrame, lower: Column) -> DataFrame:
     """Per base row with an event in ``[lower, observation date]``: the event, concluded,
-    kept and partly kept counts and ``commitments_last_broken_n``, the not-kept events among
-    the last ``BROKEN_STREAK`` concluded."""
+    kept and partly kept counts."""
     obs = F.col("observation_date")
     rows = (
         base.join(events, on="account_id")
         .filter((F.col("event_date") >= lower) & (F.col("event_date") <= obs))
         .withColumn("_concluded", F.col("promise_cutoff") <= obs)
         .withColumn("_kept", F.col("_concluded") & (F.col("promise_outcome") == "paid"))
-    )
-    last = F.slice(
-        F.sort_array(
-            F.collect_list(
-                F.when(
-                    F.col("_concluded"),
-                    F.struct(
-                        "event_date", (~F.col("_kept")).cast("int").alias("broken")
-                    ),
-                )
-            ),
-            asc=False,
-        ),
-        1,
-        BROKEN_STREAK,
     )
     return rows.groupBy(*GRAIN).agg(
         F.count(F.lit(1)).alias("commitments_n"),
@@ -91,22 +73,18 @@ def _commitment_counts(base: DataFrame, events: DataFrame, lower: Column) -> Dat
         F.sum(
             (F.col("_concluded") & (F.col("promise_outcome") == "partial")).cast("int")
         ).alias("commitments_partial"),
-        F.size(F.filter(last, lambda x: x["broken"] == 1)).alias(
-            "commitments_last_broken_n"
-        ),
     )
 
 
 def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame:
-    """Dimension A: kept / partly kept / broken / promised / no promise (D-A3-9, -26, -33).
+    """Dimension A: kept / partly kept / promised / no promise (D-A3-9, -26, -33, -34).
 
     Promise events (``build_promise_events``) dated in the last 12 months up to the
     observation date, earlier delinquency episodes included (trustworthiness, not this
     episode only); concluded once their cutoff is on or before the observation date.
-    An event is kept when paid; partial counts as not kept. Broken: the last 3 concluded
-    all not kept (a broken event ranks first on a shared day), or at least 2 concluded
-    and under 40% kept. Kept: at least 2 concluded and 80% kept. Partly kept: any
-    kept event. Promised: any other event in the window. Else no_promise.
+    An event is kept when paid; partial counts as not kept. Kept: at least 2 concluded
+    and 80% kept. Partly kept: any kept event. Promised: any other event in the window.
+    Else no_promise.
     """
     require_columns(episode, EPISODE, "A3 episode")
     require_columns(events, EVENTS, "A3 promise events")
@@ -116,12 +94,7 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
     done, ok = F.col("commitments_concluded"), F.col("commitments_kept")
     rate = F.when(done > 0, ok / done)
     level = (
-        F.when(
-            (F.col("commitments_last_broken_n") >= BROKEN_STREAK)
-            | ((done >= MIN_CONCLUDED) & (rate < BROKEN_RATE)),
-            "broken",
-        )
-        .when((done >= MIN_CONCLUDED) & (rate >= KEPT_RATE), "kept")
+        F.when((done >= MIN_CONCLUDED) & (rate >= KEPT_RATE), "kept")
         .when(ok >= 1, "partly_kept")
         .when(F.col("commitments_n") >= 1, "promised")
         .otherwise("no_promise")
@@ -131,7 +104,6 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
         "commitments_concluded",
         "commitments_kept",
         "commitments_partial",
-        "commitments_last_broken_n",
     ]
     return (
         base.join(agg, on=list(GRAIN), how="left")
@@ -144,7 +116,6 @@ def build_commitment_signals(episode: DataFrame, events: DataFrame) -> DataFrame
             "commitments_kept",
             "commitments_partial",
             rate.alias("commitments_kept_rate"),
-            "commitments_last_broken_n",
             level.alias("a3_commitments_level"),
         )
     )
