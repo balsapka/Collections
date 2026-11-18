@@ -1,22 +1,28 @@
 # A3: results for the model document (prompt for the UAT Sonnet)
 
-When to send: after bundle 25's step 8, once the A3 pipelines have been re-run in PROD for all four
-model_ids (cc_60_180, cc_180_plus, rl_60_180, rl_180_plus). The user runs the snippet in PROD per
-model_id and pastes `summary_a3_results.md` back to Claude. Claude then fills the yellow cells of the
-A3 model document (`docs/credibility/build_a3_workbook.py` → `a3_credibility_reference.xlsx`) on
-these sheets: Results, Results detail, Results trend, Results 180+ vintage and Validation.
-Sensitivity keeps its back-tests.
+When to send: now (UAT writes the snippet). PROD runs it after bundle 25's check (step 7) and
+before step 8 and the cleanup, per model_id (cc_60_180, cc_180_plus, rl_60_180, rl_180_plus), on the
+check's `<name>__b25` copies: they are what step 8 will persist, so the Broken decision (T6b) comes
+before the real run and the pipelines run once. If Broken stays, step 8 + cleanup follow and the
+results stand; if it goes, a small A3 bundle comes first and the snippet is re-run (one source switch).
+The user pastes `summary_a3_results.md` back to Claude, who then fills the yellow cells of the A3
+model document (`docs/credibility/build_a3_workbook.py` → `a3_credibility_reference.xlsx`): Results,
+Results detail, Results trend, Results 180+ vintage and Validation. Sensitivity keeps its back-tests.
 
 ````text
 Goal
 Produce every table of the A3 payment credibility model document's results sheets from the
-persisted A3 output after bundle 25 (rules D-A3-28..33: promise events, refusal lifted by a later
+A3 output of bundle 25 (rules D-A3-28..33: promise events, refusal lifted by a later
 plan or payment, card due at bucket 08, same-day contact order, points Kept 3 / Partly kept 2 /
 Broken 1 / Promised 1 / No promise 0). All four model_ids. Aggregates only; no pipeline change.
 
 Decided, to follow
-- Source: the persisted crx_<p>_a3_payment_credibility (p = cc / rl), loaded from the catalog. Do
-  not re-run or re-implement the engine. First check it is bundle 25's output: commitments_n is a
+- Source: crx_<p>_a3_payment_credibility__b25 (p = cc / rl), the bundle 25 check's copy (catalog
+  pattern "{name}__b25" in tmp_b25_check.yml), loaded from the catalog. One constant SOURCE_SUFFIX
+  = "__b25" applies to every dataset the check reran (A3 output, crx_<p>_a3_dues / _a3_payments,
+  A1 and A4 outputs); A2 is not rerun, read it persisted. Setting SOURCE_SUFFIX = "" must switch
+  the whole snippet to the persisted tables (used after step 8 if the rules change). Do not re-run
+  or re-implement the engine. First check it is bundle 25's output: commitments_n is a
   column, and a3_commitments_level takes values in kept / partly_kept / broken / promised /
   no_promise. If not, stop and say so.
 - Scored rows = a3_unknown_reason is null. "Accounts in scope" = every row of the month; every
@@ -33,12 +39,11 @@ Decided, to follow
   - 180+ vintage: early-stage = charged off less than 24 months ago, late-stage = 24 or more
     (CC chargeoff_age_months; RL feat_loan_chargeoff_segment).
 - Outcomes, per (account, observation date), over the 3 months after the observation date, from
-  the A3 dues and payments (the persisted crx_<p>_a3_dues / crx_<p>_a3_payments if the catalog has
-  them; else run the A3 source nodes on catalog loads, unchanged):
+  the A3 dues and payments (crx_<p>_a3_dues / crx_<p>_a3_payments + SOURCE_SUFFIX):
   - paid_due = payments in the 3 months reach max(one month's due at the observation date,
     100 AED);
   - paid_any = payments in the 3 months reach 100 AED.
-- Other axes, persona_end_date's month, from their persisted outputs: A1 ability state; A2
+- Other axes, persona_end_date's month: A1 ability state and A4 family (+ SOURCE_SUFFIX); A2 (persisted)
   reachability (Reachable / Non-Reachable / Unknown) and location (In Country / Skip / Unknown);
   A4 family.
 
