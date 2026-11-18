@@ -105,9 +105,9 @@ def deadline(product: str, seg: str, day: dt.date, statement: dt.date | None = N
 
 
 def _paid(product, day, end, pays) -> float:
-    """Payments after the event day up to ``end``; loans: the event month's cash counts."""
-    start = day.replace(day=1) - dt.timedelta(days=1) if product == LOAN else day
-    return sum(amount for d, amount in pays if start < d <= end)
+    """Payments from the event day up to ``end``; loans: the event month's cash counts."""
+    start = day.replace(day=1) if product == LOAN else day
+    return sum(amount for d, amount in pays if start <= d <= end)
 
 
 def outcome(product, seg, day, due, pays, statement=None) -> str:
@@ -375,8 +375,8 @@ PROMISE_RULES = [
                  "DPD: the next statement, at most 31 days later. Loans, and every account at "
                  "180+ DPD: the last day of that month. A payment on the deadline day counts."),
     ("Amount to pay", "One month's due on the event's first day, at least 100 AED."),
-    ("Kept", "The payments after the event's first day, up to the deadline, reach the amount to "
-             "pay. Less is not kept, a partial payment included. Loans: the payments of the "
+    ("Kept", "The payments from the event's first day (a payment that day counts), up to the "
+             "deadline, reach the amount to pay. Less is not kept, a partial payment included. Loans: the payments of the "
              "event month count in full."),
     ("Concluded", "The deadline is on or before the scoring date, also for an event paid "
                   "early. Pending events count only for Promised."),
@@ -540,6 +540,8 @@ D = dt.date
 ONE_PROMISE = [  # (outcome, product, segment, promise day, due, payments, next statement, why)
     ("paid", CARD, S61, D(2026, 3, 10), 800, [(D(2026, 3, 20), 800)], D(2026, 3, 25),
      "One month's due paid before the next statement."),
+    ("paid", CARD, S61, D(2026, 3, 10), 800, [(D(2026, 3, 10), 800)], D(2026, 3, 25),
+     "Paid on the promise day: it counts."),
     ("partial", CARD, S61, D(2026, 3, 10), 800, [(D(2026, 3, 20), 300)], D(2026, 3, 25),
      "A payment, but less than one month's due."),
     ("unpaid", CARD, S61, D(2026, 3, 10), 800, [(D(2026, 3, 28), 800)], D(2026, 3, 25),
@@ -662,8 +664,7 @@ def examples(wb: Workbook) -> None:
     for want, product, seg, day, due, pays, statement, text in ONE_PROMISE:
         _check(outcome(product, seg, day, due, pays, statement), want, text)
         end = deadline(product, seg, day, statement)
-        start = day.replace(day=1) - dt.timedelta(days=1) if product == LOAN else day
-        paid = sum(a for d, a in pays if start < d <= end)
+        paid = _paid(product, day, end, pays)
         s.chip(1, want)
         s.text(2, f"{product}, {seg.replace(' DPD', '')}", span=3, align=MID)
         s.text(5, f"{_day(day)} → {_day(end)}", span=4, align=MID)

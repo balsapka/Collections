@@ -111,31 +111,19 @@ def _with_terms(days: DataFrame, dues: DataFrame, deadline: str) -> DataFrame:
     )
 
 
-def _after(day: Column) -> Column:
-    """A payment counted as made after ``day``: dated later, or dated that day when its
-    period started earlier (RL cash is dated at the month end)."""
-    return (F.col("pay_date") > day) | (
-        (F.col("pay_date") == day) & (F.col("pay_from") < F.col("pay_date"))
-    )
-
-
 def _with_payments(days: DataFrame, payments: DataFrame) -> DataFrame:
-    """``days`` + three sums from one pass over the payments up to the day's
-    ``promise_cutoff``: ``_paid_before`` (dated before the day), ``_paid_not_after``
-    (not after it, ``_after``) and ``promise_paid_amount`` (after the day; NULL: none).
-    Only a payment after the promise can keep it, so an event starting that day counts
-    the last and never the money in ``_paid_not_after``."""
+    """``days`` + two sums from one pass over the payments up to the day's
+    ``promise_cutoff``: ``_paid_before`` (dated before the day) and
+    ``promise_paid_amount`` (dated on or after it; NULL: none). A payment on the
+    promise day counts toward the promise: it most likely came out of that call (RL
+    cash is dated at the month end, so the promise month's cash counts in full)."""
     day = F.col("event_date")
     pays = payments.select(
         F.col("account_id").alias("_p_account"),
-        "pay_from",
         "pay_date",
         F.col("amount").alias("_amount"),
     )
-
-    def total(counted: Column) -> Column:
-        return F.coalesce(F.sum(F.when(counted, F.col("_amount"))), F.lit(0.0))
-
+    before = F.col("pay_date") < day
     return (
         days.join(
             pays,
@@ -145,16 +133,17 @@ def _with_payments(days: DataFrame, payments: DataFrame) -> DataFrame:
         )
         .groupBy(*days.columns)
         .agg(
-            total(F.col("pay_date") < day).alias("_paid_before"),
-            total(~_after(day)).alias("_paid_not_after"),
-            F.sum(F.when(_after(day), F.col("_amount"))).alias("promise_paid_amount"),
+            F.coalesce(F.sum(F.when(before, F.col("_amount"))), F.lit(0.0)).alias(
+                "_paid_before"
+            ),
+            F.sum(F.when(~before, F.col("_amount"))).alias("promise_paid_amount"),
         )
     )
 
 
 def _event_step(live: Column, day: Column) -> Column:
     """Fold one promise day into ``live``, the event alive so far (D-A3-29). The day
-    joins it while its deadline has not passed and the payments since the event day,
+    joins it while its deadline has not passed and the payments from the event day on,
     before this day, have not reached its promised amount; otherwise the day starts a
     new event. ``starts``: the event start of every day so far."""
     # to the cent: a difference of two sums can fall a hair short of an exact payment
@@ -174,7 +163,7 @@ def _event_step(live: Column, day: Column) -> Column:
         start,
         keep("cutoff", "promise_cutoff"),
         keep("amount", "promise_amount"),
-        keep("paid_at_start", "_paid_not_after"),
+        keep("paid_at_start", "_paid_before"),
     )
 
 
@@ -192,9 +181,7 @@ def _no_event() -> Column:
 def _with_event_start(days: DataFrame) -> DataFrame:
     """``account_id``, ``_DAY_TERMS`` and ``event_start``, the event each promise day
     belongs to (``_event_step`` over the account's days in date order)."""
-    ordered = F.array_sort(
-        F.collect_list(F.struct(*_DAY_TERMS, "_paid_before", "_paid_not_after"))
-    )
+    ordered = F.array_sort(F.collect_list(F.struct(*_DAY_TERMS, "_paid_before")))
     return (
         days.groupBy("account_id")
         .agg(ordered.alias("_days"))
@@ -278,7 +265,7 @@ def build_promise_events(  # pylint: disable=too-many-arguments,too-many-positio
     The event day sets the terms: ``promise_cutoff`` by ``deadline`` (default
     ``promise_deadline(product, model_id)``, D-A3-28) and ``promise_amount``, the latest
     due on or before that day (at least ``PROMISE_MIN_AED``). Judged once on the
-    payments after the event day up to the cutoff: paid when they reach the amount,
+    payments from the event day up to the cutoff: paid when they reach the amount,
     partial from ``PROMISE_MIN_AED``, else none. RL cash is dated at the month end, so
     the event month's cash counts in full and never ends an event mid-month.
     """

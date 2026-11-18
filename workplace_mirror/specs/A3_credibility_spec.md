@@ -170,7 +170,7 @@ Measured, not assumed (V2, V3).
     apart are one event, dated at the first; a plan takes its nearest follow-up promise within
     7 days, each at most once. SOFTPTP, RETAIN PTP, arrangement names without a plan and payment
     reports are not events. Account level.
-  - Judged once: payments after the event day up to the deadline against the due of the cycle
+  - Judged once: payments from the event day (D-A3-29, 2026-11-18) up to the deadline against the due of the cycle
     open on the event day (the last known one, at least 100 AED). Paid: they reach it; partial:
     100 AED or more (counts as not kept); else none. Concluded once the deadline is on or before
     the observation date.
@@ -217,7 +217,9 @@ Measured, not assumed (V2, V3).
     on the deadline day still belongs to it.
   - The event ends when the deadline passes, or when the payments made since the event day and
     before a later promise reach the promised amount. A partial payment does not end it. The first
-    promise after the end starts a new event, which counts only the payments after its own day.
+    promise after the end starts a new event, which counts the payments from its own day on.
+  - A payment on the event day counts toward it (user, 2026-11-18): it most likely came out of
+    that call. Before, only payments after the event day counted.
   - Loans: cash is known only to the month (dated at the month end), so an event never ends
     mid-month; all promises of a month are one event.
   - `event_kind`: matched (the event holds plans and follow-up promises), table_only,
