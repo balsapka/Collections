@@ -5,10 +5,11 @@ they are, from the shared file store: ``metadata`` (every conversation), the ext
 ledger ``extracted_signals`` (only ``model_version``) and the per-conversation grid
 ``timelines/signal_level_conflicts`` (the level each conversation detected).
 
-Per customer (``cif_id``, all accounts) this counts the conversations dated strictly
-before the observation date: all of them, the extracted ones, the current-format ones
-(UC1 reads no level from ``legacy`` extractions), and those that detected each capacity
-and intent level or named an amount or a date. Only the month of
+Conversations UC1 extracted only in the ``legacy`` format are dropped everywhere (UC1
+reads no level from them). Per customer (``cif_id``, all accounts) this counts the
+remaining conversations dated strictly before the observation date: all of them, the
+extracted ones, and those that detected each capacity and intent level or named an
+amount or a date. Only the month of
 ``crx_persona.persona_end_date`` is scored: UC1's customer table has no date, so earlier
 months cannot be read point in time.
 """
@@ -37,9 +38,10 @@ def latest_month(obs_base: DataFrame, persona_end_date: str) -> DataFrame:
 def _conversations(
     base: DataFrame, metadata: DataFrame, extracted: DataFrame, grid: DataFrame
 ) -> DataFrame:
-    """One row per conversation of the base's customers: ``cif_id``, its date,
-    ``_legacy`` (NULL = not extracted, 1 = legacy format, 0 = current format) and what
-    it detected (``_capacity``, ``_intent``, ``_amount``, ``_date``)."""
+    """One row per conversation of the base's customers, legacy-only extractions
+    dropped: ``cif_id``, its date, ``_extracted`` (1 = extracted in the current format,
+    NULL = not extracted) and what it detected (``_capacity``, ``_intent``, ``_amount``,
+    ``_date``)."""
     meta = scoped(
         metadata.select(
             string_key(metadata, "cif_id").alias("cif_id"),
@@ -49,9 +51,9 @@ def _conversations(
         base,
         "cif_id",
     )
-    is_legacy = F.col("model_version") == LEGACY_MODEL_VERSION
+    is_current = F.coalesce(F.col("model_version") != LEGACY_MODEL_VERSION, F.lit(True))
     ledger = extracted.groupBy("conversationid").agg(
-        F.min(F.coalesce(is_legacy.cast("int"), F.lit(0))).alias("_legacy")
+        F.max(is_current.cast("int")).alias("_current")
     )
     signal, value = F.col("signal"), F.col("value")
     slot = F.split(value, ":").getItem(0)
@@ -66,8 +68,11 @@ def _conversations(
             F.max(F.when(specifics & (slot == "date_specific"), 1)).alias("_date"),
         )
     )
-    return meta.join(ledger, "conversationid", "left").join(
-        detected, "conversationid", "left"
+    return (
+        meta.join(ledger, "conversationid", "left")
+        .filter(F.coalesce(F.col("_current"), F.lit(1)) == 1)
+        .withColumnRenamed("_current", "_extracted")
+        .join(detected, "conversationid", "left")
     )
 
 
@@ -80,7 +85,7 @@ def build_uc1_conversation_signals(  # pylint: disable=too-many-arguments,too-ma
 ) -> DataFrame:
     """Conversation counts per latest-month observation whose customer has any UC1
     conversation (earlier or later): ``uc1_conversations_n``, ``uc1_extracted_n``,
-    ``uc1_current_n``, the last conversation / extracted dates, ``uc1_after_obs_flag``
+    the last conversation / extracted dates, ``uc1_after_obs_flag``
     (an extracted conversation on or after the observation date), ``amount_named_flag``,
     ``date_named_flag`` and one ``capacity_<level>_n`` / ``intent_<level>_n`` per level.
     """
@@ -101,7 +106,7 @@ def build_uc1_conversation_signals(  # pylint: disable=too-many-arguments,too-ma
     )
 
     before = F.col("_conv_date") < F.col("observation_date")
-    extracted = F.col("_legacy").isNotNull()
+    extracted = F.col("_extracted").isNotNull()
 
     def count(cond: Column) -> Column:
         return F.sum(F.when(before & cond, 1).otherwise(0))
@@ -115,7 +120,6 @@ def build_uc1_conversation_signals(  # pylint: disable=too-many-arguments,too-ma
         .agg(
             count(F.lit(True)).alias("uc1_conversations_n"),
             count(extracted).alias("uc1_extracted_n"),
-            count(F.col("_legacy") == 0).alias("uc1_current_n"),
             F.max(F.when(before, F.col("_conv_date"))).alias(
                 "uc1_last_conversation_date"
             ),

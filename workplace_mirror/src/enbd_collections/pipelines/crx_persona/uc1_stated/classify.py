@@ -8,10 +8,12 @@ states and adds the conversation counts of ``signals.py``:
 * ``a5_state``, stated ability, from ``payment_capacity``: able / partly_able / unable;
 * ``a6_state``, stated intent, from ``payment_intent``: pays_in_full / partly_or_later
   (partial or with delay) / refuses;
-* ``not_stated``: the customer has a current-format extracted conversation before the
-  observation date, and the signal was not detected;
+* ``not_stated``: the customer has an extracted conversation before the observation
+  date, and the signal was not detected;
 * ``no_evidence``: no such conversation; ``uc1_evidence`` says why (no_cif /
-  no_conversation / not_extracted / legacy_only).
+  no_conversation / not_extracted).
+
+Legacy-format extractions are not read (``signals.py`` drops those conversations).
 
 Support: the conversations before the observation date that detected the signal, and
 how many of them detected the published level (``a5_agree_n``, ``a6_agree_n``).
@@ -52,7 +54,6 @@ INTENT_STATES = {
 _COUNTS = [
     "uc1_conversations_n",
     "uc1_extracted_n",
-    "uc1_current_n",
     "uc1_after_obs_flag",
     "amount_named_flag",
     "date_named_flag",
@@ -137,7 +138,6 @@ def _evidence() -> Column:
         F.when(F.col("cif_id").isNull(), "no_cif")
         .when(F.col("uc1_conversations_n") == 0, "no_conversation")
         .when(F.col("uc1_extracted_n") == 0, "not_extracted")
-        .when(F.col("uc1_current_n") == 0, "legacy_only")
         .otherwise("extracted")
     )
 

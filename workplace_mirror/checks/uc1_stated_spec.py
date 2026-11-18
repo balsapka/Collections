@@ -73,7 +73,8 @@ SLOTS = {
     ],
 }
 
-# conversations: (cif, conversationid, start, ledger: None / "gemma" / "legacy", detected)
+# conversations: (cif, conversationid, start, ledger: None / "gemma" / "legacy", detected);
+# a legacy-only conversation is dropped (A3: no conversation left; A3b: one unextracted)
 # detected = {signal: value}; a repayment_specifics value is the encoded string.
 CONVERSATIONS = [
     (
@@ -89,6 +90,8 @@ CONVERSATIONS = [
     ),
     ("10000002", "c2a", "2026-06-01", "gemma", {}),
     ("10000003", "c3a", "2026-05-10", "legacy", {}),
+    ("10000013", "c13a", "2026-05-10", "legacy", {}),
+    ("10000013", "c13b", "2026-06-10", None, {}),
     ("10000004", "c4a", "2026-04-02", None, {}),
     ("10000007", "c7a", "2026-09-05", "gemma", {"payment_capacity": "none"}),
     (
@@ -146,6 +149,7 @@ OBS_BASE = [
     ("A1", date(2026, 7, 31), "10000001"),
     ("A2", OBS, "10000002"),
     ("A3", OBS, "10000003"),
+    ("A3b", OBS, "10000013"),
     ("A4", OBS, "10000004"),
     ("A5", OBS, "10000005"),
     ("A6", OBS, None),
@@ -187,11 +191,18 @@ EXPECTED = {
         "stated_request_flag": 0,
     },
     "A3": {
-        "uc1_evidence": "legacy_only",
+        "uc1_evidence": "no_conversation",
         "a5_state": "no_evidence",
         "a6_state": "no_evidence",
         "stated_dispute": None,
-        "uc1_extracted_n": 1,
+        "uc1_conversations_n": 0,
+        "uc1_extracted_n": 0,
+    },
+    "A3b": {
+        "uc1_evidence": "not_extracted",
+        "a5_state": "no_evidence",
+        "uc1_conversations_n": 1,
+        "uc1_extracted_n": 0,
     },
     "A4": {
         "uc1_evidence": "not_extracted",
