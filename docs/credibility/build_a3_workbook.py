@@ -763,7 +763,8 @@ DETAIL = [  # (section, [(label, tone key)], {segment index: counts})
       2: [804, 1_483, 822, 504, 255, 95, 22],
       3: [41_662, 10_381, 2_049, 752, 417, 100, 10]}),
     ("Refusal and other columns",
-     [("Refusal", "bad"), ("Refusal that lowers the state", "bad"),
+     [("Refusal (not lifted)", "bad"),
+      ("Refusal that lowers the state (2+ points; under 2 the account is Low anyway)", "bad"),
       ("Refusal lifted by a later plan or payment", "unknown"), ("Dispute", "unknown"),
       ("No pickup after contact", "unknown"), ("Hung up", "unknown")],
      {0: [865, 432, 70, 75, 1_344, 442], 1: [6_514, 558, 447, 570, 2_901, 4_562],
@@ -858,27 +859,41 @@ def _bands(s: Sheet) -> None:
         s.r += 1
 
 
-def _trend(s: Sheet) -> None:
-    s.text(1, "2026", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+def trend(wb: Workbook) -> None:
+    s = Sheet(wb.create_sheet("Results trend"), [10, 10] + [10, 7] * len(STATES))
+    s.title("Results trend", "Accounts per state at every month end of 2026. Shares are of the "
+                             "month's accounts.")  # fmt: skip
     for i, seg in enumerate(TREND_SEGMENTS):
-        s.text(2 + 4 * i, seg, span=4, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    s.r += 1
-    s.text(1, "Month", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    for i in range(len(TREND_SEGMENTS)):
-        s.text(2 + 4 * i, "Accounts", span=2, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-        s.text(4 + 4 * i, "High / Moderate / Low %", span=2, bold=True, color="FFFFFF",
-               fill=NAVY, align=CENTER)  # fmt: skip
-    s.ws.row_dimensions[s.r].height = 30
-    s.r += 1
-    for m, month in enumerate(TREND_MONTHS):
-        s.text(1, month, bold=True)
-        for i, seg in enumerate(TREND_SEGMENTS):
-            h, mo, lo = TREND[seg][m]
-            n = h + mo + lo
-            s.text(2 + 4 * i, n, span=2, fmt="#,##0", align=MID)
-            s.text(4 + 4 * i, " / ".join(f"{100 * x / n:.1f}" for x in (h, mo, lo)), span=2,
-                   align=CENTER)  # fmt: skip
+        s.section(seg, gap=0 if i == 0 else 1)
+        s.text(1, "Month", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+        s.text(2, "Accounts", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+        for j, st in enumerate(STATES):
+            s.chip(3 + 2 * j, st, span=2, align=CENTER)
+        s.ws.row_dimensions[s.r].height = 20
         s.r += 1
+        for month, counts in zip(TREND_MONTHS, TREND[seg]):
+            s.text(1, f"{month} 2026", bold=True)
+            s.text(2, "=" + "+".join(f"{get_column_letter(3 + 2 * j)}{s.r}" for j in range(3)),
+                   bold=True, fmt="#,##0")  # fmt: skip
+            for j, n in enumerate(counts):
+                _pair(s, 3 + 2 * j, count=n, base=f"$B{s.r}")
+            s.r += 1
+    s.r += 1
+    s.note("High holds steady in count while the 61–180 buckets fill from May (loans: 2,218 "
+           "accounts in March, 3,985 in August), so its share falls: new entrants have no "
+           "promise or payment record in this delinquency yet. Loans 61–180 High: 13.2% in March, "
+           "9.3% in August.")  # fmt: skip
+    s.ws.freeze_panes = "A4"
+
+
+def vintage(wb: Workbook) -> None:
+    s = Sheet(wb.create_sheet("Results 180+ vintage"), [16] + [12, 7] * len(VINTAGES))
+    s.title("Results 180+ by vintage",
+            "Early-stage charge-off = charged off less than 2 years ago; late-stage = 2 years or "
+            f"more; {RESULTS_DATE}. Shares are within each vintage.")  # fmt: skip
+    s.section("Credibility state", gap=0)
+    _state_table(s, VINTAGES, VINTAGE_ACCOUNTS, VINTAGE_COUNTS, {})
+    s.ws.freeze_panes = "B6"
 
 
 def results(wb: Workbook) -> None:
@@ -887,16 +902,9 @@ def results(wb: Workbook) -> None:
                        "from the run; shares and totals are calculated.")  # fmt: skip
     s.section("State by product", gap=0)
     _state_table(s, VARIANTS, ACCOUNTS, STATE_COUNTS, {})
-    s.section("180+ by charge-off vintage (early stage: charged off less than 2 years ago)")
-    _state_table(s, VINTAGES, VINTAGE_ACCOUNTS, VINTAGE_COUNTS, {})
     s.section("State by DPD band (shares of the band)")
     _bands(s)
     s.note("Cards at 180+: the DPD band is taken from the charge-off age.")
-    s.section("Trend: share of the month's accounts in each state")
-    _trend(s)
-    s.r += 1
-    s.note("Cards 61–180: High holds at 2,200–2,400 accounts while the bucket grows, so Low rises "
-           "from 53% in January to 58% in August.")  # fmt: skip
     s.ws.freeze_panes = "B4"
 
 
@@ -1175,6 +1183,8 @@ def build(out: pathlib.Path) -> pathlib.Path:
     examples(wb)
     results(wb)
     detail(wb)
+    trend(wb)
+    vintage(wb)
     validation(wb)
     sensitivity(wb)
     wb.calculation.fullCalcOnLoad = True
