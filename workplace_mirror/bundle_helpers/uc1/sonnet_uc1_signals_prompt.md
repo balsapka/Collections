@@ -126,3 +126,18 @@ Deliverables
      A1 Unknown, and stated intent inside A3 no_promise (D); which discrepancy flags behave differently
      from their concordant group (E); do transcript promises carry evidence DCORE misses (E5); what the
      requests say about treatment demand (F).
+
+---
+
+Follow-up run (2026-11-19, after the 60-180 results)
+Paste below the line into the same UAT Sonnet session.
+
+---
+
+Two additions to tmp_validation/uc1_signals/, same rules and deliverable format (summary_uc1_signals_followup.md):
+1. Run Part A (and B–F only where n allows) for cc_180_plus and rl_180_plus.
+2. 60-180 again, E5 and E6 at CIF level: a DCORE promise (or dispute) on any account of the conversation's CIF within
+   ±3 days (and ±7 days) of the call, beside the account-level result. Report how many unmatched transcript promises
+   become matched, and pay30_due / pay45_any of the still-unmatched vs the matched vs no promise at all. For E5.3,
+   split the DCORE promise events without a conversation by promise source (plan vs follow-up note, and the follow-up
+   code: digital collect, will pay at salary, etc.), to explain why they pay 41% against 15% for those with a call.

@@ -355,3 +355,37 @@ whether it out-ranks UC2. Four jobs, each with its own test:
   inside the target state, in both products, n ≥ 100 per cell); the treatment and context jobs need no AUC bar.
 - 180+: depends on whether 180+ customers have calls at all (A3); A1 is 85% Unknown there, so a fill would matter most
   there if they do.
+
+## 15. Signals test result (2026-11-19, 60-180 only)
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_signals_summary.md`. 180+ not run yet. Call-anchored sample is small:
+643 card pairs (333 accounts), 358 loan pairs (148 accounts), because most extracted calls reached customers before
+they were at 61+ DPD. Read as direction unless stated.
+
+**Coverage, revised.** Account-months with any conversation in the 90 days before the month end: cards 10–13%, loans
+12–19% (June–July); with an extracted one: cards ~3%, loans 5–8%. A full run therefore reaches ~10–13% / 12–19% of
+61–180 account-months, not the ~26% estimated in §13 (that counted any earlier conversation, not the last 90 days).
+Extraction is already 50–78% for calls made at 61+ DPD; the gap is the calls made at 1–60 DPD.
+
+**What holds:**
+- **Transcript promises go unlogged.** 79% of card and 91% of loan transcript promises have no DCORE promise on the
+  account within ±3 days. Those customers pay more than customers with no promise at all (30-day paid a due: loans
+  48.5% vs 29.4%; cards 17.9% vs 13.6%). This is evidence A3 does not see today. To check first: a DCORE promise on
+  another account of the same CIF (UC1 is CIF-level, DCORE per account).
+- **Stated disputes are not in A3's dispute flag.** Almost every stated dispute (cards 72 pairs, loans 37) has the A3
+  flag false; card disputes (mostly system problems) pay less (19.4% vs 31.4% paid a due at the next month end).
+- **Specific statements go with payment, both products:** says employed (loans 55.8% vs 33.5% for no reason given;
+  cards 23.9% vs 15.4%), a named salary-cycle period, a named amount or date (loans), restructure / settlement /
+  waiver requests (loans 52–65%). Card settlement requests are the exception (13.2%).
+- **A1 Unknown, month-end view:** stated readings pay about twice no reading (cards 13–22% vs 7.8%, loans 26–29% vs
+  16%); cards able 22.2% > partly 16.6% / not stated 17.6% > unable 12.8%. Call-anchored AUC inside Unknown only 0.51–0.57.
+
+**What does not hold (yet):** able vs partly vs full and the intent levels look alike; job / income claims are only
+loosely consistent with our income data (loans lost_employment: 45% income stopped, 37% never visible; cards
+has_employment: 56% income continues, 22% stopped) and consistency does not change payment in a stable direction;
+the discrepancy flags E1–E4 and E7 are too thin; F3 (restructure after a request) is blocked by restructure data
+ending 2026-05-31.
+
+**Effect on §14:** fill inside A1 Unknown stays a candidate, below the n bar. Cross-check gains two concrete gaps for
+A3 (unlogged promises, unlogged disputes): the strongest case for using transcripts, subject to the CIF check.
+Treatment hints hold (specific content, requests). Next: 180+ Part A, and E5 / E6 at CIF level.
