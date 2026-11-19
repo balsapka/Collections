@@ -326,8 +326,32 @@ conversation vs 3.2% with none (rl 22.3% vs 9.7%). That is a contact effect, not
   expect a modest gain at best.
 - 180+: still no coverage expected; persona stays UC2 only.
 
-**Assessment (Claude, for the user to confirm):** §12.3 row "adds nothing" applies. Keep the stated block as display
-only (collector context, dispute / relief flags), no tier effect. Re-test on the full run with the same snippet; the
-bar for an overlay rule = within-state AUC gain ≥ +0.02 on rows with a reading, holding in both products. The
-contact effect (conversation present) is the stronger signal and belongs to the parked Genesys-as-contact question
-for A2 / A3 (user / GRR), not to UC1. Carry: drop `legacy_only` (coded, `cd698c8`) in the next UC1 bundle.
+**Correction (2026-11-19, same day):** the "adds nothing" read above came from pooling all A1 / A3 states. Inside the
+states where UC2 has no evidence the stated level does separate payers: cc A1 Unknown able 21.4% (84) / partly 17.0%
+(264) / not stated 15.6% (256) / unable 12.0% (100) vs no reading 8.2%; cc A3 Low partly_or_later 9.5% (274) vs not
+stated 4.3% (235) vs no reading 3.4% (z ≈ 2.3). Small cells and repeated account-months, so directional, but it is the
+pattern a fill would need. Also untested so far: reason, period, repayment specifics, request, dispute; outcomes
+aligned to the statement (with_delay / partial pay late or below the due, the 1-month paid_due misses them);
+high-confidence detections only (43% of capacity detections are low confidence); consistency with observed data.
+Prompt: `workplace_mirror/bundle_helpers/uc1/sonnet_uc1_signals_prompt.md`.
+
+## 14. Integration design (proposed, Claude, 2026-11-19; settle after the signals prompt)
+
+UC2 measures what customers do, UC1 what they say. They answer different questions, so UC1 is not judged only by
+whether it out-ranks UC2. Four jobs, each with its own test:
+
+| Job | What UC1 gives | Test (signals prompt) | Where it lands |
+|---|---|---|---|
+| **Fill** where UC2 is blind | stated ability inside A1 Unknown (57% of cc_60_180 rows), stated intent / transcript promises inside A3 no_promise | D1–D3, E5 | sub-split of A1 Unknown and A3 no_promise in the tiering; `a1_state` / `a3_state` themselves unchanged (A1–A4 stay fixed) |
+| **Cross-check** | stated vs observed: says employed but salary stopped with us (salary may have moved to another bank), says job lost but income continues, says unable but holds ≥ one due in CASA, promise on the call but none logged in DCORE | C, E | discrepancy flags for the collector ("verify"); E5 also tells A3 / DCORE whether promises go unlogged |
+| **Treat** | reason, request (restructure 990, settlement 570, waiver 506, deferral 481 on the sample), payment period (salary cycle), dispute (system_problem 1,413) | B, F | treatment hints next to the tier: offer type, call timing, dispute routing; demand sizing for GRR's programmes; feeds UC1's `collection_action` (value sets due Dec 11) |
+| **Context** | last stated stance and call date for Non-Reachable customers (they talked, then went silent: A6.2) | (first validation) | collector view only |
+
+- The persona key stays A1–A4; UC2 sets priority and tier, UC1 adds fill, flags and the treatment hint.
+- Having a genuine conversation is itself a strong signal (cc A3 Low 7.0% with an extracted conversation vs 3.2% with
+  none). It needs only call metadata, so it covers every call today; it belongs to the parked Genesys-as-contact
+  question for A2 / A3 (user / GRR), not to UC1's extraction.
+- Do not force it: a fill or a flag ships only if it holds on the full run (bar: ≥ 5 pp paid difference or ≥ +0.02 AUC
+  inside the target state, in both products, n ≥ 100 per cell); the treatment and context jobs need no AUC bar.
+- 180+: depends on whether 180+ customers have calls at all (A3); A1 is 85% Unknown there, so a fill would matter most
+  there if they do.
