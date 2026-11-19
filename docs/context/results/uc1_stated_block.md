@@ -298,6 +298,10 @@ Source: `workplace_mirror/bundle_helpers/uc1/uc1_uc2_validation_summary.md` (60-
 sample). Calls in the store run 2026-03-06..2026-07-16 and ramp up (cc month ends with a conversation: 70 in Mar,
 4,834 in Jul); UC1 extracted only a sample of them.
 
+**Read as:** UC1 levels are what the customer *said* on the call, picked out of the transcript, not facts. Whether
+they are true is a separate question; the only test we can run is whether what they say lines up with what they do
+(paid_due) and with the observed UC2 states. All numbers below are that test.
+
 **On the sample:** no defect in UC1 inputs or bundle 26. Stated levels order sensibly overall (cc able 22% /
 partly 19% / unable 14% paid_due) but add almost nothing inside an A1 or A3 state: AUC gain on rows with a reading
 +0.00 to +0.02, on all rows +0.001 to +0.008. No decay with age is visible (weak test). L and M readings agree ~95%.
