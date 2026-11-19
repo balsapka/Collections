@@ -291,3 +291,39 @@ is Unknown?
 | A6: calls after the failed streak | raise the Genesys-as-contact question for A2 with the user / GRR |
 | C: reweighting changes the paid rates | report reweighted numbers until the full run |
 | Fill (A1 / A3 Unknown) adds | candidate rule for A1 Unknown customers, for the user to decide |
+
+## 13. Validation result (2026-11-19) and what to expect from the full transcript run
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_uc2_validation_summary.md` (60-180 only; 180+ not covered by the
+sample). Calls in the store run 2026-03-06..2026-07-16 and ramp up (cc month ends with a conversation: 70 in Mar,
+4,834 in Jul); UC1 extracted only a sample of them.
+
+**On the sample:** no defect in UC1 inputs or bundle 26. Stated levels order sensibly overall (cc able 22% /
+partly 19% / unable 14% paid_due) but add almost nothing inside an A1 or A3 state: AUC gain on rows with a reading
++0.00 to +0.02, on all rows +0.001 to +0.008. No decay with age is visible (weak test). L and M readings agree ~95%.
+What does separate payers is *having a conversation at all*: inside A3 Low, cc pays 7.0% with an extracted
+conversation vs 3.2% with none (rl 22.3% vs 9.7%). That is a contact effect, not the stated level.
+
+**Extrapolation to the full run** (all conversations extracted, July as the reference month):
+
+| | cc_60_180 | rl_60_180 |
+|---|---|---|
+| accounts with an extracted conversation now | 879 / 18,397 (5%) | 369 / 3,728 (10%) |
+| expected after the full run (all conversations) | ~4,800 (~26%) | ~960 (~26%) |
+| of which a stated level (not `not_stated`, ~70%) | ~18% of accounts | ~18% of accounts |
+| expected AUC gain, all rows (within-reading gain × coverage, upper end) | ≤ +0.01 | ≤ +0.02 |
+
+- The not-yet-extracted conversations pay less (cc 11.9% vs 16.9%) and are less often Reachable; reweighting moved
+  level rates by ≤ 2 pp and kept their order, so the level pattern should hold, slightly lower.
+- Coverage, not signal strength, is what grows. A within-state gain of ~0.01 stays ~0.01 per reading; spread over a
+  quarter of accounts it is still below what would justify a tier rule.
+- Freshness: at scoring (month end) the newest reading was 1-6 months old because the store stops mid-July. A
+  refreshed store gives fresh readings, which could matter more than coverage, but the sample showed no decay, so
+  expect a modest gain at best.
+- 180+: still no coverage expected; persona stays UC2 only.
+
+**Assessment (Claude, for the user to confirm):** §12.3 row "adds nothing" applies. Keep the stated block as display
+only (collector context, dispute / relief flags), no tier effect. Re-test on the full run with the same snippet; the
+bar for an overlay rule = within-state AUC gain ≥ +0.02 on rows with a reading, holding in both products. The
+contact effect (conversation present) is the stronger signal and belongs to the parked Genesys-as-contact question
+for A2 / A3 (user / GRR), not to UC1. Carry: drop `legacy_only` (coded, `cd698c8`) in the next UC1 bundle.
