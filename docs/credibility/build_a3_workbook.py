@@ -721,7 +721,9 @@ def examples(wb: Workbook) -> None:
 
 
 # --- results --------------------------------------------------------------------------------
-RESULTS_DATE = "the latest month end of the run"  # set when the results are filled
+# Production numbers from the A3 results prompt (bundle_helpers/a3_final/sonnet_a3_results_prompt.md):
+# run 2, the persisted tables of the final rules (bundle 28), PROD 2026-11-19.
+RESULTS_DATE = "31 August 2026"
 PRODUCTS = ["Personal Loans", "Personal Cash Loans", "Auto"]
 VARIANTS = (["CC\n61–180", "CC\n180+"]
             + [f"RL 61–180\n{p}" for p in PRODUCTS] + ["RL 61–180\ntotal"]
@@ -729,37 +731,78 @@ VARIANTS = (["CC\n61–180", "CC\n180+"]
 SEGMENTS = ["CC\n61–180", "CC\n180+", "RL\n61–180", "RL\n180+"]
 VINTAGES = [f"{prod}\n{v}" for prod in ("CC 180+", "RL 180+")
             for v in ("early-stage\ncharge-off", "late-stage\ncharge-off")]  # fmt: skip
-# Production run after the latest model change: filled from the results prompt
-# (bundle_helpers/a3_final/sonnet_a3_results_prompt.md). Empty = not run yet.
-ACCOUNTS: list[int | None] = [None] * len(VARIANTS)
-STATE_COUNTS: dict[int, list[int]] = {}  # variant index -> [High, Moderate, Low]
-VINTAGE_ACCOUNTS: list[int | None] = [None] * len(VINTAGES)
-VINTAGE_COUNTS: dict[int, list[int]] = {}
-SEGMENT_ACCOUNTS: list[int | None] = [None] * len(SEGMENTS)
+ACCOUNTS = [19_292, 318_663, 1_397, 1_224, 1_364, 3_985, 33_862, 10_306, 11_203, 55_371]
+STATE_COUNTS = {  # variant index -> [High, Moderate, Low]
+    0: [2_215, 5_861, 11_216], 1: [2_125, 13_099, 303_439],
+    2: [64, 362, 971], 3: [107, 392, 725], 4: [198, 522, 644], 5: [369, 1_276, 2_340],
+    6: [150, 904, 32_808], 7: [221, 1_127, 8_958], 8: [147, 732, 10_324],
+    9: [518, 2_763, 52_090],
+}  # fmt: skip
+VINTAGE_ACCOUNTS = [61_112, 257_551, 10_050, 45_321]
+VINTAGE_COUNTS = {0: [1_907, 10_601, 48_604], 1: [218, 2_498, 254_835],
+                  2: [319, 2_081, 7_650], 3: [199, 682, 44_440]}  # fmt: skip
+SEGMENT_ACCOUNTS = [19_292, 318_663, 3_985, 55_371]
 POINT_VALUES = range(0, 7)
 DETAIL = [  # (section, [(label, tone key)], {segment index: counts})
-    ("A. Promises kept", [(_points(k), k) for k in A_LEVELS], {}),
-    ("B. Payments in delinquency", [(_points(k), k) for k in B_LEVELS], {}),
+    ("A. Promises kept", [(_points(k), k) for k in A_LEVELS],
+     {0: [620, 4_568, 2_998, 11_106], 1: [227, 4_957, 10_950, 302_529],
+      2: [134, 684, 571, 2_596], 3: [73, 858, 1_369, 53_071]}),
+    ("B. Payments in delinquency", [(_points(k), k) for k in B_LEVELS],
+     {0: [1_445, 3_388, 14_459], 1: [1_150, 17_732, 299_781],
+      2: [434, 1_290, 2_261], 3: [548, 3_987, 50_836]}),
     ("C. Record before delinquency",
      [(_points("clean"), "clean"), (_points("not_clean"), "not_clean"),
       ("No record: fewer than 3 months with an amount due", "no_record"),
-      ("No record: delinquent since before the history we hold", "no_record")], {}),
+      ("No record: delinquent since before the history we hold", "no_record")],
+     {0: [12_447, 3_864, 2_976, 5], 1: [33_316, 12_605, 99_024, 173_718],
+      2: [1_767, 1_777, 441, 0], 3: [10_576, 8_515, 4_096, 32_184]}),
     ("Points total",
      [(f"{p} points", "low" if p < 2 else "moderate" if p < 4 else "high") for p in POINT_VALUES],
-     {}),
+     {0: [3_171, 7_668, 3_431, 2_752, 1_534, 619, 117],
+      1: [268_919, 34_052, 8_730, 4_747, 1_942, 266, 7],
+      2: [804, 1_483, 822, 504, 255, 95, 22],
+      3: [41_662, 10_381, 2_049, 752, 417, 100, 10]}),
     ("Refusal and other columns",
      [("Refusal", "bad"), ("Refusal that lowers the state", "bad"),
       ("Refusal lifted by a later plan or payment", "unknown"), ("Dispute", "unknown"),
-      ("No pickup after contact", "unknown"), ("Hung up", "unknown")], {}),
+      ("No pickup after contact", "unknown"), ("Hung up", "unknown")],
+     {0: [865, 432, 70, 75, 1_344, 442], 1: [6_514, 558, 447, 570, 2_901, 4_562],
+      2: [170, 56, 42, 0, 329, 41], 3: [1_000, 56, 102, 58, 403, 615]}),
 ]  # fmt: skip
-BAND_ROWS = [("Credit cards 61–180", b) for b in ("61–90", "91–120", "121–150", "151–180")] + [
-    ("Retail loans 61–180", b) for b in ("61–90", "91–120", "121–150", "151–180")] + [
-    (seg, b) for seg in ("Credit cards 180+", "Retail loans 180+")
-    for b in ("181–360", "361–720", "720+")]  # fmt: skip
-BANDS: dict[tuple[str, str], tuple[int, int, int]] = {}  # (segment, band) -> (H, M, L) counts
+BANDS = {  # (segment, DPD band) -> (High, Moderate, Low)
+    ("Credit cards 61–180", "61–90"): (1_032, 1_801, 3_026),
+    ("Credit cards 61–180", "91–120"): (609, 1_503, 3_148),
+    ("Credit cards 61–180", "121–150"): (345, 1_399, 2_657),
+    ("Credit cards 61–180", "151–180"): (229, 1_158, 2_385),
+    ("Retail loans 61–180", "61–90"): (202, 505, 694),
+    ("Retail loans 61–180", "91–120"): (87, 387, 632),
+    ("Retail loans 61–180", "121–150"): (59, 266, 646),
+    ("Retail loans 61–180", "151–180"): (21, 118, 368),
+    ("Credit cards 180+", "181–360"): (1_086, 5_511, 10_226),
+    ("Credit cards 180+", "361–720"): (626, 4_069, 25_017),
+    ("Credit cards 180+", "720+"): (413, 3_519, 268_196),
+    ("Retail loans 180+", "181–360"): (301, 1_539, 2_086),
+    ("Retail loans 180+", "361–720"): (77, 631, 4_140),
+    ("Retail loans 180+", "720+"): (140, 593, 45_864),
+}
 TREND_SEGMENTS = ["Credit cards 61–180", "Retail loans 61–180", "Credit cards 180+",
                   "Retail loans 180+"]  # fmt: skip
-TREND: dict[str, dict[str, tuple[int, int, int]]] = {}  # segment -> {"Jan 2026": (H, M, L)}
+TREND_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"]  # 2026
+TREND = {  # segment -> one (High, Moderate, Low) per month in TREND_MONTHS
+    "Credit cards 61–180": [(2_386, 4_571, 7_707), (2_378, 4_454, 7_744), (2_347, 4_413, 7_695),
+                            (2_250, 4_656, 7_765), (2_270, 5_244, 8_376), (2_315, 5_512, 9_155),
+                            (2_230, 5_805, 10_362), (2_215, 5_861, 11_216)],
+    "Retail loans 61–180": [(293, 799, 1_232), (284, 717, 1_212), (293, 731, 1_194),
+                            (328, 924, 1_409), (285, 1_080, 1_731), (299, 1_161, 2_054),
+                            (326, 1_184, 2_218), (369, 1_276, 2_340)],
+    "Credit cards 180+": [(1_776, 12_262, 291_219), (1_843, 12_326, 292_685),
+                          (1_899, 12_337, 294_506), (1_954, 12_384, 296_371),
+                          (1_986, 12_361, 298_279), (2_070, 12_652, 300_105),
+                          (2_099, 12_867, 301_772), (2_125, 13_099, 303_439)],
+    "Retail loans 180+": [(458, 2_363, 49_836), (457, 2_359, 50_066), (449, 2_348, 50_473),
+                          (460, 2_308, 50_847), (485, 2_408, 51_113), (509, 2_556, 51_318),
+                          (515, 2_626, 51_678), (518, 2_763, 52_090)],
+}  # fmt: skip
 ENTRY = {"color": "0000FF", "fill": INPUT_FILL}
 
 
@@ -804,21 +847,63 @@ def _state_table(s: Sheet, cols: list[str], accounts: list[int], counts: dict, s
         s.r += 1
 
 
-def results(wb: Workbook) -> None:
-    s = Sheet(wb.create_sheet("Results"), [16] + [11, 7] * len(VARIANTS))
-    s.title("Results", f"Accounts per state and model variant, {RESULTS_DATE} (production run). "
-                       "Pale yellow = from the run; other shares and totals are calculated.")  # fmt: skip
-    s.section("Credibility state", gap=0)
-    _state_table(s, VARIANTS, ACCOUNTS, STATE_COUNTS, {})
+def _bands(s: Sheet) -> None:
+    s.header(["", "Accounts", "", "High", "share", "Moderate", "share", "Low", "share"])
+    s.ws.merge_cells(start_row=s.r - 1, start_column=2, end_row=s.r - 1, end_column=3)
+    for (seg, band), counts in BANDS.items():
+        s.text(1, f"{seg} · {band} DPD")
+        s.text(2, f"=D{s.r}+F{s.r}+H{s.r}", span=2, bold=True, fmt="#,##0")
+        for col, n in zip((4, 6, 8), counts):
+            _pair(s, col, count=n, base=f"$B{s.r}")
+        s.r += 1
+
+
+def _trend(s: Sheet) -> None:
+    s.text(1, "2026", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+    for i, seg in enumerate(TREND_SEGMENTS):
+        s.text(2 + 4 * i, seg, span=4, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
     s.r += 1
-    s.note("Aggregates only. Blank = not filled from the run yet.")  # fmt: skip
-    s.ws.freeze_panes = "B6"
+    s.text(1, "Month", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+    for i in range(len(TREND_SEGMENTS)):
+        s.text(2 + 4 * i, "Accounts", span=2, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
+        s.text(4 + 4 * i, "High / Moderate / Low %", span=2, bold=True, color="FFFFFF",
+               fill=NAVY, align=CENTER)  # fmt: skip
+    s.ws.row_dimensions[s.r].height = 30
+    s.r += 1
+    for m, month in enumerate(TREND_MONTHS):
+        s.text(1, month, bold=True)
+        for i, seg in enumerate(TREND_SEGMENTS):
+            h, mo, lo = TREND[seg][m]
+            n = h + mo + lo
+            s.text(2 + 4 * i, n, span=2, fmt="#,##0", align=MID)
+            s.text(4 + 4 * i, " / ".join(f"{100 * x / n:.1f}" for x in (h, mo, lo)), span=2,
+                   align=CENTER)  # fmt: skip
+        s.r += 1
+
+
+def results(wb: Workbook) -> None:
+    s = Sheet(wb.create_sheet("Results"), [30] + [11, 7] * len(VARIANTS))
+    s.title("Results", f"Accounts per state, {RESULTS_DATE} (production, final rules). Pale yellow = "
+                       "from the run; shares and totals are calculated.")  # fmt: skip
+    s.section("State by product", gap=0)
+    _state_table(s, VARIANTS, ACCOUNTS, STATE_COUNTS, {})
+    s.section("180+ by charge-off vintage (early stage: charged off less than 2 years ago)")
+    _state_table(s, VINTAGES, VINTAGE_ACCOUNTS, VINTAGE_COUNTS, {})
+    s.section("State by DPD band (shares of the band)")
+    _bands(s)
+    s.note("Cards at 180+: the DPD band is taken from the charge-off age.")
+    s.section("Trend: share of the month's accounts in each state")
+    _trend(s)
+    s.r += 1
+    s.note("Cards 61–180: High holds at 2,200–2,400 accounts while the bucket grows, so Low rises "
+           "from 53% in January to 58% in August.")  # fmt: skip
+    s.ws.freeze_panes = "B4"
 
 
 def detail(wb: Workbook) -> None:
-    s = Sheet(wb.create_sheet("Results detail"), [50] + [11, 7] * len(SEGMENTS))
-    s.title("Results detail", f"What sits behind the states, {RESULTS_DATE}. Shares are of all "
-                              "accounts in the segment.")  # fmt: skip
+    s = Sheet(wb.create_sheet("Results detail"), [44] + [11, 7] * len(SEGMENTS))
+    s.title("Results detail", f"What sits behind the states, {RESULTS_DATE}. Shares are "
+                              "of all accounts in the segment.")  # fmt: skip
     s.header([""] + [x for name in SEGMENTS for x in (name, "share")], height=30)
     s.text(1, "Accounts", bold=True)
     base = s.r
@@ -834,73 +919,73 @@ def detail(wb: Workbook) -> None:
                 L = get_column_letter(2 + 2 * b)
                 _pair(s, 2 + 2 * b, count=data[b][i] if b in data else None, base=f"{L}${base}")
             s.r += 1
-    s.section("State by DPD band")
-    s.header(["", "Accounts", "", "High", "share", "Moderate", "share", "Low", "share"])
-    s.ws.merge_cells(start_row=s.r - 1, start_column=2, end_row=s.r - 1, end_column=3)
-    for seg, band in BAND_ROWS:
-        s.text(1, f"{seg} · {band} DPD")
-        s.text(2, f"=D{s.r}+F{s.r}+H{s.r}", span=2, bold=True, fmt="#,##0")
-        counts = BANDS.get((seg, band), (None, None, None))
-        for col, n in zip((4, 6, 8), counts):
-            _pair(s, col, count=n, base=f"$B{s.r}")
-        s.r += 1
     s.r += 1
-    s.note("Shares are of all accounts in the segment; DPD band shares of the band. Cards at "
-           "180+: the DPD band is taken from the charge-off age.")  # fmt: skip
-    s.ws.freeze_panes = "B6"
-
-
-def trend(wb: Workbook) -> None:
-    states = STATES
-    s = Sheet(wb.create_sheet("Results trend"), [10, 10] + [10, 7] * len(states))
-    s.title("Results trend", "Accounts per state at every month end of the run. Shares are of "
-                             "the month's accounts.")  # fmt: skip
-    for i, title in enumerate(TREND_SEGMENTS):
-        months = TREND.get(title, {})
-        s.section(title, gap=0 if i == 0 else 1)
-        s.text(1, "Month", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-        s.text(2, "Accounts", bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-        for j, st in enumerate(states):
-            s.chip(3 + 2 * j, st, span=2, align=CENTER)
-        s.ws.row_dimensions[s.r].height = 20
-        s.r += 1
-        for month, counts in months.items():
-            s.text(1, month, bold=True)
-            s.text(2, "=" + "+".join(f"{get_column_letter(3 + 2 * j)}{s.r}" for j in range(3)),
-                   bold=True, fmt="#,##0")  # fmt: skip
-            for j, n in enumerate(counts):
-                _pair(s, 3 + 2 * j, count=n, base=f"$B{s.r}")
-            s.r += 1
-    s.ws.freeze_panes = "A4"
-
-
-def vintage(wb: Workbook) -> None:
-    s = Sheet(wb.create_sheet("Results 180+ vintage"), [16] + [12, 7] * len(VINTAGES))
-    s.title("Results 180+ by vintage",
-            "Early-stage charge-off = charged off less than 2 years ago; late-stage = 2 years or "
-            f"more; {RESULTS_DATE}. Shares are within each vintage.")  # fmt: skip
-    s.section("Credibility state", gap=0)
-    _state_table(s, VINTAGES, VINTAGE_ACCOUNTS, VINTAGE_COUNTS, {})
-    s.ws.freeze_panes = "B6"
+    s.note("At 180+ most accounts have no promise, no payment and no record (0 points: 84% of "
+           "cards, 75% of loans); most of them were delinquent before the history we hold. The "
+           "dispute count on loans at 61–180 is 0: the loan dispute code is being checked.")  # fmt: skip
+    s.ws.freeze_panes = "B5"
 
 
 # --- validation -----------------------------------------------------------------------------
 BOOKS = ["Cards 61–180", "Loans 61–180", "Cards 180+", "Loans 180+"]
-# Pooled month ends with 3 months of outcome after them, from the results prompt. None = not run.
-OUTCOME_MONTHS = ""  # e.g. "January to July 2026"
-OUTCOMES = {b: None for b in BOOKS}  # book -> (n H, n M, n L, paid a due H, M, L, any H, M, L)
-GROUPS = [(b, "DPD", g) for b in ("Cards 61–180", "Loans 61–180")
-          for g in ("61–90", "91–120", "121–150", "151–180")] + [
-    ("Loans 61–180", "Product", p) for p in PRODUCTS] + [
-    (b, "DPD", g) for b in ("Cards 180+", "Loans 180+") for g in ("181–360", "361–720", "720+")] + [
-    ("Loans 180+", "Product", p) for p in PRODUCTS] + [
-    (b, "Vintage", v) for b in ("Cards 180+", "Loans 180+")
-    for v in ("Early-stage charge-off", "Late-stage charge-off")]  # fmt: skip
-BY_GROUP: dict[tuple[str, str, str], tuple[float, float, float]] = {}  # paid a due H, M, L
-AUC: dict[str, tuple[str, str, str]] = {}  # book -> (state, state within DPD band, points)
-POINTS_PAID: dict[int, tuple] = {}  # points -> paid a due % per book (BOOKS order)
-STABILITY: dict[str, tuple] = {}  # book -> same, up, down, High stays, Moderate stays (%)
-OVERLAP: dict[str, tuple] = {}  # book -> Cramér's V with ability, reachability, location, A4
+# Run 2: month ends January to May 2026 pooled, outcomes over the 3 months after each.
+OUTCOME_MONTHS = "January to May 2026"
+OUTCOMES = {  # book -> (n H, n M, n L, paid a due H, M, L, any payment H, M, L)
+    "Cards 61–180": (11_631, 23_338, 39_287, 54.9, 22.7, 6.3, 57.0, 25.0, 6.9),
+    "Loans 61–180": (1_483, 4_251, 6_778, 64.5, 48.2, 18.6, 71.5, 58.6, 26.1),
+    "Cards 180+": (9_458, 61_670, 1_473_060, 36.8, 22.3, 1.2, 40.3, 27.6, 1.6),
+    "Loans 180+": (2_309, 11_786, 252_335, 53.4, 24.7, 1.0, 57.2, 31.1, 1.6),
+}
+BY_GROUP = {  # (book, split, group) -> paid a due H, M, L
+    ("Cards 61–180", "DPD", "61–90"): (56.8, 31.4, 11.4),
+    ("Cards 61–180", "DPD", "91–120"): (60.3, 24.6, 7.2),
+    ("Cards 61–180", "DPD", "121–150"): (52.2, 19.0, 4.5),
+    ("Cards 61–180", "DPD", "151–180"): (31.8, 8.8, 1.5),
+    ("Loans 61–180", "DPD", "61–90"): (70.8, 56.2, 28.3),
+    ("Loans 61–180", "DPD", "91–120"): (62.9, 50.0, 16.8),
+    ("Loans 61–180", "DPD", "121–150"): (55.3, 36.5, 11.2),
+    ("Loans 61–180", "DPD", "151–180"): (44.7, 30.7, 12.3),
+    ("Loans 61–180", "Product", "Personal Loans"): (64.5, 35.8, 12.0),
+    ("Loans 61–180", "Product", "Personal Cash Loans"): (67.7, 47.1, 16.3),
+    ("Loans 61–180", "Product", "Auto"): (62.3, 59.4, 35.9),
+    ("Cards 180+", "DPD", "181–360"): (13.5, 9.2, 3.1),
+    ("Cards 180+", "DPD", "361–720"): (53.7, 22.6, 2.6),
+    ("Cards 180+", "DPD", "720+"): (66.8, 44.3, 1.0),
+    ("Loans 180+", "DPD", "181–360"): (44.6, 18.6, 5.8),
+    ("Loans 180+", "DPD", "361–720"): (59.3, 22.9, 3.1),
+    ("Loans 180+", "DPD", "720+"): (68.0, 41.2, 0.6),
+    ("Loans 180+", "Product", "Personal Loans"): (59.5, 30.6, 0.7),
+    ("Loans 180+", "Product", "Personal Cash Loans"): (51.1, 23.4, 2.1),
+    ("Loans 180+", "Product", "Auto"): (50.4, 19.0, 1.2),
+    ("Cards 180+", "Vintage", "Early-stage charge-off"): (33.6, 16.6, 2.5),
+    ("Cards 180+", "Vintage", "Late-stage charge-off"): (67.1, 45.9, 0.9),
+    ("Loans 180+", "Vintage", "Early-stage charge-off"): (45.2, 18.0, 3.5),
+    ("Loans 180+", "Vintage", "Late-stage charge-off"): (68.4, 44.4, 0.6),
+}
+GROUPS = list(BY_GROUP)
+AUC = {  # book -> (state, state within DPD band: lowest–highest band, points)
+    "Cards 61–180": ("0.771", "0.732–0.791", "0.783"),
+    "Loans 61–180": ("0.701", "0.655–0.715", "0.730"),
+    "Cards 180+": ("0.728", "0.657–0.769", "0.861"),
+    "Loans 180+": ("0.790", "0.713–0.755", "0.890"),
+}
+POINTS_PAID = {  # points -> paid a due % per book (BOOKS order)
+    0: (4.9, 9.5, 0.5, 0.4), 1: (6.6, 23.6, 8.0, 3.9), 2: (19.0, 42.4, 17.0, 19.7),
+    3: (26.1, 54.9, 30.2, 35.9), 4: (46.8, 61.5, 33.9, 48.1), 5: (64.5, 66.6, 53.4, 70.9),
+    6: (70.3, 89.5, 60.5, 74.1),
+}  # fmt: skip
+STABILITY = {  # book -> same, up, down, High stays, Moderate stays (%)
+    "Cards 61–180": (88.3, 5.1, 6.6, 80.7, 80.4),
+    "Loans 61–180": (86.7, 6.0, 7.3, 77.9, 79.4),
+    "Cards 180+": (99.2, 0.3, 0.4, 85.9, 88.8),
+    "Loans 180+": (99.1, 0.4, 0.5, 87.1, 89.3),
+}
+OVERLAP = {  # book -> Cramér's V with ability, reachability, location, deterioration
+    "Cards 61–180": (0.163, 0.244, 0.214, 0.457),
+    "Loans 61–180": (0.099, 0.209, 0.210, 0.405),
+    "Cards 180+": (0.198, 0.283, 0.237, 0.293),
+    "Loans 180+": (0.256, 0.313, 0.245, 0.235),
+}
 HML = {2: "good", 3: "mid", 4: "bad"}
 
 
@@ -929,6 +1014,8 @@ def validation(wb: Workbook) -> None:
         s.row([book, n, *map(_pc, v[3:])], align=MID,
               tones={2: "good", 3: "mid", 4: "bad", 5: "good", 6: "mid", 7: "bad"})  # fmt: skip
 
+    s.note("High pays a due 3 to 9 times as often as Low at 61–180 and 20 to 50 times at 180+; "
+           "Moderate sits in between in every book.")  # fmt: skip
     s.section("Paid a due by group")
     s.header(["Book", "Group", "High", "Moderate", "Low"], [1, 1, 1, 1, 1])
     for key in GROUPS:
@@ -936,6 +1023,9 @@ def validation(wb: Workbook) -> None:
         s.row([book, f"{split}: {group}", *map(_pc, BY_GROUP.get(key, _blank(3)))], align=MID,
               tones=HML)  # fmt: skip
 
+    s.note("High > Moderate > Low in every group. Thin gaps: Auto loans at 61–180 (High 62.3%, "
+           "Moderate 59.4%) and cards at 181–360 DPD, where the band comes from the charge-off "
+           "age.")  # fmt: skip
     s.section("Ranking power (AUC on paid a due; 0.5 = chance)")
     s.header(["Book", "State", "State within DPD band", "", "", "", "Points total", ""])
     for c1, c2 in ((3, 6), (7, 8)):
@@ -952,6 +1042,10 @@ def validation(wb: Workbook) -> None:
             s.text(col, _pc(v), align=MID)
         s.r += 1
 
+    s.note("Each extra point pays more. At 180+ 0 and 1 point are both Low but pay 0.5% and 8.0% "
+           "(cards), 0.4% and 3.9% (loans): the points total ranks better than the state there "
+           "(AUC 0.861 / 0.890 against 0.728 / 0.790). 6 points at 180+ and on loans: under 80 "
+           "accounts.")  # fmt: skip
     s.section("Stability, one month to the next")
     s.header(["Book", "Same state", "Up", "Down", "High stays", "Moderate stays"])
     for book in BOOKS:
@@ -962,6 +1056,8 @@ def validation(wb: Workbook) -> None:
     for book in BOOKS:
         vals = OVERLAP.get(book, _blank(4))
         s.row([book, *(None if v is None else f"{v:.2f}" for v in vals)], align=MID)
+    s.note("A3 overlaps deterioration most (it shares the payment history) and ability least: "
+           "each axis adds its own view.")  # fmt: skip
     s.ws.freeze_panes = "A4"
 
 
@@ -985,6 +1081,18 @@ PROMISE_PAID = [  # book, paid a due %: Kept, Partly, Broken, Promised (one not 
     ("Loans 61–180", 58.0, 53.9, 47.9, 42.9, 25.3),
     ("Cards 180+", 21.1, 30.5, 17.6, 21.0, 1.3),
     ("Loans 180+", 36.6, 43.5, 19.8, 20.4, 1.6),
+]
+BROKEN = [  # book, paid a due %: Broken with a kept promise, Partly kept, difference [95%], AUC with / without
+    ("Cards 61–180", 34.8, 34.1, "+0.6 [−1.0, +2.3]", "0.763 / 0.769"),
+    ("Loans 61–180", 53.0, 52.7, "+0.3 [−5.1, +5.7]", "0.698 / 0.701"),
+    ("Cards 180+", 17.5, 29.5, "−12.0 [−13.6, −10.3]", "0.724 / 0.725"),
+    ("Loans 180+", 22.0, 41.1, "−19.0 [−23.6, −13.8]", "0.790 / 0.790"),
+]
+SAME_DAY = [  # book, promises kept by a payment on the promise day, share of not kept, rows up, their paid a due
+    ("Cards 61–180", "777", "8.6%", "1,745", "33.5%"),
+    ("Cards 180+", "1,329", "17.9%", "3,561", "41.8%"),
+    ("Loans 61–180", "<10", "–", "<10", "–"),
+    ("Loans 180+", "<10", "–", "14", "–"),
 ]
 NO_EVIDENCE = [  # book, share of accounts, paid a due %: no evidence, rest of Low, Moderate
     ("Cards 61–180", 12.2, 3.9, 12.4, 35.2),
@@ -1011,8 +1119,7 @@ def sensitivity(wb: Workbook) -> None:
     s.note("Customers who never promised pay least by far. A broken record pays like a single "
            "promise not kept: what separates is promising at all, so every promise earns a "
            "point and keeping it earns more. Broken is no longer a level (2026-11-18): Broken "
-           "accounts with a kept promise pay like Partly kept at 61–180, and dropping it ranks "
-           "no worse in any book.")  # fmt: skip
+           "accounts with a kept promise pay like Partly kept at 61–180 (below).")  # fmt: skip
 
     s.section("Promise points")
     s.header(["Book", "State AUC:\nKept 2 / Partly 1 / Broken −1", "State AUC:\nmodel points",
@@ -1032,6 +1139,24 @@ def sensitivity(wb: Workbook) -> None:
     s.note("With the model points the deadline barely matters (at most 0.005), so GRR's rule "
            "stays.")  # fmt: skip
 
+    s.section("Broken as a level (run 1, 18 Nov 2026)")
+    s.header(["Book", "Paid a due:\nBroken with a kept promise", "Paid a due:\nPartly kept",
+              "Difference, pp\n[95% interval]", "State AUC:\nwith / without Broken"],
+             [2, 1, 1, 1, 1], height=44)  # fmt: skip
+    for book, a, b, d, auc in BROKEN:
+        s.row([book, _pc(a), _pc(b), d, auc], [2, 1, 1, 1, 1], align=MID)
+    s.note("At 61–180 a broken record with a kept promise pays like Partly kept; at 180+ it pays "
+           "less, but dropping Broken ranks no worse in any book. One rule for all: no Broken "
+           "level.")  # fmt: skip
+
+    s.section("A payment on the promise day (run 1)")
+    s.header(["Book", "Promises it keeps", "Share of the\nnot-kept ones", "Rows that move up",
+              "Paid a due:\nrows that move"], [2, 1, 1, 1, 1], height=30)  # fmt: skip
+    for row in SAME_DAY:
+        s.row(list(row), [2, 1, 1, 1, 1], align=MID)
+    s.note("The rows it moves up pay like Moderate and High do, so a payment on the promise day "
+           "counts. Loans are known by month, so they barely change.")  # fmt: skip
+
     s.section("Low with no evidence in any dimension")
     s.header(["Book", "Share of accounts", "Paid a due:\nno evidence",
               "Paid a due:\nrest of Low", "Paid a due:\nModerate"], [2, 1, 1, 1, 1],
@@ -1050,8 +1175,6 @@ def build(out: pathlib.Path) -> pathlib.Path:
     examples(wb)
     results(wb)
     detail(wb)
-    trend(wb)
-    vintage(wb)
     validation(wb)
     sensitivity(wb)
     wb.calculation.fullCalcOnLoad = True
