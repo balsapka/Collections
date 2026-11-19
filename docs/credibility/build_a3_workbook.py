@@ -971,11 +971,11 @@ BY_GROUP = {  # (book, split, group) -> paid a due H, M, L
     ("Loans 180+", "Vintage", "Late-stage charge-off"): (68.4, 44.4, 0.6),
 }
 GROUPS = list(BY_GROUP)
-AUC = {  # book -> (state, state within DPD band: lowest–highest band, points)
-    "Cards 61–180": ("0.771", "0.732–0.791", "0.783"),
-    "Loans 61–180": ("0.701", "0.655–0.715", "0.730"),
-    "Cards 180+": ("0.728", "0.657–0.769", "0.861"),
-    "Loans 180+": ("0.790", "0.713–0.755", "0.890"),
+AUC = {  # book -> (state, lowest DPD band, highest DPD band, points)
+    "Cards 61–180": ("0.771", "0.732", "0.791", "0.783"),
+    "Loans 61–180": ("0.701", "0.655", "0.715", "0.730"),
+    "Cards 180+": ("0.728", "0.657", "0.769", "0.861"),
+    "Loans 180+": ("0.790", "0.713", "0.755", "0.890"),
 }
 POINTS_PAID = {  # points -> paid a due % per book (BOOKS order)
     0: (4.9, 9.5, 0.5, 0.4), 1: (6.6, 23.6, 8.0, 3.9), 2: (19.0, 42.4, 17.0, 19.7),
@@ -1010,18 +1010,15 @@ def validation(wb: Workbook) -> None:
     s.title("Validation", f"What each state goes on to do: month ends {OUTCOME_MONTHS or '…'}, "
                           "outcomes over the following 3 months. Paid a due = payments reach one "
                           "month's due; any payment = 100 AED or more.")  # fmt: skip
-    s.section("Outcome by state", gap=0)
-    s.text(1, None, span=2, border=False)
-    s.text(3, "Paid a due", span=3, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    s.text(6, "Any payment", span=3, bold=True, color="FFFFFF", fill=NAVY, align=CENTER)
-    s.r += 1
-    s.header(["Book", "Accounts\nH / M / L"] + ["High", "Moderate", "Low"] * 2, height=30)
-    for book, v in OUTCOMES.items():
-        v = v or _blank(9)
-        n = None if v[0] is None else " / ".join(f"{x:,}" for x in v[:3])
-        s.row([book, n, *map(_pc, v[3:])], align=MID,
-              tones={2: "good", 3: "mid", 4: "bad", 5: "good", 6: "mid", 7: "bad"})  # fmt: skip
-
+    for i, (book, v) in enumerate(OUTCOMES.items()):
+        s.section(f"Outcome by state, {book}", gap=0 if i == 0 else 1)
+        s.header(["State", "Account-months", "Paid a due", "Any payment"])
+        for j, st in enumerate(STATES):
+            s.chip(1, st)
+            s.text(2, v[j], align=MID, fmt="#,##0")
+            s.text(3, v[3 + j] / 100, align=MID, fmt="0.0%")
+            s.text(4, v[6 + j] / 100, align=MID, fmt="0.0%")
+            s.r += 1
     s.note("High pays a due 3 to 9 times as often as Low at 61–180 and 20 to 50 times at 180+; "
            "Moderate sits in between in every book.")  # fmt: skip
     s.section("Paid a due by group")
@@ -1035,11 +1032,10 @@ def validation(wb: Workbook) -> None:
            "Moderate 59.4%) and cards at 181–360 DPD, where the band comes from the charge-off "
            "age.")  # fmt: skip
     s.section("Ranking power (AUC on paid a due; 0.5 = chance)")
-    s.header(["Book", "State", "State within DPD band", "", "", "", "Points total", ""])
-    for c1, c2 in ((3, 6), (7, 8)):
-        s.ws.merge_cells(start_row=s.r - 1, start_column=c1, end_row=s.r - 1, end_column=c2)
+    s.header(["Book", "State", "State, weakest\nDPD band", "State, strongest\nDPD band",
+              "Points total"], [1, 1, 2, 2, 2], height=30)  # fmt: skip
     for book in BOOKS:
-        s.row([book, *AUC.get(book, _blank(3))], [1, 1, 4, 2], align=MID)
+        s.row([book, *AUC.get(book, _blank(4))], [1, 1, 2, 2, 2], align=MID)
 
     s.section("Paid a due by points total")
     s.header(["Points", "State (no refusal)", *BOOKS])
@@ -1090,11 +1086,11 @@ PROMISE_PAID = [  # book, paid a due %: Kept, Partly, Broken, Promised (one not 
     ("Cards 180+", 21.1, 30.5, 17.6, 21.0, 1.3),
     ("Loans 180+", 36.6, 43.5, 19.8, 20.4, 1.6),
 ]
-BROKEN = [  # book, paid a due %: Broken with a kept promise, Partly kept, difference [95%], AUC with / without
-    ("Cards 61–180", 34.8, 34.1, "+0.6 [−1.0, +2.3]", "0.763 / 0.769"),
-    ("Loans 61–180", 53.0, 52.7, "+0.3 [−5.1, +5.7]", "0.698 / 0.701"),
-    ("Cards 180+", 17.5, 29.5, "−12.0 [−13.6, −10.3]", "0.724 / 0.725"),
-    ("Loans 180+", 22.0, 41.1, "−19.0 [−23.6, −13.8]", "0.790 / 0.790"),
+BROKEN = [  # book, paid a due %: Broken with a kept promise, Partly kept; difference pp, 95% interval; AUC with, without
+    ("Cards 61–180", 34.8, 34.1, "+0.6", "−1.0 to +2.3", "0.763", "0.769"),
+    ("Loans 61–180", 53.0, 52.7, "+0.3", "−5.1 to +5.7", "0.698", "0.701"),
+    ("Cards 180+", 17.5, 29.5, "−12.0", "−13.6 to −10.3", "0.724", "0.725"),
+    ("Loans 180+", 22.0, 41.1, "−19.0", "−23.6 to −13.8", "0.790", "0.790"),
 ]
 SAME_DAY = [  # book, promises kept by a payment on the promise day, share of not kept, rows up, their paid a due
     ("Cards 61–180", "777", "8.6%", "1,745", "33.5%"),
@@ -1108,10 +1104,6 @@ NO_EVIDENCE = [  # book, share of accounts, paid a due %: no evidence, rest of L
     ("Cards 180+", 83.0, 0.5, 7.6, 30.6),
     ("Loans 180+", 65.1, 0.2, 3.9, 32.5),
 ]
-
-
-def _mix(m) -> str:
-    return "–" if m is None else " / ".join(f"{x:.1f}" for x in m)
 
 
 def sensitivity(wb: Workbook) -> None:
@@ -1130,11 +1122,18 @@ def sensitivity(wb: Workbook) -> None:
            "accounts with a kept promise pay like Partly kept at 61–180 (below).")  # fmt: skip
 
     s.section("Promise points")
-    s.header(["Book", "State AUC:\nKept 2 / Partly 1 / Broken −1", "State AUC:\nmodel points",
-              "High / Moderate / Low %:\nearlier", "High / Moderate / Low %:\nmodel points"],
-             [2, 1, 1, 1, 1], height=44)  # fmt: skip
-    for book, a, b, m0, m1 in POINT_SCHEMES:
-        s.row([book, f"{a:.3f}", f"{b:.3f}", _mix(m0), _mix(m1)], [2, 1, 1, 1, 1], align=MID)
+    s.header(["Book", "State AUC:\nearlier points", "State AUC:\nmodel points"], [2, 1, 1],
+             height=30)  # fmt: skip
+    for book, a, b, _, _ in POINT_SCHEMES:
+        s.row([book, f"{a:.3f}", f"{b:.3f}"], [2, 1, 1], align=MID)
+    s.note("Earlier points: Kept 2, Partly kept 1, Broken −1.")
+    s.r += 1
+    s.header(["Book", "Points", "High", "Moderate", "Low"], [2, 1, 1, 1, 1])
+    for book, _, _, m0, m1 in POINT_SCHEMES:
+        for name, mix in (("Earlier", m0), ("Model", m1)):
+            if mix:
+                s.row([book, name, *map(_pc, mix)], [2, 1, 1, 1, 1], align=MID,
+                      tones={2: "good", 3: "mid", 4: "bad"})  # fmt: skip
     s.note("The model points rank customers better in every book; at 61–180 also in every "
            "month, DPD band and loan product. High and Moderate then hold 78% of the money "
            "collected from cards at 61–180, against 53%.")  # fmt: skip
@@ -1148,11 +1147,11 @@ def sensitivity(wb: Workbook) -> None:
            "stays.")  # fmt: skip
 
     s.section("Broken as a level (run 1, 18 Nov 2026)")
-    s.header(["Book", "Paid a due:\nBroken with a kept promise", "Paid a due:\nPartly kept",
-              "Difference, pp\n[95% interval]", "State AUC:\nwith / without Broken"],
-             [2, 1, 1, 1, 1], height=44)  # fmt: skip
-    for book, a, b, d, auc in BROKEN:
-        s.row([book, _pc(a), _pc(b), d, auc], [2, 1, 1, 1, 1], align=MID)
+    s.header(["Book", "Paid a due:\nBroken, kept one", "Paid a due:\nPartly kept",
+              "Difference\n(pp)", "95% interval\n(pp)", "State AUC:\nwith Broken",
+              "State AUC:\nwithout"], height=44)  # fmt: skip
+    for book, a, b, d, ci, w, wo in BROKEN:
+        s.row([book, _pc(a), _pc(b), d, ci, w, wo], align=MID)
     s.note("At 61–180 a broken record with a kept promise pays like Partly kept; at 180+ it pays "
            "less, but dropping Broken ranks no worse in any book. One rule for all: no Broken "
            "level.")  # fmt: skip
