@@ -280,6 +280,12 @@ Measured, not assumed (V2, V3).
   the streak of 3 and `commitments_last_broken_n` go; D-A3-16's commitment thresholds are now 12
   months / 2 concluded / 80%.
 
+- **D-A3-35: Dimension A stays as D-A3-34: no kept-rate floor, no recency rule, Kept rule unchanged** (user,
+  2026-11-19, `bundle_helpers/a3_final/a3_promise_sensitivity_summary.md`, all four model_ids). A 40% floor
+  costs state AUC at 60–180 (cc −0.005, rl −0.003; the rows under it pay like Partly kept) and is flat at 180+;
+  recency rules (last broken, broken streak) cost AUC or are flat. "Kept from 3 concluded" would add +0.002 at
+  cc 60–180 and is flat elsewhere; not taken, as the axis is signed off.
+
 - **V1h back 2026-11-13** (`bundle_helpers/a3_final/v1h_review.md`): GRR's month end ranks worst for loans and at 180+ (RL 61–180 AUC 0.643 vs 0.666), 30 days best or equal in every book; the no-evidence rows are the weakest part of Low (D-A3-27 holds); Thin pays less than Broken (V1i running). Deadline open with GRR; bundle 23 step 8 on hold. Model document: `docs/credibility/build_a3_workbook.py` (updated 2026-11-13; detailed results from `sonnet_a3_detailed_results_prompt.md`).
 - **V1i + detailed results back 2026-11-13** (`a3_final/v1i_summary.md`, `a3_detail_summary.md`): never promising (T0) is what separates, not breaking: Broken pays like one failed promise (T2) and well above T0, also inside reachable / contacted accounts. Broken +1 ranks best in every book, deadline and month (state AUC cc61 +.045, rl61 +.030, 180+ +.02/+.03), moves 12% / 8% of 61–180 rows Low → Moderate (they pay like Moderate); Thin −1 hurts the state. Open for the user / GRR: Broken +1 (or 0); next test: Broken and T2 raised together, Partly +2. Detail: High > Moderate > Low on payment in every split and month; states 88–90% stable at 61–180, 99% at 180+; Cramér's V with other axes ≤ 0.41 (A4 highest); the payment step is at 2 points in every book. To check: rl_60_180 shows no dispute (58 at 180+): the RL dispute code mapping.
 - **D-A3-11 decided: payments judge** (user, 2026-11-09, from the bundle 17 check,
