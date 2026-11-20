@@ -5,10 +5,8 @@
     build_cc_balance      : minimum_due / overdue buckets / total_due (A3 dues).
     build_cc_billing      : billing-cycle header (billing_date, due_date,
                             next_billing_date) (A3 cycles).
-    build_cc_limits       : credit-limit snapshots pivoted by type_code, on its own
-                            spell-table window (no persona reader at present).
 
-The first three read ``crx_cc_acct_windows`` (``build_cc_acct_windows`` in
+All three read ``crx_cc_acct_windows`` (``build_cc_acct_windows`` in
 ``cc_a3_payment_credibility.nodes``) and prune raw partitions with
 ``_window_utils.prune_by_edp_load_date``. ``contract_idt`` is cast double -> long at the
 raw boundary; transactions keep primary_entry_idt != 0 and org == 100.
@@ -132,55 +130,6 @@ def build_cc_transactions(
         F.col("txn_category").cast("string"),
         F.col("is_post_block_x_fee").cast("int"),
     ).distinct()
-
-
-def build_cc_limits(
-    raw_stg_limit: DataFrame,
-    crx_cc_spell_table: DataFrame,
-) -> DataFrame:
-    """CC credit-limit snapshots (``FIN_LIMIT`` and ``AVAILABLE`` pivoted by type_code)
-    in the window [min(t0) − 12 months, max(t0)] of each account's non-censored spells;
-    it does not read ``crx_cc_acct_windows``, whose forward edge is the observation
-    base.
-
-    Returns::
-
-        contract_id (long), observation_date (date),
-        credit_limit (double), available_limit (double)
-    """
-    spell = crx_cc_spell_table.filter(F.col("t0_censored_flag") == 0)
-
-    acct_windows = (
-        spell.groupBy("account_id")
-        .agg(
-            F.add_months(F.trunc(F.min("t0"), "month"), -12).alias("acct_start"),
-            F.trunc(F.max("t0"), "month").alias("acct_end"),
-        )
-        .select(
-            F.col("account_id").alias("contract_idt"),
-            "acct_start",
-            "acct_end",
-        )
-    )
-
-    scoped = scope_to_acct_window(raw_stg_limit, acct_windows, "banking_date")
-
-    pivoted = (
-        scoped.filter(F.col("type_code").isin("FIN_LIMIT", "AVAILABLE"))
-        # max(): the highest limit and the highest available amount win on a tie
-        .groupBy("contract_idt", "banking_date")
-        .pivot("type_code", ["FIN_LIMIT", "AVAILABLE"])
-        .agg(F.max("amount"))
-        .withColumnRenamed("FIN_LIMIT", "credit_limit")
-        .withColumnRenamed("AVAILABLE", "available_limit")
-    )
-
-    return pivoted.select(
-        F.col("contract_idt").alias("contract_id"),  # long
-        F.col("banking_date").cast(DateType()).alias("observation_date"),
-        F.col("credit_limit").cast("double"),
-        F.col("available_limit").cast("double"),
-    )
 
 
 def build_cc_balance(

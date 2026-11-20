@@ -1,14 +1,9 @@
 ##################################################
 # CRX PERSONA PIPELINE CONFIGURATION
 ##################################################
-# Evaluation window for the RL persona pipeline.
-# These dates control which spine rows are included in persona outputs
-# (crx_rl_a4_spine and all downstream assets).
-#
-# Filter is applied at the spine-join step (RL-A4-2), NOT on raw history
-# or T0 tables — full history is required for T0 identification and
-# pre-T0 feature lookback.
-#
+# Persona window: the months the obs base keeps (persona_start_date .. persona_end_date).
+# Raw histories (crx_cc_full_history, crx_rl_full_history) are not windowed: A4 reads
+# the whole DPD history to find the current delinquency episode.
 # Orthogonal to modelling.start_date / modelling.end_date (training spine window).
 ##################################################
 

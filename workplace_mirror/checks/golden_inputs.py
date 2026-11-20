@@ -951,20 +951,6 @@ def cc_a3_inputs() -> dict:
             " txn_description string, add_info string, trans_mcc int, trans_date date,"
             " card_idt int, service_class string",
         ),
-        "crx_cc_spell_table": df(
-            [(K, D(2026, 4, 10), 0), (K + 1, D(2026, 4, 10), 1)],
-            "account_id long, t0 date, t0_censored_flag int",
-        ),
-        "raw_stg_limit": df(
-            [
-                (float(K), D(2026, 3, 1), "FIN_LIMIT", 10000.0),
-                (float(K), D(2026, 3, 1), "AVAILABLE", 2000.0),
-                (float(K), D(2026, 3, 1), "ADD_LIMIT", 500.0),
-                (float(K), D(2024, 1, 1), "FIN_LIMIT", 9000.0),
-                (float(K + 1), D(2026, 3, 1), "FIN_LIMIT", 7000.0),
-            ],
-            "contract_idt double, banking_date date, type_code string, amount double",
-        ),
     }
 
 

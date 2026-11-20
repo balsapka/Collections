@@ -72,7 +72,6 @@ from enbd_collections.pipelines.bureau import validation as validation_bureau
 from enbd_collections.pipelines import model_input
 from enbd_collections.pipelines import model_training
 from enbd_collections.pipelines import model_reporting
-from enbd_collections.pipelines.crx_persona import cc_spell as crx_cc_spell
 from enbd_collections.pipelines.crx_persona import (
     cc_full_history as crx_cc_full_history,
 )
@@ -95,9 +94,7 @@ from enbd_collections.pipelines.crx_persona import (
 )
 from enbd_collections.pipelines.crx_persona import (
     rl_full_history as crx_rl_full_history,
-    rl_spell_table as crx_rl_spell_table,
 )
-from enbd_collections.pipelines.crx_persona import rl_a4_spine as crx_rl_a4_spine
 from enbd_collections.pipelines.crx_persona import (
     rl_a4_deterioration as crx_rl_a4_deterioration,
 )
@@ -237,7 +234,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         "rl_180_plus.bureau": bureau.create_pipeline(),
         # -- CRX Persona (experimental, additive) ---------------------------
         # Revert: remove this entry + the import above + rm -r crx_persona/
-        "crx_cc_spell_table": crx_cc_spell.create_pipeline(),
         "crx_cc_full_history": crx_cc_full_history.create_pipeline(),
         "crx_cc_raw_extract": crx_cc_raw_extract.create_pipeline(),
         "crx_cc_a4_deterioration": crx_cc_a4_deterioration.create_pipeline(),
@@ -251,8 +247,6 @@ def register_pipelines() -> dict[str, Pipeline]:
             crx_cc_a3_payment_credibility.create_pipeline()
         ),
         "crx_rl_full_history": crx_rl_full_history.create_pipeline(),
-        "crx_rl_spell_table": crx_rl_spell_table.create_pipeline(),
-        "crx_rl_a4_spine": crx_rl_a4_spine.create_pipeline(),
         "crx_rl_a4_deterioration": crx_rl_a4_deterioration.create_pipeline(),
         "crx_rl_a1_ability": crx_rl_a1_ability.create_pipeline(),
         "crx_rl_a2_locatability": crx_rl_a2_locatability.create_pipeline(),

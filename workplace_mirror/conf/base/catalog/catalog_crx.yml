@@ -1,7 +1,7 @@
 # ==============================================================================
 # CRX (collections-risk experimental) asset catalog
 #
-# All assets created by the T03+ persona-axis pipeline live here, under the
+# All assets created by the persona-axis pipelines live here, under the
 # 'crx_' prefix. This separation makes the abandon path clean:
 #   rm conf/base/catalog/catalog_crx.yml
 #   rm -r src/enbd_collections/pipelines/crx_persona/
@@ -11,12 +11,11 @@
 # model_id-namespaced — each model run writes to its own directory.
 # ==============================================================================
 
-# -- T04c: T0-scoped CC raw DDI intermediates ----------------------------------
+# -- CC raw extracts for A3 ------------------------------------------------------
 # Grain: (contract_id, observation_date) — one row per account per date.
 # Built by the crx_cc_raw_extract pipeline; the CC A3 pipeline reads crx_cc_transactions,
-# crx_cc_balance and crx_cc_billing.
-# Replaces prm_transaction / prm_limit / prm_balance primary-layer inputs,
-# which are spine-scoped and lack history for cc_180_plus T0 windows.
+# crx_cc_balance and crx_cc_billing. Read from raw because the spine-scoped primaries
+# lack the history the cc_180_plus windows need.
 # Grain: (account_id). The per-account [acct_start, acct_end] window of the CC raw
 # extracts, from the A3 episode anchor (build_cc_acct_windows).
 crx_cc_acct_windows:
@@ -30,13 +29,6 @@ crx_cc_transactions:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_transactions"
-  save_args:
-    mode: overwrite
-
-crx_cc_limits:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_limits"
   save_args:
     mode: overwrite
 
@@ -64,18 +56,6 @@ crx_cc_full_history:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_full_history"
-  save_args:
-    mode: overwrite
-
-# -- T03: Delinquency-spell table (CC) ----------------------------------------
-# Grain: (account_id, spell_id). One row per delinquency episode.
-# T0 = spell anchor for all A4 features.
-# Built from raw_stg_billing (no date/DLQ filter; leftsemi-scoped to cc_spine).
-# model_id-namespaced so cc_60_180 and cc_180_plus runs do not overwrite each other.
-crx_cc_spell_table:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_cc_spell_table"
   save_args:
     mode: overwrite
 
@@ -278,38 +258,13 @@ crx_cc_a3_payments:
     mode: overwrite
 
 # ── RL Foundation (RL-B1) ───────────────────────────────────────────────────
-# Grain: (account_id, month_end_date). Full pre-delinquency monthly history for
-# all RL spine accounts. Source: int_loan_master (month-end snapshots).
-# No date window — full history required for T0 identification (RL-B2) and
-# pre-T0 A4 lookback (RL-A4-2). Date filter applied downstream in crx_rl_a4_spine.
+# Grain: (account_id, month_end_date). Full monthly history for all RL spine
+# accounts. Source: int_loan_master (month-end snapshots). No date window: A4 reads
+# the whole DPD history to find the current delinquency episode.
 crx_rl_full_history:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_full_history"
-  save_args:
-    mode: overwrite
-
-# ── RL Foundation (RL-B2) ───────────────────────────────────────────────────
-# Grain: one row per account_id. T0 anchor table with first delinquency onset
-# date and pre-T0 behavioural metadata. spell_id=1 / spell_end=NULL adapter
-# makes this compatible with join_spine_to_spell() (R18).
-crx_rl_spell_table:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_spell_table"
-  save_args:
-    mode: overwrite
-
-# ── RL A4 Spine (structural — superseded CASA/EMI classifier removed) ───────
-
-# Spine-grain structural projection (windowed to persona_start_date / persona_end_date).
-# Grain: (account_id, observation_date). Carries cif_id, spell_id, t0 (sourced from
-# crx_rl_spell_table) — no classification columns. Built by the rl_a4_spine pipeline.
-# Filter point per TASKS_RL.md.
-crx_rl_a4_spine:
-  type: spark.SparkDataset
-  file_format: parquet
-  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/crx/crx_rl_a4_spine"
   save_args:
     mode: overwrite
 

@@ -20,9 +20,9 @@ from pyspark.sql import functions as F
 from .._common import require_columns
 from .._dpd_journey import CC, build_deterioration, build_dpd_sequences, journey_params
 
-# Same value as cc_spell's _RESTRUCTURE_DLQ_THRESHOLD: an account whose earliest
-# billing row is already at this dlq_bucket or above was opened mid-delinquency by a
-# restructure, not merely cut off by the data depth (conformance D2).
+# An account whose earliest billing row is already at this dlq_bucket or above was
+# opened mid-delinquency by a restructure, not merely cut off by the data depth
+# (conformance D2).
 _RESTRUCTURE_DLQ_THRESHOLD = 4
 
 

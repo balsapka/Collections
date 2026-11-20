@@ -2,8 +2,7 @@
 
 ``build_cc_acct_windows`` reads the obs base and A4 (the episode anchor), so this runs
 after ``crx_cc_a4_deterioration`` and before ``crx_cc_a3_payment_credibility``. The
-transactions, balance and billing extracts read its windows; ``build_cc_limits`` keeps
-its own spell-table window.
+transactions, balance and billing extracts read its windows.
 
     kedro run --pipeline=crx_cc_raw_extract
 """
@@ -14,13 +13,12 @@ from ..cc_a3_payment_credibility.nodes import build_cc_acct_windows
 from .nodes import (
     build_cc_balance,
     build_cc_billing,
-    build_cc_limits,
     build_cc_transactions,
 )
 
 
 def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
-    """The account windows and the four extracts."""
+    """The account windows and the three extracts."""
     return Pipeline(
         [
             node(
@@ -42,16 +40,6 @@ def create_pipeline(**kwargs) -> Pipeline:  # pylint: disable=unused-argument
                 },
                 outputs="crx_cc_transactions",
                 name="build_crx_cc_transactions",
-                tags=["crx", "t04c"],
-            ),
-            node(
-                func=build_cc_limits,
-                inputs={
-                    "raw_stg_limit": "raw_stg_limit",
-                    "crx_cc_spell_table": "crx_cc_spell_table",
-                },
-                outputs="crx_cc_limits",
-                name="build_crx_cc_limits",
                 tags=["crx", "t04c"],
             ),
             node(

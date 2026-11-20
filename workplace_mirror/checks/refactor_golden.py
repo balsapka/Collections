@@ -428,8 +428,6 @@ PROBES = [
      lambda f: bool(f.where("is_post_block_x_fee = 1").limit(1).count())),
     ("billing", "latest cycle has no next statement",
      lambda f: bool(f.where("next_billing_date IS NULL").limit(1).count())),
-    ("limits", "limits pivoted from non-censored spells",
-     lambda f: bool(f.limit(1).count())),
     ("bureau_bounces_monthly", "two cheques on one day count once",
      lambda f: bool(f.where("cif_id = '9' AND bounce_events = 1"
                             " AND max_bounce_amount = 800").limit(1).count())),
@@ -489,8 +487,8 @@ NOT_COVERED = [
     "`product_features`' card minimum due and `crx_cc_balance` come through the"
     " `prm_cc` stand-in: the oracle fixes what our code does with them, not Way4's"
     " derivation.",
-    "Dead candidates (`cc_spell`, `rl_spell_table`, `rl_a4_spine`, `_spine_utils`) are"
-    " not run; `crx_cc_limits` (no reader) is run from a synthetic spell table.",
+    "The spell tables, `rl_a4_spine`, `_spine_utils` and `crx_cc_limits` were removed"
+    " in bundle 30 (no reader).",
 ]
 
 
