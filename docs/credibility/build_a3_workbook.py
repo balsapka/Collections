@@ -1001,6 +1001,10 @@ def _pc(x: float | None) -> str | None:
     return None if x is None else f"{x:.1f}%"
 
 
+def _auc_diff(x: float) -> str:
+    return "0.0000" if abs(x) < 5e-5 else f"{x:+.4f}".replace("-", "−")
+
+
 def _blank(n: int) -> tuple:
     return (None,) * n
 
@@ -1098,6 +1102,29 @@ SAME_DAY = [  # book, promises kept by a payment on the promise day, share of no
     ("Loans 61–180", "<10", "–", "<10", "–"),
     ("Loans 180+", "<10", "–", "14", "–"),
 ]
+# Promise rule test (19 Nov 2026): month ends January–May 2026, final rules, all four books.
+RULES = [  # rule, state AUC change vs the model rule per book (BOOKS order)
+    ("Kept rate floor 20%", (-0.0004, -0.0003, 0.0, 0.0)),
+    ("Kept rate floor 30%", (-0.0020, -0.0010, -0.0001, 0.0)),
+    ("Kept rate floor 40%", (-0.0050, -0.0030, -0.0002, 0.0)),
+    ("Kept rate floor 50%", (-0.0063, -0.0028, -0.0002, 0.0)),
+    ("Last promise not kept, under 80% kept", (-0.0078, -0.0047, -0.0003, -0.0001)),
+    ("Last 2 promises not kept", (-0.0044, -0.0014, -0.0001, 0.0)),
+    ("Last 3 promises not kept", (-0.0016, -0.0001, 0.0, 0.0)),
+    ("Kept from 70%", (-0.0001, 0.0003, 0.0, 0.0)),
+    ("Kept from 90%", (0.0001, -0.0004, 0.0, 0.0)),
+    ("Kept from 3 concluded", (0.0019, 0.0005, 0.0, 0.0)),
+]
+MOVED = [  # book, rule, rows moved, paid a due %: moved rows, level they leave, level they join
+    ("Cards 61–180", "Floor 40%", "3,979", 33.8, 34.3, 23.5),
+    ("Loans 61–180", "Floor 40%", "369", 53.9, 52.8, 44.3),
+    ("Cards 180+", "Floor 40%", "2,832", 16.8, 31.6, 16.8),
+    ("Loans 180+", "Floor 40%", "305", 22.0, 39.4, 19.8),
+    ("Cards 61–180", "Kept from 3 concluded", "1,551", 36.8, 42.9, 34.3),
+    ("Loans 61–180", "Kept from 3 concluded", "291", 50.5, 54.3, 52.8),
+    ("Cards 180+", "Kept from 3 concluded", "760", 33.7, 38.6, 31.6),
+    ("Loans 180+", "Kept from 3 concluded", "162", 41.4, 41.5, 39.4),
+]
 NO_EVIDENCE = [  # book, share of accounts, paid a due %: no evidence, rest of Low, Moderate
     ("Cards 61–180", 12.2, 3.9, 12.4, 35.2),
     ("Loans 61–180", 7.0, 9.2, 28.1, 54.2),
@@ -1108,9 +1135,9 @@ NO_EVIDENCE = [  # book, share of accounts, paid a due %: no evidence, rest of L
 
 def sensitivity(wb: Workbook) -> None:
     s = Sheet(wb.create_sheet("Sensitivity"), [20, 26, 16, 16, 16, 16, 16])
-    s.title("Sensitivity", "Why the promise points and the deadline are what they are. Back-tests "
-                           "on month ends March to May 2026, outcome: paid a due in the following "
-                           "3 months.")  # fmt: skip
+    s.title("Sensitivity", "Why the promise points, the promise rule and the deadline are what "
+                           "they are. Back-tests on month ends March to May 2026 unless a section "
+                           "says otherwise; outcome: paid a due in the following 3 months.")  # fmt: skip
     s.section("Paid a due by promise level", gap=0)
     s.header(["Book", *(LABEL[k] for k in ("kept", "partly", "broken", "promised", "no_promise"))],
              [2, 1, 1, 1, 1, 1])  # fmt: skip
@@ -1155,6 +1182,26 @@ def sensitivity(wb: Workbook) -> None:
     s.note("At 61–180 a broken record with a kept promise pays like Partly kept; at 180+ it pays "
            "less, but dropping Broken ranks no worse in any book. One rule for all: no Broken "
            "level.")  # fmt: skip
+
+    s.section("Kept rate floor, recent broken promises, Kept rule (month ends January to May 2026)")
+    s.header(["Rule (otherwise as the model)", *(b.replace(" ", "\n", 1) for b in BOOKS)],
+             [2, 1, 1, 1, 1], height=30)  # fmt: skip
+    for rule, diffs in RULES:
+        s.row([rule, *map(_auc_diff, diffs)], [2, 1, 1, 1, 1], align=MID)
+    s.note("State AUC change against the model rule (account bootstrap, 200 draws). A floor or a "
+           "recency rule moves a Partly kept account to Promised; no rule brings Broken back.")  # fmt: skip
+    s.r += 1
+    s.header(["Book", "Rule", "Rows moved", "Paid a due:\nmoved rows", "Paid a due:\nlevel left",
+              "Paid a due:\nlevel joined"], height=30)  # fmt: skip
+    for book, rule, n, *vals in MOVED:
+        s.row([book, rule, n, *map(_pc, vals)], align=MID)
+    s.note("At 61–180 customers who kept under 40% of their promises pay like Partly kept, not "
+           "Promised, so a floor ranks worse; at 180+ they pay like Promised but are too few to "
+           "change the ranking. A broken last promise lowers payment only at 180+, and as a rule "
+           "it adds nothing. Customers who kept 1 in 10 are almost absent. Kept on exactly 2 "
+           "concluded pays like Partly kept; Kept from 3 concluded ranks a little better on cards "
+           "at 61–180 only. The model rule stays (no floor, no recency, Kept from 2 concluded and "
+           "80%); Kept from 3 concluded is a candidate for a longer back-test.")  # fmt: skip
 
     s.section("A payment on the promise day (run 1)")
     s.header(["Book", "Promises it keeps", "Share of the\nnot-kept ones", "Rows that move up",
