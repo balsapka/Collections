@@ -1,1 +1,0 @@
-- Remove the old outputs of the deleted datasets in HDFS, for each model_id (cc_60_180, cc_180_plus, rl_60_180, rl_180_plus): `hdfs dfs -rm -r <persona path>/<model_id>/<persona folder>/crx/{crx_cc_spell_table,crx_rl_spell_table,crx_rl_a4_spine,crx_cc_limits}` (paths from the catalog entries in the previous commit; a folder that does not exist is fine).

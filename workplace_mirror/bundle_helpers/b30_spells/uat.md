@@ -1,6 +1,0 @@
-**Step 4.** Ask Sonnet the following, in one go, and fix what it finds before committing:
-
-1. **Catalog and registry.** List every top-level key the apply removed from `conf/base/catalog/catalog_crx.yml` and `src/enbd_collections/pipeline_registry.py` compared with the last commit. Expected: exactly `crx_cc_spell_table`, `crx_rl_spell_table`, `crx_rl_a4_spine`, `crx_cc_limits` (catalog) and the three registry entries `crx_cc_spell_table`, `crx_rl_spell_table`, `crx_rl_a4_spine`. Put back anything else that went missing.
-2. **Leftover files and references.** Delete whatever is left in `crx_persona/cc_spell/`, `crx_persona/rl_spell_table/` and `crx_persona/rl_a4_spine/` (e.g. an `__init__.py` the mirror does not have) and the folders. Search the whole repo (src, conf, tests, notebooks) for `cc_spell`, `rl_spell_table`, `rl_a4_spine`, `_spine_utils`, `join_spine_to_spell`, `build_cc_limits`, `crx_cc_limits`, `crx_cc_spell_table`, `crx_rl_spell_table`. Delete tests that only cover the removed code; fix any other reader, and list what you changed.
-3. `kedro registry list` runs, without the three removed pipelines; `python -c "import enbd_collections.pipeline_registry"` imports.
-4. The crx_persona tests pass; black, ruff and pylint clean on the touched files.
