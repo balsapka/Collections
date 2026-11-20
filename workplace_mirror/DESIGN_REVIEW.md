@@ -189,6 +189,8 @@ separately so each change in numbers has one cause.
   with DCORE's own agreement start date, if `dcore_stg_scope_agreements` carries one.
 - **A3 keeps the spell tables** until the DE moves it to `observation_date`; bundle 7 then
   deletes them.
+  **Done 2026-11-20 (bundle 30):** A3 reads the obs base and A4's episode start; the spell tables,
+  `rl_a4_spine`, `_spine_utils` and `crx_cc_limits` are removed. `cc_raw_extract` stays for A3's extracts.
 
   **Blocker:** the DE's A3 (`cc_a3_payment_credibility`, `rl_a3_payment_credibility`) is keyed on
   `(account_id, spell_id)` and reads the spell tables. The spell tables can only be deleted after
