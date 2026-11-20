@@ -409,8 +409,9 @@ the UC1 sample yet. The what-if rebuild reproduces the persisted A3 exactly (0 d
   +0.001 (loans, interval touching 0). They would be 0.8% / 3.0% of A3's promise events, 2.1% / 4.2% if every call in
   the store were extracted. The moved loan rows pay above both neighbouring levels (n 17–26, a selected group).
 
-**§14 settled for now (2026-11-20).** Not into A3: too few events to move the state. Cross-check: "promise on the
-call, none logged" and "dispute stated, not flagged" go in the stated block as flags for the collector and as a
+**§14 provisional reading (2026-11-20); nothing is locked or built until the full transcript run (user).** Not into
+A3 on today's sample: too few events to move the state. Cross-check: "promise on the
+call, none logged" and "dispute stated, not flagged" are candidates for stated-block flags for the collector and as a
 data-quality finding for collections operations / DCORE. Treat and context as in §14. Fill inside A1 Unknown stays
 a candidate. All re-tested on the full transcript run with the §14 bars, where reach may be much larger: the store
 holds a call for only ~6% of DCORE promise events today, so "every call extracted" here still undercounts a full run.
