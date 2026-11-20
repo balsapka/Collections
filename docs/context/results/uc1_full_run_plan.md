@@ -62,6 +62,25 @@ out whether they come from logging (agents) or from the data (DCORE feed / codes
 Output: a short note for collections operations / DCORE with the rates, where they concentrate, and the likely
 cause.
 
+## 2b. Every sample statement is re-checked (user, 2026-11-20)
+
+Each finding below was read on the sample and is re-tested on the full run; the result note says for each one
+whether it holds, changes or fails.
+
+| # | Sample statement | Re-test |
+|---|---|---|
+| S1 | UC1's counts, support and aggregation match our recomputation | recompute the customer-level levels from the per-conversation rows |
+| S2 | Coverage 10–13% cards / 12–19% loans (any call, 90 days), 3% / 5–8% extracted; no 180+ | §1 |
+| S3 | Stored calls are a selected group (DCORE promises with a call pay 15% vs 41% without, cards) | §1 selection check |
+| S4 | 60% / 85% of transcript promises unlogged on the CIF within a week; unlogged ones pay more than no promise on loans | §2a, D2 |
+| S5 | Stated disputes are almost never in A3's dispute flag; loans have no dispute flag | §2a, D3 |
+| S6 | Specific statements go with payment (employed, salary-date period, amount or date named, restructure / settlement / waiver requests); card settlement requests the exception | Part B: each level vs not detected, overall and within A1 / A3 states |
+| S7 | Inside A1 Unknown a stated reading pays about twice no reading; able > unable on cards | D4 |
+| S8 | Able vs partly able and the intent levels barely separate | D4, D5 and Part B3 level orderings |
+| S9 | Job and income claims only loosely match our income data, and the match does not change payment | Part C (claim × income class, payment by class), D6 |
+| S10 | Transcript promises as A3 events move almost nothing | D1 |
+| S11 | Calls at 61+ DPD are mostly extracted; the gap is calls at 1–60 DPD | §1 extraction by DPD at the call |
+
 ## 3. Prompts to reuse (git history)
 
 - `sonnet_uc1_uc2_validation_prompt.md` (`3b53168^`): stated levels vs UC2 states and payment.
