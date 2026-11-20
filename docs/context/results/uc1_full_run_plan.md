@@ -39,8 +39,28 @@ target state, in both products, n ≥ 100 per cell**. Outcomes: pay30 / pay45 (d
 | D7 | Treatment hints: reason, request, payment period | demand by A1 × A3; pay after each request type | descriptive, no bar |
 | D8 | 180+ | Part A coverage, then D2–D5 if n allows | the bar |
 
-Also report for collections operations, whatever D1–D3 decide: the unlogged promise and unflagged dispute rates
-(sample: 60% cards / 85% loans of transcript promises unlogged on the CIF within a week).
+## 2a. Logging gaps: re-assessed on the full data (user, 2026-11-20)
+
+Whatever D1–D3 decide, re-measure the gaps between what customers say on calls and what DCORE records, and find
+out whether they come from logging (agents) or from the data (DCORE feed / codes):
+
+- **Unlogged promises.** Share of transcript promises (amount or date named) with no DCORE promise on the account /
+  the CIF within ±3 and ±7 days (sample: 60% cards / 85% loans unlogged on the CIF within a week). Also the reverse:
+  DCORE promises next to a call where no intent was stated.
+- **Where the gap sits.** The same share by month, product, DPD band, call direction, campaign / queue, agent team
+  (aggregated, no agent ids), call length, and by promise type (full / partial / with delay, amount vs date named).
+  A gap spread evenly points to the feed; one concentrated in teams or queues points to logging practice.
+- **Timing.** For promises that are logged: days between the call and the DCORE entry, and whether the logged date
+  and amount match the stated ones.
+- **Disputes.** Share of stated disputes with no A3 dispute flag at the next month end (account and CIF), by
+  dispute type (system problem, amount, fraud, …); loans carry no dispute flag at all, so check the loan dispute
+  codes in DCORE.
+- **Requests.** Restructure, settlement and waiver requests stated on calls vs any matching DCORE record or
+  restructure within 90 days.
+- **Does it matter.** Payment of unlogged vs logged promises vs no promise, within A3 level.
+
+Output: a short note for collections operations / DCORE with the rates, where they concentrate, and the likely
+cause.
 
 ## 3. Prompts to reuse (git history)
 
