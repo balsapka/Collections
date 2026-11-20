@@ -333,7 +333,8 @@ stated 4.3% (235) vs no reading 3.4% (z ≈ 2.3). Small cells and repeated accou
 pattern a fill would need. Also untested so far: reason, period, repayment specifics, request, dispute; outcomes
 aligned to the statement (with_delay / partial pay late or below the due, the 1-month paid_due misses them);
 high-confidence detections only (43% of capacity detections are low confidence); consistency with observed data.
-Prompt: `workplace_mirror/bundle_helpers/uc1/sonnet_uc1_signals_prompt.md`.
+Prompt: `sonnet_uc1_signals_prompt.md` (run 2026-11-19 / 20, removed; last version in git `d7ef094`, reuse it for the
+full-run retest).
 
 ## 14. Integration design (proposed, Claude, 2026-11-19; settle after the signals prompt)
 
@@ -389,3 +390,27 @@ ending 2026-05-31.
 **Effect on §14:** fill inside A1 Unknown stays a candidate, below the n bar. Cross-check gains two concrete gaps for
 A3 (unlogged promises, unlogged disputes): the strongest case for using transcripts, subject to the CIF check.
 Treatment hints hold (specific content, requests). Next: 180+ Part A, and E5 / E6 at CIF level.
+
+## 16. Follow-up result (2026-11-20, 60-180 only): CIF matching, transcript promises as A3 events
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_signals_followup_summary.md`. 180+ not run: 180+ customers are not in
+the UC1 sample yet. The what-if rebuild reproduces the persisted A3 exactly (0 differences), so its numbers hold.
+
+- **Unlogged promises are real, not a CIF artefact.** Looking at every account of the CIF within ±7 days, 60% of card
+  and 85% of loan transcript promises still have no DCORE promise. Loans: those customers pay 48% within 30 days vs
+  30–34% with no promise at all; cards: 18–21% vs 17–18% (not adjusted for state). Where a DCORE promise does sit
+  next to the call, it pays no better.
+- **Stated disputes stay outside A3's flag at CIF level too**; loans carry no dispute flag at all.
+- **DCORE promises with a call in the store pay far less than those without** (cards 14.6% vs 41.2%), inside every
+  promise source and follow-up code. The calls in the store are a selected group (harder customers); the sampling
+  rule is unknown, which is why we ask UC1 for it.
+- **As A3 promise events they change nothing today.** Adding the unlogged transcript promises as events moves
+  Dimension A on 42 card and 64 loan account-months (≈ 5 per 10,000 / 4 per 1,000) and the state AUC by at most
+  +0.001 (loans, interval touching 0). They would be 0.8% / 3.0% of A3's promise events, 2.1% / 4.2% if every call in
+  the store were extracted. The moved loan rows pay above both neighbouring levels (n 17–26, a selected group).
+
+**§14 settled for now (2026-11-20).** Not into A3: too few events to move the state. Cross-check: "promise on the
+call, none logged" and "dispute stated, not flagged" go in the stated block as flags for the collector and as a
+data-quality finding for collections operations / DCORE. Treat and context as in §14. Fill inside A1 Unknown stays
+a candidate. All re-tested on the full transcript run with the §14 bars, where reach may be much larger: the store
+holds a call for only ~6% of DCORE promise events today, so "every call extracted" here still undercounts a full run.

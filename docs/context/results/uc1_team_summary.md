@@ -1,6 +1,6 @@
 # UC1 transcript signals in the collections persona: what we found and how we propose to use them
 
-DRAFT, 2026-11-19. Cards and retail loans at 61–180 DPD; 180+ follows.
+DRAFT, 2026-11-20. Cards and retail loans at 61–180 DPD; 180+ follows.
 
 ## What we tested
 
@@ -14,10 +14,11 @@ it consistent with what our data shows.
 
 - **The inputs are sound.** Counts, support and UC1's own aggregation match our recomputation from the
   per-conversation grid.
-- **Transcripts capture promises our collections system does not.** 79% of card and 91% of loan promises made on a
-  call have no promise logged on the account within ±3 days, and those customers pay more than customers with no
-  promise at all (loans 48% vs 29%, cards 18% vs 14% paid within 30 days). Stated disputes are likewise almost never
-  in the collections record. This is evidence our credibility axis does not see today.
+- **Transcripts capture promises our collections system does not.** 60% of card and 85% of loan promises made on a
+  call have no promise logged on any of the customer's accounts within a week. On loans those customers pay more
+  than customers with no promise at all (48% vs 30–34% within 30 days); on cards the gap is small. Stated disputes
+  are likewise almost never in the collections record. As extra promise events in our credibility axis they are too
+  few to change it today; we use them as a separate flag and will retest on the full run.
 - **Specific statements go with payment.** Customers who say they are employed, tie payment to their salary date,
   name an amount or date, or ask for a restructure, settlement or waiver pay more than those who say none of it
   (loans: 52–65% against 34%). Card settlement requests are the exception.
@@ -37,7 +38,7 @@ The persona key stays on observed data; UC1 adds what observed data cannot give.
 
 | Job | What UC1 gives | Status |
 |---|---|---|
-| Cross-check | promises and disputes stated on the call but not logged | strongest result; next we check promises logged on the customer's other accounts |
+| Cross-check | promises and disputes stated on the call but not logged | strongest result: 60% of card and 85% of loan promises have no logged promise on any of the customer's accounts within a week; shown to collectors as a flag and raised with collections operations |
 | Treat | reason, request, payment period, dispute | supported; feeds offer type, call timing, dispute routing and UC1's `collection_action` |
 | Fill | stated ability where our ability axis has no evidence | promising, needs the full run to reach a usable sample |
 | Context | the last stated stance and call date | collector view |
@@ -47,6 +48,7 @@ The persona key stays on observed data; UC1 adds what observed data cannot give.
 1. The full-run date over all transcripts, including calls made at 1–60 DPD, and the refresh cadence after it
    (ideally before each month end).
 2. Whether 180+ customers' calls are in the transcript store.
-3. The sampling rule for the current extractions: extraction rises from 6–11% of calls at 0–30 DPD to 50–78% at
-   61+ DPD, and we would like to weight it correctly until the full run.
+3. The sampling rule for the current extractions and transcripts: extraction rises from 6–11% of calls at 0–30 DPD to
+   50–78% at 61+ DPD, and logged promises with a call in the store pay far less than those without (15% vs 41% on
+   cards), so the stored calls look selected; we would like to weight them correctly until the full run.
 4. Detection confidence and conversation date carried through to the customer-level delivery.
