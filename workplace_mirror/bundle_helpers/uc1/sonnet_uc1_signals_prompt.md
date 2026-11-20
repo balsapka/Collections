@@ -134,10 +134,20 @@ Paste below the line into the same UAT Sonnet session.
 
 ---
 
-Two additions to tmp_validation/uc1_signals/, same rules and deliverable format (summary_uc1_signals_followup.md):
+Three additions to tmp_validation/uc1_signals/, same rules and deliverable format (summary_uc1_signals_followup.md):
 1. Run Part A (and B–F only where n allows) for cc_180_plus and rl_180_plus.
 2. 60-180 again, E5 and E6 at CIF level: a DCORE promise (or dispute) on any account of the conversation's CIF within
    ±3 days (and ±7 days) of the call, beside the account-level result. Report how many unmatched transcript promises
    become matched, and pay30_due / pay45_any of the still-unmatched vs the matched vs no promise at all. For E5.3,
    split the DCORE promise events without a conversation by promise source (plan vs follow-up note, and the follow-up
    code: digital collect, will pay at salary, etc.), to explain why they pay 41% against 15% for those with a call.
+3. 60-180, transcript promises as A3 events (what-if, no pipeline change). A transcript promise = as in E5 (intent
+   payback_full / partial / with_delay with amount_mentioned or date_specific). Treat each one still unmatched at CIF
+   level (±7 days) as an extra promise event on the account: event day = call date, deadline and kept / not kept
+   judged exactly as A3 judges a DCORE event (D-A3-28 deadline, crx_<p>_a3_dues / _a3_payments, a payment on the day
+   counts), merged into the account's events by A3's event rule. Recompute Dimension A and the state at month ends
+   2026-03 .. 07 (B, C and refusal unchanged). Report: accounts and account-months whose Dimension A level changes
+   (No promise -> Promised / Partly kept, Promised -> Partly kept, ...) and whose state changes; paid_due over the
+   next 3 months (as the A3 results run) of the moved rows next to the level they leave and the level they join;
+   state AUC vs the persisted A3 (account bootstrap, 200 draws). Also the share of all A3 promise events that would
+   come from transcripts, and that share if every call were extracted (scale by the Part A coverage).
