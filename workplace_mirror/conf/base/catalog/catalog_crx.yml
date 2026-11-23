@@ -470,11 +470,18 @@ crx_rl_a3_payments:
 # ── UC1 stated block (stated ability A5, stated intent A6, dispute / request flags) ──
 # UC1's outputs, read as they are from the shared file store (read only; written by the
 # UC1 team, never by us). No model_id in the path: one store for all model_ids.
+# The pipeline reads the customer table and the call metadata.
+crx_uc1_customer_signal_export:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/customer_signal_export"
+
 crx_uc1_metadata:
   type: spark.SparkDataset
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/metadata"
 
+# Read only by the UC1 validation snippets (tmp_validation/uc1_full), not by the pipeline.
 crx_uc1_extracted_signals:
   type: spark.SparkDataset
   file_format: parquet
@@ -490,7 +497,8 @@ crx_uc1_signal_level_conflicts:
   file_format: parquet
   filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/signal_level_conflicts"
 
-# Grain (account_id, observation_date); only the month of persona_end_date is scored.
+# Grain (account_id, observation_date); only the UC1 month (uc1_month_end, else
+# persona_end_date) is scored.
 crx_cc_uc1_conversation_signals:
   type: spark.SparkDataset
   file_format: parquet

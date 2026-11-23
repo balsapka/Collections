@@ -107,6 +107,7 @@ from enbd_collections.pipelines.crx_persona import (
 )
 from enbd_collections.pipelines.crx_persona import cc_uc1_stated as crx_cc_uc1_stated
 from enbd_collections.pipelines.crx_persona import rl_uc1_stated as crx_rl_uc1_stated
+from enbd_collections.pipelines.crx_persona import b31_check  # TEMPORARY
 from enbd_collections.pipelines import digital_login as dl
 from enbd_collections.pipelines.location import pipeline as location_features
 from enbd_collections.pipelines import genesys
@@ -243,6 +244,10 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_obs_base": crx_obs_base.create_rl_pipeline(),
         "crx_cc_uc1_stated": crx_cc_uc1_stated.create_pipeline(),
         "crx_rl_uc1_stated": crx_rl_uc1_stated.create_pipeline(),
+        "crx_cc_b31_snapshot": b31_check.create_snapshot_pipeline("cc"),
+        "crx_rl_b31_snapshot": b31_check.create_snapshot_pipeline("rl"),
+        "crx_cc_b31_compare": b31_check.create_compare_pipeline("cc"),
+        "crx_rl_b31_compare": b31_check.create_compare_pipeline("rl"),
         "crx_cc_a3_payment_credibility": (
             crx_cc_a3_payment_credibility.create_pipeline()
         ),

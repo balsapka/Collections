@@ -1,6 +1,7 @@
 """Kedro pipeline: CC UC1 stated block on the shared ``uc1_stated`` engine.
 
-Needs, for the model_id (cc_60_180 / cc_180_plus): ``crx_cc_obs_base``.
+Needs, for the model_id (cc_60_180 / cc_180_plus): ``crx_cc_obs_base``, ``crx_cc_a1_ability``,
+``crx_cc_a3_promise_events``.
 
     kedro run --pipeline=crx_cc_uc1_stated
 """

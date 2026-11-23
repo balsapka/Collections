@@ -1,0 +1,14 @@
+# TEMPORARY (bundle 31): the UC1 block before step 8; removed by the bundle's cleanup.
+crx_cc_b31_old_uc1:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b31_check/crx_cc_b31_old_uc1"
+  save_args:
+    mode: overwrite
+
+crx_rl_b31_old_uc1:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.persona}/b31_check/crx_rl_b31_old_uc1"
+  save_args:
+    mode: overwrite

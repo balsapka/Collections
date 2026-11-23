@@ -15,6 +15,11 @@ crx_persona: "${globals:crx_persona}"
 # as crx_persona above.
 model_id: "${globals:model_id}"
 
+# UC1 stated block: the month end UC1 is scored at (UC1's customer table carries no date
+# per level). null = crx_persona.persona_end_date. 2026-07-31: the last UC1 call is
+# 2026-07-16, so July is the month its table describes.
+uc1_month_end: "2026-07-31"
+
 # CC A3 payment credibility - earliest billing date A3 reads (TEMPORARY).
 # Billing has no rows 2021-01..2023-12 (balance/transaction: 2019-2021), so history
 # before this date is not used by A3, and the raw extract windows never start more than
