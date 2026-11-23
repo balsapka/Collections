@@ -451,3 +451,53 @@ to size the contact effect within A1 × A3 × DPD cells. Same code reruns on the
 `workplace_mirror/bundle_helpers/uc1/sonnet_uc1_full_data_prompt.md`. Nothing is decided until the refresh. The interim run is best effort (user, 2026-11-23): no n ≥ 100 gate; every test is read as
 direction and size with bootstrap intervals and n, cards and loans also pooled where small. The §14 bar applies to
 the final decision on the refreshed data.
+
+## 18. Interim exploration on the current export (2026-11-23, 60-180 only)
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_full_interim_summary.md` (prompt `sonnet_uc1_full_data_prompt.md` +
+its interim section, kept for the rerun on the refresh). Best effort: strength = strong (interval excludes 0 and
+≥ 5 pp / +0.02 AUC), suggestive, no signal. Covered group only, month ends 2026-04 .. 07.
+
+**What the delivery is.** Not the full run: 16% of cards' and 35% of loans' calls are extracted, and the call store
+itself ends 2026-07-16 (no later calls to extract). UC1's settings differ from their description (half-life 30
+days, not 60; remark weight 3.0, not 1.0). Bundle 26 does not break (columns and levels unchanged; A5 / A6 agree
+89-95% with the persisted block). Point in time works from the dated evidence (08-31 and 10-31 partitions identical
+up to July; 09-30 is a smaller cut, not to be used), not from the export.
+
+**Remarks are DCORE notes.** 92% of card remark days have a DCORE follow-up the same day; remark intent agrees with the
+transcript on only 36-39% of days, and remark-only readings order payers weakly (cards) or not at all (loans).
+Remarks are our own data re-read, not independent evidence, and the export weighs them as much as transcripts.
+
+**Reading rule.** `latest` transcript level within 90 days is as good as modal or 180-day rules; no fade with age
+inside 90 days; `support ≥ 2` helps only loan intent (a strength flag, not a requirement). Capacity AUC ~0.57,
+intent 0.55 (cards) / 0.58 (loans) among covered customers: stated levels are weak on their own.
+
+**Selection and contact.** Cards: covered reachable customers pay 7 pp less than uncovered reachable ones, in every A3
+level, and having a call lowers payment by 11 pp standardised: extracted calls go to harder customers. Loans: no
+difference. The earlier "a conversation is a positive signal" (§13, §14) was the reachable-vs-not effect A2 already
+holds; it does not survive inside reachable.
+
+**Decisions, best current reading:**
+
+| # | Reading | Strength |
+|---|---|---|
+| D1 transcript promises as A3 events | 0.2 / 2.5 state changes per 1,000 rows, AUC ±0.000 | no signal: drop |
+| D2 unlogged promise | loans +13 pp over no promise (+31 inside A3 promised, n 81); cards +3.5; unlogged never pay less than logged | loans suggestive, cards none |
+| D3 unflagged dispute | 99.9% of stated disputes unflagged, but no payment difference | no signal (ops note only) |
+| D4 A1 Unknown fill | able 23.5 / partly 17.7 / not stated 23.9 / unable 12.3% (cards), AUC 0.53; only "unable" stands out | suggestive (weak); the 2× "reading vs none" ratio mixes in reachability |
+| D5 A3 no_promise fill | loans: pays in full 34% / partly 18% / refuses <10, AUC 0.61 (0.71 at 3 months); cards none | loans strong, cards none |
+| D6 discrepancy flags | says able / pays in full while A1 Low: ~25 pp below its comparison (cards, small n); others weak | suggestive to strong (cards only) |
+| D7 treatment | lost employment pays about half of has employment (both); requests (untyped) and period do not separate | descriptive |
+
+**Logging gaps.** 60% (cards) / 81% (loans) of transcript promises have no DCORE promise on the CIF within ±7 days.
+The gap grows with DPD, call length and partial / with-delay promises; logged amounts match the stated amount in 29%
+of cases and dates in 12%; and agents' own DCORE notes name a promise that never becomes a promise event (55% / 84%
+of remark promises unlogged). That points to logging practice, not a feed loss.
+
+**Provisional reading (Claude, 2026-11-23; nothing decided until the refresh).** The candidates worth carrying are
+loan-side and narrow: stated intent inside A3 no_promise and the unlogged promise (both "said they will pay, DCORE
+has no promise"), the delinquency reason as a treatment hint in both products, and "says able while A1 Low" as a
+verify flag on cards. Card fills, D1, the dispute flag as a payment signal, requests (untyped), UC1's confidence,
+`supporting_data` and remarks as evidence are not worth carrying on this data. Questions for UC1: the settings
+mismatch, the 09-30 partition, request types and repayment values in the evidence, extracting all stored calls,
+refreshing the call store after 2026-07-16, and agent / team / queue fields in the call metadata.

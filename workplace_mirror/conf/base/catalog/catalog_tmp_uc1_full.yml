@@ -1,0 +1,29 @@
+# Temporary (UC1 full export exploration, tmp_validation/uc1_full); removed in the cleanup.
+# The UC1 team's tables in the shared store, read only. Explicit entries (no dataset factories). Distinct keys from
+# catalog_tmp_uc1_cov.yml so both files can load together. The evidence entry gives the parent folder: the snippet lists the
+# snapshot_date=YYYY-MM-DD folders and reads the non-empty ones one by one (a root load fails: UNABLE_TO_INFER_SCHEMA).
+crx_uc1_full_export:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/customer_signal_export"
+
+crx_uc1_full_evidence:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/proposer_level_observations"
+
+crx_uc1_full_posteriors:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/signal_level_posteriors"
+
+crx_uc1_full_time_weighted:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/time_weighted_signal_aggregation"
+
+# The quick check's proven entry (one partition folder: the persona end date's); fallback only.
+crx_uc1_full_evidence_end:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/proposer_level_observations/snapshot_date=${globals:crx_persona.persona_end_date}"
