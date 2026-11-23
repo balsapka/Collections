@@ -502,3 +502,8 @@ verify flag on cards. Card fills, D1, the dispute flag as a payment signal, requ
 added (no request types, repayment values in the evidence, or agent / team / queue fields), so the analysis works with
 the fields there are. What the refresh can still change is coverage: more stored calls extracted and calls after
 2026-07-16.
+
+**Decision (user and manager, 2026-11-23), replaces the reading rule above.** The state value per signal is UC1's
+`estimated_value`, their final verdict: read as is at the scoring month, rebuilt the way UC1 builds it for past months
+(validation) until UC1 delivers it dated. Agent remarks stay in as UC1 data (UC2 derives no such signals from DCORE notes).
+Our `latest` transcript reading served the interim exploration only.
