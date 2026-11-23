@@ -258,7 +258,12 @@ more). We make the best of it with our own point-in-time readings; everything st
    independent: Part 0 (0.3–0.5), points 1, 8; Part 1; points 3–5; D4 (A1 Unknown fill), D2 and Part 5.1–5.3
    (unlogged promises, with point 6), point 7; then D1, D3, D5, D6, D7, Part 2.4–2.6, Part 3.4, Part 6. Part 2.1
    (confidence) and Part 3.2–3.3 (reproducing the estimate) are dropped: the confidence is flat and we use our own
-   reading. Cells below n 100 are shown and marked "thin"; the bar stays as stated (both products, n ≥ 100).
+   reading.
+   Best effort, no n gate (user, 2026-11-23): the n ≥ 100 / both-products bar does not apply to this interim run.
+   Run every test on whatever n exists and read it as direction and size: paid difference and AUC with their
+   bootstrap intervals, n beside them. Where a product is small, also show cc and rl pooled (model_id as a stratum)
+   and coarser cells (e.g. A1 Unknown by able-or-partly vs unable vs not stated). Only the privacy rule stays:
+   cells under 10 shown as "<10".
 10. Coverage ceiling. Only about 20% of the book is A2 reachable (August), and a transcript needs a conversation,
     so the realistic ceiling is the reachable pool, not the whole book. Every coverage figure (Part 1, the Part 4
     cell counts, the projection) is shown against two denominators: the whole book and A2 reachable account-months.
@@ -268,4 +273,5 @@ more). We make the best of it with our own point-in-time readings; everything st
     days between the conversation and the month end): a data note for A2, not a change to it.
 11. Summary verdicts as in the prompt, plus: which reading rule (latest / modal90, window, support) separates best;
     the contact effect within cells; for D4 and D2 whether the direction holds in every A3 level × DPD stratum;
-    what the refresh must add for each D that is thin now.
+    per D: best current reading (direction, size, interval, n) and how confident we can be in it (strong /
+    suggestive / no signal), not pass / fail; what the refresh would most change.

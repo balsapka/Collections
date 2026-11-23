@@ -448,4 +448,6 @@ July as the headline month (freshest with an outcome; Aug-end has neither new ca
 are judged inside the covered group and within A3 level × DPD band (the selection does not bias a rule that only
 applies to covered customers, but the covered mix will change after a full extraction); covered vs not is used only
 to size the contact effect within A1 × A3 × DPD cells. Same code reruns on the refresh. Prompt: interim section of
-`workplace_mirror/bundle_helpers/uc1/sonnet_uc1_full_data_prompt.md`. Nothing is decided until the refresh.
+`workplace_mirror/bundle_helpers/uc1/sonnet_uc1_full_data_prompt.md`. Nothing is decided until the refresh. The interim run is best effort (user, 2026-11-23): no n ≥ 100 gate; every test is read as
+direction and size with bootstrap intervals and n, cards and loans also pooled where small. The §14 bar applies to
+the final decision on the refreshed data.
