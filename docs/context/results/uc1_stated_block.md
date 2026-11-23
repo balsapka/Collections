@@ -427,7 +427,10 @@ The delivered export still covers only about 10k conversations; a refresh is due
 - **Who.** 30% of the CIFs are in the cc 60-180 base, 10% in rl; at least 60% in neither (mostly card holders,
   about 40% of them delinquent outside 60-180). No product is strongly selected.
 - **Coverage.** Aug-end 5.5% of cc / 8.5% of rl account-months; pooled Jan-Aug 2.6% / 5.7%. Projection if every
-  stored call were extracted: 13% / 16%.
+  stored call were extracted: 13% / 16%. **Read against the reachable pool** (user, 2026-11-23): only about
+  20% of the book is A2 reachable (August) and a transcript needs a conversation, so ~20% is the realistic
+  ceiling; a full extraction would reach about two thirds of it on cards and four fifths on loans. Covered
+  customers being reachable is the design, not a bias; selection is judged within reachable.
 - **Quality.** Every capacity / intent estimate is LOW confidence (HIGH only for request); no repayment rows in
   the evidence and none usable in the export.
 - **Personas.** 0 of 660 cc / 470 rl personas reach 100 covered account-months; after a full extraction 43 cc
