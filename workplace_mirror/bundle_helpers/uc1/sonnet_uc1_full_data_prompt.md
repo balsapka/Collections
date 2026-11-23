@@ -207,3 +207,58 @@ Deliverables
    - logging_gap_note.md: one page for collections operations / DCORE: unlogged promise, dispute and request
      rates, where they concentrate, the likely cause (agents' logging or the feed), and whether it matters for
      payment. Aggregates only.
+
+---
+
+Interim run on the current export (2026-11-23, after the quick coverage check)
+Paste below the line into the same UAT Sonnet session, after the prompt above (it changes the uc1_full build; build
+it once, run it now on the current data, rerun it unchanged on the refresh).
+
+---
+
+Changes to the uc1_full build. The quick coverage check (`tmp_validation/uc1_cov/`) showed: 5,038 CIFs, transcript
+observations dated 2026-03 .. 07 only, every capacity / intent estimate LOW confidence, no repayment rows in the
+evidence and none usable in the export, covered customers selected (reachable, early DPD, fewer no_promise, pay
+more). We make the best of it with our own point-in-time readings; everything stays provisional until the refresh.
+
+1. Evidence partition. List the `proposer_level_observations` partitions (08-31, 09-30, 10-31) with row counts, CIFs
+   and max `observed_at`; check whether the observations dated up to 2026-07-31 are identical across them. Use the
+   latest non-empty partition, chosen by a single parameter so the refresh needs no code change. The export is used
+   only in 0.5 and for one comparison (point 4); it is timeless, all LOW, and carries no repayment data.
+2. Months. Month-end view on month ends 2026-04 .. 07 pooled (account bootstrap, 200 draws, for every AUC and
+   every paid difference that decides something), with 2026-07-31 as the headline single month (freshest readings
+   with an outcome). 2026-08-31 is not used for validation (no new transcripts, no outcome window). March and
+   earlier: report n only. Say the last payment date; use 3-month outcomes only where the window is complete.
+3. Our reading (validation only, nothing goes into a pipeline). Per CIF × signal at each month end, from evidence
+   with `observed_at` < month end:
+   - `latest`: the level(s) of the latest transcript customer-day within 90 days; several levels that day =
+     `mixed`; no transcript day but a remark day = the remark level, kept as its own source category;
+   - `modal90`: the most frequent transcript level over the 90 days, ties to the latest;
+   - `support`: number of customer-days naming the reading's level, and whether any day named another level.
+   Every Part 4 table: readings by `latest` (main) and the `modal90` AUC beside it; `support` ≥ 2 replaces the
+   HIGH-confidence-only versions (HIGH does not exist). Also by age of the reading (0–30 / 31–60 / 61–90 days):
+   does separation fade? And 90 vs 180-day windows for capacity and intent. This decides the reading rule the
+   pipeline would use.
+4. Agreement of `latest` at 2026-07-31 with the export's `estimated_value` (CIFs in both), per signal.
+5. Selection. Read every fill / flag inside the covered group (that is where a rule applies), always within A3
+   level × DPD band as well as overall, and say whether the direction holds in each stratum. Covered vs not covered
+   is used only for the contact effect: paid_due with a transcript day in the 90 days vs none, within A1 × A3 ×
+   DPD band cells (weighted to the book), so the effect of having a call is separated from what was said.
+6. Transcript promise. The evidence has no repayment rows. First check whether the new `signal_level_conflicts`
+   (per conversation, joined to `crx_uc1_metadata` for the date, legacy dropped) still has repayment slots
+   (amount / date named); if yes, a promise = paying intent + amount or date named, as before; if not, intent only
+   (payback_full / partial / with_delay), labelled an upper bound. Say which.
+7. Remarks. Where do remarks come from? Share of remark days with a DCORE follow-up / promise / agreement record on
+   any account of the CIF the same day or the day before; agreement of remark and transcript levels on days with
+   both; whether remark-only readings order payers like transcript readings.
+8. Calls in the store. `crx_uc1_metadata` conversations by month 2026-01 .. latest, for the model CIFs and in total,
+   vs extracted customer-days by month: does the store hold calls after July that UC1 has not extracted, or did it
+   stop? (Tells us what the refresh can add.)
+9. Scope and priority. 180+ is out (not in UC1's sample): report n only. Run in this order and keep each part
+   independent: Part 0 (0.3–0.5), points 1, 8; Part 1; points 3–5; D4 (A1 Unknown fill), D2 and Part 5.1–5.3
+   (unlogged promises, with point 6), point 7; then D1, D3, D5, D6, D7, Part 2.4–2.6, Part 3.4, Part 6. Part 2.1
+   (confidence) and Part 3.2–3.3 (reproducing the estimate) are dropped: the confidence is flat and we use our own
+   reading. Cells below n 100 are shown and marked "thin"; the bar stays as stated (both products, n ≥ 100).
+10. Summary verdicts as in the prompt, plus: which reading rule (latest / modal90, window, support) separates best;
+    the contact effect within cells; for D4 and D2 whether the direction holds in every A3 level × DPD stratum;
+    what the refresh must add for each D that is thin now.

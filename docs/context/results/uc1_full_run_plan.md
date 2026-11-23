@@ -14,6 +14,7 @@ table (point in time possible), bank corroboration built from our data (circular
 and `signal_level_conflicts` were overwritten at the paths bundle 26 reads. Exploration / validation prompt:
 `workplace_mirror/bundle_helpers/uc1/sonnet_uc1_full_data_prompt.md` (covers §0–§2b; Part 0 says whether it is the
 full transcript run).
+Quick coverage result and the interim approach: logic doc §17; the prompt's interim section applies until the refresh.
 
 1. **Schema map.** Map the clean schema to bundle 26's four inputs (`metadata`, `extracted_signals`,
    `simple_signal_aggregation`, `signal_level_conflicts`): CIF key, conversation id and date, slot / level, detected

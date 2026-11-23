@@ -415,3 +415,34 @@ call, none logged" and "dispute stated, not flagged" are candidates for stated-b
 data-quality finding for collections operations / DCORE. Treat and context as in §14. Fill inside A1 Unknown stays
 a candidate. All re-tested on the full transcript run with the §14 bars, where reach may be much larger: the store
 holds a call for only ~6% of DCORE promise events today, so "every call extracted" here still undercounts a full run.
+
+## 17. Signal export, quick coverage check (2026-11-23, 60-180 only)
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_coverage_summary.md` (prompt removed; last version in git `47e3af1`).
+The delivered export still covers only about 10k conversations; a refresh is due.
+
+- **Size.** 5,038 CIFs, 11,043 customer-days; transcript observations dated 2026-03 .. 07 only (none in August),
+  remarks earlier and later. 28,022 conversations of these CIFs are in the metadata. The export (latest snapshot
+  2026-10-31) has the same CIFs as the 08-31 evidence: no growth after July.
+- **Who.** 30% of the CIFs are in the cc 60-180 base, 10% in rl; at least 60% in neither (mostly card holders,
+  about 40% of them delinquent outside 60-180). No product is strongly selected.
+- **Coverage.** Aug-end 5.5% of cc / 8.5% of rl account-months; pooled Jan-Aug 2.6% / 5.7%. Projection if every
+  stored call were extracted: 13% / 16%.
+- **Quality.** Every capacity / intent estimate is LOW confidence (HIGH only for request); no repayment rows in
+  the evidence and none usable in the export.
+- **Personas.** 0 of 660 cc / 470 rl personas reach 100 covered account-months; after a full extraction 43 cc
+  personas (46% of the book) and 2 rl. Persona-level calls are out of reach; single-state fills are not.
+- **Selection.** Covered customers are reachable, in-country, early DPD, fewer no_promise / Low / Unknown, and pay
+  more (cc +5.6 pp, rl +10.1 pp; inside A1 Unknown 17.2% vs 8.7% cc).
+- **Readiness against the bar (both products, n ≥ 100).** A1 Unknown fill: cc cells ≥ 100, rl 61–142: not yet.
+  Unlogged-promise flag: n ≥ 100 in both (intent only, an upper bound: 81% / 87% unmatched). A3 no_promise fill,
+  dispute flag, treatment by A1 × A3: wait.
+
+**How we use it now (Claude, 2026-11-23).** The export is timeless, flat in confidence and without repayment data, so
+the interim analysis reads the dated evidence table with our own point-in-time reading (latest transcript level in
+the 90 days before the month end, with a modal and a support-count variant), month ends 2026-04 .. 07 pooled and
+July as the headline month (freshest with an outcome; Aug-end has neither new calls nor an outcome). Fills and flags
+are judged inside the covered group and within A3 level × DPD band (the selection does not bias a rule that only
+applies to covered customers, but the covered mix will change after a full extraction); covered vs not is used only
+to size the contact effect within A1 × A3 × DPD cells. Same code reruns on the refresh. Prompt: interim section of
+`workplace_mirror/bundle_helpers/uc1/sonnet_uc1_full_data_prompt.md`. Nothing is decided until the refresh.
