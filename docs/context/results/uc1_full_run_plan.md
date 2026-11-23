@@ -5,6 +5,16 @@ Prepared 2026-11-20. Nothing about UC1 is decided until this run (user). The sam
 
 ## 0. Intake (before any analysis)
 
+**Delivery received 2026-11-23** (`workplace_mirror/bundle_helpers/uc1/uc1_signal_export_datasets.md`): six tables in
+the shared store; official = `customer_signal_export` (primary: one row per CIF × signal at one `snapshot_date`,
+time-weighted `estimated_value` with HIGH / MEDIUM / LOW confidence, `latest_value`, `average_value`, agent-remark
+value, UC2-based `supporting_data`) and `proposer_level_observations` (evidence per customer-day, transcript and
+remark, one partition per snapshot). New against bundle 26: agent remarks count, confidence exists, a dated evidence
+table (point in time possible), bank corroboration built from our data (circular with A1). `simple_signal_aggregation`
+and `signal_level_conflicts` were overwritten at the paths bundle 26 reads. Exploration / validation prompt:
+`workplace_mirror/bundle_helpers/uc1/sonnet_uc1_full_data_prompt.md` (covers §0–§2b; Part 0 says whether it is the
+full transcript run).
+
 1. **Schema map.** Map the clean schema to bundle 26's four inputs (`metadata`, `extracted_signals`,
    `simple_signal_aggregation`, `signal_level_conflicts`): CIF key, conversation id and date, slot / level, detected
    vs published level, confidence. List what is new, renamed or gone. The next UC1 bundle carries the map plus the
