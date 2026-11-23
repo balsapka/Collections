@@ -1,0 +1,6 @@
+**Step 4.** Ask Sonnet the following, in one go, and fix what it finds before committing:
+
+1. **Catalog and registry.** List every top-level key the apply added or removed in `conf/base/catalog/catalog_crx.yml` and `src/enbd_collections/pipeline_registry.py` compared with the last commit. Expected: catalog adds `crx_uc1_customer_signal_export`, removes nothing (`crx_uc1_metadata` only moved up); registry adds the `b31_check` import and `crx_cc_b31_snapshot`, `crx_rl_b31_snapshot`, `crx_cc_b31_compare`, `crx_rl_b31_compare`. Put back anything else that went missing (compare with the last commit), and make sure no key appears twice across `conf/base/catalog/*.yml` (`catalog_tmp_uc1_cov.yml` must be gone; `catalog_tmp_uc1_full.yml` stays, its keys are `crx_uc1_full_*`).
+2. **Parameters.** `parameters_crx_persona.yml` has `uc1_month_end: "2026-07-31"` and everything it had before.
+3. **Tests.** Update the crx_persona tests of `uc1_stated` to the new inputs and columns (the module docstrings and `checks/uc1_stated_spec.py` in the bundle describe the rules); delete tests of removed functions. The crx_persona tests pass.
+4. `kedro registry list` shows the four `*_b31_*` pipelines; `python -c "import enbd_collections.pipeline_registry"` imports; black, ruff and pylint clean on the touched files.

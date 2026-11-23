@@ -507,3 +507,22 @@ the fields there are. What the refresh can still change is coverage: more stored
 `estimated_value`, their final verdict: read as is at the scoring month, rebuilt the way UC1 builds it for past months
 (validation) until UC1 delivers it dated. Agent remarks stay in as UC1 data (UC2 derives no such signals from DCORE notes).
 Our `latest` transcript reading served the interim exploration only.
+
+## 19. As built, bundle 31 (2026-11-23): the block on UC1's signal export
+
+Replaces §2–§8 where they differ (code: `crx_persona/uc1_stated/`; spec test `checks/uc1_stated_spec.py`).
+
+- **Source:** `customer_signal_export` as is; `estimated_value` = the state value per signal (transcripts and remarks).
+  Call metadata only for the evidence status. `simple_signal_aggregation`, `signal_level_conflicts` and
+  `extracted_signals` are no longer read by the pipeline.
+- **Month:** parameter `uc1_month_end` (2026-07-31; null = `persona_end_date`); other months NULL. No point-in-time
+  correction (user, 2026-11-23).
+- **States:** A5 / A6 mapping unchanged; a tie takes the more cautious level (raw value kept); `not-detected` →
+  `not_stated`; not in the export → `no_evidence` with `uc1_evidence` no_cif / no_conversation / not_extracted.
+- **Pass-through:** confidence, latest transcript and remark values (A5 / A6), `supporting_data` (capacity), reason
+  (+ confidence), period, dispute, request, fraudulent customer, amount / date / plan mentioned, snapshot date.
+- **Flags:** `stated_promise_unlogged_flag` (paying intent + amount or date mentioned, no A3 promise event of the
+  customer's accounts alive within ±7 days of the last call; NULL without a dated call); `verify_stated_ability_flag`
+  (able or pays in full while A1 low). Inputs added: `crx_<p>_a1_ability`, `crx_<p>_a3_promise_events`.
+- **Check (temporary):** distributions, old × new, paid_due over August by state and flag at July end; results feed
+  the workshop doc's findings table.

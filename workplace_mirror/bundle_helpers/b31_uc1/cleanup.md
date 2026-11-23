@@ -1,0 +1,4 @@
+- Remove `src/enbd_collections/pipelines/crx_persona/b31_check.py`, `conf/base/catalog/catalog_tmp_b31_check.yml`, and from `pipeline_registry.py` the `b31_check` import and the four `crx_*_b31_*` entries.
+- HDFS, for each model_id: `hdfs dfs -rm -r <persona path>/<model_id>/<persona folder>/b31_check` (path from `catalog_tmp_b31_check.yml`).
+- Remove the tracked folder `tmp_validation/uc1_cov/` (quick coverage check, finished). Keep `tmp_validation/uc1_full/` and `catalog_tmp_uc1_full.yml`: they rerun on the full UC1 data.
+- Remove `data/input/mirror_bundles/`.
