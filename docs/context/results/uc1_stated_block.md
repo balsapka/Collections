@@ -459,8 +459,8 @@ its interim section, kept for the rerun on the refresh). Best effort: strength =
 ≥ 5 pp / +0.02 AUC), suggestive, no signal. Covered group only, month ends 2026-04 .. 07.
 
 **What the delivery is.** Not the full run: 16% of cards' and 35% of loans' calls are extracted, and the call store
-itself ends 2026-07-16 (no later calls to extract). UC1's settings differ from their description (half-life 30
-days, not 60; remark weight 3.0, not 1.0). Bundle 26 does not break (columns and levels unchanged; A5 / A6 agree
+itself ends 2026-07-16 (no later calls to extract). UC1's settings (half-life 30 days, remark weight 3.0) differ from their
+description; taken as generated. Bundle 26 does not break (columns and levels unchanged; A5 / A6 agree
 89-95% with the persisted block). Point in time works from the dated evidence (08-31 and 10-31 partitions identical
 up to July; 09-30 is a smaller cut, not to be used), not from the export.
 
@@ -498,6 +498,7 @@ of remark promises unlogged). That points to logging practice, not a feed loss.
 loan-side and narrow: stated intent inside A3 no_promise and the unlogged promise (both "said they will pay, DCORE
 has no promise"), the delinquency reason as a treatment hint in both products, and "says able while A1 Low" as a
 verify flag on cards. Card fills, D1, the dispute flag as a payment signal, requests (untyped), UC1's confidence,
-`supporting_data` and remarks as evidence are not worth carrying on this data. Questions for UC1: the settings
-mismatch, the 09-30 partition, request types and repayment values in the evidence, extracting all stored calls,
-refreshing the call store after 2026-07-16, and agent / team / queue fields in the call metadata.
+`supporting_data` and remarks as evidence are not worth carrying on this data. UC1's outputs are taken as generated (user, 2026-11-23): no questions on their settings, and no extra fields will be
+added (no request types, repayment values in the evidence, or agent / team / queue fields), so the analysis works with
+the fields there are. What the refresh can still change is coverage: more stored calls extracted and calls after
+2026-07-16.
