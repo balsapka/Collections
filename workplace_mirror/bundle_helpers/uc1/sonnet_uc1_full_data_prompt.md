@@ -275,3 +275,41 @@ more). We make the best of it with our own point-in-time readings; everything st
     the contact effect within cells; for D4 and D2 whether the direction holds in every A3 level × DPD stratum;
     per D: best current reading (direction, size, interval, n) and how confident we can be in it (strong /
     suggestive / no signal), not pass / fail; what the refresh would most change.
+
+---
+
+July-end view on UC1's own estimate (2026-11-23, for the workshop)
+Paste below the line into the same UAT Sonnet session. Same folder, rules and loaders as `tmp_validation/uc1_full/`;
+one small added part, one short summary.
+
+---
+
+Decided since the interim run (user and manager): the state value per signal is UC1's `estimated_value` from
+`customer_signal_export`, taken as it is (remarks included, no point-in-time correction: assume it lines up). Align it
+with the UC2 states of the 2026-07-31 month end (closest to the last call, 2026-07-16; August payments give the
+outcome). Best effort, no n gate, strength as in the interim run. Our own `latest` reading is no longer used, except as
+one comparison column.
+
+J1 Coverage at 2026-07-31, cc_60_180 and rl_60_180: book, reachable, accounts whose CIF has an export row, and with a
+   non-`not-detected` estimate per signal (capacity, intent, reason, period, dispute, request); confidence mix.
+J2 States: A5 from the capacity estimate (full → able, partial → partly_able, none → unable), A6 from the intent
+   estimate (payback_full → pays_in_full, partial / with_delay → partly_or_later, no_payment → refuses); tied
+   estimates ("a|b") → the more cautious level; not-detected → not_stated; no export row → no reading. Distribution
+   overall and by A1 state, A3 state and level.
+J3 paid_due over August (as the A3 results run), with bootstrap intervals and n:
+   - A5 inside A1 Unknown, and inside each other A1 state; AUC of able > partly > not stated > unable inside Unknown;
+   - A6 inside A3 no_promise, and inside each other A3 level; AUC inside no_promise;
+   - reason (lost / reduced / has employment, increased obligations) overall and inside A1 Unknown;
+   - verify flag: A5 able or A6 pays_in_full while A1 Low, vs the rest of A1 Low with a reading;
+   - unlogged promise flag: A6 pays_in_full or partly_or_later with a repayment amount or date mentioned
+     (`repayment_specifics` `latest_value` or `agent_remark_value` a clean amount or date), and no DCORE promise on
+     any account of the CIF within ±7 days of the export's last call date; vs A6 the same without the amount / date,
+     vs no reading, within A3 level;
+   - stated dispute (any level) and request detected vs not.
+   Every table also pooled over cc and rl (model_id as a stratum) where a product is small.
+J4 Same J3 headline numbers with our `latest` reading beside them (one column), so the workshop sees whether UC1's
+   estimate gives the same picture.
+
+Deliverable: `summary_uc1_july_estimate.md`, under 150 lines, one table per item with a model_id column, ending with
+one line per item: what UC1's estimate shows at July end and whether it changes the interim picture (stated intent
+inside A3 no_promise on loans, unlogged promise on loans, reason, verify flag on cards, A1 Unknown fill).
