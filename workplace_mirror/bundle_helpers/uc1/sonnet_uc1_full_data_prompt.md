@@ -259,6 +259,13 @@ more). We make the best of it with our own point-in-time readings; everything st
    (unlogged promises, with point 6), point 7; then D1, D3, D5, D6, D7, Part 2.4–2.6, Part 3.4, Part 6. Part 2.1
    (confidence) and Part 3.2–3.3 (reproducing the estimate) are dropped: the confidence is flat and we use our own
    reading. Cells below n 100 are shown and marked "thin"; the bar stays as stated (both products, n ≥ 100).
-10. Summary verdicts as in the prompt, plus: which reading rule (latest / modal90, window, support) separates best;
+10. Coverage ceiling. Only about 20% of the book is A2 reachable (August), and a transcript needs a conversation,
+    so the realistic ceiling is the reachable pool, not the whole book. Every coverage figure (Part 1, the Part 4
+    cell counts, the projection) is shown against two denominators: the whole book and A2 reachable account-months.
+    Persona coverage (Q4 of the quick check) is recounted on reachable personas only. Selection is judged within
+    reachable (covered vs not covered reachable account-months, paid_due by A3 level and A1 state); being reachable
+    is the design, not a bias. Also report the covered account-months that A2 calls non_reachable (n, and how many
+    days between the conversation and the month end): a data note for A2, not a change to it.
+11. Summary verdicts as in the prompt, plus: which reading rule (latest / modal90, window, support) separates best;
     the contact effect within cells; for D4 and D2 whether the direction holds in every A3 level × DPD stratum;
     what the refresh must add for each D that is thin now.
