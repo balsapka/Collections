@@ -1,6 +1,6 @@
 # UAT Sonnet prompt: UC1 signal export: quick coverage and sample check
 
-Paste everything below the line into the UAT Sonnet session. Run this before the full exploration prompt
+Paste everything below the line into the UAT Sonnet session (self-contained: catalog entries and table layout included). Run this before the full exploration prompt
 (`sonnet_uc1_full_data_prompt.md`): the current export covers only about 10k conversations and will be refreshed in
 the coming days.
 
@@ -12,6 +12,45 @@ and `proposer_level_observations`) still cover only about 10k conversations. Bef
 read: who is covered, and is this sample good enough to make strategic calls on how UC1 joins the persona (fill
 inside A1 Unknown / A3 no_promise, discrepancy flags, treatment hints, context), or must we wait for the refresh?
 Counts and shares only; no outcome modelling beyond the one selection check (Q5).
+
+New datasets (not in the repo or the catalog yet)
+Add this file as it is: `conf/base/catalog/catalog_tmp_uc1_cov.yml`. It uses the path pattern of the existing
+`crx_uc1_simple_signal_aggregation` entry, which reads the same folder and works in PROD (no dataset factories: the
+workplace Kedro does not resolve them):
+
+```yaml
+# Temporary (UC1 quick coverage check); removed in the cleanup.
+crx_uc1_customer_signal_export:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/customer_signal_export"
+
+crx_uc1_proposer_level_observations:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:shared_id}/${globals:folders.feat}/file_store/current/outputs/timelines/proposer_level_observations"
+```
+
+The literal PROD folder is
+`hdfs://cdpprod/ai_data/sandpit_aacoe/ai_adv/enbd/risk_collections/dev/shared/05_feat/file_store/current/outputs/timelines/<name>`.
+The snippet prints both resolved file paths first and stops with a clear message if they differ from it or the load
+fails (then the user checks `hdfs dfs -ls` on the literal folder). If the folders are not parquet, say what they
+are and read them accordingly.
+
+What the two tables hold (from the UC1 team's description):
+- `customer_signal_export`: one row per `cif_id` × `signal` at one `snapshot_date`, overwritten on each run. Each
+  customer with any observation has 10 rows: 7 categorical signals (payment_capacity, payment_intent,
+  delinquency_reason, payment_period, dispute, request, fraudulent_customer) and 3 repayment slots
+  (`repayment_specifics:amount_mentioned`, `:date_specific`, `:plan_structure_mentioned`). Columns: `snapshot_date`,
+  `cif_id` (string), `signal`, `estimated_value` (the headline level; tied levels joined by `|`; `not-detected`),
+  `confidence` (HIGH / MEDIUM / LOW / N/A), `latest_value`, `agent_remark_value`, `average_value`, `average_count`,
+  `historic_consistency`, `supporting_data`. Customers with no observation have no rows.
+- `proposer_level_observations`: the evidence behind it, partitioned by `snapshot_date`
+  (`.../proposer_level_observations/snapshot_date=YYYY-MM-DD/`). Each partition holds the full history up to its
+  own date: filter to one partition, never add rows across partitions. One row per `cif_id` × `observation_id`
+  (one customer on one calendar day, `cif_id|YYYY-MM-DD`) × `signal` × `source` (`transcript` / `remark`) ×
+  `level`. Columns used here: `snapshot_date`, `cif_id`, `observation_id`, `observed_at` (midnight of the day),
+  `signal`, `source`, `level`. No conversation id: count conversations from `crx_uc1_metadata` if needed.
 
 Decided, to follow
 - model_ids: all four (cc_60_180, rl_60_180, cc_180_plus, rl_180_plus). Our book per model = crx_<p>_obs_base.
@@ -55,9 +94,8 @@ Q6 Readiness. For each integration job, can this sample support a decision now? 
    how many covered account-months per cell would there be (scale by calls per CIF, or count CIFs with any call)?
 
 Rules
-catalog.load only; model_id = catalog.load("params:model_id"), in every output file name. The two UC1 tables not in
-the catalog get explicit entries in a temporary `conf/base/catalog/catalog_tmp_uc1_cov.yml` (same path pattern as
-the existing `crx_uc1_*` entries; no dataset factories). Aggregates only: no account / CIF / conversation / agent
+catalog.load only (the two new tables through the temporary entries above); model_id =
+catalog.load("params:model_id"), in every output file name. Aggregates only: no account / CIF / conversation / agent
 ids, no free text; cells under 10 as "<10". A question that fails records its error and the rest still runs.
 Literal date filters right after catalog.load; scope UC1 tables to the model's CIFs first (except Q2's "in none");
 broadcast small tables; no row-level collect. New tracked folder `tmp_validation/uc1_cov/`; commit only that folder
