@@ -122,9 +122,9 @@ An illustrative customer, not a real one:
 | Persona (UC2) | ability Unknown · reachable · credibility Moderate (promised) · slow roller |
 | Stated ability (UC1) | partly able |
 | Reason (UC1) | lost employment |
-| Payment intention (UC1) | amount named on the last call; no promise in DCORE |
+| Stated intent (UC1) | partly or later |
 | Last call | 10 July |
-| Suggested action | follow up the payment named on the last call; offer hardship options |
+| Suggested action | offer hardship options; agree a partial or later payment |
 
 ## Decisions for the workshop and next steps
 
