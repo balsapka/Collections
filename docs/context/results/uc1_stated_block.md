@@ -589,3 +589,22 @@ issue was right for most of the gap.
   map was found for 74% (cc) / 99% (rl) of promise customers, which points at our agreement map or customer link.
   Case review prompt (agreement check first, then transcript + full DCORE log per case, classes a-d):
   `bundle_helpers/uc1/sonnet_uc1_unlogged_validation_prompt.md`.
+
+## 23. Case review of promises with no DCORE promise (2026-11-24, first read)
+
+Summary: `workplace_mirror/bundle_helpers/uc1/uc1_case_review_summary.md` (Sonnet's reading of 20 rl cases; the user's
+classes, the cc cases and rl 21-100 are still to do).
+- **Agreement link is sound.** <10 CIFs fan out to two DCORE customers, <10 agreements re-key one account. The outside
+  agreements are other accounts of the same customer: these delinquent customers hold more products than the book
+  (card and loan: 24% cc, 68% rl; plus overdrafts and closed accounts). Agents' follow-ups are often copied to every
+  agreement of the customer.
+- **Case set** (PTP / settlement / instalment rows or A3 promise codes, any agreement, ±7 days, all date columns):
+  318 days (21.3%) cc, 149 (26.8%) rl; entry dates only 25.4% / 29.9%. By month flat for cc (19-23%), rl 18-36%.
+- **20 rl cases:** a UC1 misread 8 (past payments, deferment / settlement requests, "I will try", amounts or dates
+  taken from the agent's turn, two impossible dates); b DCORE has it in the dialer feedback table
+  (`col_trn_atdfeedback`) 1; c promise noted in the remark under another code (LEFT_MSG, FOLLOW UP, SETTLEMENT,
+  JOB LOST) 11, five of them hedged; d nothing in DCORE 0. Hedged cases decide the split: a 30-70%, c 25-65%.
+- **Reading:** "UC1 promises are missing from DCORE" is not supported. UC1 over-reads promises, and DCORE records most
+  of the real ones in remark text outside the promise codes (SETTLEMENT is not an A3 promise code).
+- Open: user classes + cc cases; the dialer table as promise evidence on all days; SETTLEMENT and remark-only promises;
+  UC1 extraction feedback (agent turns, past payments, hedged language, impossible dates).
