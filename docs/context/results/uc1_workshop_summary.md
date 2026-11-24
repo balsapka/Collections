@@ -2,20 +2,17 @@
 
 24 November 2026
 
-UC2 tells us who to call first; UC1 tells us what to say and what we are missing. UC1 (what customers say on calls, extracted from transcripts and agent notes) should sit beside the UC2 persona (A1 ability, A2 locatability, A3 credibility, A4 deterioration), not inside it: A1–A4 keep setting the persona and tier, and what customers say on calls adds a few narrow signals, treatment hints and an operations finding. All readings are provisional until UC1 finishes generating signals for every available transcript and remark.
+UC2 tells us who to call first; UC1 tells us what to say and what we are missing. UC1 (what customers say on calls, extracted from transcripts and agent notes) should sit beside the UC2 persona (A1 ability, A2 locatability, A3 credibility, A4 deterioration), not inside it: A1–A4 keep setting the persona and tier, and what customers say on calls adds a few narrow signals, treatment hints and context for the collector. All readings are provisional until UC1 finishes generating signals for every available transcript and remark.
 
 ## Where we are
 
-The current UC1 delivery is a sample: 5,038 customers, with signals from calls dated March to 16 July 2026. It covers 2.6% of 61–180 DPD card account-months and 5.9% of loan account-months (April–July). UC1 is now generating signals for every available transcript and remark; the same analysis reruns on that data.
+The current UC1 delivery is partial: 5,038 customers, with signals from calls dated March to 16 July 2026. UC1 is now generating signals for every available transcript and remark, so the share of customers with a reading will grow; the same analysis reruns on that data. At the July month end:
 
 |  | Cards 61–180 | Loans 61–180 |
 | --- | --- | --- |
-| Book reachable (A2), share of account-months | 25% | 29% |
-| Covered by UC1, average April–July | 2.6% | 5.9% |
-| Covered by UC1 at the July month end | 4.8% | 9.0% |
-| Had a call UC1 has not read yet (July) | 21.8% | 17.4% |
-| Stored calls read by UC1 | 16% | 35% |
-| Projected coverage if all stored calls are read | about 13% | about 16% |
+| Accounts | 18,397 | 3,728 |
+| Reachable (A2) | about 25% | about 29% |
+| With a UC1 reading today | 891 (4.8%) | 334 (9.0%) |
 
 - **The realistic ceiling is the reachable pool** (about a fifth to a quarter of the book): a transcript needs a conversation. Most customers will never have a UC1 reading, so every customer must get a persona and tier without one.
 - **180+ DPD is barely covered.** UC1 reaches 107 card and 68 loan accounts at 180+ (0.1% or less), through the same customer's other products.
@@ -23,16 +20,16 @@ The current UC1 delivery is a sample: 5,038 customers, with signals from calls d
 
 ## What the data says
 
-The stated reason holds in both readings, and stated ability orders the card customers our data cannot read. Payment = paid at least one due in the following month, among customers with a UC1 reading. "April–July" uses each customer's latest call reading over four month ends; "July" uses UC1's own final estimate at the July month end. One month with small groups: read the July figures as direction. AUC measures how well a signal ranks payers above non-payers (0.5 = no better than chance, 1.0 = perfect).
+Two signals are worth using: stated ability on cards and the delinquency reason. Figures are the share of customers who paid at least one due in August, among customers with a UC1 reading at the July month end. Groups are small, so read them as direction.
 
-| Finding | Cards: April–July / July | Loans: April–July / July | Reading |
+| What we tested | Cards | Loans | Verdict |
 | --- | --- | --- | --- |
-| Stated ability inside A1 Unknown: able / partly / not stated / unable | 24 / 18 / 24 / 12%, AUC 0.53 / 27 / 16 / 14 / 7%, AUC 0.61 | 32 / 27% / no order (AUC 0.47) | cards: orders payers |
-| Reason: has employment vs lost employment | 21% vs 10% / 17% vs 14% | 37% vs 19% / 44% vs 23% | holds; strongest on loans |
-| Stated intent inside A3 "no promise": pays in full vs partly | no difference / no difference | 34% vs 18%, AUC 0.61 / 22% vs 24%, AUC 0.52 | not confirmed: recheck on the full data |
-| Says able or pays in full while A1 is Low | about 25 pp lower / no difference (20% vs 19%) | too few / no difference (33% vs 33%) | did not hold |
-| Transcript promises added to A3 as promise events | 0.2 state changes per 1,000 rows | 2.5 per 1,000 rows | no effect on A3 |
-| Stated dispute or request | no payment difference | no payment difference | not a risk signal |
+| Stated ability, where our data cannot judge ability (A1 Unknown) | says able 27% paid, says unable 7% | no clear difference | use on cards |
+| Delinquency reason | employed 17%, lost job 14% | employed 44%, lost job 23% | use as a treatment hint |
+| Stated intent, where DCORE has no promise (A3) | no difference | pays in full 34%, partly 18% (April–July); not seen in July | recheck on the full data |
+| Says able while our data says low ability | no difference | no difference | drop |
+| Promises from calls added to A3 | almost no change | almost no change | drop |
+| Disputes and requests | no difference | no difference | drop |
 
 Four findings change how we use UC1:
 
@@ -110,20 +107,10 @@ UC1's value is in what the collector does with it, and only a test can show that
 - **Measured:** promises kept, cures, and payment within 30 and 60 days, compared between the halves.
 - **Cost:** low; the UC1 fields are already produced per customer and month.
 
-## Coverage roadmap
-
-UC1's reach grows with extraction, up to the reachable pool:
-
-| Share of 61–180 account-months | Cards | Loans |
-| --- | --- | --- |
-| Today (July month end) | 4.8% | 9.0% |
-| All stored calls read | about 13% | about 16% |
-| Ceiling: reachable customers | about 25% | about 29% |
-
 ## What we ask the UC1 team
 
 1. **A monthly dated estimate,** back to March, so results can be measured over several month ends instead of one.
-2. **All stored calls read, and calls after 16 July added,** which takes coverage to about two thirds (cards) and four fifths (loans) of the reachable pool.
+2. **All available calls read, including calls after 16 July,** so every reachable customer with a call can have a reading.
 3. **180+ calls:** are recoveries and vendor calls recorded? If yes, UC1 could be the only signal source at 180+, where our ability axis is about 85% Unknown.
 
 ## Example: what the collector sees
@@ -149,7 +136,7 @@ The workshop is asked to agree the shape of the integration now, so the full-dat
 - [ ] UC1's final estimate per signal is the state value; it uses both call transcripts and agent remarks.
 - [ ] GRR runs the pilot: the UC1 card for a random half of reachable 61–180 customers with a reading.
 - [ ] The three asks go to the UC1 team (dated estimate, all calls read, 180+ calls).
-- [ ] Bar on the full data, per product: at least 5 pp paid difference or +0.02 AUC inside the target state, with at least 100 account-months per cell.
+- [ ] Bar on the full data, per product: at least 5 pp paid difference or +0.02 AUC (how well it ranks payers above non-payers) inside the target state, with at least 100 account-months per cell.
 
 Next steps:
 
