@@ -548,3 +548,17 @@ payments; one month end, so cells are small and read as direction).
 - **180+:** accounts with any UC1 conversation pay 5-9x the rest (cc 4.7-7.2% vs 1.1%; rl 8.8-12.3% vs 1.3%), n 107-
   329: a contact effect at 180+, relevant to finding the few positive 180+ customers.
 - A3 still separates far more than A5 / A6 (hi vs lo 35.2 vs 3.0 cc_60 without UC1); UC1 is read within states.
+
+## 21. Bundle 31 follow-up (2026-11-24): transcript vs remark, money at stake, reasons in A1 Unknown
+
+Source: `workplace_mirror/bundle_helpers/b31_uc1/b31_followup_summary.md` (60-180, July month end; prompt removed, last
+version in git `60adabb`). Limits: cc DPD band unmapped in the snippet; cc outstanding = latest July balance snapshot,
+not the month end.
+
+- **Transcript vs remark:** the transcript reading orders payers better in 5 of 6 comparisons (AUC 0.51-0.61 vs
+  0.44-0.55), every interval includes 0; the remark reading is mostly not detected (A5: 826 of 891 cc rows).
+- **Money:** unlogged promise cc 239 accounts / 349k due / 8.1M outstanding / 28% of due paid in August; rl 137 /
+  531k / 14.4M / 57% (inside A3 promised 93%). A1 Unknown = 54% of cc outstanding (283M, 13% paid) and 35% of rl
+  (148M, 30%); UC1 reaches 4% / 6% of its due. Cards A1 Unknown: says able 66% of due paid vs unable 5%.
+- **Reasons in A1 Unknown (cards):** lost employment 38% (27% in A1 Low, 16% in Moderate), lost + reduced 46%; they
+  pay least (reduced 4%, lost 11%, no reason stated 17%). Loans: lost employment 31-34%.

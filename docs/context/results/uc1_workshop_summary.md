@@ -43,6 +43,25 @@ Four findings change how we use UC1:
 - **Agent remarks come from DCORE notes.** 92% of card remark days have a DCORE follow-up the same day. They add what agents wrote but DCORE never records as structured data, such as promises noted but not logged.
 - **At 180+, the few customers UC1 reaches stand out.** Card accounts with any UC1 conversation pay 4.7–7.2% vs 1.1% for the rest; loans 8.8–12.3% vs 1.3% (107 to 329 accounts). Small, but it is the kind of positive signal 180+ needs.
 
+## Money behind the signals
+
+UC1's signals sit on real balances, and the biggest blind spot it can help with is A1 Unknown: more than half of card outstanding. July month end, AED; "paid of due" = August payments as a share of the amount due.
+
+| Group | Cards: accounts | Cards: outstanding | Cards: paid of due | Loans: accounts | Loans: outstanding | Loans: paid of due |
+| --- | --- | --- | --- | --- | --- | --- |
+| Whole book | 18,397 | 519M | 19% | 3,728 | 418M | 35% |
+| With a UC1 reading | 891 | 30M | 31% | 334 | 37M | 44% |
+| Promise said, not logged (being verified) | 239 | 8.1M | 28% | 137 | 14.4M | 57% |
+| A1 Unknown (our data cannot read ability) | 10,001 | 283M | 13% | 1,493 | 148M | 30% |
+| A1 Unknown, says able | 33 | 1.1M | 66% | 13 | 1.2M | 14% |
+| A1 Unknown, says unable | 72 | 2.2M | 5% | 22 | 2.2M | 79% |
+
+- **A1 Unknown holds 54% of card outstanding and about a third of loan outstanding;** UC1 reaches 4–6% of its amount due today. On cards, those who say they can pay paid 66% of their due in August; those who say they cannot, 5%. Loan groups are too small to read.
+- **Why A1 Unknown customers are behind (cards):** lost employment is the most common reason (38%, against 27% in A1 Low and 16% in A1 Moderate); lost or reduced employment together make 46%, and they pay least (reduced 4%, lost 11%, no reason stated 17%). On loans, lost employment is 31–34%.
+- **The call transcripts carry the signal.** Readings from transcripts order payers better than readings from agent remarks in 5 of 6 comparisons; remark readings are mostly empty. Each difference alone is within noise.
+
+Card outstanding is the latest July balance, close to but not exactly the month end.
+
 ## How UC1 fits the persona
 
 UC2 measures what customers do; UC1 records what they say. The persona key and the tier stay on A1 (ability), A2 (locatability), A3 (credibility) and A4 (deterioration); UC1 never changes an A1–A4 state. It adds a "stated layer" beside them with four jobs:
