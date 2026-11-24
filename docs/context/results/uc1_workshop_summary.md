@@ -2,7 +2,7 @@
 
 24 November 2026
 
-UC2 tells us who to call first; UC1 tells us what to say and what we are missing. UC1 (what customers say on calls, extracted from transcripts and agent notes) should sit beside the UC2 persona (A1 ability, A2 locatability, A3 credibility, A4 deterioration), not inside it: A1–A4 keep setting the persona and tier, and what customers say on calls adds a few narrow signals, treatment hints and context for the collector. All readings are provisional until UC1 finishes generating signals for every available transcript and remark.
+UC2 tells us who to call first; UC1 tells us what to say and what we are missing. UC1 (what customers say on calls, extracted from transcripts and agent notes) should sit beside the UC2 persona (A1 deterioration, A2 locatability, A3 credibility, A4 ability), not inside it: A1–A4 keep setting the persona and tier, and what customers say on calls adds a few narrow signals, treatment hints and context for the collector. All readings are provisional until UC1 finishes generating signals for every available transcript and remark.
 
 ## Where we are
 
@@ -24,7 +24,7 @@ Two signals are worth using: stated ability on cards and the delinquency reason.
 
 | What we tested | Cards | Loans | Verdict |
 | --- | --- | --- | --- |
-| Stated ability, where our data cannot judge ability (A1 Unknown) | says able 27%, says unable 7% (33 and 72 accounts) | no clear order (small groups) | use on cards |
+| Stated ability, where our data cannot judge ability (A4 Unknown) | says able 27%, says unable 7% (33 and 72 accounts) | no clear order (small groups) | use on cards |
 | Delinquency reason | employed 17%, lost job 14% | employed 44%, lost job 23% | use as a treatment hint |
 | Stated intent, where DCORE has no promise (A3) | no clear difference | pays in full 34%, partly 18% (April–July); not seen in July | recheck on the full data |
 | Says able while our data says low ability | no difference | no difference | drop |
@@ -40,29 +40,29 @@ Four findings change how we use UC1:
 
 ## Money behind the signals
 
-UC1's signals sit on real balances, and the biggest blind spot it can help with is A1 Unknown: more than half of card outstanding. July month end, AED; "paid of due" = August payments as a share of the amount due.
+UC1's signals sit on real balances, and the biggest blind spot it can help with is A4 Unknown: more than half of card outstanding. July month end, AED; "paid of due" = August payments as a share of the amount due.
 
 | Group | Cards: accounts | Cards: outstanding | Cards: paid of due | Loans: accounts | Loans: outstanding | Loans: paid of due |
 | --- | --- | --- | --- | --- | --- | --- |
 | Whole book | 18,397 | 519M | 19% | 3,728 | 418M | 35% |
 | With a UC1 reading | 891 | 30M | 31% | 334 | 37M | 44% |
-| A1 Unknown (our data cannot read ability) | 10,001 | 283M | 13% | 1,493 | 148M | 30% |
-| A1 Unknown, says able | 33 | 1.1M | 66% | 13 | 1.2M | 14% |
-| A1 Unknown, says unable | 72 | 2.2M | 5% | 22 | 2.2M | 79% |
+| A4 Unknown (our data cannot read ability) | 10,001 | 283M | 13% | 1,493 | 148M | 30% |
+| A4 Unknown, says able | 33 | 1.1M | 66% | 13 | 1.2M | 14% |
+| A4 Unknown, says unable | 72 | 2.2M | 5% | 22 | 2.2M | 79% |
 
-- **A1 Unknown holds 54% of card outstanding and about a third of loan outstanding;** UC1 reaches 4–6% of its amount due today. On cards, those who say they can pay paid 66% of their due in August; those who say they cannot, 5% (33 and 72 accounts). Loan groups are too small to read.
-- **Why A1 Unknown customers are behind (cards):** lost employment is the most common reason (38%, against 27% in A1 Low and 16% in A1 Moderate); lost or reduced employment together make 46%, and they pay least (reduced 4%, lost 11%, no reason stated 17%). On loans, lost employment is 31–34%.
+- **A4 Unknown holds 54% of card outstanding and about a third of loan outstanding;** UC1 reaches 4–6% of its amount due today. On cards, those who say they can pay paid 66% of their due in August; those who say they cannot, 5% (33 and 72 accounts). Loan groups are too small to read.
+- **Why A4 Unknown customers are behind (cards):** lost employment is the most common reason (38%, against 27% in A4 Low and 16% in A4 Moderate); lost or reduced employment together make 46%, and they pay least (reduced 4%, lost 11%, no reason stated 17%). On loans, lost employment is 31–34%.
 - **The call transcripts carry the signal.** Readings from transcripts order payers better than readings from agent remarks in 5 of 6 comparisons; remark readings are mostly empty. Each difference alone is within noise.
 
 Card outstanding is the latest July balance, close to but not exactly the month end.
 
 ## How UC1 fits the persona
 
-UC2 measures what customers do; UC1 records what they say. The persona key and the tier stay on A1 (ability), A2 (locatability), A3 (credibility) and A4 (deterioration); UC1 never changes an A1–A4 state. It adds a "stated layer" beside them with four jobs:
+UC2 measures what customers do; UC1 records what they say. The persona key and the tier stay on A1 (deterioration), A2 (locatability), A3 (credibility) and A4 (ability); UC1 never changes an A1–A4 state. It adds a "stated layer" beside them with four jobs:
 
 | Job | What UC1 adds | Where it lands | Candidates on today's data |
 | --- | --- | --- | --- |
-| Fill | a stated reading where UC2 has no evidence | priority order inside a tier | cards: stated ability inside A1 Unknown |
+| Fill | a stated reading where UC2 has no evidence | priority order inside a tier | cards: stated ability inside A4 Unknown |
 | Cross-check | what was said next to what DCORE recorded | collector view only | payment intention stated, no promise recorded |
 | Treat | the reason behind the delinquency | treatment hint next to the tier | lost vs has employment (strongest on loans) |
 | Context | last stated stance and call date | collector view only | every customer with a UC1 record |
@@ -78,7 +78,7 @@ What the stated layer holds for each customer and month, all taken from UC1's es
 
 | Field | Values | Use |
 | --- | --- | --- |
-| Stated ability | able / partly able / unable / not stated / no reading | cards: order inside A1 Unknown |
+| Stated ability | able / partly able / unable / not stated / no reading | cards: order inside A4 Unknown |
 | Stated intent | pays in full / partly or later / refuses / not stated / no reading | context; loans: recheck inside A3 "no promise" |
 | Delinquency reason | lost / reduced / has employment, increased obligations | treatment hint |
 | Payment intention, no promise recorded | yes / no | context for the collector |
@@ -91,11 +91,11 @@ What the stated layer holds for each customer and month, all taken from UC1's es
 Lead with what UC1 sees that nothing else does, keep two narrow signals, and judge UC1 by what it changes for the collector, not by how well it ranks payers on its own (A1–A4 already rank them). Each candidate is confirmed or dropped on the full data.
 
 1. **Keep the persona key A1–A4 unchanged.** UC1 sits beside it as the stated layer; a customer with no call keeps exactly the persona and tier they have today.
-2. **Cards: stated ability orders customers inside A1 Unknown,** where our data has no reading: able 27%, partly 16%, not stated 14%, unable 7% (July). Use it to order calls inside the tier.
+2. **Cards: stated ability orders customers inside A4 Unknown,** where our data has no reading: able 27%, partly 16%, not stated 14%, unable 7% (July). Use it to order calls inside the tier.
 3. **The delinquency reason as a treatment hint.** Lost employment pays about half as often as has employment on loans (23% vs 44%): route to hardship or restructure options rather than a standard promise script.
 4. **Context for the collector:** the last stated stance and call date, shown, not scored.
 5. **Recheck on the full data:** stated intent inside A3 "no promise" on loans (strong over April–July, not seen in July alone).
-6. **Drop:** the "says able while A1 is Low" flag (did not hold), transcript promises as A3 events, disputes and requests as risk signals, UC1's confidence as a filter (almost all LOW today).
+6. **Drop:** the "says able while A4 is Low" flag (did not hold), transcript promises as A3 events, disputes and requests as risk signals, UC1's confidence as a filter (almost all LOW today).
 7. **DCORE: two data points for the data owners.** No follow-ups at all were recorded on 6 July 2026, and promise-coded follow-ups fall from March to July while total follow-ups stay flat.
 
 ## Proving the value: a pilot
