@@ -582,3 +582,10 @@ issue was right for most of the gap.
 - **DCORE data points:** promise-coded follow-ups fall from March to July while total follow-ups stay flat (cc 5,612 →
   1,887; rl 799 → 579): a possible coding change that would also thin A3's promise events. No follow-ups on 2026-07-06.
 - UC1 agrees with DCORE where both exist: on DCORE promise days with an extracted call, UC1 found a paying intent in 73%.
+- **User 2026-11-24 (decisions for the case review):** "logged" = a promise in the PTP / settlement / instalment tables
+  or under A3's promise codes, on any agreement of the customer, ±7 days; a same-day non-promise code does not count:
+  a call promise missing from the promise tables is a DCORE recording / data issue. The "loan promises are entered on
+  the card" reading is not accepted: ~15% of customers hold more than one product, yet an agreement outside the model
+  map was found for 74% (cc) / 99% (rl) of promise customers, which points at our agreement map or customer link.
+  Case review prompt (agreement check first, then transcript + full DCORE log per case, classes a-d):
+  `bundle_helpers/uc1/sonnet_uc1_unlogged_validation_prompt.md`.

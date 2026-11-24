@@ -36,7 +36,7 @@ The stated reason holds in both readings, and stated ability orders the card cus
 
 Four findings change how we use UC1:
 
-- **About a quarter of promises made on calls have no promise in DCORE.** Looking at every DCORE agreement of the customer, 25% (cards) and 30% (loans) of promises made on calls have no promise entered anywhere within a week of the call. Promises are often entered on another product of the same customer: for loans, usually on the card. Most of the calls without a promise still have a DCORE entry that day under another code (settlement, callback, already paid, deferment). Whether each of these calls really held a promise is being checked on a sample of transcripts.
+- **About a quarter of promises made on calls have no promise in DCORE.** Looking at every DCORE agreement of the customer, 25% (cards) and 30% (loans) of promises made on calls have no promise entered anywhere within a week of the call. Most of the calls without a promise still have a DCORE entry that day under another code (settlement, callback, already paid, deferment). Each of these calls is being checked against its transcript and the customer's full DCORE log.
 - **Having a call is not a good sign by itself.** Inside reachable card customers, those with a transcript pay 7 pp less: calls go to harder cases. Customers with a UC1 reading pay more than the whole book (cards 16% vs 9%) only because they are reachable, which A2 already captures.
 - **Agent remarks come from DCORE notes.** 92% of card remark days have a DCORE follow-up the same day. They add what agents wrote but DCORE never records as structured data, such as promises noted but not logged.
 - **At 180+, the few customers UC1 reaches stand out.** Card accounts with any UC1 conversation pay 4.7–7.2% vs 1.1% for the rest; loans 8.8–12.3% vs 1.3% (107 to 329 accounts). Small, but it is the kind of positive signal 180+ needs.
@@ -100,7 +100,7 @@ Lead with what UC1 sees that nothing else does, keep three narrow signals, and j
 5. **Context for the collector:** the last stated stance and call date, shown, not scored.
 6. **Recheck on the full data:** stated intent inside A3 "no promise" on loans (strong over April–July, not seen in July alone).
 7. **Drop:** the "says able while A1 is Low" flag (did not hold), transcript promises as A3 events, disputes and requests as risk signals, UC1's confidence as a filter (LOW throughout today).
-8. **Operations / DCORE: the remaining promise gap and two data points.** Once the transcript sample confirms that the remaining quarter to third are real promises, a note goes to collections operations. For the DCORE data owners: no follow-ups at all were recorded on 6 July 2026, and promise-coded follow-ups fall from March to July while total follow-ups stay flat.
+8. **DCORE: the remaining promise gap and two data points.** If the transcript check confirms that these calls held a promise, the gap goes to the DCORE data owners as a recording issue, with two more data points: no follow-ups at all were recorded on 6 July 2026, and promise-coded follow-ups fall from March to July while total follow-ups stay flat.
 
 ## Proving the value: a pilot
 
@@ -149,7 +149,7 @@ The workshop is asked to agree the shape of the integration now, so the full-dat
 - [ ] A signal may be adopted for one product only (the strongest results are product-specific).
 - [ ] UC1's final estimate per signal is the state value; it uses both call transcripts and agent remarks.
 - [ ] GRR runs the pilot: the UC1 card for a random half of reachable 61–180 customers with a reading.
-- [ ] Once the transcript sample confirms the remaining promise gap, a note goes to collections operations / DCORE, with an owner on their side.
+- [ ] If the transcript check confirms the remaining promise gap, it goes to the DCORE data owners, with an owner on their side.
 - [ ] The three asks go to the UC1 team (dated estimate, all calls read, 180+ calls).
 - [ ] Bar on the full data, per product: at least 5 pp paid difference or +0.02 AUC inside the target state, with at least 100 account-months per cell.
 
