@@ -38,7 +38,7 @@ Two findings hold in both readings, promises said on calls but never logged and 
 
 Four findings change how we use UC1:
 
-- **Promises go unlogged, and they are real promises.** 60% of card and 81% of loan transcript promises have no DCORE promise on the customer within ±7 days; at July, 41% (cards) and 70% (loans) of promises with an amount or date have no promise record near the call. Logged amounts match what was said in 29% of cases and dates in 12%. Agents even write the promise in their DCORE note without creating a promise event: a logging practice gap, not a broken feed.
+- **Many promises made on calls have no DCORE promise record (being verified).** 60% of card and 81% of loan transcript promises have no DCORE promise on the customer within ±7 days; at July, 41% (cards) and 70% (loans) of promises with an amount or date have no promise record near the call. Logged amounts match what was said in 29% of cases and dates in 12%. We are verifying this against the raw call and DCORE records (time stamps, all agreements of the customer, all DCORE codes, who handled the call) before concluding whether it is a logging practice or a data-linking issue.
 - **Having a call is not a good sign by itself.** Inside reachable card customers, those with a transcript pay 7 pp less: calls go to harder cases. Customers with a UC1 reading pay more than the whole book (cards 16% vs 9%) only because they are reachable, which A2 already captures.
 - **Agent remarks come from DCORE notes.** 92% of card remark days have a DCORE follow-up the same day. They add what agents wrote but DCORE never records as structured data, such as promises noted but not logged.
 - **At 180+, the few customers UC1 reaches stand out.** Card accounts with any UC1 conversation pay 4.7–7.2% vs 1.1% for the rest; loans 8.8–12.3% vs 1.3% (107 to 329 accounts). Small, but it is the kind of positive signal 180+ needs.
@@ -84,7 +84,7 @@ Lead with what UC1 sees that nothing else does, keep three narrow signals, and j
 5. **Context for the collector:** the last stated stance and call date, shown, not scored.
 6. **Recheck on the full data:** stated intent inside A3 "no promise" on loans (strong over April–July, not seen in July alone).
 7. **Drop:** the "says able while A1 is Low" flag (did not hold), transcript promises as A3 events, disputes and requests as risk signals, UC1's confidence as a filter (LOW throughout today).
-8. **Operations / DCORE: the logging gap.** Most promises made on calls are never logged as promise events, and logged amounts and dates rarely match what was said. Fixing logging improves A3 for every customer, not only those with a call. A one-page note goes to collections operations.
+8. **Operations / DCORE: the promise gap, once verified.** If the raw-data check confirms that most promises made on calls are not recorded, fixing the recording improves A3 for every customer, not only those with a call, and a one-page note goes to collections operations.
 
 ## Proving the value: a pilot
 
@@ -133,7 +133,7 @@ The workshop is asked to agree the shape of the integration now, so the full-dat
 - [ ] A signal may be adopted for one product only (the strongest results are product-specific).
 - [ ] UC1's final estimate per signal is the state value; it uses both call transcripts and agent remarks.
 - [ ] GRR runs the pilot: the UC1 card for a random half of reachable 61–180 customers with a reading.
-- [ ] The logging-gap note goes to collections operations / DCORE, with an owner on their side.
+- [ ] Once the raw-data check confirms the promise gap, a note goes to collections operations / DCORE, with an owner on their side.
 - [ ] The three asks go to the UC1 team (dated estimate, all calls read, 180+ calls).
 - [ ] Bar on the full data, per product: at least 5 pp paid difference or +0.02 AUC inside the target state, with at least 100 account-months per cell.
 
