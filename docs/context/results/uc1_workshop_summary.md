@@ -23,12 +23,11 @@ The current UC1 delivery is a sample: 5,038 customers, with signals from calls d
 
 ## What the data says
 
-The stated reason holds in both readings, and stated ability now orders the card customers our data cannot read; the promise result is being re-measured at customer level. Payment = paid at least one due in the following month, among customers with a UC1 reading. "April–July" uses each customer's latest call reading over four month ends; "July" uses UC1's own final estimate at the July month end. One month with small groups: read the July figures as direction. AUC measures how well a signal ranks payers above non-payers (0.5 = no better than chance, 1.0 = perfect).
+The stated reason holds in both readings, and stated ability orders the card customers our data cannot read. Payment = paid at least one due in the following month, among customers with a UC1 reading. "April–July" uses each customer's latest call reading over four month ends; "July" uses UC1's own final estimate at the July month end. One month with small groups: read the July figures as direction. AUC measures how well a signal ranks payers above non-payers (0.5 = no better than chance, 1.0 = perfect).
 
 | Finding | Cards: April–July / July | Loans: April–July / July | Reading |
 | --- | --- | --- | --- |
-| Promise said on the call, no promise in the same product, vs no promise | +3.5 pp / inside A3 "no promise" 8.7% vs 4.1% | +13 pp / inside "no promise" 25% vs 14%; inside "promised" 61% vs 29% | to be re-measured at customer level (see below) |
-| Stated ability inside A1 Unknown: able / partly / not stated / unable | 24 / 18 / 24 / 12%, AUC 0.53 / 27 / 16 / 14 / 7%, AUC 0.61 | 32 / 27% / no order (AUC 0.47) | cards: now orders payers |
+| Stated ability inside A1 Unknown: able / partly / not stated / unable | 24 / 18 / 24 / 12%, AUC 0.53 / 27 / 16 / 14 / 7%, AUC 0.61 | 32 / 27% / no order (AUC 0.47) | cards: orders payers |
 | Reason: has employment vs lost employment | 21% vs 10% / 17% vs 14% | 37% vs 19% / 44% vs 23% | holds; strongest on loans |
 | Stated intent inside A3 "no promise": pays in full vs partly | no difference / no difference | 34% vs 18%, AUC 0.61 / 22% vs 24%, AUC 0.52 | not confirmed: recheck on the full data |
 | Says able or pays in full while A1 is Low | about 25 pp lower / no difference (20% vs 19%) | too few / no difference (33% vs 33%) | did not hold |
@@ -37,7 +36,7 @@ The stated reason holds in both readings, and stated ability now orders the card
 
 Four findings change how we use UC1:
 
-- **Fewer promises go unrecorded than first measured.** Checked against every DCORE agreement of the customer and DCORE's raw promise tables, about 25% (cards) and 30% (loans) of promises made on calls have no promise code anywhere within a week of the call. The first estimate (60% / 81%) matched within one product and one date only: for loans, the promise is often entered on the customer's card. Many of the remaining calls carry a same-day DCORE entry under another code (settlement, callback, already paid). Time zones, who handled the call and data load gaps were ruled out; whether each call really held a promise is being checked on a sample of transcripts.
+- **About a quarter of promises made on calls have no promise in DCORE.** Looking at every DCORE agreement of the customer, 25% (cards) and 30% (loans) of promises made on calls have no promise entered anywhere within a week of the call. Promises are often entered on another product of the same customer: for loans, usually on the card. Most of the calls without a promise still have a DCORE entry that day under another code (settlement, callback, already paid, deferment). Whether each of these calls really held a promise is being checked on a sample of transcripts.
 - **Having a call is not a good sign by itself.** Inside reachable card customers, those with a transcript pay 7 pp less: calls go to harder cases. Customers with a UC1 reading pay more than the whole book (cards 16% vs 9%) only because they are reachable, which A2 already captures.
 - **Agent remarks come from DCORE notes.** 92% of card remark days have a DCORE follow-up the same day. They add what agents wrote but DCORE never records as structured data, such as promises noted but not logged.
 - **At 180+, the few customers UC1 reaches stand out.** Card accounts with any UC1 conversation pay 4.7–7.2% vs 1.1% for the rest; loans 8.8–12.3% vs 1.3% (107 to 329 accounts). Small, but it is the kind of positive signal 180+ needs.
@@ -50,7 +49,6 @@ UC1's signals sit on real balances, and the biggest blind spot it can help with 
 | --- | --- | --- | --- | --- | --- | --- |
 | Whole book | 18,397 | 519M | 19% | 3,728 | 418M | 35% |
 | With a UC1 reading | 891 | 30M | 31% | 334 | 37M | 44% |
-| Promise said, none in the same product (to be re-measured) | 239 | 8.1M | 28% | 137 | 14.4M | 57% |
 | A1 Unknown (our data cannot read ability) | 10,001 | 283M | 13% | 1,493 | 148M | 30% |
 | A1 Unknown, says able | 33 | 1.1M | 66% | 13 | 1.2M | 14% |
 | A1 Unknown, says unable | 72 | 2.2M | 5% | 22 | 2.2M | 79% |
@@ -68,7 +66,7 @@ UC2 measures what customers do; UC1 records what they say. The persona key and t
 | Job | What UC1 adds | Where it lands | Candidates on today's data |
 | --- | --- | --- | --- |
 | Fill | a stated reading where UC2 has no evidence | priority order inside a tier | cards: stated ability inside A1 Unknown |
-| Cross-check | what was said but never recorded | collector priority; operations finding | promise said on the call, not logged (strongest on loans) |
+| Cross-check | what was said but never recorded | collector priority; operations finding | promise said on the call, none in DCORE |
 | Treat | the reason behind the delinquency | treatment hint next to the tier | lost vs has employment (strongest on loans) |
 | Context | last stated stance and call date | collector view only | every customer with a UC1 record |
 
@@ -96,7 +94,7 @@ What the stated layer holds for each customer and month, all taken from UC1's es
 Lead with what UC1 sees that nothing else does, keep three narrow signals, and judge UC1 by what it changes for the collector, not by how well it ranks payers on its own (A1–A4 already rank them). Each candidate is confirmed or dropped on the full data.
 
 1. **Keep the persona key A1–A4 unchanged.** UC1 sits beside it as the stated layer; a customer with no call keeps exactly the persona and tier they have today.
-2. **"Promise said on the call" as a priority signal, re-measured at customer level.** The first reading was strong on loans (61% vs 29% inside A3 "promised"), but it compared within one product only; it is rebuilt across all of the customer's agreements before it is used. The collector follows up the promise the customer already made.
+2. **"Promise said on the call, none in DCORE" as a priority signal (candidate).** Matched across all of the customer's agreements; its link to payment is measured on the full data. The collector follows up the promise the customer already made.
 3. **Cards: stated ability orders customers inside A1 Unknown,** where our data has no reading: able 27%, partly 16%, not stated 14%, unable 7% (July). Use it to order calls inside the tier.
 4. **The delinquency reason as a treatment hint.** Lost employment pays about half as often as has employment on loans (23% vs 44%): route to hardship or restructure options rather than a standard promise script.
 5. **Context for the collector:** the last stated stance and call date, shown, not scored.
