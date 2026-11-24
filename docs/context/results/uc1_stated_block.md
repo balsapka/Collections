@@ -562,3 +562,23 @@ not the month end.
   (148M, 30%); UC1 reaches 4% / 6% of its due. Cards A1 Unknown: says able 66% of due paid vs unable 5%.
 - **Reasons in A1 Unknown (cards):** lost employment 38% (27% in A1 Low, 16% in Moderate), lost + reduced 46%; they
   pay least (reduced 4%, lost 11%, no reason stated 17%). Loans: lost employment 31-34%.
+
+## 22. Raw-data check of "promises said on calls are not logged" (2026-11-24, 60-180)
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_unlogged_validation_summary.md` (raw DCORE: col_his_followup,
+col_mst_result, col_trn_agreement, ptp_trn_promise*, rps_cur_*; case review not done yet). The user's suspicion of a data
+issue was right for most of the gap.
+
+- **The 60% / 81% headline was a matching artefact** (A3 event date within ±7 days, one model's agreements). With A3's
+  own rule (event alive) it is 33% / 69%; matched at CIF level on every DCORE agreement with A3's promise codes 25% (cc)
+  / 30% (rl); counting broad result names (settlement, callback, "already paid", deferment) 9% / 11%.
+- **Main cause = data linking:** A3 matches inside one model's agreement map; the promise is often entered on another
+  product of the same customer (loans: 194 days on a card agreement). Ruled out: time zone / date column (≤4%), not a
+  collections call (a same-day DCORE follow-up exists on >97% of days), load gaps (except 2026-07-06: zero follow-ups
+  that day). Extraction error untested (case review open).
+- **Bundle 31 flag overstates:** model-scoped match, and the anchor call (last call before the month end) is itself a
+  promise day for only 42% (cc) / 51% (rl) of flagged customers. The payment results of the flag (§20) are not usable as
+  "not logged"; re-measure after a fix.
+- **DCORE data points:** promise-coded follow-ups fall from March to July while total follow-ups stay flat (cc 5,612 →
+  1,887; rl 799 → 579): a possible coding change that would also thin A3's promise events. No follow-ups on 2026-07-06.
+- UC1 agrees with DCORE where both exist: on DCORE promise days with an extracted call, UC1 found a paying intent in 73%.
