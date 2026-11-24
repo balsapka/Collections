@@ -608,3 +608,7 @@ classes, the cc cases and rl 21-100 are still to do).
   of the real ones in remark text outside the promise codes (SETTLEMENT is not an A3 promise code).
 - Open: user classes + cc cases; the dialer table as promise evidence on all days; SETTLEMENT and remark-only promises;
   UC1 extraction feedback (agent turns, past payments, hedged language, impossible dates).
+- **User 2026-11-24: stop here.** UC1 extracts the signals well; whether the customer can be trusted is the hard
+  question, and it is why agents often leave a promise out of DCORE. UC1 is not a credibility check (A3 is). The
+  unlogged-promise line is closed; the rest of the case review (user classes, cc cases, rl 21-100) is not run. Focus:
+  what the UC1 data says, how it fits the personas, what we do with it.
