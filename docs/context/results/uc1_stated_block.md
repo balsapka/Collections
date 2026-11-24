@@ -526,3 +526,25 @@ Replaces §2–§8 where they differ (code: `crx_persona/uc1_stated/`; spec test
   (able or pays in full while A1 low). Inputs added: `crx_<p>_a1_ability`, `crx_<p>_a3_promise_events`.
 - **Check (temporary):** distributions, old × new, paid_due over August by state and flag at July end; results feed
   the workshop doc's findings table.
+
+## 20. Bundle 31 results (2026-11-24): UC1's estimate at the July month end
+
+Source: `workplace_mirror/bundle_helpers/b31_uc1/b31_results_summary.md` (all four model_ids; outcome = August
+payments; one month end, so cells are small and read as direction).
+
+- **Coverage (July end):** UC1 reading for 4.8% of cc_60_180 and 9.0% of rl_60_180 accounts; 21.8% / 17.4% more had
+  a call UC1 has not read. 180+: 107 cc / 68 rl accounts reached through their CIF (0.0-0.1%).
+- **A1 Unknown fill, cards: holds and orders.** able 27.3% (33) / partly 15.7% (108) / not stated 13.9% (101) /
+  unable 6.9% (72) vs no reading 6.5%; AUC 0.613 (n 314; interim 0.528). Loans: no order (AUC 0.47, n 98).
+- **Promise said, not logged: holds.** Loans inside A3 promised: unlogged 60.6% (33) vs logged 28.0% (25) vs no UC1
+  29.0%; inside no_promise 25.0% (60) vs 13.9% without UC1. Cards smaller: no_promise 8.7% vs 4.1%, partly kept 23.3%
+  vs logged 18.4%. Overall unlogged promises pay as well as logged ones (cc 18.0 vs 16.9; rl 36.5 vs 39.0). Of
+  stated promises with an amount or date, 41% (cards) / 70% (loans) have no A3 promise event near the last call.
+- **Reason: holds on loans** (has employment 43.9% vs lost 23.3%), weaker on cards (17.3 vs 14.1; inside A1 Unknown
+  14.9 vs 10.8, reduced employment 4.3%).
+- **Did not hold at July:** stated intent inside A3 no_promise on loans (pays in full 22.2% vs partly 23.7%, AUC
+  0.52; interim 0.61 pooled); verify flag (cc 20.0 vs 19.4, rl 32.6 vs 33.1; interim -25 pp). Dispute and request:
+  no payment signal.
+- **180+:** accounts with any UC1 conversation pay 5-9x the rest (cc 4.7-7.2% vs 1.1%; rl 8.8-12.3% vs 1.3%), n 107-
+  329: a contact effect at 180+, relevant to finding the few positive 180+ customers.
+- A3 still separates far more than A5 / A6 (hi vs lo 35.2 vs 3.0 cc_60 without UC1); UC1 is read within states.
