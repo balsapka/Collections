@@ -1,8 +1,8 @@
 # UC1 integration: workshop summary and proposals
 
-Snapshot of the Claude Docs version, 2026-11-24.
+24 November 2026
 
-UC2 tells us who to call first; UC1 tells us what to say and what we are missing. UC1 should sit beside the persona, not inside it: A1–A4 keep setting the persona and tier, and what customers say on calls adds a few narrow signals, treatment hints and an operations finding. All readings are provisional until UC1 finishes generating signals for every available transcript and remark.
+UC2 tells us who to call first; UC1 tells us what to say and what we are missing. UC1 (what customers say on calls, extracted from transcripts and agent notes) should sit beside the UC2 persona (A1 ability, A2 locatability, A3 credibility, A4 deterioration), not inside it: A1–A4 keep setting the persona and tier, and what customers say on calls adds a few narrow signals, treatment hints and an operations finding. All readings are provisional until UC1 finishes generating signals for every available transcript and remark.
 
 ## Where we are
 
@@ -19,11 +19,11 @@ The current UC1 delivery is a sample: 5,038 customers, with signals from calls d
 
 - **The realistic ceiling is the reachable pool** (about a fifth to a quarter of the book): a transcript needs a conversation. Most customers will never have a UC1 reading, so every customer must get a persona and tier without one.
 - **180+ DPD is barely covered.** UC1 reaches 107 card and 68 loan accounts at 180+ (0.1% or less), through the same customer's other products.
-- **Results are measured as of each month end**, using only calls made before it, so they show what the signals would have told us at the time.
+- **Results are read at month ends**, with payment measured in the following month.
 
 ## What the data says
 
-Two findings hold in both readings, promises said on calls but never logged and the stated reason, and stated ability now orders the card customers our data cannot read. Payment = paid at least one due in the following month, among customers with a UC1 reading. "April–July" uses each customer's latest call reading over four month ends; "July" uses UC1's own final estimate at the July month end. One month with small groups: read the July figures as direction.
+Two findings hold in both readings, promises said on calls but never logged and the stated reason, and stated ability now orders the card customers our data cannot read. Payment = paid at least one due in the following month, among customers with a UC1 reading. "April–July" uses each customer's latest call reading over four month ends; "July" uses UC1's own final estimate at the July month end. One month with small groups: read the July figures as direction. AUC measures how well a signal ranks payers above non-payers (0.5 = no better than chance, 1.0 = perfect).
 
 | Finding | Cards: April–July / July | Loans: April–July / July | Reading |
 | --- | --- | --- | --- |
@@ -57,7 +57,7 @@ UC2 measures what customers do; UC1 records what they say. The persona key and t
 Rules that keep it safe:
 
 - **UC1's final estimate is the state.** For each signal, the state value is UC1's own estimate, built from call transcripts and agent remarks; we do not re-judge it.
-- **Measured as of each month end.** For past months, UC1's estimate is rebuilt from the calls and remarks before each month end, so results show what the signal would have said at the time.
+- **One month end for now.** UC1's estimate carries no date, so results use the July month end; a monthly dated estimate (see the asks below) would allow several.
 - **Within a tier, not across.** UC1 can reorder customers inside a tier and attach hints and flags; moving a customer across tiers needs an explicit decision on the full data.
 - **Confidence and bank check read with care.** UC1's confidence is LOW for every ability and intent estimate today, and its bank check uses our own income data, so neither is read as proof of a statement.
 
