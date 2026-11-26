@@ -656,3 +656,28 @@ refresh; results are named by export snapshot. Corrections and additions to the 
   comes from 451 old remark rows. Evidence age: at 07-31 56% of rows rest on evidence 91-180 days old, at 08-31 72%
   (calls stop 07-16). Usable as UC1's dated estimate only with an evidence-age field beside it.
 - **Outcomes:** one-month outcome for 04-30 .. 07-31, three-month for 04-30 and 05-31.
+
+## 25. Latest results on the August refresh (2026-11-26, all four model_ids)
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_latest_results_summary.md` (prompt removed, last version `56b1fc7`).
+R1 = export `estimated_value` at 07-31, August payments (slight look-ahead: export evidence runs to 08-31). R2 =
+posteriors at 04-30 .. 07-31 pooled, next-month payments (assessment; posteriors are not an agreed input). Extraction is
+still partial (calls to 07-16; April-June ~13% of card calls read), so all readings stay provisional.
+
+- **Coverage:** readings at 07-31 cards 3,528 (19.2%) / loans 680 (18.2%), was 891 / 334; evidence in the last 90 days
+  only 7.1% / 8.2%, mostly remarks.
+- **Weaker: stated ability inside A4 Unknown** (the workshop's lead card proposal). Cards AUC 0.510 R1 / 0.525 [0.496,
+  0.560] R2 (n 3,014), was 0.613 on n 314; loans 0.52-0.54. Readers in the tier pay more than non-readers (10-13% vs
+  6-8%), but the stated level does not order them. Sum-based paid of due still shows able above unable on cards (R2
+  38% vs 21%), driven by a few large payers.
+- **Stronger: delinquency reason** (has minus lost employment): cards +6.2 pp [3.9, 8.3] R2, every month end, +11.0 at
+  three months; loans +7.6 [0.9, 14.6] (was +20.6 on the old cut). Increased obligations pays as well as employed.
+- **New candidate: agent-remark intent on cards inside A3 no_promise:** AUC 0.607 [0.540, 0.680] R2 (n 367), 0.711 R1
+  (n 204); transcript-based intent there is 0.48. Fits the agents' judgement point (§23 closure).
+- **Loan intent inside A3 no_promise:** no signal at one month (0.54), AUC 0.661 [0.587, 0.753] at three months (04-30,
+  05-31, n 258): the recheck survives on a longer horizon. Loans partly_kept: pays in full +14.4 pp [3.2, 25.9] (n 63).
+- **Selection holds on cards:** readers inside A2 reachable pay 7-9 pp less at every month end; loans no difference.
+- **180+:** a recorded call in the last 90 days pays 5-14% vs 1.1-1.3%, but unread calls pay as much as read ones: the
+  signal is the conversation, not UC1's reading. Not yet compared within A2 reachable.
+- **Still no signal:** disputes, requests, cross-check flags (loans "says able while A4 Low" +9.0 pp [2.0, 16.9], n
+  165, positive not risk), amount or date named (cards R1 +4.2), confidence (HIGH <10 accounts).
