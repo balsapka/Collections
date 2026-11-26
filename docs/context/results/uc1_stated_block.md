@@ -639,3 +639,20 @@ last version `25c75f4`, reuse when UC1 refreshes `metadata` / `extracted_signals
   grid starts in 2022 (calls start March 2026), and whether it uses UC2 inputs.
 - **Outcome.** Payments run to 2026-08-31: month ends up to 07-31 have a one-month outcome; 08-31 waits for September.
   A month-end cohort is "as of today": readings for past months grow when UC1 extracts more calls.
+
+**Reusable check, first run (2026-11-26; `uc1/uc1_refresh_check_2026-08-31_summary.md`; same delivery, 60-180 only).**
+The snippet in the workplace `tmp_validation/uc1_refresh/` is now the standing check: rerun it per model_id on each UC1
+refresh; results are named by export snapshot. Corrections and additions to the first run above:
+
+- **Waterfall from right-party contact days** (8-14% of attempt days): the Genesys store has a transcript on 13% cc /
+  5% rl of them (nothing before March) — a store gap for the data owners, not UC1's. Store → metadata is 85-87%;
+  UC1 read March almost fully, April-June 12-14% cc / 22-27% rl of store-and-metadata days, July 33% cc.
+- **Coverage, three measures** (whole population, cc / rl): M1 export row (looks ahead), M2 evidence in the last 90
+  days, M3 posterior row at the month end. 05-31: M2 10.2% / 13.5% (the peak: its window holds the fully read March);
+  07-31: M1 19.2% / 18.2%, M2 7.1% / 8.2%, M3 19.2% / 18.2%. M3 = evidence ever seen, so it tracks M1 from June.
+- **Remark readings are not mostly empty** (the B31 follow-up said so on the older delivery): remark-only readings name
+  intent for 63-75% of CIFs, reason 51-63%, request 57-62%; capacity, period and dispute are nearly empty from remarks.
+- **Posteriors:** no UC2 or bank-data source (remark and transcript only; the `uc2` weight is unused). The 2022 start
+  comes from 451 old remark rows. Evidence age: at 07-31 56% of rows rest on evidence 91-180 days old, at 08-31 72%
+  (calls stop 07-16). Usable as UC1's dated estimate only with an evidence-age field beside it.
+- **Outcomes:** one-month outcome for 04-30 .. 07-31, three-month for 04-30 and 05-31.
