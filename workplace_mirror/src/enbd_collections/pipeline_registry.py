@@ -89,6 +89,7 @@ from enbd_collections.pipelines.crx_persona import (
     cc_a1_ability as crx_cc_a1_ability,
 )
 from enbd_collections.pipelines.crx_persona import obs_base as crx_obs_base
+from enbd_collections.pipelines.crx_persona import master as crx_master
 
 from enbd_collections.pipelines.crx_persona import (
     cc_a3_payment_credibility as crx_cc_a3_payment_credibility,
@@ -256,7 +257,12 @@ def register_pipelines() -> dict[str, Pipeline]:
         "crx_rl_a3_payment_credibility": (
             crx_rl_a3_payment_credibility.create_pipeline()
         ),
-        # TEMPORARY (bundle 28): removed by the cleanup
+        # Master e2e: upstream domains + every persona axis for one model_id.
+        # Name prefix = model_id so ModelConfigHook sets the model config.
+        "cc_60_180.persona_e2e": crx_master.create_cc_60_180_pipeline(),
+        "cc_180_plus.persona_e2e": crx_master.create_cc_180_plus_pipeline(),
+        "rl_60_180.persona_e2e": crx_master.create_rl_60_180_pipeline(),
+        "rl_180_plus.persona_e2e": crx_master.create_rl_180_plus_pipeline(),
         # -- Digital login (OMB) --------------------------------------------
         "digital_login": dl.create_pipeline(),
         "location_features": location_features.create_pipeline(),

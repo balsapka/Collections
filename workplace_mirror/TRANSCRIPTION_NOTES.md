@@ -450,3 +450,15 @@ Mirrored only what the persona code reads or bundles edit:
   entries (their cleanups are pending); the mirror keeps them out (bundle 24 cleanup mirrored ahead). Separator
   lengths and the em dash on the "Full pipelines" comment kept from the mirror (transcriber: `-`). Apart from
   those, the photo and the mirror are identical.
+
+## 2026-11-26 — persona e2e master pipelines (text handoff, not photos)
+
+The user added four end-to-end persona pipelines in the workplace (branch `feature/persona_refactor`, not yet
+committed there at handoff time).
+- `pipelines/crx_persona/master.py` (156 lines) copied verbatim from the handoff. It imports domain pipelines the
+  mirror lacks (`dcore/*`, `credit_card_way4/*`, `retail_loans/*`, `demographics`) and `cc_raw_extract`, so the
+  smoke check gains one known line (`import ...crx_persona.master`, same `EDP_LOAD_DATE_BUFFER_MONTHS` gap).
+- `pipeline_registry.py`: only lines 77–112 and 253–281 were shown. Added the `crx_master` import (after
+  `obs_base`, blank line kept) and the four `<model_id>.persona_e2e` entries after `crx_rl_a3_payment_credibility`.
+  The photo has no `# TEMPORARY (bundle 28): removed by the cleanup` line before `# -- Digital login`, so the mirror's
+  stale copy is removed. Lines 113–252 not compared.
