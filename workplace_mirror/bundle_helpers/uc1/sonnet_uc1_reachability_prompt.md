@@ -23,6 +23,11 @@ Decided (do not reopen)
   or increased obligations; an amount or a date named (export only); request stated. Negative = intent refuses;
   ability unable; reason lost or reduced employment; dispute stated. Report each signal and "any positive".
 - No minimum n; n beside every share; 95% intervals from 200 account resamples for the differences quoted.
+- Signal age decides how a signal is read: a customer's situation changes, so a statement from four months ago is not
+  a statement about today. For every signal, age = days from the latest evidence naming it (on or before the month
+  end) to the month end. Every signal table in Q1 and Q2 is shown by age band: 0-30, 31-60, 61-90, 91-180, over 180
+  days. Posteriors carry old values forward, so take the age from the evidence, never from the posterior row. Say
+  where a signal holds only when recent.
 
 Q1 Going dark
 - Unit: account-months reachable at month end t, t = 2026-04-30 .. 07-31; outcome = `reachability_state` at t + 1
@@ -37,6 +42,7 @@ Q2 Non-Reachable but talking
 - Unit: account-months non_reachable at month end t, 04-30 .. 08-31 (payments only to 07-31).
 - Accounts whose CIF has UC1 evidence in the 90 days before t; split by when the latest evidence falls:
   (a) on or before A2's `last_contact_date`; (b) after it, or no contact ever — a conversation A2 does not see.
+  Also days from the latest evidence to A2's `last_attempt_date` (did the customer talk after the failed calls began?).
 - For (b), why A2 does not see it, on the evidence day: a DCORE right-party contact on another account of the same
   CIF; any DCORE follow-up on the CIF but not a contact; nothing in DCORE (a Genesys-only conversation). Say whether
   the call was inbound or outbound if `crx_uc1_metadata` or Genesys holds the direction (say which field).
@@ -55,5 +61,5 @@ cells under 10 as "<10". A part that fails records its error and the rest still 
 Deliverables
 1. Snippet + README (one command per model_id), pushed from UAT.
 2. After the user commits the PROD results: `summary_uc1_reach.md` (under 150 lines): Q1 table (signal → going-dark
-   rate, within A3 / A4), Q2 table (groups a / b, the reasons for b, positive signals, amount due, paid_due), a short
+   rate, within A3 / A4, by signal age), Q2 table (by signal age) (groups a / b, the reasons for b, positive signals, amount due, paid_due), a short
    "what this means" list, and what could not be computed and why.
