@@ -672,12 +672,15 @@ still partial (calls to 07-16; April-June ~13% of card calls read), so all readi
   38% vs 21%), driven by a few large payers.
 - **Stronger: delinquency reason** (has minus lost employment): cards +6.2 pp [3.9, 8.3] R2, every month end, +11.0 at
   three months; loans +7.6 [0.9, 14.6] (was +20.6 on the old cut). Increased obligations pays as well as employed.
-- **New candidate: agent-remark intent on cards inside A3 no_promise:** AUC 0.607 [0.540, 0.680] R2 (n 367), 0.711 R1
+- **Watch item (too weak to rank on, user 2026-11-26: AUC ~0.6 is not good enough): agent-remark intent on cards inside A3 no_promise:** AUC 0.607 [0.540, 0.680] R2 (n 367), 0.711 R1
   (n 204); transcript-based intent there is 0.48. Fits the agents' judgement point (§23 closure).
 - **Loan intent inside A3 no_promise:** no signal at one month (0.54), AUC 0.661 [0.587, 0.753] at three months (04-30,
-  05-31, n 258): the recheck survives on a longer horizon. Loans partly_kept: pays in full +14.4 pp [3.2, 25.9] (n 63).
+  05-31, n 258): a watch item on a longer horizon, not a ranking signal. Loans partly_kept: pays in full +14.4 pp [3.2, 25.9] (n 63).
 - **Selection holds on cards:** readers inside A2 reachable pay 7-9 pp less at every month end; loans no difference.
 - **180+:** a recorded call in the last 90 days pays 5-14% vs 1.1-1.3%, but unread calls pay as much as read ones: the
   signal is the conversation, not UC1's reading. Not yet compared within A2 reachable.
 - **Still no signal:** disputes, requests, cross-check flags (loans "says able while A4 Low" +9.0 pp [2.0, 16.9], n
   165, positive not risk), amount or date named (cards R1 +4.2), confidence (HIGH <10 accounts).
+- **Reading (user 2026-11-26):** an AUC around 0.6 inside a state is too weak to rank customers on; A3 alone reaches 0.70-0.79.
+  No UC1 signal is a ranking signal on this data; UC1's case rests on treatment (reason), collector context and the
+  pilot. The 180+ conversation flag is a contact effect, to be compared within A2 reachable.
