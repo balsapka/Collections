@@ -684,3 +684,25 @@ still partial (calls to 07-16; April-June ~13% of card calls read), so all readi
 - **Reading (user 2026-11-26):** an AUC around 0.6 inside a state is too weak to rank customers on; A3 alone reaches 0.70-0.79.
   No UC1 signal is a ranking signal on this data; UC1's case rests on treatment (reason), collector context and the
   pilot. The 180+ conversation flag is a contact effect, to be compared within A2 reachable.
+
+## 26. UC1 reach: coverage ceiling, unreachable but talking, tier effect (2026-11-26, all four model_ids)
+
+Summary `workplace_mirror/bundle_helpers/uc1/uc1_reach_summary.md` (pack: `uc1_reach_results_pack.md`; prompt removed,
+last `d5121f9`; details prompt `sonnet_uc1_reach_details_prompt.md`). Groups: C1 reading with a positive signal, C2
+reading without, C3 conversation without a reading, C4 no conversation (CIF view, 90 days).
+
+- **Ceiling (07-31, account view):** right-party contact since March cards 49.3% / loans 54.7%, in the last 90 days
+  36.1% / 42.7%; Genesys store call in 90 days 10.5% / 13.3%; UC1 reading under 90 days 7.1% / 8.2% (any age 19.2% /
+  18.2%). The earlier "~20% reachable = ceiling" (§17) was too low: many customers go dark after a contact (2,919 cards
+  non-reachable with a contact in W).
+- **The store is the limit:** remark-only readings almost all sit on an unread store call (97.1% same day or the day
+  before, 2.6% extracted). Only about a third of right-party customers ever have a store call; the store is thin in
+  July. 180+: contact 3-4%, store ≈ 0, UC1 0.1%: no UC1 role at 180+ on today's data.
+- **Going dark:** no UC1 signal (C1 - C3 within last-contact age +0.6 / +0.3 / -1.1 pp); recency of contact decides.
+- **Unreachable but talking:** the conversation is the signal (cards C3 11.2% vs C4 4.1%). UC1 positive on top: cards
+  +1.7 pp [0.0, +3.3] (watch), loans +8.5 pp [+4.5, +12.0] (holds; strong positive +11.6). Cards C2 pays 4.2% (n 120).
+- **Tier (G3, indicative: shares moved after the persona rerun):** a positive reading does not lift agency accounts to
+  in-house level (cards 13% pay vs ~36%); inside the non-workable pool it marks agency-level payers (cards 8.6% vs C3
+  3.0%, loans 14.3% vs 6.7%; ~150 accounts a month). P4 was 0 by construction (movers ranked below in-house).
+- **Caveat:** C1 vs C3 mixes "UC1's reading" with "a recorded store call"; the details prompt splits C3 into store
+  call not read vs contact only.

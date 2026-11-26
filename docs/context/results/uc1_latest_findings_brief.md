@@ -11,9 +11,12 @@ least the amount due in the next month (`paid_due`). All UC1 results are provisi
 
 ## Messages for the slides
 
-1. **UC1 reach grew about four times, mostly through agent remarks.** Accounts with a UC1 reading at the July month
-   end: cards 3,528 (19.2% of 18,397), loans 680 (18.2% of 3,728); before: 891 / 334. With a call in the last 90 days
-   only 7.1% / 8.2%, because UC1's calls stop on 16 July.
+1. **UC1 reach grew about four times, mostly through agent remarks, but it is far from full.** Accounts with a UC1
+   reading at the July month end: cards 3,528 (19.2% of 18,397), loans 680 (18.2% of 3,728); before: 891 / 334. With a
+   call in the last 90 days only 7.1% / 8.2%, because UC1's calls stop on 16 July. Against the ceiling (reach run,
+   below): 36% / 43% of accounts had a right-party contact in those 90 days, and the Genesys store, which is all UC1
+   can read, holds a call for 11% / 13%. Do not put the 19% next to the 22% reachable share as if coverage were
+   nearly full: the readers are mostly not the reachable customers (cards: 1,275 of 3,528).
 2. **No UC1 signal is strong enough to rank customers.** The best in-state AUCs are about 0.55–0.66; A3 alone reaches
    0.70–0.79. User's view: an AUC around 0.6 is not good enough. UC1 does not change the persona or tier.
 3. **What holds: the delinquency reason, as a treatment hint.** Customers who still have a job pay more than those who
@@ -61,7 +64,23 @@ Recency does not rescue the weak signals; the reason holds best on the cleanest 
   only the reason and the context card are ready to show.
 - Framework tiles with the dashed UC1 box: unchanged.
 
-## Still running (may land before the deck)
+## Reach run (2026-11-26): coverage ceiling, unreachable customers, tier
 
-`summary_uc1_reach.md`: which UC1 signals come before Reachable → Non-Reachable, and Non-Reachable accounts with a
-recent conversation (about 700 card and 180 loan accounts at the July month end), by signal age.
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_reach_summary.md` (logic doc §26). Lines the deck can use:
+
+1. About half of 60-180 customers had a right-party conversation since March (cards 49%, loans 55%); at the July month
+   end 36% / 43% had one in the last 90 days. That is the most a conversation-based signal could reach.
+2. UC1 can read only calls in the Genesys store, which holds a conversation for 11% / 13% of accounts in the last 90
+   days. UC1 has a reading under 90 days old for 7% / 8%: about two thirds of what the store holds, a fifth of the
+   conversation ceiling. Which calls reach the store is the first question for the UC1 team.
+3. At 180+ hardly any customer is reached (3-4% since March) and UC1 reads almost none: no UC1 role at 180+ for now.
+   (The 180+ "recorded call pays 5-14%" point in message 6 is a contact effect, not UC1.)
+4. Among customers we cannot reach, having had a conversation is what goes with payment (cards 11% pay vs 4% without).
+   What UC1 read adds on top: cards +2 points (not enough), loans +8.5 points (holds).
+5. UC1 signals do not predict who goes dark; the age of the last contact does.
+6. Tier: a positive UC1 reading does not move an agency account to in-house level. It does find accounts in the
+   non-workable pool that pay like the agency tier (cards 8.6% vs 2% for the pool; loans 14%): about 150 accounts a
+   month. Tier figures are indicative (tier shares moved after a persona rerun).
+
+Still open (details prompt): whether the loan and non-workable results hold against "a store call UC1 did not read",
+the per-month store flow, and the age-limit tables.
