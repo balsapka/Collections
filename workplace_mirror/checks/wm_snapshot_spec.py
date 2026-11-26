@@ -5,6 +5,7 @@ Run: ``JAVA_HOME=/opt/homebrew/opt/openjdk@17 python workplace_mirror/checks/wm_
 
 from __future__ import annotations
 
+import logging
 import sys
 import tempfile
 from datetime import date
@@ -117,14 +118,17 @@ with tempfile.TemporaryDirectory() as tmp:
             and "2026-09-02: weeks end at 20260804" in msg,
         )
 
-    try:
-        dataset(root, "2026-08-02", required_from="2026-06-01").load()
-        check("partition without the history: fails", False)
-    except DatasetError as err:
-        check(
-            "partition without the history: fails",
-            "2026-08-02: weeks start at 20260704, run needs 202606" in str(err),
-        )
+    warnings: list[str] = []
+    handler = logging.Handler()
+    handler.emit = lambda record: warnings.append(record.getMessage())
+    handler.setLevel(logging.WARNING)
+    logging.getLogger(WMSnapshotDataset.__module__).addHandler(handler)
+    df = dataset(root, "2026-08-02", required_from="2026-06-01").load()
+    check(
+        "weeks start after required_from: loads the target, with a warning",
+        last_week(df) == 20260801
+        and any("weeks start at 20260704" in w and "202606" in w for w in warnings),
+    )
 
     try:
         dataset(root, "2026-10-02").save(None)

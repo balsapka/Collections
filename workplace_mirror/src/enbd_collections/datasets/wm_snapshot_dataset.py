@@ -13,10 +13,12 @@ nothing.
 
 Fallback order: newer partitions first (nearest first), then older ones (nearest
 first), at most ``max_fallback`` of them. A partition is only used when its
-``week_number`` range covers the ``required_from`` and ``required_through`` months (each
-optional): an older snapshot that would leave the last months empty, or a partition
-without the full history, is refused. When no partition qualifies, the load
-fails with the reason for each one tried. A fallback is logged as a warning.
+``week_number`` range reaches the ``required_through`` month (optional): an older
+snapshot that would leave the last months empty is refused. When no partition
+qualifies, the load fails with the reason for each one tried. A partition whose weeks
+start after the ``required_from`` month (optional) is still used, with a warning: WM
+keeps a rolling history, so the earliest months are empty. A fallback is logged as a
+warning.
 
 Catalog example::
 
@@ -144,8 +146,9 @@ class WMSnapshotDataset(AbstractDataset[None, DataFrame]):
         return (text.splitlines() or [type(err).__name__])[0][:300]
 
     def coverage_problem(self, df: DataFrame) -> str | None:
-        """Why ``df``'s weeks miss the ``required_from`` or ``required_through`` month,
-        or None (also when neither is set). Logs the partition's week range."""
+        """Why ``df``'s weeks miss the ``required_through`` month, or None (also when
+        neither date is set). Logs the partition's week range, and a warning when the
+        weeks start after the ``required_from`` month."""
         if not (self._required_from or self._required):
             return None
         week = F.col(self._week).cast("long")
@@ -153,10 +156,16 @@ class WMSnapshotDataset(AbstractDataset[None, DataFrame]):
         logger.info("%s: weeks %s to %s", self._root, first, last)
         if last is None:
             return "no rows"
-        if self._required_from and first // 100 > _month(self._required_from):
-            return f"weeks start at {first}, run needs {_month(self._required_from)}"
         if self._required and last // 100 < _month(self._required):
             return f"weeks end at {last}, run needs month {_month(self._required)}"
+        if self._required_from and first // 100 > _month(self._required_from):
+            logger.warning(
+                "%s: weeks start at %s, later than the requested month %s; the months"
+                " before are empty",
+                self._root,
+                first,
+                _month(self._required_from),
+            )
         return None
 
     def partitions(self) -> list[date]:
