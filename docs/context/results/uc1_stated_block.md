@@ -612,3 +612,30 @@ classes, the cc cases and rl 21-100 are still to do).
   question, and it is why agents often leave a promise out of DCORE. UC1 is not a credibility check (A3 is). The
   unlogged-promise line is closed; the rest of the case review (user classes, cc cases, rl 21-100) is not run. Focus:
   what the UC1 data says, how it fits the personas, what we do with it.
+
+## 24. UC1 refresh for the August month end (2026-11-26, 60-180)
+
+Source: `workplace_mirror/bundle_helpers/uc1/uc1_refresh_coverage_summary.md` (cc_60_180, rl_60_180; prompt removed,
+last version `25c75f4`, reuse when UC1 refreshes `metadata` / `extracted_signals`).
+
+- **What arrived.** Export (snapshot 08-31) 19,617 CIFs, was 5,040; new `signal_level_posteriors` (monthly grid,
+  2022-02 .. 2026-08) and `time_weighted_signal_aggregation`. `metadata` and `extracted_signals` are NOT refreshed:
+  calls still end 2026-07-16. The gain is agent remarks plus an apparent re-read of March calls (93-95% of March
+  metadata conversations in the conflicts table vs 19-44% for April-June).
+- **Not everything read.** Of persona-CIF conversations in the transcript store (Mar-Sep), 20% cc / 25% rl are not in
+  UC1 metadata (2,590 / 837 of them after 07-16); of what is in metadata, 84% cc / 66% rl have no ledger extraction.
+  No call after 08-31 has been read. The DCORE call-day step of the waterfall counts every OC / CB / IC follow-up,
+  failed attempts included, so "98% of call days have no transcript" overstates the store gap; the conversation-level
+  waterfall is the one to read.
+- **Coverage, two measures.** Export row on the CIF (B31's measure, no date): 19.2% cc / 18.2% rl at 07-31, was 4.8%
+  / 9.0%. Evidence in the 90 days before the month end (Sonnet's measure): 7.1% / 8.2% at 07-31 (14.8% / 12.2% of A2
+  reachable), mostly remark-only (cc 879 remark-only, 86 transcript-only, 334 both). Transcript readers at 07-31 are
+  unchanged (420 / 164). The two measures are not comparable: the "loans lower than B31" remark in the summary
+  compares them. Coverage falls with DPD and is lowest in A3 no_promise and A4 Unknown.
+- **Posteriors = UC1's estimate, dated.** Every CIF × signal has a value at every month end; the top level reproduces
+  the export's `estimated_value` for 90-100% of pairs (mismatches = tied levels) and a rebuild from the observations
+  with `parameters.json` (evidence up to each month end) for 95-100%. Values are carried forward with decay, so the
+  row does not show evidence age: recency has to come from the observations. Not an agreed input (§19). Open: why the
+  grid starts in 2022 (calls start March 2026), and whether it uses UC2 inputs.
+- **Outcome.** Payments run to 2026-08-31: month ends up to 07-31 have a one-month outcome; 08-31 waits for September.
+  A month-end cohort is "as of today": readings for past months grow when UC1 extracts more calls.
