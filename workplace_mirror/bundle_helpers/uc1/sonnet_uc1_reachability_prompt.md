@@ -145,6 +145,13 @@ Q2 Unreachable but talking
 - Scope: all four model_ids (Non-Reachable is common at 180+).
 
 Q3 Tier effect
+- How the tier code gets in: copy the G3 functions (mapping build, cap, relative cut, money at equal in-house share)
+  from `tier_stability.py` / `inhouse_check.py` unchanged into `tmp_validation/uc1_reach/tier_g3.py`, with a header
+  naming the source files and commit. The harness must not depend on another temp folder. Only the inputs change: the
+  frame instead of their loaders. The third tier (the non-workable cut) is a config value. Tie-out: for one complete
+  month (05-31, cards and loans) the copied code gives 0 tier differences against a run of `tier_stability.py` G3,
+  and the same in-house share and money at equal in-house share as its saved results. If they differ, stop Q3 and
+  report.
 - 60-180: the G3 tier from the workplace `tier_stability.py` / `inhouse_check.py` (reuse them, do not rewrite):
   - segment = deterioration family × reachability × credible-or-able;
   - value = money collected per account in the next 3 months, pooled over up to 6 earlier months with complete
