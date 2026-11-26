@@ -57,10 +57,29 @@ What to produce (cc_60_180 and rl_60_180 in full; cc_180_plus and rl_180_plus on
    - R: loan accounts in A3 no_promise with a stated intent, and their paid_due by intent.
    - P: 180+ accounts whose CIF had a recorded call (read by UC1 or not) in the 90 days before the month end,
      their paid_due and amount due vs the rest.
-5. One line per workshop finding: holds / changes / fails with the new numbers (stated ability on cards 27% vs 7%
-   in A4 Unknown; reason employed vs lost job, loans 44% vs 23%; loan intent in no_promise 34% vs 18%; readers pay
-   7 pp less inside reachable; transcripts order payers better than remarks in 5 of 6; 180+ callers 4.7-12.3% vs
-   1.1-1.3%).
+5. Every integration idea, old vs new: one row each, both products, with the earlier figure (bundle 31, July end,
+   old export), the R1 figure, the R2 pooled figure with its 95% interval, n, and a verdict stronger / same / weaker
+   / still no signal. Include the dropped ideas: more coverage (mostly remarks) could revive them.
+
+   | # | idea (where it would land) | earlier figure |
+   |---|---|---|
+   | 1 | stated ability inside A4 Unknown (fill) | cards able 27.3% (33) / partly 15.7% (108) / not stated 13.9% (101) / unable 6.9% (72), no reading 6.5%, AUC 0.613 (n 314); loans AUC 0.47 (n 98) |
+   | 2 | delinquency reason (treat) | loans has employment 43.9% vs lost 23.3%; cards 17.3% vs 14.1%; cards in A4 Unknown 14.9% vs 10.8%, reduced 4.3% |
+   | 3 | stated intent inside A3 no_promise (fill / recheck) | loans pays in full 22.2% vs partly 23.7%, AUC 0.52 at July; 34% vs 18%, AUC 0.61 pooled Apr-Jul (interim) |
+   | 4 | stated intent inside A3 promised and partly kept (does a stated plan mean more where promises held?) | not measured |
+   | 5 | payment period: weeks / salary cycle / months (treat) | specific statements went with payment on the sample; not measured on the export |
+   | 6 | amount or date named with a paying intent (treat / context) | not measured on the export |
+   | 7 | says able or pays in full while A4 Low (cross-check flag, dropped) | cc 20.0% vs 19.4%, rl 32.6% vs 33.1% |
+   | 8 | says unable while A4 High / Moderate (cross-check flag) | not measured |
+   | 9 | dispute stated; request stated (open-issue flags, dropped as risk signals) | no payment signal |
+   | 10 | UC1 confidence HIGH vs LOW (filter, dropped) | almost all LOW |
+   | 11 | transcript vs remark-only reading (which evidence carries the signal) | transcript orders payers better in 5 of 6, AUC 0.51-0.61 vs 0.44-0.55, all intervals include 0 |
+   | 12 | having a reading inside A2 reachable (selection) | readers paid 7 pp less (cards, Apr-Jul) |
+   | 13 | 180+: a recorded call in the last 90 days | cc 4.7% (read) / 7.2% (not read) vs 1.1%; rl 8.8% / 12.3% vs 1.3% (n 107-329) |
+
+   "Inside" = within the A3 level / A4 state named; compare with the no-reading group of the same state too. AUC for
+   ordered ideas, pp difference for flags and hints. Bar for a later decision (for the verdict only): ≥ 5 pp or
+   ≥ +0.02 AUC inside the target state.
 
 Known defects to fix first
 - CC DPD band came out `unknown` for most UC1 rows in the last run (A4 `current_bucket` did not map to buckets 4-7);
@@ -79,6 +98,6 @@ pipeline, catalog (beyond the temp file) or registry change.
 
 Deliverables
 1. Snippet + README (one command per model_id), pushed from UAT.
-2. After the user commits the PROD results: `summary_uc1_latest.md` (under 150 lines): coverage, the findings
+2. After the user commits the PROD results: `summary_uc1_latest.md` (under 200 lines): coverage, the findings
    table, the money table and the impact sizing laid out as tables ready for slides, the holds / changes / fails
-   lines, and what could not be computed and why.
+   list, and what could not be computed and why.
