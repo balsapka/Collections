@@ -1,12 +1,14 @@
-# UAT Sonnet prompt: UC1 signals and reachability (going dark; unreachable but talking; tier effect)
+# UAT Sonnet prompt: UC1 coverage ceiling, and UC1 signals vs reachability (going dark; unreachable but talking; tier effect)
 
 Paste everything below the line into the UAT Sonnet session. Deadline: results the same day.
-If the snippet for Q1-Q2 is already pushed, paste this again and ask Sonnet to add Q3 and the Unknown group to it.
+If the snippet for Q1-Q2 is already pushed, paste this again and ask Sonnet to add Q0, Q3 and the Unknown group to it.
 
 ---
 
 Goal
-Two questions about UC1 signals and A2 reachability, on UC1's August refresh:
+UC1 coverage against what it could reach, then UC1 signals vs A2 reachability, on UC1's August refresh:
+Q0 What share of customers had a right-party contact since March (when the Genesys store starts)? That is the upper
+   bound of UC1's customer coverage; everything else (recency, month-end reachability) is read against it.
 Q1 Which UC1 signals come before a customer goes from Reachable to Non-Reachable the next month?
 Q2 Are there accounts A2 calls Non-Reachable whose customer had a recent conversation in UC1, and did any of those
    conversations carry a positive signal? How many, what do they owe, and do they pay? Same for A2 Unknown.
@@ -35,6 +37,21 @@ Decided (do not reopen)
   end) to the month end. Every signal table in Q1 and Q2 is shown by age band: 0-30, 31-60, 61-90, 91-180, over 180
   days. Posteriors carry old values forward, so take the age from the evidence, never from the posterior row. Say
   where a signal holds only when recent.
+
+Q0 Coverage ceiling (run first; the other parts use its flags)
+- Base: persona accounts at each month end t = 2026-03-31 .. 08-31, all four model_ids; count accounts and CIFs.
+- Right-party contact (RPC) = a DCORE call event (`CALL_CODES` OC / CB / IC) with a result in `RIGHT_PARTY_CONTACT`
+  (`_dcore_codes.py`), on any account of the CIF (UC1 is CIF level), and on the account's own agreements (A2's view).
+  Window from the first day the Genesys store holds (about 2026-03-06; say the date used) to t.
+- Per t: share with an RPC ever in the window; by age of the latest RPC (0-30 / 31-60 / 61-90 / 91-180 days); also the
+  fixed window to 08-31 per customer (ever since March).
+- The same, one step down each: a conversation in the Genesys store (`stg_genesys_transcripts`, any direction; say if
+  inbound calls show without an RPC code); in UC1 metadata; a UC1 transcript reading; any UC1 reading (incl. remarks).
+  An agent remark on an RPC day (the remark ceiling) beside them.
+- UC1 coverage as a share of each ceiling (any age and under 90 days), by A2 state at t, A3 level, A4 state, DPD band.
+  Among non_reachable / unknown at t: share with an RPC since March, and age of that RPC.
+- Known (refresh check): only about 13% of card RPC days and 5% of loan RPC days have a transcript in the store; keep the
+  RPC ceiling and the store ceiling apart.
 
 Q1 Going dark
 - Unit: account-months reachable at month end t, t = 2026-04-30 .. 07-31; outcome = `reachability_state` at t + 1
@@ -92,7 +109,9 @@ cells under 10 as "<10". A part that fails records its error and the rest still 
 
 Deliverables
 1. Snippet + README (one command per model_id), pushed from UAT.
-2. After the user commits the PROD results: `summary_uc1_reach.md` (under 200 lines): Q1 table (signal → going-dark
+2. After the user commits the PROD results: `summary_uc1_reach.md` (under 220 lines): Q0 table (ceilings per month
+   end and model_id: RPC since March, store, metadata, UC1 transcript, any UC1; UC1 as a share of each; by age and A2
+   state); Q1 table (signal → going-dark
    rate, within A3 / A4, by signal age); Q2 table (by signal age) for non_reachable and unknown (groups a / b, the
    reasons for b, positive signals, amount due, paid_due); Q3 table (group → tier as assigned, money vs segment and vs
    the tier above, what-if moves and money at equal in-house share, 90-day vs 30-day); a short "what this means"
