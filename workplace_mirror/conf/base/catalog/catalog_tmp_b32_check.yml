@@ -1,0 +1,8 @@
+# TEMPORARY (bundle 32): feat_cif_casa_balance_monthly before the WM snapshot switch;
+# removed by the bundle's cleanup.
+casa_b32_old_balance:
+  type: spark.SparkDataset
+  file_format: parquet
+  filepath: "${_project.hdfs_path}/${globals:model_id}/${globals:folders.feat}/b32_check/casa_b32_old_balance"
+  save_args:
+    mode: overwrite

@@ -1,0 +1,4 @@
+- Remove `src/enbd_collections/pipelines/casa/b32_check.py`, `conf/base/catalog/catalog_tmp_b32_check.yml`, and from `pipeline_registry.py` the `b32_check` import and the `casa_b32_snapshot` / `casa_b32_compare` entries.
+- HDFS, for each model_id that ran the check: `hdfs dfs -rm -r <hdfs_path>/<model_id>/<feat folder>/b32_check` (path from `catalog_tmp_b32_check.yml`).
+- Remove `data/input/mirror_bundles/`.
+- Keep `WMSnapshotDataset`, the switched catalog entries and `wm_snapshot_required_from`.
