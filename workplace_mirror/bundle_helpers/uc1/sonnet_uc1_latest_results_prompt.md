@@ -99,5 +99,5 @@ pipeline, catalog (beyond the temp file) or registry change.
 Deliverables
 1. Snippet + README (one command per model_id), pushed from UAT.
 2. After the user commits the PROD results: `summary_uc1_latest.md` (under 200 lines): coverage, the findings
-   table, the money table and the impact sizing laid out as tables ready for slides, the holds / changes / fails
-   list, and what could not be computed and why.
+   table, the money table, the old-vs-new table of every idea and the impact sizing laid out as tables ready for
+   slides, a short "what got stronger" list, and what could not be computed and why.
