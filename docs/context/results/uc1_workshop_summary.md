@@ -52,7 +52,7 @@ UC1's signals sit on real balances, and the biggest blind spot it can help with 
 
 - **A4 Unknown holds 54% of card outstanding and about a third of loan outstanding;** UC1 reaches 4–6% of its amount due at the July month end. On cards, those who say they can pay paid 66% of their due in August; those who say they cannot, 5% (33 and 72 accounts). Loan groups are too small to read.
 - **Why A4 Unknown customers say they are behind (cards, accounts with a UC1 reading):** lost employment is the most common reason (38%, against 27% in A4 Low and 16% in A4 Moderate); lost or reduced employment together make 46%, and they pay least (reduced 4%, lost 11%, no reason stated 17%). On loans, lost employment is 31–34%.
-- **The call transcripts carry the signal.** Readings from transcripts order payers better than readings from agent remarks in 5 of 6 comparisons; remark readings are mostly empty. Each difference alone is within noise.
+- **The call transcripts carry the signal.** Readings from transcripts order payers better than readings from agent remarks in 5 of 6 comparisons, though each difference alone is within noise. Remark readings are not empty: in UC1's latest delivery they name intent, reason or a request for about half to three quarters of the customers they cover, but rarely ability, payment period or a dispute.
 
 Card outstanding is the latest July balance, close to but not exactly the month end.
 
@@ -90,7 +90,7 @@ Lead with what UC1 sees that nothing else does, keep two narrow signals, and jud
 
 1. **Keep the persona key A1–A4 unchanged.** UC1 sits beside it as the stated layer; a customer with no call keeps exactly the persona and tier they have today.
 2. **Cards: stated ability orders customers inside A4 Unknown,** where our data has no reading: able 27%, partly 16%, not stated 14%, unable 7% (July; 33 to 108 accounts per group). Use it to order calls inside the tier.
-3. **The delinquency reason as a treatment hint.** Lost employment pays about half as often as has employment on loans (23% vs 44%): route to hardship or restructure options rather than a standard promise script.
+3. **The delinquency reason as a treatment hint.** Lost employment pays about half as often as has employment on loans (23% vs 44%).
 4. **Context for the collector:** the last stated stance and call date, shown, not scored.
 5. **Recheck on the full data:** stated intent inside A3 "no promise" on loans (strong over April–July, not seen in July alone).
 6. **Drop:** the "says able or will pay in full while A4 is Low" flag (did not hold), transcript promises as A3 events, disputes and requests as risk signals, UC1's confidence as a filter (almost all LOW today).
@@ -122,7 +122,6 @@ An illustrative customer, not a real one:
 | Reason (UC1) | lost employment |
 | Stated intent (UC1) | partly or later |
 | Last call | 10 July |
-| Suggested action | offer hardship options; agree a partial or later payment |
 
 ## Decisions for the workshop and next steps
 
