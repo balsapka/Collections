@@ -14,8 +14,9 @@ customer:
   GREEN / ORANGE / RED / YELLOW) and barely-connected calls (KSA/CONNECT AND DROP, CUSTOMER HUNG UP);
 - only about 13% of card RPC days and 5% of loan RPC days have a Genesys transcript for the CIF on the same day;
 - about 1 in 5 accounts with a Genesys transcript in the last 90 days has no RPC in those 90 days;
-- call transcripts have two sources: Genesys until before August 2026, PCA from August on. Every earlier run used Genesys
-  only, so September-October calls were never counted.
+- call transcripts have two sources: Genesys (raw and staging run to 2026-09-29; staging rebuilt 2026-11-12) and PCA
+  (outbound, `financial_remediation` only; the only source for October-November). Earlier runs saw Genesys only to
+  2026-08-29, so later calls were never counted.
 Find out what the RPC measures, why so few RPC days have a transcript, and what the upper bound is when only real
 conversations count. Data understanding only: no pipeline change, no A2 rule change.
 
@@ -54,8 +55,8 @@ Decided (do not reopen)
 - RPC as the deck counts it: a DCORE event with a code in `CALL_CODES` (OC / CB / IC) and a result in
   `RIGHT_PARTY_CONTACT`, read in the CIF view (any agreement of the CIF) and the account view (the account's own
   agreements), exactly as `tmp_validation/uc1_reach/` does.
-- Transcripts come from Genesys until before August 2026 and from PCA from August on (user). The Genesys store starts
-  about 2026-03-06; UC1 metadata ends 2026-07-16. Report what each source really holds; do not assume these dates.
+- Transcripts: Genesys to 2026-09-29, PCA alongside and alone for October-November (source map run, cc_60_180,
+  2026-11-27). The Genesys store starts about 2026-03-06; UC1 metadata ends 2026-07-16. Report what each source really holds; do not assume these dates.
 - Result names are vocabulary, not ids: they may appear in the results.
 
 Tie-outs (print first; report any mismatch at the top of the summary; never adjust to match)
