@@ -18,6 +18,14 @@ S1 Source and linking (mostly from code and schemas, then confirmed on data)
      bank's customer base.
    - Whether anything identifies the account or product of a conversation: any account / agreement / card / loan
      field, queue, skill, campaign, IVR menu or call type in Genesys or `metadata`. Name each field and its fill rate.
+   - Raw vs staging. Raw Genesys transcripts are masked; our `stg_genesys_transcripts` ends 2026-08-29 and UC1
+     `metadata` 2026-07-16, while the user knows of 150,000+ transcripts including September and October. From the
+     staging node's code and the data: which raw source(s) staging reads; what is masked in raw (text only, or
+     the phone / customer ids too) and how staging still gets a CIF (an unmasked id column, a separate lookup
+     table, a hashed key, other); when the staging output was last written (partition or file dates) and whether
+     it is incremental or a full rebuild. Monthly conversation counts side by side: raw, staging, UC1 `metadata`,
+     with the first and last date of each; say which gap is "staging not rerun", which is "UC1 not refreshed",
+     and which is filtering (no CIF, masking, dedup).
    - Whether the conversations are all collections calls: split by direction (inbound / outbound) and queue or
      campaign group (collections / service / sales / other), as far as the fields allow.
 
@@ -82,7 +90,8 @@ Deliverables
    model_id and the S1 field list (table, field, meaning, fill rate).
 2. After the user commits the PROD results: `summary_uc1_source_map.md`, under 100 lines, plain English, in order:
    - a. Tie-out mismatches, or "all match".
-   - b. The chain in 5-8 lines: Genesys → CIF (how) → UC1 tables → export; where product is or is not known.
+   - b. The chain in 5-8 lines: raw Genesys (masked) → staging (how the CIF survives masking, last run) → UC1
+     tables → export; where product is or is not known. One table: monthly counts raw / staging / metadata.
    - c. The 147k waterfall as one table, and one line naming the biggest groups outside our spines (product × DPD).
    - d. Multi-product CIFs: share per model_id; whether UC1 is CIF-level only; the best method to tie a conversation
      to a product and its resolution rate; verdict in one line on whether promises from UC1 can be product-attributed.
