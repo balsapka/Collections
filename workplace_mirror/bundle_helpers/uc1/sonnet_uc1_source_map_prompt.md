@@ -88,6 +88,10 @@ Deliverables
 1. The snippet, pushed from UAT, in `tmp_validation/uc1_source_map/`: config block at the top (dates, match windows,
    parts `s1,s2,s3`); results per model_id (`uc1_source_map_<model_id>.json` + `.md`); a README with one command per
    model_id and the S1 field list (table, field, meaning, fill rate).
+   Also in the README, before the snippet: ready-to-paste `hdfs dfs` commands the user runs on PROD to see when
+   `stg_genesys_transcripts` was last written (e.g. `hdfs dfs -ls -t` on its path, `hdfs dfs -stat "%y"` on the
+   newest files / partitions), with the full path taken from the catalog entry; the same for the raw Genesys
+   source(s) staging reads and for UC1 `metadata`. Say in one line per command what to read off the output.
 2. After the user commits the PROD results: `summary_uc1_source_map.md`, under 100 lines, plain English, in order:
    - a. Tie-out mismatches, or "all match".
    - b. The chain in 5-8 lines: raw Genesys (masked) → staging (how the CIF survives masking, last run) → UC1
