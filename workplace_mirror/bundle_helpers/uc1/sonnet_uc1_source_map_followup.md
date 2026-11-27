@@ -4,16 +4,19 @@ Paste everything below the line into the same UAT Sonnet session that ran `tmp_v
 
 ---
 
-Thanks for the cc_60_180 results. Before rl_60_180, fix or explain these, in the same snippet and results files.
+Thanks for the cc_60_180 results. Note from a parallel PROD run (RPC check): PCA has no row before 2026-10-01,
+so Genesys (to 09-29) and PCA do not overlap; your 'only October-November are PCA-only' stands. Before rl_60_180, fix or explain these, in the same snippet and results files.
 
 F1 Step 6 (in the persona base) looks wrong. 1,013 metadata conversations (0.7%) in the cc_60_180 base does not fit
    your own 26.5% of persona CIFs reached at 07-31, nor our earlier run (32,216 UC1-metadata conversations from CIFs
    scored at 61-180, `tmp_validation/uc1_reach/`). Recount step 6 three ways and show all three: (a) as now; (b) the
    CIF is in the obs base at any month end from March to August; (c) the CIF is in the obs base at the first month
-   end on or after the call date, CIF-level (any account of the CIF), not account-level. Say which caused the gap
+   end on or after the call date, CIF-level (any account of the CIF), not account-level. The RPC check (same day,
+   PROD) counted 32,354 staged Genesys conversations on persona CIFs for cards and 6,376 for loans; tie to those. Say which caused the gap
    (month-end match, the obs base's month range, account vs CIF join, other) and use (c) from then on.
 
-F2 Direction. 99% inbound does not fit collections calls, which are mostly outbound. Show the raw values of the
+F2 Direction. 99% inbound does not fit collections calls, and the RPC check found the raw direction field 100%
+   "outbound" in both staging tables. Find which field your count used and why it differs. Show the raw values of the
    direction field(s) you used (Genesys and PCA) with counts, the field's source column, and what each value means
    per the schema or code. If the field is the media direction of a leg, a transfer, or a callback, say so. Recount
    inbound / outbound with the right reading.
