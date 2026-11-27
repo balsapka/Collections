@@ -1,0 +1,4 @@
+body { font-family: 'Plus Jakarta Sans', Arial, sans-serif; color: #072447; }
+section, section div, section p, section h1, section h2, section h3 { box-sizing: border-box; }
+section h1, section h2, section h3, section p { margin: 0; }
+section { font-family: 'Plus Jakarta Sans', Arial, sans-serif; color: #072447; }

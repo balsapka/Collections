@@ -1,0 +1,51 @@
+{
+  "v": 5,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-26T18:00:00Z"
+  },
+  "lists": "css",
+  "format": {
+    "v": 1,
+    "shared": [
+      "project/deck.css"
+    ]
+  },
+  "title": "UC1 integration and pilot selection — GRR",
+  "cover": "cover",
+  "order": [
+    "cover",
+    "p2-explode",
+    "p2-top",
+    "card",
+    "uc1-coverage",
+    "uc1-results",
+    "uc1-options",
+    "pilot-options",
+    "pilot-card",
+    "tier",
+    "uc1-tier",
+    "next"
+  ],
+  "sections": {
+    "s1": {
+      "description": "From states to personas, and the collector card we hand over",
+      "start": "cover"
+    },
+    "s2": {
+      "description": "UC1: coverage, early results and how it joins the persona",
+      "start": "uc1-coverage"
+    },
+    "s3": {
+      "description": "Pilot selection: the options, the card test, the tier and what we need by 11 December",
+      "start": "pilot-options"
+    }
+  },
+  "faces": {
+    "plus-jakarta-sans": {
+      "family": "Plus Jakarta Sans",
+      "href": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+    }
+  },
+  "designSystems": []
+}
