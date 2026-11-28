@@ -12,7 +12,8 @@ gaps that decide whether UC1 earns its rows on the collector card. This job clos
 - Handler map: name the handler of far more read calls than today's 28% (cards) / 11% (loans).
 - Collector spread: is the spread between collectors real or noise once months are pooled?
 - Handover inside 61-180: most read calls happened before the customer reached 61 days, so the 98% "another handler"
-  mostly compares the early caller with the 61+ collector. Loans have an owner: does the owner hear the call?
+  mostly compares the early caller with the 61+ collector. Allocation is monthly (one collector holds an account for
+  the month): inside 61-180, does that collector make or hear the call?
 - Collector reaction (E6) again, with the handler map and plans.
 - Reading age: 84% of card-view customers have a value but no call date. Find the date of the evidence.
 - Said against data (E4) recounted with the full matrix below.
@@ -84,11 +85,14 @@ find (a DPD or bucket field in `dcore_prm_allocation_state`, snapshots every 4 d
 end before the call), say which and print the count. Last run: 1,013 / 936 calls in the base at the call's month
 end. Per product:
 - the call's handler known (h1): share;
-- owner: the top handler of the customer's DCORE conversations in the 30 days before the call. The customer has an
-  owner when that handler holds at least 60% (cards) / 80% (loans) of them and there are 2 or more. Report the share
-  of anchors with an owner, and of those, the share where the call's handler is the owner;
-- next conversation: days to it (bands as before), handled by the call's handler, by the owner (if not the call's
-  handler), or by someone else;
+- allocated collector: allocation is monthly, so each account has one collector for the month. Find the field that
+  holds it (for example in `dcore_prm_allocation_state`); name it and give its fill rate. Report the share of
+  anchors whose call was made by the collector allocated to the account that month. Also report how often that
+  collector holds the customer's conversations in the month: cards looked like a dialer (top handler 50%), loans
+  like an owner (100%). Only if no allocation field exists, fall back to the top handler of the customer's DCORE
+  conversations in the 30 days before the call (at least 60% cards / 80% loans, 2 or more), and say so;
+- next conversation: days to it (bands as before), handled by the call's handler, by the allocated collector (if not
+  the call's handler), or by someone else;
 - already in the remarks: for each signal of the call, a UC1 remark reading on the same CIF within 0-3 days after
   the call (`crx_uc1_proposer_level_observations`, source `remark`, partition at the latest `snapshot_date`). Does
   it name the same level, another level, or is there no remark reading? Say in one line that "no remark reading" is
@@ -154,7 +158,7 @@ Rules
 
 Deliverables
 1. The snippet in `tmp_validation/uc1_card_followup/`:
-   - a config block at the top (`SETTLEMENT_LEVELS` empty, `WAIVER_RULE`, collector minimum, windows, owner cut-offs,
+   - a config block at the top (`SETTLEMENT_LEVELS` empty, `WAIVER_RULE`, collector minimum, windows, fallback owner cut-offs,
      cut-offs, parts);
    - one results pair per model_id (`uc1_card_followup_<model_id>.json` + `.md`), tie-outs first;
    - a README with one command per model_id and the `settlement_type` code table from part s1 with an empty
@@ -165,11 +169,11 @@ Deliverables
      - plans: codes known or still open, and who proposes;
      - handler map: coverage before and after;
      - collector spread: which levers really vary by collector;
-     - inside 61-180: does the next handler (or the loan owner) hear the call;
+     - inside 61-180: does the next handler (or the allocated collector) hear the call;
      - E6: any reaction that survives a handover.
    - c. s1: code profile table, plan date and actor fill, `WAIVER_RULE` and what it keeps.
    - d. h1: agreement and coverage.
    - e. g1b: lever x reading per product, with quantiles and reliability, and collectors at 10 / 20 / 30.
-   - f. g2b: owner, next handler, already in the remarks, per product.
+   - f. g2b: allocated collector, next handler, already in the remarks, per product.
    - g. e6b: one table per signal for each anchor set, with the reading.
    - h. a1 + e4b: age by source, the full matrices with shares, and what is still missing.
